@@ -1,0 +1,5 @@
+{
+  "name": "NexOrder 智能订单系统",
+  "description": "全面的订单管理系统 (OMS)，包含仪表盘、订单、产品和客户模块，集成 Gemini 2.5 Flash 提供智能商业洞察和内容生成。",
+  "requestFramePermissions": []
+}
