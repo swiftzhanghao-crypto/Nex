@@ -56,7 +56,6 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, departments 
   };
 
   const getPermissionsList = (role: UserRole) => {
-     // ... keep permissions logic ...
       switch(role) {
           case 'Admin': return ['所有模块的完全访问权限', '系统配置与参数设置', '用户与角色管理', '全量数据统计与分析'];
           case 'Sales': return ['创建与管理销售订单', '查看客户档案', '发起销售审批流程', '查看个人销售报表'];
@@ -68,14 +67,34 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, departments 
   };
 
   const handleOpenModal = (user?: User) => {
-      if (user) { setEditingId(user.id); setFormData(user); } else { setEditingId(null); setFormData({ name: '', email: '', role: 'Sales', departmentId: '', status: 'Active', avatar: `https://ui-avatars.com/api/?name=User&background=random&color=fff` }); }
+      if (user) { 
+          setEditingId(user.id); 
+          setFormData(user); 
+      } else { 
+          setEditingId(null); 
+          setFormData({ 
+              name: '', 
+              email: '', 
+              role: 'Sales', 
+              departmentId: '', 
+              status: 'Active', 
+              avatar: `https://api.dicebear.com/9.x/avataaars/svg?seed=${Date.now()}` 
+          }); 
+      }
       setIsModalOpen(true);
   };
 
   const handleSave = () => {
       if (!formData.name || !formData.email) return;
       if (editingId) setUsers(prev => prev.map(u => u.id === editingId ? { ...u, ...formData } as User : u));
-      else { const newUser: User = { id: `u-${Date.now()}`, ...formData as User, avatar: formData.avatar || `https://ui-avatars.com/api/?name=${formData.name}&background=random&color=fff` }; setUsers(prev => [...prev, newUser]); }
+      else { 
+          const newUser: User = { 
+              id: `u-${Date.now()}`, 
+              ...formData as User, 
+              avatar: formData.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${formData.name}` 
+          }; 
+          setUsers(prev => [...prev, newUser]); 
+      }
       setIsModalOpen(false);
   };
 
@@ -132,7 +151,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, departments 
                 <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition">
                   <td className="p-4">
                       <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setViewUser(user)}>
-                          <img src={user.avatar} className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-white/10 group-hover:ring-2 group-hover:ring-indigo-100 transition" alt={user.name} />
+                          <img src={user.avatar} className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-white/10 group-hover:ring-2 group-hover:ring-indigo-100 transition bg-gray-100 dark:bg-gray-800" alt={user.name} />
                           <div>
                               <div className="font-medium text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-[#FF2D55] text-sm transition">{user.name}</div>
                               <div className="text-xs text-gray-500 dark:text-gray-400">{user.email}</div>
@@ -189,7 +208,28 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, departments 
             
             <div className="p-6 space-y-4">
                 <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">姓名</label><input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-lg p-2.5 outline-none text-gray-900 dark:text-white" /></div>
-                {/* ... other inputs ... */}
+                <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">邮箱</label><input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-lg p-2.5 outline-none text-gray-900 dark:text-white" /></div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">角色</label>
+                        <select value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value as UserRole})} className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-lg p-2.5 outline-none text-gray-900 dark:text-white">
+                            <option value="Sales">销售</option>
+                            <option value="Business">商务</option>
+                            <option value="Technical">技术</option>
+                            <option value="Logistics">物流</option>
+                            <option value="Admin">管理员</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">状态</label>
+                        <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value as any})} className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-lg p-2.5 outline-none text-gray-900 dark:text-white">
+                            <option value="Active">正常</option>
+                            <option value="Inactive">停用</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div>
                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">所属部门</label>
                      <select value={formData.departmentId} onChange={(e) => setFormData({...formData, departmentId: e.target.value})} className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-lg p-2.5 outline-none text-gray-900 dark:text-white">
@@ -212,26 +252,83 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, departments 
         <div className="fixed inset-0 z-50 flex justify-end">
             <div className={`absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity ${isDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={handleCloseDrawer}></div>
             <div className={`relative w-full max-w-md h-full bg-white dark:bg-[#1C1C1E] shadow-2xl overflow-y-auto flex flex-col ${isDrawerClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`} onClick={(e) => e.stopPropagation()}>
-                {/* ... Drawer Content with dark mode styles ... */}
-                 <div className="h-40 bg-gradient-to-br from-[#0071E3] to-purple-600 dark:from-[#FF2D55] dark:to-orange-500 shrink-0 relative"></div>
+                 
+                 {/* Header Gradient */}
+                 <div className="h-40 bg-gradient-to-br from-[#0071E3] to-purple-600 dark:from-[#FF2D55] dark:to-orange-500 shrink-0 relative flex justify-end p-4">
+                     <button onClick={handleCloseDrawer} className="text-white/80 hover:text-white bg-black/20 hover:bg-black/40 rounded-full p-2 transition"><X className="w-5 h-5"/></button>
+                 </div>
+                 
                  <div className="px-6 pb-8 -mt-16 flex-1 relative z-10">
+                     {/* Avatar & Name */}
                      <div className="flex flex-col items-center text-center mb-8">
-                         <img src={viewUser.avatar} className="w-32 h-32 rounded-full border-4 border-white dark:border-[#1C1C1E] shadow-lg bg-white object-cover" alt={viewUser.name} />
+                         <img src={viewUser.avatar} className="w-32 h-32 rounded-full border-4 border-white dark:border-[#1C1C1E] shadow-lg bg-white dark:bg-gray-800 object-cover" alt={viewUser.name} />
                          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mt-4">{viewUser.name}</h2>
-                         {/* ... */}
+                         <p className="text-gray-500 dark:text-gray-400 text-sm">{viewUser.email}</p>
                      </div>
+
                      <div className="space-y-6">
+                        {/* Basic Info Card */}
                         <div className="bg-white dark:bg-black/20 rounded-xl border border-gray-100 dark:border-white/10 shadow-sm overflow-hidden">
                              <div className="bg-gray-50 dark:bg-white/5 px-4 py-3 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                                  <Hash className="w-4 h-4 text-indigo-500" />
                                  <span className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider">基础信息</span>
                              </div>
                              <div className="p-4 space-y-3">
-                                 {/* ... fields ... */}
                                   <div className="flex justify-between items-center text-sm">
                                      <span className="text-gray-500 dark:text-gray-400">用户 ID</span>
                                      <span className="font-mono text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-white/10 px-2 py-0.5 rounded text-xs">{viewUser.id}</span>
                                  </div>
+                                 <div className="flex justify-between items-center text-sm">
+                                     <span className="text-gray-500 dark:text-gray-400">邮箱</span>
+                                     <span className="text-gray-700 dark:text-gray-200">{viewUser.email}</span>
+                                 </div>
+                                 <div className="flex justify-between items-center text-sm">
+                                     <span className="text-gray-500 dark:text-gray-400">所属部门</span>
+                                     <span className="text-gray-700 dark:text-gray-200 font-medium flex items-center gap-1">
+                                         <Building2 className="w-3 h-3" /> {getDepartmentName(viewUser.departmentId)}
+                                     </span>
+                                 </div>
+                             </div>
+                        </div>
+
+                        {/* Role & Status Card */}
+                        <div className="bg-white dark:bg-black/20 rounded-xl border border-gray-100 dark:border-white/10 shadow-sm overflow-hidden">
+                             <div className="bg-gray-50 dark:bg-white/5 px-4 py-3 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                 <Shield className="w-4 h-4 text-orange-500" />
+                                 <span className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider">账号状态</span>
+                             </div>
+                             <div className="p-4 space-y-3">
+                                 <div className="flex justify-between items-center text-sm">
+                                     <span className="text-gray-500 dark:text-gray-400">系统角色</span>
+                                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${getRoleBadgeColor(viewUser.role)}`}>
+                                         {getRoleIcon(viewUser.role)} {viewUser.role}
+                                     </span>
+                                 </div>
+                                 <div className="flex justify-between items-center text-sm">
+                                     <span className="text-gray-500 dark:text-gray-400">当前状态</span>
+                                     <span className={`px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${viewUser.status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                                         <div className={`w-1.5 h-1.5 rounded-full ${viewUser.status === 'Active' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                                         {viewUser.status === 'Active' ? '正常' : '停用'}
+                                     </span>
+                                 </div>
+                             </div>
+                        </div>
+
+                        {/* Permissions Card */}
+                        <div className="bg-white dark:bg-black/20 rounded-xl border border-gray-100 dark:border-white/10 shadow-sm overflow-hidden">
+                             <div className="bg-gray-50 dark:bg-white/5 px-4 py-3 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                 <CheckCircle className="w-4 h-4 text-green-500" />
+                                 <span className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider">权限与职能</span>
+                             </div>
+                             <div className="p-4">
+                                 <ul className="space-y-2">
+                                     {getPermissionsList(viewUser.role).map((perm, idx) => (
+                                         <li key={idx} className="text-sm text-gray-600 dark:text-gray-300 flex items-start gap-2">
+                                             <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></div>
+                                             {perm}
+                                         </li>
+                                     ))}
+                                 </ul>
                              </div>
                         </div>
                      </div>

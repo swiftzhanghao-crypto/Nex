@@ -422,9 +422,11 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customers, setCustome
                               <div key={contact.id} className={`p-4 rounded-lg border flex flex-col gap-2 relative group hover:shadow-md transition ${contact.isPrimary ? 'border-indigo-200 bg-indigo-50/30' : 'border-gray-200 bg-white'}`}>
                                   <div className="flex justify-between items-start">
                                       <div className="flex items-center gap-2">
-                                          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
-                                              {contact.name.substring(0, 1)}
-                                          </div>
+                                          <img 
+                                            src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${contact.name}`}
+                                            className="w-8 h-8 rounded-full bg-white border border-gray-200"
+                                            alt={contact.name}
+                                          />
                                           <div>
                                               <div className="font-bold text-gray-800 text-sm flex items-center gap-2">
                                                   {contact.name}
@@ -564,8 +566,8 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customers, setCustome
                           ) : (
                               <div className="flex items-center gap-3">
                                   <img 
-                                      src={ownerUser?.avatar || `https://ui-avatars.com/api/?name=${ownerUser?.name || 'Unassigned'}`} 
-                                      className="w-10 h-10 rounded-full border" 
+                                      src={ownerUser?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${ownerUser?.name || 'Unassigned'}`} 
+                                      className="w-10 h-10 rounded-full border bg-gray-100" 
                                       alt=""
                                   />
                                   <div>

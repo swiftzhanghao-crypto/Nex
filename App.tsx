@@ -103,14 +103,14 @@ const App: React.FC = () => {
 
   // --- 3. Users Mock Data ---
   const [users, setUsers] = useState<User[]>([
-    { id: 'u1', name: '张伟 (Admin)', email: 'zhangwei@nexorder.com', role: 'Admin', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=张伟&background=random', departmentId: 'root' },
-    { id: 'u2', name: '李娜 (Sales)', email: 'lina@nexorder.com', role: 'Sales', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=李娜&background=random', departmentId: 'c2-d1-r1-t1' },
-    { id: 'u3', name: '王强 (Business)', email: 'wangqiang@nexorder.com', role: 'Business', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=王强&background=random', departmentId: 'c3-d1' },
-    { id: 'u4', name: '赵敏 (Technical)', email: 'zhaomin@nexorder.com', role: 'Technical', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=赵敏&background=random', departmentId: 'c1-d1' },
-    { id: 'u5', name: '孙涛 (Logistics)', email: 'suntao@nexorder.com', role: 'Logistics', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=孙涛&background=random', departmentId: 'c3-d2' },
-    { id: 'u6', name: '周杰 (Sales)', email: 'zhoujie@nexorder.com', role: 'Sales', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=周杰&background=random', departmentId: 'c2-d1-r2' },
-    { id: 'u7', name: '吴刚 (Sales)', email: 'wugang@nexorder.com', role: 'Sales', status: 'Inactive', avatar: 'https://ui-avatars.com/api/?name=吴刚&background=random', departmentId: 'c2-d1-r3' },
-    { id: 'u8', name: '郑华 (Finance)', email: 'zhenghua@nexorder.com', role: 'Business', status: 'Active', avatar: 'https://ui-avatars.com/api/?name=郑华&background=random', departmentId: 'c4' },
+    { id: 'u1', name: '张伟 (Admin)', email: 'zhangwei@nexorder.com', role: 'Admin', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhangWei', departmentId: 'root' },
+    { id: 'u2', name: '李娜 (Sales)', email: 'lina@nexorder.com', role: 'Sales', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=LiNa', departmentId: 'c2-d1-r1-t1' },
+    { id: 'u3', name: '王强 (Business)', email: 'wangqiang@nexorder.com', role: 'Business', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=WangQiang', departmentId: 'c3-d1' },
+    { id: 'u4', name: '赵敏 (Technical)', email: 'zhaomin@nexorder.com', role: 'Technical', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhaoMin', departmentId: 'c1-d1' },
+    { id: 'u5', name: '孙涛 (Logistics)', email: 'suntao@nexorder.com', role: 'Logistics', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=SunTao', departmentId: 'c3-d2' },
+    { id: 'u6', name: '周杰 (Sales)', email: 'zhoujie@nexorder.com', role: 'Sales', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhouJie', departmentId: 'c2-d1-r2' },
+    { id: 'u7', name: '吴刚 (Sales)', email: 'wugang@nexorder.com', role: 'Sales', status: 'Inactive', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=WuGang', departmentId: 'c2-d1-r3' },
+    { id: 'u8', name: '郑华 (Finance)', email: 'zhenghua@nexorder.com', role: 'Business', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhengHua', departmentId: 'c4' },
   ]);
   const [currentUser, setCurrentUser] = useState<User>(users[0]);
 

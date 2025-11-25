@@ -85,7 +85,7 @@ const OpportunityDetails: React.FC<OpportunityDetailsProps> = ({ opportunities, 
             <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10">
                 <div className="flex justify-between items-center relative z-10">
                     {stages.map((step, idx) => {
-                        const currentIdx = stages.indexOf(opportunity.stage === 'Closed Lost' ? 'New' : opportunity.stage); // Fallback
+                        const currentIdx = stages.indexOf(opportunity.stage); 
                         const isDone = idx <= currentIdx;
                         return (
                             <div key={step} className="flex flex-col items-center gap-2 flex-1">
@@ -101,7 +101,7 @@ const OpportunityDetails: React.FC<OpportunityDetailsProps> = ({ opportunities, 
                     {/* Line */}
                     <div className="absolute top-2 left-0 w-full h-0.5 bg-gray-100 dark:bg-white/10 -z-0">
                          <div className="h-full bg-[#0071E3] dark:bg-[#FF2D55] transition-all duration-700" 
-                              style={{ width: `${(stages.indexOf(opportunity.stage === 'Closed Lost' ? 'New' : opportunity.stage) / (stages.length - 1)) * 100}%` }}></div>
+                              style={{ width: `${(stages.indexOf(opportunity.stage) / (stages.length - 1)) * 100}%` }}></div>
                     </div>
                 </div>
             </div>

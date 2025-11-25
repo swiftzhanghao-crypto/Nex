@@ -191,6 +191,10 @@ export interface Order {
     approvalRecords: ApprovalRecord[];
     // Helper for mock sort
     rawDate?: Date; 
+    
+    // CRM Integration
+    opportunityId?: string;
+    opportunityName?: string;
 }
 
 export type UserRole = 'Admin' | 'Sales' | 'Business' | 'Technical' | 'Logistics';

@@ -185,8 +185,8 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
                        {customer.ownerName ? (
                            <div className="flex items-center gap-2">
                                <img 
-                                  src={getOwnerAvatar(customer.ownerId) || `https://ui-avatars.com/api/?name=${customer.ownerName}&background=random`} 
-                                  className="w-6 h-6 rounded-full border border-gray-200 dark:border-white/10"
+                                  src={getOwnerAvatar(customer.ownerId) || `https://api.dicebear.com/9.x/avataaars/svg?seed=${customer.ownerName}`} 
+                                  className="w-6 h-6 rounded-full border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-800"
                                   alt=""
                                />
                                <span className="text-sm text-gray-700 dark:text-gray-300">{customer.ownerName}</span>

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Order, OrderStatus, Product, Customer, OrderItem, ActivationMethod, User, Department } from '../types';
+import { Order, OrderStatus, Product, Customer, OrderItem, ActivationMethod, User, Department, Opportunity } from '../types';
 import { Search, Eye, User as UserIcon, Plus, Trash2, MapPin, Building2, Briefcase, ChevronRight } from 'lucide-react';
 
 interface OrderManagerProps {
@@ -12,9 +12,10 @@ interface OrderManagerProps {
   currentUser: User;
   users: User[];
   departments: Department[];
+  opportunities: Opportunity[];
 }
 
-const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products, customers, currentUser, users, departments }) => {
+const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products, customers, currentUser, users, departments, opportunities }) => {
   const navigate = useNavigate();
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [searchTerm, setSearchTerm] = useState('');

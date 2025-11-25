@@ -208,6 +208,8 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
       return 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400';
   }
 
+  const ownerUser = users.find(u => u.id === selectedOrder.salesRepId);
+
   return (
     <div className="flex flex-col min-h-screen bg-[#F5F5F7] dark:bg-black">
       {/* Sticky Header - Apple Style */}
@@ -393,8 +395,12 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                           
                           {selectedOrder.approvalRecords?.map(rec => (
                               <div key={rec.id} className="relative pl-10">
-                                  <div className={`absolute left-0 top-0 w-10 h-10 rounded-full border-4 border-white dark:border-[#1C1C1E] shadow-sm flex items-center justify-center z-10 bg-gray-50 dark:bg-white/10`}>
-                                      <img src={`https://ui-avatars.com/api/?name=${rec.operatorName}&background=random`} className="w-full h-full rounded-full" alt=""/>
+                                  <div className={`absolute left-0 top-0 w-10 h-10 rounded-full border-4 border-white dark:border-[#1C1C1E] shadow-sm flex items-center justify-center z-10 bg-white dark:bg-gray-800`}>
+                                      <img 
+                                        src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${rec.operatorName}`} 
+                                        className="w-full h-full rounded-full object-cover" 
+                                        alt=""
+                                      />
                                   </div>
                                   <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
                                       <div className="flex justify-between mb-1">
@@ -448,9 +454,14 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                           <div>
                               <div className="text-gray-400 text-xs mb-0.5">销售负责人</div>
                               <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                                  <UserIcon className="w-3 h-3 text-blue-500" /> {selectedOrder.salesRepName || '未分配'}
+                                  {ownerUser ? (
+                                      <img src={ownerUser.avatar} className="w-5 h-5 rounded-full border border-gray-100 dark:border-white/10 bg-white" alt=""/>
+                                  ) : (
+                                      <UserIcon className="w-3 h-3 text-blue-500" />
+                                  )}
+                                  {selectedOrder.salesRepName || '未分配'}
                               </div>
-                              {selectedOrder.salesDepartmentId && <div className="text-xs text-gray-400 ml-5 mt-0.5">{getDepartmentPath(selectedOrder.salesDepartmentId)}</div>}
+                              {selectedOrder.salesDepartmentId && <div className="text-xs text-gray-400 ml-7 mt-0.5">{getDepartmentPath(selectedOrder.salesDepartmentId)}</div>}
                           </div>
                           <div>
                               <div className="text-gray-400 text-xs mb-0.5">商务跟单</div>
