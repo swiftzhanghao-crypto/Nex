@@ -1,123 +1,323 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Customer } from '../types';
-import { Search, Eye, Building2, Mail, Phone } from 'lucide-react';
+import { Customer, User, CustomerType, CustomerLevel, CustomerContact, ContactRole } from '../types';
+import { Search, Eye, Building2, Mail, Phone, User as UserIcon, Plus, X } from 'lucide-react';
 
 interface CustomerManagerProps {
   customers: Customer[];
+  setCustomers?: React.Dispatch<React.SetStateAction<Customer[]>>; 
+  users?: User[]; 
 }
 
-const CustomerManager: React.FC<CustomerManagerProps> = ({ customers }) => {
+const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustomers, users }) => {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = React.useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+
+  // New Customer Form State
+  const initialFormState = {
+      companyName: '',
+      industry: '',
+      customerType: 'Enterprise' as CustomerType,
+      level: 'B' as CustomerLevel,
+      region: '',
+      address: '',
+      contactName: '',
+      contactPhone: '',
+      contactEmail: '',
+      contactRole: 'Purchasing' as ContactRole
+  };
+  const [formData, setFormData] = useState(initialFormState);
 
   const filteredCustomers = customers.filter(c => 
     c.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.industry.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.contactPerson.toLowerCase().includes(searchTerm.toLowerCase())
+    c.contacts.some(contact => contact.name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  const getOwnerAvatar = (ownerId?: string) => {
+      const user = users?.find(u => u.id === ownerId);
+      return user?.avatar;
+  };
+
+  const getLevelBadge = (level: string) => {
+      switch(level) {
+          case 'KA': return 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800';
+          case 'A': return 'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800';
+          case 'B': return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
+          default: return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700';
+      }
+  };
+
+  const getPrimaryContact = (customer: Customer) => {
+      return customer.contacts.find(c => c.isPrimary) || customer.contacts.find(c => c.roles.includes('Purchasing')) || customer.contacts[0];
+  };
+
+  // Pagination Logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentCustomers = filteredCustomers.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
+
+  const handlePageChange = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const handleCreate = () => {
+      if (!setCustomers || !formData.companyName) return;
+      const newId = `C${Date.now()}`;
+      const initialContact: CustomerContact = {
+          id: `ct-${Date.now()}`,
+          name: formData.contactName || 'Contact',
+          phone: formData.contactPhone,
+          email: formData.contactEmail,
+          roles: [formData.contactRole],
+          isPrimary: true,
+          position: '主要联系人'
+      };
+      const newCustomer: Customer = {
+          id: newId,
+          companyName: formData.companyName,
+          industry: formData.industry,
+          customerType: formData.customerType,
+          level: formData.level,
+          region: formData.region,
+          address: formData.address,
+          shippingAddress: formData.address,
+          status: 'Active',
+          logo: `https://ui-avatars.com/api/?name=${formData.companyName.substring(0, 2)}&background=random&color=fff`,
+          contacts: [initialContact],
+          billingInfo: { taxId: '', title: formData.companyName, bankName: '', accountNumber: '', registerAddress: formData.address, registerPhone: '' },
+          enterprises: []
+      };
+      setCustomers(prev => [newCustomer, ...prev]);
+      setIsCreateOpen(false);
+      setFormData(initialFormState);
+      navigate(`/customers/${newId}`);
+  };
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-            <h2 className="text-2xl font-bold text-gray-800">企业客户管理</h2>
-            <p className="text-gray-500 text-sm mt-1">管理客户档案、查看财务信息及历史订单。</p>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight">企业客户管理</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">管理客户档案、查看财务信息及历史订单。</p>
         </div>
-        <div className="bg-white p-2.5 rounded-lg shadow-sm border border-gray-100 flex items-center gap-3 w-full md:w-80">
-          <Search className="w-5 h-5 text-gray-400" />
-          <input 
-            type="text" 
-            placeholder="搜索公司、行业或联系人..." 
-            className="bg-transparent border-none outline-none flex-1 text-gray-700 text-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="bg-white dark:bg-[#1C1C1E] p-2.5 rounded-lg shadow-sm border border-gray-100 dark:border-white/10 flex items-center gap-3 flex-1 md:w-64">
+                <Search className="w-5 h-5 text-gray-400" />
+                <input 
+                    type="text" 
+                    placeholder="搜索公司、行业或联系人..." 
+                    className="bg-transparent border-none outline-none flex-1 text-gray-700 dark:text-gray-200 text-sm"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
+            {setCustomers && (
+                <button 
+                    onClick={() => setIsCreateOpen(true)}
+                    className="bg-[#0071E3] dark:bg-[#FF2D55] text-white px-4 py-2.5 rounded-lg flex items-center gap-2 hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 transition shadow-sm whitespace-nowrap text-sm font-medium"
+                >
+                    <Plus className="w-4 h-4" /> 新增客户
+                </button>
+            )}
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden flex flex-col">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50 text-gray-500 font-medium text-sm">
+            <thead className="bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400 font-medium text-xs uppercase">
               <tr>
-                <th className="p-4 border-b border-gray-100 pl-6">企业名称 / 行业</th>
-                <th className="p-4 border-b border-gray-100">主要联系人</th>
-                <th className="p-4 border-b border-gray-100">联系方式</th>
-                <th className="p-4 border-b border-gray-100">合作状态</th>
-                <th className="p-4 border-b border-gray-100 text-right pr-6">操作</th>
+                <th className="p-4 border-b border-gray-100 dark:border-white/10 pl-6">企业名称 / 行业</th>
+                <th className="p-4 border-b border-gray-100 dark:border-white/10">客户类型</th>
+                <th className="p-4 border-b border-gray-100 dark:border-white/10">主要联系人</th>
+                <th className="p-4 border-b border-gray-100 dark:border-white/10">归属销售</th>
+                <th className="p-4 border-b border-gray-100 dark:border-white/10">合作状态</th>
+                <th className="p-4 border-b border-gray-100 dark:border-white/10 text-right pr-6">操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredCustomers.map(customer => (
-                <tr 
-                    key={customer.id} 
-                    className="hover:bg-gray-50 transition group cursor-pointer"
-                    onClick={() => navigate(`/customers/${customer.id}`)}
-                >
-                  <td className="p-4 pl-6">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden shrink-0">
-                            {customer.logo ? (
-                                <img src={customer.logo} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                                <Building2 className="w-5 h-5 text-gray-400" />
-                            )}
-                        </div>
-                        <div>
-                            <div className="font-bold text-gray-800 group-hover:text-indigo-600 transition">{customer.companyName}</div>
-                            <div className="text-xs text-gray-500">{customer.industry}</div>
-                        </div>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="font-medium text-gray-700">{customer.contactPerson}</div>
-                    <div className="text-xs text-gray-400">{customer.position}</div>
-                  </td>
-                  <td className="p-4">
-                    <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
-                            <Mail className="w-3.5 h-3.5 text-gray-400" />
-                            {customer.email}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
-                            <Phone className="w-3.5 h-3.5 text-gray-400" />
-                            {customer.phone}
-                        </div>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                        customer.status === 'Active' 
-                        ? 'bg-green-50 text-green-700 border-green-100' 
-                        : 'bg-gray-100 text-gray-600 border-gray-200'
-                    }`}>
-                        {customer.status === 'Active' ? '合作中' : '已暂停'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right pr-6">
-                    <button 
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/customers/${customer.id}`);
-                        }}
-                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition"
-                    >
-                        <Eye className="w-5 h-5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {filteredCustomers.length === 0 && (
+            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+              {currentCustomers.map(customer => {
+                const primaryContact = getPrimaryContact(customer);
+                return (
+                  <tr 
+                      key={customer.id} 
+                      className="hover:bg-gray-50 dark:hover:bg-white/5 transition group cursor-pointer"
+                      onClick={() => navigate(`/customers/${customer.id}`)}
+                  >
+                    <td className="p-4 pl-6">
+                      <div className="flex items-center gap-3">
+                          {/* Logo removed as requested */}
+                          <div>
+                              <div className="font-bold text-gray-800 dark:text-white group-hover:text-[#0071E3] dark:group-hover:text-[#FF2D55] transition flex items-center gap-2 text-sm">
+                                  {customer.companyName}
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded border ${getLevelBadge(customer.level)}`}>{customer.level}</span>
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">{customer.region} | {customer.industry}</div>
+                          </div>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                       <span className="text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-white/10 px-2 py-1 rounded">{customer.customerType}</span>
+                    </td>
+                    <td className="p-4">
+                      {primaryContact ? (
+                          <>
+                            <div className="font-medium text-gray-700 dark:text-gray-200 text-sm">{primaryContact.name}</div>
+                            <div className="text-xs text-gray-400 flex flex-col">
+                                <span>{primaryContact.phone}</span>
+                            </div>
+                          </>
+                      ) : (
+                          <span className="text-gray-400 text-sm italic">无联系人</span>
+                      )}
+                    </td>
+                    <td className="p-4">
+                       {customer.ownerName ? (
+                           <div className="flex items-center gap-2">
+                               <img 
+                                  src={getOwnerAvatar(customer.ownerId) || `https://ui-avatars.com/api/?name=${customer.ownerName}&background=random`} 
+                                  className="w-6 h-6 rounded-full border border-gray-200 dark:border-white/10"
+                                  alt=""
+                               />
+                               <span className="text-sm text-gray-700 dark:text-gray-300">{customer.ownerName}</span>
+                           </div>
+                       ) : (
+                           <span className="text-xs text-gray-400 italic">未分配</span>
+                       )}
+                    </td>
+                    <td className="p-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                          customer.status === 'Active' 
+                          ? 'bg-green-50 text-green-700 border-green-100 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' 
+                          : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                      }`}>
+                          {customer.status === 'Active' ? '合作中' : '已暂停'}
+                      </span>
+                    </td>
+                    <td className="p-4 text-right pr-6">
+                      <button 
+                          onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/customers/${customer.id}`);
+                          }}
+                          className="p-2 text-gray-400 hover:text-[#0071E3] dark:hover:text-[#FF2D55] hover:bg-blue-50 dark:hover:bg-white/10 rounded-full transition"
+                      >
+                          <Eye className="w-5 h-5" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {currentCustomers.length === 0 && (
                   <tr>
-                      <td colSpan={5} className="p-8 text-center text-gray-400">未找到符合条件的客户。</td>
+                      <td colSpan={6} className="p-8 text-center text-gray-400">未找到符合条件的客户。</td>
                   </tr>
               )}
             </tbody>
           </table>
         </div>
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+            <div className="flex justify-between items-center p-4 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5">
+                <button 
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 rounded border border-gray-300 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-sm"
+                >
+                    上一页
+                </button>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                    第 {currentPage} 页 / 共 {totalPages} 页
+                </div>
+                <button 
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 rounded border border-gray-300 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-sm"
+                >
+                    下一页
+                </button>
+            </div>
+        )}
       </div>
+
+      {/* Create Customer Modal */}
+      {isCreateOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col animate-modal-enter max-h-[90vh] border border-white/10">
+            <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5">
+              <h3 className="text-xl font-bold text-gray-800 dark:text-white">新增企业客户</h3>
+              <button onClick={() => setIsCreateOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">&times;</button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto">
+                <div className="space-y-6">
+                    {/* Basic Info */}
+                    <div>
+                        <h4 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">基本信息</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">企业名称 <span className="text-red-500">*</span></label>
+                                <input 
+                                    type="text" 
+                                    value={formData.companyName}
+                                    onChange={e => setFormData({...formData, companyName: e.target.value})}
+                                    className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded p-2 text-sm focus:ring-2 focus:ring-[#0071E3] outline-none dark:text-white"
+                                />
+                            </div>
+                             {/* ... other inputs styled similarly ... */}
+                             <div>
+                                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">所属行业</label>
+                                <input 
+                                    type="text" 
+                                    value={formData.industry}
+                                    onChange={e => setFormData({...formData, industry: e.target.value})}
+                                    className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded p-2 text-sm focus:ring-2 focus:ring-[#0071E3] outline-none dark:text-white"
+                                />
+                            </div>
+                            {/* ... select inputs ... */}
+                            <div>
+                                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">客户类型</label>
+                                <select 
+                                    value={formData.customerType}
+                                    onChange={e => setFormData({...formData, customerType: e.target.value as CustomerType})}
+                                    className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded p-2 text-sm focus:ring-2 focus:ring-[#0071E3] outline-none dark:text-white"
+                                >
+                                    <option value="Enterprise">企业 (Enterprise)</option>
+                                    <option value="Government">政府 (Government)</option>
+                                    <option value="Education">教育 (Education)</option>
+                                    <option value="Partner">合作伙伴 (Partner)</option>
+                                    <option value="SMB">中小企业 (SMB)</option>
+                                </select>
+                            </div>
+                            {/* ... more fields ... */}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="p-6 bg-gray-50 dark:bg-white/5 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
+              <button onClick={() => setIsCreateOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition font-medium">取消</button>
+              <button 
+                onClick={handleCreate} 
+                disabled={!formData.companyName}
+                className="px-4 py-2 bg-[#0071E3] dark:bg-[#FF2D55] text-white rounded-lg hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 transition font-medium shadow-md disabled:opacity-50"
+              >
+                  创建客户
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

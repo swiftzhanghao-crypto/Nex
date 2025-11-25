@@ -9,139 +9,254 @@ export enum OrderStatus {
   CANCELLED = '已取消',
 }
 
-export interface BankInfo {
+export type CustomerType = 'Enterprise' | 'Government' | 'Education' | 'Partner' | 'SMB';
+export type CustomerLevel = 'KA' | 'A' | 'B' | 'C'; // KA = Key Account
+
+export type ContactRole = 'Purchasing' | 'IT' | 'Finance' | 'Management' | 'Other';
+
+export interface ContactInfo {
+  name: string;
+  phone: string;
+  email: string;
+  position?: string;
+}
+
+export interface CustomerContact extends ContactInfo {
+    id: string;
+    roles: ContactRole[];
+    isPrimary?: boolean;
+}
+
+export interface BillingInfo {
+  taxId: string; // 纳税人识别号
+  title: string; // 发票抬头
   bankName: string;
-  accountName: string; // 账户名称（通常是公司名或财务专用名）
-  accountNumber: string;
+  accountNumber: string; // 银行账号
+  registerAddress: string; // 注册地址
+  registerPhone: string; // 注册电话
+}
+
+export interface Enterprise {
+  id: string; // Tenant ID / Enterprise ID
+  name: string; // Enterprise Name
 }
 
 export interface Customer {
   id: string;
   companyName: string; // 企业名称
   industry: string;    // 所属行业
-  contactPerson: string; // 联系人
-  position: string;    // 职位
-  email: string;
-  phone: string;
-  address: string;
+  
+  // New Classification
+  customerType: CustomerType;
+  level: CustomerLevel;
+  region: string; // 所属城市/区域
+
+  // Unified Contacts
+  contacts: CustomerContact[];
+
+  // Addresses
+  address: string;         // 办公地址
+  shippingAddress: string; // 收货地址
+
+  // Financial
+  billingInfo: BillingInfo; // 发票/开票信息
+  
+  // Tenants/Enterprises
+  enterprises?: Enterprise[];
+
   status: 'Active' | 'Inactive'; // 合作状态
   logo: string;
-  bankInfo?: BankInfo; // 客户默认付款账户信息
+  ownerId?: string;    // 客户归属人ID (销售负责人)
+  ownerName?: string;  // 客户归属人姓名
+  
+  // Engagement
+  nextFollowUpDate?: string; // 下次跟进/回访日期
 }
 
 export type LicenseType = 'PerUser' | 'FlatRate' | 'Subscription' | 'Perpetual';
 
-export interface LicenseOption {
-  id: string;
-  name: string;       // e.g., "个人版", "企业版(5人)", "终身授权"
-  price: number;
-  type: LicenseType;
-  description?: string;
+export interface ProductSku {
+    id: string;
+    name: string; // e.g., "Enterprise Edition 5 Users"
+    code: string; // e.g., "WPS-ENT-5"
+    price: number;
+    stock: number;
+    description?: string;
+}
+
+export interface LicenseTemplateConfig {
+    showLicensePeriod: boolean; // 是否显示授权期限
+    showLicenseScope: boolean;  // 是否显示授权范围
+    customTerms?: string;       // 自定义补充条款
 }
 
 export type CpuArchitecture = 'x86_64' | 'ARM64' | 'MIPS64' | 'LoongArch' | 'SW_64' | 'Universal';
 
 export interface InstallPackage {
-  id: string;
-  name: string;       // e.g., "Windows x64 Installer"
-  version: string;    // e.g., "12.1.0"
-  os: string;         // e.g., "Windows", "macOS", "Linux", "UOS", "Kylin"
-  cpuArchitecture?: CpuArchitecture; // e.g. "ARM64" (Kunpeng), "LoongArch" (Loongson)
-  url?: string;       // Download link placeholder
+    id: string;
+    name: string;
+    version: string;
+    os: string;
+    cpuArchitecture?: CpuArchitecture;
 }
 
 export interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  price: number; // Display price (usually the lowest or default)
-  stock: number;
-  category: string;
-  description: string;
-  status: 'OnShelf' | 'OffShelf'; // 产品状态：已上架 | 已下架
-  licenseOptions?: LicenseOption[]; // Multiple licensing options
-  installPackages?: InstallPackage[]; // Available installation packages
+    id: string;
+    name: string;
+    category: string;
+    description: string;
+    status: 'OnShelf' | 'OffShelf';
+    
+    skus: ProductSku[];
+    
+    installPackages?: InstallPackage[];
+    licenseTemplate?: LicenseTemplateConfig;
 }
 
 export type ActivationMethod = 'LicenseKey' | 'AccountBind';
 
 export interface OrderItem {
-  productId: string;
-  productName: string;
-  licenseOptionId?: string; // Selected license option ID
-  licenseOptionName?: string; // Selected license option Name
-  installPackageName?: string; // Selected installation package name
-  quantity: number;
-  priceAtPurchase: number;
-  activationMethod: ActivationMethod; // 激活方式
-  deliveredContent?: string[]; // 具体发放的序列号或绑定的账号列表
-}
+    productId: string;
+    productName: string;
+    
+    // SKU Association
+    skuId: string;
+    skuName: string; // e.g. "Professional Edition"
+    skuCode: string; // e.g. "SKU-001"
 
-export interface OrderApproval {
-  salesApproved: boolean;
-  salesApprovedDate?: string;
-  businessApproved: boolean;
-  businessApprovedDate?: string;
+    quantity: number;
+    priceAtPurchase: number;
+    
+    installPackageName?: string;
+    activationMethod: ActivationMethod;
+    deliveredContent?: string[];
 }
 
 export interface PaymentRecord {
-  method: 'BankTransfer'; // Currently supporting Bank Transfer
-  bankName: string;       // e.g. "招商银行", "工商银行"
-  accountNumber: string;  // Last 4 digits or full account
-  transactionId: string;  // Bank transaction reference number
-  payerName: string;      // Account holder name
-  amount: number;
-  paymentDate: string;
-  remarks?: string;
+    method: string;
+    bankName: string;
+    accountNumber: string;
+    transactionId: string;
+    payerName: string;
+    amount: number;
+    paymentDate: string;
+    remarks?: string;
+}
+
+export interface ApprovalRecord {
+    id: string;
+    operatorId: string;
+    operatorName: string;
+    operatorRole: string;
+    actionType: string;
+    result: string;
+    timestamp: string;
+    comment?: string;
+}
+
+export interface OrderApproval {
+    salesApproved: boolean;
+    businessApproved: boolean;
+    financeApproved: boolean;
+    salesApprovedDate?: string;
+    businessApprovedDate?: string;
+    financeApprovedDate?: string;
 }
 
 export interface Order {
-  id: string;
-  customerId: string;
-  customerName: string; // 这里指公司名称
-  date: string;
-  status: OrderStatus;
-  total: number;
-  items: OrderItem[];
-  shippingAddress: string;
-  carrier?: string;
-  trackingNumber?: string;
-  approval?: OrderApproval;
-  
-  // New Workflow Fields
-  isPaid: boolean;              // 是否已支付
-  paymentDate?: string;
-  paymentRecord?: PaymentRecord; // 详细支付记录
-  confirmedDate?: string;       // 订单最终确认时间
-  
-  // Production Steps
-  isPackageConfirmed: boolean;  // 安装包是否已校验确认
-  isCDBurned: boolean;          // 光盘是否已刻录
-  cdBurnedDate?: string;
-}
-
-export interface DashboardStats {
-  totalRevenue: number;
-  totalOrders: number;
-  averageOrderValue: number;
-  activeCustomers: number;
+    id: string;
+    customerId: string;
+    customerName: string;
+    date: string;
+    status: OrderStatus;
+    total: number;
+    items: OrderItem[];
+    shippingAddress: string;
+    isPaid: boolean;
+    paymentRecord?: PaymentRecord;
+    paymentDate?: string;
+    isPackageConfirmed: boolean;
+    isCDBurned: boolean;
+    cdBurnedDate?: string;
+    confirmedDate?: string;
+    carrier?: string;
+    trackingNumber?: string;
+    salesRepId?: string;
+    salesRepName?: string;
+    salesDepartmentId?: string;
+    salesDepartmentName?: string;
+    businessManagerId?: string;
+    businessManagerName?: string;
+    approval: OrderApproval;
+    approvalRecords: ApprovalRecord[];
+    // Helper for mock sort
+    rawDate?: Date; 
 }
 
 export type UserRole = 'Admin' | 'Sales' | 'Business' | 'Technical' | 'Logistics';
 
-export interface Department {
-  id: string;
-  name: string;
-  description: string;
-  parentId?: string; // Optional Parent ID for hierarchy
+export interface User {
+    id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+    status: 'Active' | 'Inactive';
+    avatar: string;
+    departmentId?: string;
 }
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  avatar: string;
-  status: 'Active' | 'Inactive';
-  departmentId?: string;
+export interface Department {
+    id: string;
+    name: string;
+    description: string;
+    parentId?: string;
+}
+
+export type ChannelType = 'Distributor' | 'Reseller' | 'SI' | 'ISV'; // 经销商, 分销商, 系统集成商, 独立软件开发商
+
+export interface Channel {
+    id: string;
+    name: string;
+    type: ChannelType;
+    contactName: string;
+    contactPhone: string;
+    email: string;
+    region: string;
+    status: 'Active' | 'Inactive';
+    level: 'Tier1' | 'Tier2' | 'Tier3';
+    agreementDate: string;
+}
+
+// --- NEW MODULES ---
+
+export type OpportunityStage = 'New' | 'Qualification' | 'Proposal' | 'Negotiation' | 'Closed Won' | 'Closed Lost';
+
+export interface Opportunity {
+    id: string;
+    name: string; // 商机名称
+    customerId: string;
+    customerName: string;
+    expectedRevenue: number;
+    stage: OpportunityStage;
+    probability: number; // 0-100%
+    closeDate: string; // 预计成交日期
+    ownerId: string;
+    ownerName: string;
+    createdAt: string;
+}
+
+export type ProjectStatus = 'Planning' | 'Ongoing' | 'OnHold' | 'Completed' | 'Cancelled';
+
+export interface Project {
+    id: string;
+    name: string;
+    customerId: string;
+    customerName: string;
+    pmId: string; // Project Manager ID
+    pmName: string;
+    startDate: string;
+    endDate?: string;
+    status: ProjectStatus;
+    progress: number; // 0-100
+    description?: string;
 }
