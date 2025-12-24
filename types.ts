@@ -1,146 +1,336 @@
 
-export enum OrderStatus {
-  PENDING_PAYMENT = '待支付',
-  PENDING_APPROVAL = '待审批',
-  PENDING_CONFIRM = '待确认',
-  PROCESSING_PROD = '生产处理中', // 包含安装包确认、光盘刻录
-  SHIPPED = '已发货',
-  DELIVERED = '已送达',
-  CANCELLED = '已取消',
-}
+export type LicenseType = 'Subscription' | 'Perpetual' | 'FlatRate' | 'PerUser';
+export type LicenseUnit = 'Year' | 'Month' | 'Day' | 'Forever';
 
-export type CustomerType = 'Enterprise' | 'Government' | 'Education' | 'Partner' | 'SMB';
-export type CustomerLevel = 'KA' | 'A' | 'B' | 'C'; // KA = Key Account
-
-export type ContactRole = 'Purchasing' | 'IT' | 'Finance' | 'Management' | 'Other';
-
-export interface ContactInfo {
-  name: string;
-  phone: string;
-  email: string;
-  position?: string;
-}
-
-export interface CustomerContact extends ContactInfo {
+export interface LicenseTypeDefinition {
     id: string;
-    roles: ContactRole[];
-    isPrimary?: boolean;
-}
-
-export interface BillingInfo {
-  taxId: string; // 纳税人识别号
-  title: string; // 发票抬头
-  bankName: string;
-  accountNumber: string; // 银行账号
-  registerAddress: string; // 注册地址
-  registerPhone: string; // 注册电话
-}
-
-export interface Enterprise {
-  id: string; // Tenant ID / Enterprise ID
-  name: string; // Enterprise Name
-}
-
-export interface Customer {
-  id: string;
-  companyName: string; // 企业名称
-  industry: string;    // 所属行业
-  
-  // New Classification
-  customerType: CustomerType;
-  level: CustomerLevel;
-  region: string; // 所属城市/区域
-
-  // Unified Contacts
-  contacts: CustomerContact[];
-
-  // Addresses
-  address: string;         // 办公地址
-  shippingAddress: string; // 收货地址
-
-  // Financial
-  billingInfo: BillingInfo; // 发票/开票信息
-  
-  // Tenants/Enterprises
-  enterprises?: Enterprise[];
-
-  status: 'Active' | 'Inactive'; // 合作状态
-  logo: string;
-  ownerId?: string;    // 客户归属人ID (销售负责人)
-  ownerName?: string;  // 客户归属人姓名
-  
-  // Engagement
-  nextFollowUpDate?: string; // 下次跟进/回访日期
-}
-
-export type LicenseType = 'PerUser' | 'FlatRate' | 'Subscription' | 'Perpetual';
-
-export interface ProductSku {
-    id: string;
-    name: string; // e.g., "Enterprise Edition 5 Users"
-    code: string; // e.g., "WPS-ENT-5"
-    price: number;
-    stock: number;
+    name: string; // e.g. "Commercial Annual"
+    code: string;
+    type: LicenseType;
+    period: number;
+    periodUnit: LicenseUnit;
+    scope: string; // e.g. "1 User"
     description?: string;
 }
 
-export interface LicenseTemplateConfig {
-    showLicensePeriod: boolean; // 是否显示授权期限
-    showLicenseScope: boolean;  // 是否显示授权范围
-    customTerms?: string;       // 自定义补充条款
+export type ActivationMethod = 'LicenseKey' | 'Online' | 'Dongle';
+
+export interface MerchandiseItem {
+    productId: string;
+    productName: string;
+    skuId: string;
+    skuName: string;
+    quantity: number;
 }
 
-export type CpuArchitecture = 'x86_64' | 'ARM64' | 'MIPS64' | 'LoongArch' | 'SW_64' | 'Universal';
+export interface OrderItem extends MerchandiseItem {
+    // Reference to Merchandise
+    merchandiseId?: string;
+    merchandiseName?: string;
+
+    skuCode?: string;
+
+    quantity: number; // Final quantity in order
+    priceAtPurchase: number;
+    
+    installPackageName?: string;
+    activationMethod: ActivationMethod;
+    deliveredContent?: string[];
+
+    // Enterprise Connect
+    enterpriseId?: string;
+    enterpriseName?: string;
+    
+    // Snapshot of Atomic Capabilities for this order (Layer 4 realization)
+    capabilitiesSnapshot?: string[]; 
+
+    // Pricing Option selected
+    pricingOptionId?: string;
+    pricingOptionName?: string;
+}
+
+export type CapabilityType = 'Component' | 'Feature' | 'Rights' | 'Service';
+
+export interface AtomicCapability {
+    id: string;
+    name: string;
+    type: CapabilityType;
+    description?: string;
+}
+
+export type RightDataType = 'Number' | 'Boolean' | 'Text';
+
+export interface ProductRightDefinition {
+    id: string;
+    name: string;
+    code: string;
+    dataType: RightDataType;
+    unit?: string;
+    description?: string;
+}
+
+export interface RightValue {
+    definitionId: string;
+    name: string;
+    value: number | boolean | string;
+    unit?: string;
+}
+
+export interface RightPackage {
+    id: string;
+    name: string;
+    description?: string;
+    rights: RightValue[];
+}
+
+export interface ProductLicenseConfig {
+    type: LicenseType;
+    period: number;
+    periodUnit: LicenseUnit;
+    scope: string;
+}
+
+export interface SkuPricingOption {
+    id: string;
+    title: string;
+    price: number;
+    license: ProductLicenseConfig;
+}
+
+export interface ProductSku {
+    id: string;
+    code: string;
+    name: string;
+    price: number;
+    stock: number;
+    status: 'Active' | 'Inactive';
+    description?: string;
+    license?: ProductLicenseConfig;
+    pricingOptions?: SkuPricingOption[];
+    parentId?: string;
+    parentName?: string;
+    packageId?: string;
+    packageName?: string;
+}
 
 export interface InstallPackage {
     id: string;
     name: string;
     version: string;
-    os: string;
-    cpuArchitecture?: CpuArchitecture;
+    url: string;
 }
 
 export interface Product {
     id: string;
     name: string;
     category: string;
-    description: string;
+    description?: string;
     status: 'OnShelf' | 'OffShelf';
-    
+    tags?: string[];
     skus: ProductSku[];
-    
+    composition?: AtomicCapability[];
     installPackages?: InstallPackage[];
-    licenseTemplate?: LicenseTemplateConfig;
+    packageId?: string;
+    rights?: RightValue[];
+    licenseTemplate?: {
+        showLicensePeriod: boolean;
+        showLicenseScope: boolean;
+    };
 }
 
-export type ActivationMethod = 'LicenseKey' | 'AccountBind';
+export type SalesType = 'Direct' | 'Channel';
+export type PricingPolicy = 'Fixed' | 'Negotiable';
 
-export interface OrderItem {
-    productId: string;
-    productName: string;
-    
-    // SKU Association
-    skuId: string;
-    skuName: string; // e.g. "Professional Edition"
-    skuCode: string; // e.g. "SKU-001"
+export interface SalesMerchandise {
+    id: string;
+    name: string;
+    salesType: SalesType[];
+    pricingPolicy: PricingPolicy;
+    price: number;
+    status: 'Active' | 'Inactive';
+    items: MerchandiseItem[];
+}
 
-    quantity: number;
-    priceAtPurchase: number;
-    
-    installPackageName?: string;
-    activationMethod: ActivationMethod;
-    deliveredContent?: string[];
+export type CustomerType = 'Enterprise' | 'SMB' | 'Government' | 'Education' | 'Partner';
+export type CustomerLevel = 'KA' | 'A' | 'B' | 'C';
+export type ContactRole = 'Purchasing' | 'IT' | 'Finance' | 'Management' | 'Other';
+
+export interface CustomerContact {
+    id: string;
+    name: string;
+    phone: string;
+    email: string;
+    position?: string;
+    roles: ContactRole[];
+    isPrimary: boolean;
+}
+
+export interface BillingInfo {
+    taxId: string;
+    title: string;
+    bankName: string;
+    accountNumber: string;
+    registerAddress: string;
+    registerPhone: string;
+}
+
+export interface Enterprise {
+    id: string;
+    name: string;
+}
+
+export interface Customer {
+    id: string;
+    companyName: string;
+    industry: string;
+    customerType: CustomerType;
+    level: CustomerLevel;
+    region: string;
+    address: string;
+    shippingAddress: string;
+    status: 'Active' | 'Inactive';
+    logo?: string;
+    contacts: CustomerContact[];
+    billingInfo?: BillingInfo;
+    ownerId?: string;
+    ownerName?: string;
+    enterprises?: Enterprise[];
+    nextFollowUpDate?: string;
+}
+
+export type UserRole = 'Admin' | 'Sales' | 'Business' | 'Technical' | 'Logistics' | string; // Updated to allow dynamic strings
+export type UserType = 'Internal' | 'External';
+
+export interface RoleDefinition {
+    id: string;
+    name: string;
+    description: string;
+    permissions: string[];
+    isSystem?: boolean; // System roles cannot be deleted
+}
+
+export interface User {
+    id: string;
+    accountId: string; // 8-digit numeric ID
+    name: string;
+    email: string;
+    role: UserRole;
+    userType: UserType;
+    status: 'Active' | 'Inactive';
+    avatar?: string;
+    departmentId?: string;
+}
+
+export interface Department {
+    id: string;
+    name: string;
+    description?: string;
+    parentId?: string;
+}
+
+export type ChannelType = 'Distributor' | 'Reseller' | 'SI' | 'ISV';
+
+export interface Channel {
+    id: string;
+    name: string;
+    type: ChannelType;
+    level: 'Tier1' | 'Tier2' | 'Tier3';
+    contactName: string;
+    contactPhone: string;
+    email: string;
+    region: string;
+    status: 'Active' | 'Inactive';
+    agreementDate: string;
+}
+
+export type OpportunityStage = 'New' | 'Qualification' | 'Proposal' | 'Negotiation' | 'Closed Won' | 'Closed Lost';
+
+export interface Opportunity {
+    id: string;
+    name: string;
+    customerId: string;
+    customerName: string;
+    expectedRevenue: number;
+    stage: OpportunityStage;
+    probability: number;
+    closeDate: string;
+    ownerId: string;
+    ownerName: string;
+    createdAt: string;
+}
+
+export type OrderStatus = 
+    | 'PENDING_APPROVAL' 
+    | 'PENDING_CONFIRM' 
+    | 'PROCESSING_PROD' 
+    | 'PENDING_PAYMENT' 
+    | 'SHIPPED' 
+    | 'DELIVERED' 
+    | 'CANCELLED' 
+    | 'REFUND_PENDING' 
+    | 'REFUNDED';
+
+export const OrderStatus = {
+    PENDING_APPROVAL: 'PENDING_APPROVAL' as OrderStatus,
+    PENDING_CONFIRM: 'PENDING_CONFIRM' as OrderStatus,
+    PROCESSING_PROD: 'PROCESSING_PROD' as OrderStatus,
+    PENDING_PAYMENT: 'PENDING_PAYMENT' as OrderStatus,
+    SHIPPED: 'SHIPPED' as OrderStatus,
+    DELIVERED: 'DELIVERED' as OrderStatus,
+    CANCELLED: 'CANCELLED' as OrderStatus,
+    REFUND_PENDING: 'REFUND_PENDING' as OrderStatus,
+    REFUNDED: 'REFUNDED' as OrderStatus,
+};
+
+export type OrderSource = 'Sales' | 'ChannelPortal' | 'OnlineStore' | 'APISync' | 'Renewal';
+export type BuyerType = 'Customer' | 'Channel' | 'SelfDeal' | 'Direct';
+export type DeliveryMethod = 'Online' | 'Offline' | 'Hybrid';
+export type PaymentMethod = 'Online' | 'Transfer' | 'COD';
+
+export interface InvoiceInfo {
+    type: 'VAT_Special' | 'VAT_Normal';
+    title: string;
+    taxId: string;
+    content: string;
+    bankName?: string;
+    accountNumber?: string;
+    address?: string;
+    phone?: string;
 }
 
 export interface PaymentRecord {
-    method: string;
+    amount: number;
+    paymentDate: string;
     bankName: string;
     accountNumber: string;
     transactionId: string;
     payerName: string;
-    amount: number;
-    paymentDate: string;
     remarks?: string;
+}
+
+export interface AcceptanceInfo {
+    contactName: string;
+    contactPhone: string;
+    method: 'Remote' | 'OnSite';
+    email?: string;
+}
+
+export type AcceptanceType = 'OneTime' | 'Phased';
+
+export interface AcceptancePhase {
+    id: string;
+    name: string;
+    percentage: number;
+    amount: number;
+    status: 'Pending' | 'Accepted';
+    acceptedDate?: string;
+}
+
+export interface AcceptanceConfig {
+    type: AcceptanceType;
+    status: 'Pending' | 'In Progress' | 'Completed';
+    phases: AcceptancePhase[];
+    setupDate: string;
 }
 
 export interface ApprovalRecord {
@@ -156,10 +346,10 @@ export interface ApprovalRecord {
 
 export interface OrderApproval {
     salesApproved: boolean;
-    businessApproved: boolean;
-    financeApproved: boolean;
     salesApprovedDate?: string;
+    businessApproved: boolean;
     businessApprovedDate?: string;
+    financeApproved: boolean;
     financeApprovedDate?: string;
 }
 
@@ -167,86 +357,65 @@ export interface Order {
     id: string;
     customerId: string;
     customerName: string;
+    
+    // Customer Snapshot
+    customerType?: CustomerType;
+    customerLevel?: CustomerLevel;
+    customerIndustry?: string;
+    customerRegion?: string;
+
     date: string;
     status: OrderStatus;
     total: number;
     items: OrderItem[];
-    shippingAddress: string;
+    
+    source: OrderSource;
+    buyerType: BuyerType;
+    buyerName?: string;
+    buyerId?: string; // ID of the Channel or Customer buying the product
+    
+    shippingAddress?: string;
+    deliveryMethod?: DeliveryMethod;
+    
     isPaid: boolean;
-    paymentRecord?: PaymentRecord;
     paymentDate?: string;
-    isPackageConfirmed: boolean;
-    isCDBurned: boolean;
+    paymentMethod?: PaymentMethod;
+    paymentTerms?: string;
+    paymentRecord?: PaymentRecord;
+    
+    isAuthConfirmed?: boolean;
+    authConfirmedDate?: string;
+    isPackageConfirmed?: boolean;
+    packageConfirmedDate?: string;
+    isShippingConfirmed?: boolean;
+    shippingConfirmedDate?: string;
+    isCDBurned?: boolean;
     cdBurnedDate?: string;
-    confirmedDate?: string;
+    
+    shippedDate?: string;
     carrier?: string;
     trackingNumber?: string;
-    salesRepId?: string;
-    salesRepName?: string;
-    salesDepartmentId?: string;
-    salesDepartmentName?: string;
-    businessManagerId?: string;
-    businessManagerName?: string;
+    
     approval: OrderApproval;
     approvalRecords: ApprovalRecord[];
-    // Helper for mock sort
-    rawDate?: Date; 
     
-    // CRM Integration
+    salesRepId?: string;
+    salesRepName?: string;
+    businessManagerId?: string;
+    businessManagerName?: string;
+    
+    invoiceInfo?: InvoiceInfo;
+    acceptanceInfo?: AcceptanceInfo;
+    acceptanceConfig?: AcceptanceConfig;
+    
     opportunityId?: string;
     opportunityName?: string;
-}
-
-export type UserRole = 'Admin' | 'Sales' | 'Business' | 'Technical' | 'Logistics';
-
-export interface User {
-    id: string;
-    name: string;
-    email: string;
-    role: UserRole;
-    status: 'Active' | 'Inactive';
-    avatar: string;
-    departmentId?: string;
-}
-
-export interface Department {
-    id: string;
-    name: string;
-    description: string;
-    parentId?: string;
-}
-
-export type ChannelType = 'Distributor' | 'Reseller' | 'SI' | 'ISV'; // 经销商, 分销商, 系统集成商, 独立软件开发商
-
-export interface Channel {
-    id: string;
-    name: string;
-    type: ChannelType;
-    contactName: string;
-    contactPhone: string;
-    email: string;
-    region: string;
-    status: 'Active' | 'Inactive';
-    level: 'Tier1' | 'Tier2' | 'Tier3';
-    agreementDate: string;
-}
-
-// --- NEW MODULES ---
-
-export type OpportunityStage = 'New' | 'Qualification' | 'Proposal' | 'Negotiation' | 'Closed Won' | 'Closed Lost';
-
-export interface Opportunity {
-    id: string;
-    name: string; // 商机名称
-    customerId: string;
-    customerName: string;
-    expectedRevenue: number;
-    stage: OpportunityStage;
-    probability: number; // 0-100%
-    closeDate: string; // 预计成交日期
-    ownerId: string;
-    ownerName: string;
-    createdAt: string;
+    
+    originalOrderId?: string; 
+    confirmedDate?: string;
+    
+    refundReason?: string;
+    refundAmount?: number;
 }
 
 export type ProjectStatus = 'Planning' | 'Ongoing' | 'OnHold' | 'Completed' | 'Cancelled';
@@ -256,11 +425,17 @@ export interface Project {
     name: string;
     customerId: string;
     customerName: string;
-    pmId: string; // Project Manager ID
+    pmId: string;
     pmName: string;
     startDate: string;
     endDate?: string;
     status: ProjectStatus;
-    progress: number; // 0-100
+    progress: number;
     description?: string;
+}
+
+export interface ContactInfo {
+    name: string;
+    phone: string;
+    email: string;
 }

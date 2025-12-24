@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Customer, Order, User, Enterprise, ContactInfo, CustomerType, CustomerLevel, CustomerContact, ContactRole } from '../types';
+import { Customer, Order, User, Enterprise, ContactInfo, CustomerType, CustomerLevel, CustomerContact, ContactRole, OrderStatus } from '../types';
 import { ArrowLeft, Building2, User as UserIcon, MapPin, Phone, Mail, CreditCard, History, Briefcase, Save, Edit2, Shield, Truck, FileText, Monitor, X, Plus, Trash2, Building, Calendar, Bell, Clock, Users, CheckSquare, Tag, ArrowUpCircle, Archive } from 'lucide-react';
 
 interface CustomerDetailsProps {
@@ -10,6 +10,18 @@ interface CustomerDetailsProps {
   orders: Order[];
   users: User[];
 }
+
+const statusMap: Record<string, string> = {
+    [OrderStatus.PENDING_APPROVAL]: '待审批',
+    [OrderStatus.PENDING_CONFIRM]: '待确认',
+    [OrderStatus.PROCESSING_PROD]: '备货中',
+    [OrderStatus.PENDING_PAYMENT]: '待支付',
+    [OrderStatus.SHIPPED]: '已发货',
+    [OrderStatus.DELIVERED]: '已完成',
+    [OrderStatus.CANCELLED]: '已取消',
+    [OrderStatus.REFUND_PENDING]: '退款中',
+    [OrderStatus.REFUNDED]: '已退款',
+};
 
 const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customers, setCustomers, orders, users }) => {
   const { id } = useParams<{ id: string }>();
@@ -255,8 +267,8 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customers, setCustome
   };
 
   const getOrderStatusColor = (status: string) => {
-    if (status === '已送达') return 'bg-green-100 text-green-700';
-    if (status === '已取消') return 'bg-red-100 text-red-700';
+    if (status === '已完成' || status === OrderStatus.DELIVERED) return 'bg-green-100 text-green-700';
+    if (status === '已取消' || status === OrderStatus.CANCELLED) return 'bg-red-100 text-red-700';
     return 'bg-blue-100 text-blue-700';
   };
 
@@ -492,7 +504,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customers, setCustome
                                           </td>
                                           <td className="p-4 font-medium">¥{order.total.toLocaleString()}</td>
                                           <td className="p-4">
-                                              <span className={`px-2 py-0.5 rounded text-xs ${getOrderStatusColor(order.status)}`}>{order.status}</span>
+                                              <span className={`px-2 py-0.5 rounded text-xs ${getOrderStatusColor(order.status)}`}>{statusMap[order.status] || order.status}</span>
                                           </td>
                                       </tr>
                                   ))}

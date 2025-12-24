@@ -89,7 +89,7 @@ const OpportunityManager: React.FC<OpportunityManagerProps> = ({ opportunities, 
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-left">
-                    <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 dark:text-gray-500 font-medium text-xs uppercase">
+                    <thead className="bg-gray-50/80 dark:bg-white/5 backdrop-blur border-b border-gray-200/50 dark:border-white/10 text-gray-400 dark:text-gray-500 font-medium text-xs uppercase">
                         <tr>
                             <th className="p-4 pl-6">商机名称</th>
                             <th className="p-4">客户</th>
@@ -99,11 +99,11 @@ const OpportunityManager: React.FC<OpportunityManagerProps> = ({ opportunities, 
                             <th className="p-4">预计成交</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                    <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                         {filtered.map(opp => (
                             <tr 
                                 key={opp.id} 
-                                className="hover:bg-gray-50/80 dark:hover:bg-white/5 transition group cursor-pointer"
+                                className="group cursor-pointer hover:bg-gray-100/80 dark:hover:bg-white/[0.08] even:bg-gray-50/50 dark:even:bg-white/[0.02] transition-colors"
                                 onClick={() => navigate(`/opportunities/${opp.id}`)}
                             >
                                 <td className="p-4 pl-6">

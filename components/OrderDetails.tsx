@@ -1,8 +1,13 @@
 
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Order, OrderStatus, Product, Customer, OrderItem, ActivationMethod, PaymentRecord, User, Department, ApprovalRecord } from '../types';
-import { CheckCircle, Clock, Truck, Package, User as UserIcon, X, ShieldCheck, Key, AtSign, Edit3, Save, Download, CreditCard, Disc, CheckSquare, Settings, AlertCircle, Award, Briefcase, Building2, History, UserCheck, XSquare, ArrowLeft, Calendar, FileText, ChevronRight, Activity, Target } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Order, OrderStatus, Product, Customer, User, Department, Opportunity, OrderItem, ApprovalRecord } from '../types';
+import { 
+    ArrowLeft, Box, Printer, Award, X, Lock, CheckCircle, Truck, ClipboardCheck, 
+    UploadCloud, AlertOctagon, RefreshCcw, Key, Package, Disc, Receipt, FileText, 
+    Briefcase, History, Eye, CheckSquare, CreditCard, ShieldCheck, User as UserIcon, Building,
+    ChevronRight, AlertCircle, Clock, MapPin
+} from 'lucide-react';
 
 interface OrderDetailsProps {
   orders: Order[];
@@ -12,371 +17,464 @@ interface OrderDetailsProps {
   users: User[];
   departments: Department[];
   currentUser: User;
+  opportunities: Opportunity[];
 }
 
-const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products, customers, users, departments, currentUser }) => {
+const statusMap: Record<string, string> = {
+    [OrderStatus.PENDING_APPROVAL]: '待审批',
+    [OrderStatus.PENDING_CONFIRM]: '待确认',
+    [OrderStatus.PROCESSING_PROD]: '备货中',
+    [OrderStatus.PENDING_PAYMENT]: '待支付',
+    [OrderStatus.SHIPPED]: '已发货',
+    [OrderStatus.DELIVERED]: '已完成',
+    [OrderStatus.CANCELLED]: '已取消',
+    [OrderStatus.REFUND_PENDING]: '退款中',
+    [OrderStatus.REFUNDED]: '已退款',
+};
+
+const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, customers, currentUser }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  
   const selectedOrder = orders.find(o => o.id === id);
 
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [paymentForm, setPaymentForm] = useState<Partial<PaymentRecord>>({ bankName: '', accountNumber: '', transactionId: '', payerName: '', remarks: '' });
-  const [isCertificateOpen, setIsCertificateOpen] = useState(false);
-  const [shippingCarrier, setShippingCarrier] = useState('');
-  const [shippingTracking, setShippingTracking] = useState('');
+  // States
+  const [activeStepModal, setActiveStepModal] = useState<string | null>(null);
+  const [isDrawerClosing, setIsDrawerClosing] = useState(false);
+  const [refundReason, setRefundReason] = useState('');
+  const [refundAmount, setRefundAmount] = useState<number>(0);
+  
+  const [isCertDrawerClosing, setIsCertDrawerClosing] = useState(false);
+  const [selectedCertificateItem, setSelectedCertificateItem] = useState<OrderItem | null>(null);
+  const [isCertPreviewMode, setIsCertPreviewMode] = useState(false);
+  
   const [fulfillmentItemIndex, setFulfillmentItemIndex] = useState<number | null>(null);
   const [fulfillmentContent, setFulfillmentContent] = useState('');
 
-  const getDepartmentPath = (deptId?: string) => {
-      if (!deptId) return '';
-      const path: string[] = [];
-      let current = departments.find(d => d.id === deptId);
-      const visited = new Set<string>();
-      while (current && !visited.has(current.id)) {
-          visited.add(current.id);
-          path.unshift(current.name);
-          if (current.parentId && current.parentId !== current.id) current = departments.find(d => d.id === current.parentId); else current = undefined;
+  // Step specific forms
+  const [shippingCarrier, setShippingCarrier] = useState('');
+  const [shippingTracking, setShippingTracking] = useState('');
+  const [paymentForm, setPaymentForm] = useState({ bankName: '', transactionId: '' });
+  const [approvalComment, setApprovalComment] = useState('');
+
+  useEffect(() => {
+      if (location.state && (location.state as any).openAction) {
+          setActiveStepModal((location.state as any).openAction);
       }
-      return path.join(' / ');
-  };
-  const generateLicenseKey = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    let result = '';
-    for (let i = 0; i < 4; i++) {
-      for (let j = 0; j < 5; j++) { result += chars.charAt(Math.floor(Math.random() * chars.length)); }
-      if (i < 3) result += '-';
-    }
-    return result;
-  };
-  
-  // Helper to update order and persist state
-  const updateOrder = (order: Order) => setOrders(prev => prev.map(o => o.id === order.id ? order : o));
+  }, [location.state]);
 
-  // *** NEW: Helper to add operation record ***
-  const createOperationRecord = (actionType: string, result: string, comment?: string): ApprovalRecord => {
-      return {
-          id: `op-${Date.now()}`,
-          operatorId: currentUser.id,
-          operatorName: currentUser.name,
-          operatorRole: currentUser.role,
-          actionType,
-          result,
-          timestamp: new Date().toISOString(),
-          comment
-      };
+  // If no order found, return early
+  if (!selectedOrder) {
+      return (
+          <div className="flex flex-col items-center justify-center h-screen bg-[#F5F5F7] dark:bg-black">
+              <div className="text-gray-500 mb-4">订单不存在</div>
+              <button onClick={() => navigate('/orders')} className="text-blue-600 hover:underline">返回订单列表</button>
+          </div>
+      );
+  }
+
+  const fullCustomer = customers.find(c => c.id === selectedOrder.customerId);
+
+  const updateOrder = (updatedOrder: Order) => {
+      setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
   };
 
-  if (!selectedOrder) return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  const createOperationRecord = (actionType: string, result: string, comment?: string): ApprovalRecord => ({
+      id: `op-${Date.now()}`,
+      operatorId: currentUser.id,
+      operatorName: currentUser.name,
+      operatorRole: currentUser.role,
+      actionType,
+      result,
+      timestamp: new Date().toISOString(),
+      comment
+  });
 
-  const canManagePayment = currentUser.role === 'Admin' || currentUser.role === 'Business';
-  const canApproveSales = currentUser.role === 'Admin' || currentUser.role === 'Sales';
-  const canApproveBusiness = currentUser.role === 'Admin' || currentUser.role === 'Business';
-  const canApproveFinance = currentUser.role === 'Admin' || currentUser.role === 'Business';
-  const canConfirmOrder = currentUser.role === 'Admin' || currentUser.role === 'Sales';
-  const canManageProduction = currentUser.role === 'Admin' || currentUser.role === 'Technical';
-  const canManageShipping = currentUser.role === 'Admin' || currentUser.role === 'Logistics';
+  const isStockReady = selectedOrder.isAuthConfirmed && selectedOrder.isPackageConfirmed && selectedOrder.isCDBurned && selectedOrder.isShippingConfirmed;
 
-  const openPaymentModal = () => { if (!canManagePayment) return; const c = customers.find(c => c.id === selectedOrder?.customerId); const b = c?.billingInfo; setPaymentForm({ bankName: b?.bankName || '', accountNumber: b?.accountNumber || '', transactionId: '', payerName: b?.title || selectedOrder?.customerName || '', remarks: '' }); setIsPaymentModalOpen(true); };
-  
-  const handleConfirmPayment = () => { 
-      if (!selectedOrder || !paymentForm.bankName) return; 
-      const record: PaymentRecord = { method: 'BankTransfer', bankName: paymentForm.bankName, accountNumber: paymentForm.accountNumber || '', transactionId: paymentForm.transactionId!, payerName: paymentForm.payerName || '', amount: paymentForm.amount || selectedOrder.total, paymentDate: new Date().toISOString(), remarks: paymentForm.remarks }; 
-      
-      const opRecord = createOperationRecord('Payment Received', 'Success', `Amount: ¥${record.amount}`);
-      
-      updateOrder({ 
-          ...selectedOrder, 
-          status: OrderStatus.PENDING_APPROVAL, 
-          isPaid: true, 
-          paymentDate: new Date().toISOString(), 
-          paymentRecord: record,
-          approvalRecords: [opRecord, ...(selectedOrder.approvalRecords || [])]
-      }); 
-      setIsPaymentModalOpen(false); 
-  };
+  // Updated Workflow: Payment -> Approval (Sales, Business, Finance) -> Confirm -> Stock -> Ship -> Accept
+  let steps = [
+      { 
+          id: 'PAYMENT', 
+          label: '支付', 
+          icon: CreditCard, 
+          status: selectedOrder.isPaid ? 'Completed' : (![OrderStatus.CANCELLED, OrderStatus.REFUNDED].includes(selectedOrder.status) ? 'Current' : 'Locked'),
+          disabled: false 
+      },
+      { 
+          id: 'APPROVAL', 
+          label: '审批', 
+          icon: FileText, 
+          status: !selectedOrder.isPaid ? 'Locked' : (selectedOrder.status === OrderStatus.PENDING_APPROVAL ? 'Current' : (['PENDING_CONFIRM', 'PROCESSING_PROD', 'SHIPPED', 'DELIVERED'].includes(selectedOrder.status) ? 'Completed' : 'Locked')), 
+          disabled: !selectedOrder.isPaid 
+      },
+      { 
+          id: 'CONFIRM', 
+          label: '确认', 
+          icon: CheckSquare, 
+          status: selectedOrder.status === OrderStatus.PENDING_CONFIRM ? 'Current' : (['PROCESSING_PROD', 'SHIPPED', 'DELIVERED'].includes(selectedOrder.status) ? 'Completed' : 'Locked'), 
+          disabled: !['PENDING_CONFIRM', 'PROCESSING_PROD', 'SHIPPED', 'DELIVERED'].includes(selectedOrder.status)
+      },
+      { 
+          id: 'STOCK_PREP', 
+          label: '备货', 
+          icon: Package, 
+          status: (selectedOrder.status === OrderStatus.PROCESSING_PROD && isStockReady) ? 'Completed' : (selectedOrder.status === OrderStatus.PROCESSING_PROD ? 'Current' : (['SHIPPED', 'DELIVERED'].includes(selectedOrder.status) ? 'Completed' : 'Locked')), 
+          disabled: !['PROCESSING_PROD', 'SHIPPED', 'DELIVERED'].includes(selectedOrder.status)
+      },
+      { 
+          id: 'SHIPPING', 
+          label: '发货', 
+          icon: Truck, 
+          status: selectedOrder.status === OrderStatus.SHIPPED || selectedOrder.status === OrderStatus.DELIVERED ? 'Completed' : (selectedOrder.status === OrderStatus.PROCESSING_PROD && isStockReady ? 'Current' : 'Locked'), 
+          disabled: !['PROCESSING_PROD', 'SHIPPED', 'DELIVERED'].includes(selectedOrder.status)
+      },
+      { 
+          id: 'ACCEPTANCE', 
+          label: '验收', 
+          icon: ClipboardCheck, 
+          status: selectedOrder.status === OrderStatus.DELIVERED ? 'Completed' : (selectedOrder.status === OrderStatus.SHIPPED ? 'Current' : 'Locked'), 
+          disabled: !['SHIPPED', 'DELIVERED'].includes(selectedOrder.status)
+      },
+  ];
 
-  const handleApprove = (type: any, action: any) => { 
-      const updated = { ...selectedOrder }; 
-      if(!updated.approval) updated.approval={salesApproved:false,businessApproved:false,financeApproved:false};
-      const res = action==='Approve'?'Approved':'Rejected';
-      
-      // Use helper
-      const opRecord = createOperationRecord(`${type} Approval`, res, action==='Approve'?'Approved by flow':'Rejected by flow');
-      updated.approvalRecords=[opRecord, ...(updated.approvalRecords||[])];
-      
-      if(action==='Approve'){
-          if(type==='sales') updated.approval.salesApproved=true;
-          if(type==='business') updated.approval.businessApproved=true;
-          if(type==='finance') updated.approval.financeApproved=true;
-          if(updated.approval.salesApproved && updated.approval.businessApproved && updated.approval.financeApproved) updated.status=OrderStatus.PENDING_CONFIRM;
-      }
-      updateOrder(updated);
-  };
+  // Override steps for SelfDeal mode
+  if (selectedOrder.buyerType === 'SelfDeal') {
+      steps = [
+          { 
+              id: 'PAYMENT', 
+              label: '支付', 
+              icon: CreditCard, 
+              status: selectedOrder.isPaid ? 'Completed' : 'Current',
+              disabled: false 
+          },
+          {
+              id: 'COMPLETED',
+              label: '交易完成',
+              icon: CheckCircle,
+              status: selectedOrder.status === OrderStatus.DELIVERED ? 'Completed' : 'Locked',
+              disabled: true
+          }
+      ];
+  }
 
-  const handleConfirmOrder = () => { 
-      const opRecord = createOperationRecord('Production Confirmed', 'Started', 'Order moved to production queue');
-      updateOrder({ 
-          ...selectedOrder, 
-          status: OrderStatus.PROCESSING_PROD, 
+  const handleConfirmOrder = () => {
+      updateOrder({
+          ...selectedOrder,
+          status: OrderStatus.PROCESSING_PROD,
           confirmedDate: new Date().toISOString(),
-          approvalRecords: [opRecord, ...(selectedOrder.approvalRecords || [])]
-      }); 
+          approvalRecords: [createOperationRecord('订单确认', 'Confirmed', '进入备货阶段'), ...selectedOrder.approvalRecords]
+      });
+      handleCloseDrawer();
   };
 
-  const handleConfirmPackage = () => {
-      const opRecord = createOperationRecord('Package Check', 'Confirmed', 'Installation package verified');
-      updateOrder({ 
-          ...selectedOrder, 
-          isPackageConfirmed: true,
-          approvalRecords: [opRecord, ...(selectedOrder.approvalRecords || [])]
+  const handleConfirmPayment = () => {
+      const isSelfDeal = selectedOrder.buyerType === 'SelfDeal';
+      
+      const paymentRecord = {
+          amount: selectedOrder.total,
+          paymentDate: new Date().toISOString(),
+          bankName: paymentForm.bankName,
+          accountNumber: '',
+          transactionId: paymentForm.transactionId,
+          payerName: selectedOrder.customerName
+      };
+
+      if (isSelfDeal) {
+          // Auto-complete logic for SelfDeal
+          const updatedItems = selectedOrder.items.map(item => ({
+              ...item,
+              deliveredContent: [`LICENSE-${Date.now()}-${Math.floor(Math.random()*1000)}`] // Mock Auto-Gen
+          }));
+
+          updateOrder({
+              ...selectedOrder,
+              isPaid: true,
+              status: OrderStatus.DELIVERED,
+              paymentDate: new Date().toISOString(),
+              paymentRecord,
+              items: updatedItems,
+              shippedDate: new Date().toISOString(),
+              // Auto-fill required fields for "Completed" state consistency
+              isAuthConfirmed: true, isPackageConfirmed: true, isCDBurned: true, isShippingConfirmed: true,
+              approval: { salesApproved: true, businessApproved: true, financeApproved: true },
+              approvalRecords: [
+                  createOperationRecord('支付完成', 'Paid', `流水号: ${paymentForm.transactionId}`),
+                  createOperationRecord('系统交付', 'Completed', '自助订单自动完成交付')
+              , ...selectedOrder.approvalRecords]
+          });
+      } else {
+          // Standard Flow
+          updateOrder({
+              ...selectedOrder,
+              isPaid: true,
+              status: OrderStatus.PENDING_APPROVAL, // Move to Approval after Payment
+              paymentDate: new Date().toISOString(),
+              paymentRecord,
+              approvalRecords: [createOperationRecord('确认收款', 'Paid', `流水号: ${paymentForm.transactionId}`), ...selectedOrder.approvalRecords]
+          });
+      }
+      handleCloseDrawer();
+  };
+
+  const handleApproveAction = (role: 'sales' | 'finance' | 'business', action: 'Approve' | 'Reject') => {
+      if (action === 'Reject') {
+          // Rejection keeps it in PENDING_APPROVAL but logs the rejection
+          updateOrder({
+              ...selectedOrder,
+              approvalRecords: [createOperationRecord(`${role === 'sales' ? '销售' : role === 'business' ? '商务' : '财务'}审批`, 'Rejected', approvalComment), ...selectedOrder.approvalRecords]
+          });
+          setApprovalComment('');
+          alert('审批已拒绝，流程暂停。');
+          return;
+      }
+
+      const newApproval = { ...selectedOrder.approval };
+      let nextStatus = selectedOrder.status;
+      let actionName = '';
+
+      if (role === 'sales') {
+          newApproval.salesApproved = true;
+          newApproval.salesApprovedDate = new Date().toISOString();
+          actionName = '销售审批';
+      } else if (role === 'business') {
+          newApproval.businessApproved = true;
+          newApproval.businessApprovedDate = new Date().toISOString();
+          actionName = '商务审批';
+      } else if (role === 'finance') {
+          newApproval.financeApproved = true;
+          newApproval.financeApprovedDate = new Date().toISOString();
+          actionName = '财务审批';
+          // Final approval moves to CONFIRM
+          nextStatus = OrderStatus.PENDING_CONFIRM;
+      }
+
+      updateOrder({
+          ...selectedOrder,
+          status: nextStatus,
+          approval: newApproval,
+          approvalRecords: [createOperationRecord(actionName, 'Approved', approvalComment || '同意'), ...selectedOrder.approvalRecords]
+      });
+      setApprovalComment('');
+      // If it was the final approval, close drawer
+      if (role === 'finance') {
+          handleCloseDrawer();
+      }
+  };
+
+  const handleStockAction = (action: string) => {
+      let updates: Partial<Order> = {};
+      let comment = '';
+      const now = new Date().toISOString();
+
+      if (action === 'package') {
+          updates = { isPackageConfirmed: true, packageConfirmedDate: now };
+          comment = '安装包核验完成';
+      } else if (action === 'shipping_confirm') {
+          updates = { isShippingConfirmed: true, shippingConfirmedDate: now, carrier: shippingCarrier, trackingNumber: shippingTracking };
+          comment = `物流信息确认: ${shippingCarrier} ${shippingTracking}`;
+      } else if (action === 'cd') {
+          updates = { isCDBurned: true, cdBurnedDate: now };
+          comment = '光盘刻录完成';
+      } else if (action === 'auth') {
+          updates = { isAuthConfirmed: true, authConfirmedDate: now };
+          comment = '授权证书确认';
+          setIsCertPreviewMode(false);
+          setIsCertDrawerClosing(true);
+          setTimeout(() => { setSelectedCertificateItem(null); setIsCertDrawerClosing(false); }, 280);
+      }
+
+      updateOrder({
+          ...selectedOrder,
+          ...updates,
+          approvalRecords: [createOperationRecord('备货操作', 'Success', comment), ...selectedOrder.approvalRecords]
       });
   };
 
-  const handleBurnCD = () => {
-      const opRecord = createOperationRecord('CD Burning', 'Completed', 'Physical media created');
-      updateOrder({ 
-          ...selectedOrder, 
-          isCDBurned: true, 
-          cdBurnedDate: new Date().toISOString(),
-          approvalRecords: [opRecord, ...(selectedOrder.approvalRecords || [])]
+  const handleStockComplete = () => {
+      // In this new flow, clicking complete stock prep just confirms readiness. 
+      // It stays in PROCESSING_PROD but the UI should show "Ready".
+      // The Shipping step will actually transition status to SHIPPED.
+      updateOrder({
+          ...selectedOrder,
+          approvalRecords: [createOperationRecord('备货完成', 'Ready', '所有备货环节已确认完成'), ...selectedOrder.approvalRecords]
       });
+      handleCloseDrawer();
+  };
+
+  const handlePreviewAuth = (item: OrderItem) => {
+      setSelectedCertificateItem(item);
+      setIsCertPreviewMode(true);
   };
 
   const handleShipOrder = () => {
-      const opRecord = createOperationRecord('Shipping', 'Shipped', `Carrier: ${shippingCarrier}, Tracking: ${shippingTracking}`);
+      // Strict validation before shipping
+      const isStockReady = selectedOrder.isAuthConfirmed && selectedOrder.isPackageConfirmed && selectedOrder.isCDBurned && selectedOrder.isShippingConfirmed;
+      if (!selectedOrder.isPaid || !isStockReady) {
+          alert("无法发货：请确保订单已付款，且备货流程（授权确认、安装包核验、光盘刻录、物流单确认）全部完成。");
+          return;
+      }
+
+      const opRecord = createOperationRecord('正式发货', 'Shipped', `${selectedOrder.carrier}: ${selectedOrder.trackingNumber}`);
+      updateOrder({ ...selectedOrder, status: OrderStatus.SHIPPED, shippedDate: new Date().toISOString(), approvalRecords: [opRecord, ...selectedOrder.approvalRecords] });
+      handleCloseDrawer();
+  };
+
+  const handleAcceptPhase = (phaseId: string) => {
+      if (!selectedOrder.acceptanceConfig) return;
+      const phases = selectedOrder.acceptanceConfig.phases.map(p => p.id === phaseId ? { ...p, status: 'Accepted' as const, acceptedDate: new Date().toISOString() } : p);
+      // const allDone = phases.every(p => p.status === 'Accepted'); // Removed auto-complete
       updateOrder({ 
           ...selectedOrder, 
-          status: OrderStatus.SHIPPED, 
-          carrier: shippingCarrier, 
-          trackingNumber: shippingTracking,
-          approvalRecords: [opRecord, ...(selectedOrder.approvalRecords || [])]
+          // status: allDone ? OrderStatus.DELIVERED : selectedOrder.status, // Don't auto complete
+          acceptanceConfig: { ...selectedOrder.acceptanceConfig, phases, status: 'In Progress' },
+          approvalRecords: [createOperationRecord('验收确认', 'Success', '阶段验收通过'), ...selectedOrder.approvalRecords]
       });
   };
 
-  const handleConfirmDelivery = () => {
-      const opRecord = createOperationRecord('Delivery', 'Delivered', 'Customer received goods');
-      updateOrder({ 
-          ...selectedOrder, 
+  const handleCompleteAcceptance = () => {
+      if (selectedOrder.status === OrderStatus.DELIVERED) return;
+
+      let phases = selectedOrder.acceptanceConfig?.phases || [];
+      const hasPending = phases.some(p => p.status !== 'Accepted');
+      
+      if (hasPending) {
+          if (!confirm("当前仍有未完成的验收阶段，确认强制通过并完成订单吗？")) return;
+          const now = new Date().toISOString();
+          phases = phases.map(p => p.status === 'Accepted' ? p : { ...p, status: 'Accepted', acceptedDate: now });
+      }
+
+      updateOrder({
+          ...selectedOrder,
           status: OrderStatus.DELIVERED,
-          approvalRecords: [opRecord, ...(selectedOrder.approvalRecords || [])]
+          acceptanceConfig: selectedOrder.acceptanceConfig ? { ...selectedOrder.acceptanceConfig, phases, status: 'Completed' } : undefined,
+          approvalRecords: [createOperationRecord('最终验收确认', 'Completed', '订单已归档'), ...selectedOrder.approvalRecords]
       });
+      handleCloseDrawer();
   };
 
-  const startFulfillment = (i:number, item:OrderItem) => { setFulfillmentItemIndex(i); setFulfillmentContent(item.deliveredContent ? item.deliveredContent.join('\n') : ''); };
-  const saveFulfillment = () => { 
-      if(fulfillmentItemIndex===null) return; 
-      const items = [...selectedOrder.items]; items[fulfillmentItemIndex] = { ...items[fulfillmentItemIndex], deliveredContent: fulfillmentContent.split('\n').filter(l=>l.trim()!=='') };
-      
-      // Log fulfillment
-      const opRecord = createOperationRecord('Content Delivery', 'Updated', `Updated content for ${items[fulfillmentItemIndex].productName}`);
-      
-      updateOrder({...selectedOrder, items, approvalRecords: [opRecord, ...(selectedOrder.approvalRecords || [])]}); 
-      setFulfillmentItemIndex(null); 
+  const handleRefundSubmit = () => {
+      if (!refundReason) return alert("请填写退款原因");
+      updateOrder({
+          ...selectedOrder,
+          status: OrderStatus.REFUND_PENDING,
+          refundReason,
+          refundAmount,
+          approvalRecords: [createOperationRecord('发起退款', 'Requested', `原因: ${refundReason}, 金额: ¥${refundAmount}`), ...selectedOrder.approvalRecords]
+      });
+      handleCloseDrawer();
   };
 
-  // --- UI Components ---
-  const StatusBadge = ({ status }: { status: OrderStatus }) => {
-     let style = 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400';
-     if(status === OrderStatus.DELIVERED) style='bg-[#34C759] text-white dark:bg-[#32D74B]';
-     if(status === OrderStatus.PROCESSING_PROD) style='bg-[#0071E3] text-white dark:bg-[#FF2D55]';
-     if(status === OrderStatus.PENDING_APPROVAL) style='bg-[#FF9500] text-white dark:bg-[#FF9F0A]';
-     return <span className={`px-3 py-1 rounded-full text-xs font-bold ${style}`}>{status}</span>
-  }
+  const handleUploadAcceptanceDoc = () => {
+      alert("验收单模拟上传成功！");
+  };
 
-  const ActionButton = ({ label, icon: Icon, onClick, disabled, variant='primary' }: any) => (
-      <button 
-        onClick={onClick}
-        disabled={disabled}
-        className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition disabled:opacity-50
-            ${variant === 'primary' 
-                ? 'bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200' 
-                : 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-white/20'}
-        `}
-      >
-        {Icon && <Icon className="w-3.5 h-3.5" />} {label}
-      </button>
-  );
+  const handleCloseDrawer = () => { setIsDrawerClosing(true); setTimeout(() => { setActiveStepModal(null); setIsDrawerClosing(false); }, 280); };
+  
+  const handleCloseCertDrawer = () => { 
+      setIsCertDrawerClosing(true); 
+      setTimeout(() => { 
+          setSelectedCertificateItem(null); 
+          setIsCertDrawerClosing(false); 
+          setIsCertPreviewMode(false);
+      }, 280); 
+  };
 
-  const getResultBadgeColor = (result: string) => {
-      const r = result.toLowerCase();
-      if (r === 'approved' || r === 'success' || r === 'completed' || r === 'delivered' || r === 'shipped' || r === 'confirmed') 
-          return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-      if (r === 'rejected') 
-          return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
-      if (r === 'started')
-          return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
-      return 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400';
-  }
-
-  const ownerUser = users.find(u => u.id === selectedOrder.salesRepId);
+  const startFulfillment = (idx: number, item: OrderItem) => { setFulfillmentItemIndex(idx); setFulfillmentContent(item.deliveredContent?.join('\n') || ''); };
+  const saveFulfillment = () => {
+      if (fulfillmentItemIndex === null) return;
+      const items = [...selectedOrder.items];
+      items[fulfillmentItemIndex] = { ...items[fulfillmentItemIndex], deliveredContent: fulfillmentContent.split('\n').filter(l => l.trim()) };
+      updateOrder({ ...selectedOrder, items, approvalRecords: [createOperationRecord('交付内容更新', 'Updated'), ...selectedOrder.approvalRecords] });
+      setFulfillmentItemIndex(null);
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-[#F5F5F7] dark:bg-black">
-      {/* Sticky Header - Apple Style */}
+      {/* Header */}
       <div className="sticky top-0 z-20 bg-white/80 dark:bg-[#1C1C1E]/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-white/10 px-6 py-4 flex justify-between items-center">
-           <div className="flex items-center gap-4">
-               <button onClick={() => navigate('/orders')} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition text-gray-500 dark:text-gray-400">
-                   <ArrowLeft className="w-5 h-5" />
-               </button>
+           <div className="flex items-center gap-6">
+               <button onClick={() => navigate('/orders')} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition text-gray-500 dark:text-gray-400"><ArrowLeft className="w-5 h-5" /></button>
                <div className="flex flex-col">
                    <div className="flex items-center gap-3">
-                       <h1 className="text-xl font-bold text-gray-900 dark:text-white">订单 {selectedOrder.id}</h1>
-                       <StatusBadge status={selectedOrder.status} />
+                       <h1 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">订单 {selectedOrder.id}</h1>
+                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                           selectedOrder.status === OrderStatus.REFUND_PENDING ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                       }`}>{statusMap[selectedOrder.status] || selectedOrder.status}</span>
                    </div>
-                   <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-medium">
-                       <span>{selectedOrder.customerName}</span>
-                       <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600"></span>
-                       <span>{new Date(selectedOrder.date).toLocaleDateString()}</span>
-                   </div>
+                   <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{selectedOrder.customerName} · {new Date(selectedOrder.date).toLocaleDateString()}</div>
                </div>
            </div>
-           
-           <div className="flex gap-3">
-               {selectedOrder.isPaid && (
-                  <button onClick={() => setIsCertificateOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-xs font-semibold rounded-full hover:bg-gray-50 dark:hover:bg-white/5 transition shadow-sm">
-                      <Award className="w-4 h-4 text-[#FF9500]" /> 电子授权书
-                  </button>
-              )}
+           <div className="flex gap-4 items-center">
+               <div className="text-right hidden sm:block">
+                   <div className="text-[10px] text-gray-400 uppercase font-bold">应收总额</div>
+                   <div className="text-lg font-bold text-orange-600 dark:text-orange-400 font-mono">¥{selectedOrder.total.toLocaleString()}</div>
+               </div>
+               <div className="flex gap-2">
+                   {selectedOrder.isPaid && selectedOrder.status !== OrderStatus.REFUND_PENDING && selectedOrder.status !== OrderStatus.REFUNDED && selectedOrder.status !== OrderStatus.CANCELLED && (
+                       <button 
+                           onClick={() => setActiveStepModal('REFUND_REQUEST')} 
+                           className="px-4 py-2 border border-red-200 dark:border-red-900/30 text-red-600 dark:text-red-400 rounded-full text-xs font-bold hover:bg-red-50 dark:hover:bg-red-900/10 transition flex items-center gap-1.5"
+                       >
+                           <AlertOctagon className="w-3.5 h-3.5"/> 申请退款
+                       </button>
+                   )}
+                   <button onClick={() => navigate('/orders', { state: { initRenewal: true, originalOrder: selectedOrder } })} className="px-4 py-2 bg-indigo-600 text-white rounded-full text-xs font-bold shadow-lg flex items-center gap-1.5 hover:bg-indigo-700 transition"><RefreshCcw className="w-3.5 h-3.5"/> 续费订单</button>
+               </div>
            </div>
       </div>
 
-      <div className="p-6 lg:p-10 max-w-[1200px] mx-auto w-full space-y-8 animate-fade-in">
-          
-          {/* Progress Bar (Apple Style) */}
-          <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10">
-             <div className="relative flex justify-between items-center z-10">
-                 {[OrderStatus.PENDING_PAYMENT, OrderStatus.PENDING_APPROVAL, OrderStatus.PENDING_CONFIRM, OrderStatus.PROCESSING_PROD, OrderStatus.SHIPPED, OrderStatus.DELIVERED].map((step, idx) => {
-                     const steps = [OrderStatus.PENDING_PAYMENT, OrderStatus.PENDING_APPROVAL, OrderStatus.PENDING_CONFIRM, OrderStatus.PROCESSING_PROD, OrderStatus.SHIPPED, OrderStatus.DELIVERED];
-                     const currentIdx = steps.indexOf(selectedOrder.status === OrderStatus.CANCELLED ? OrderStatus.PENDING_PAYMENT : selectedOrder.status);
-                     const isDone = idx <= currentIdx;
-                     return (
-                         <div key={step} className="flex flex-col items-center gap-2">
-                             <div className={`w-3 h-3 rounded-full border-2 transition-all duration-500 ${isDone ? 'bg-[#0071E3] dark:bg-[#FF2D55] border-[#0071E3] dark:border-[#FF2D55] scale-125' : 'bg-white dark:bg-black border-gray-300 dark:border-gray-600'}`}></div>
-                             <div className={`text-[10px] font-semibold uppercase tracking-wider ${isDone ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-600'}`}>{step}</div>
-                         </div>
-                     )
-                 })}
-                 {/* Line */}
-                 <div className="absolute top-1.5 left-0 w-full h-0.5 bg-gray-100 dark:bg-white/10 -z-10">
-                     <div className="h-full bg-[#0071E3] dark:bg-[#FF2D55] transition-all duration-700" style={{ width: `${( [OrderStatus.PENDING_PAYMENT, OrderStatus.PENDING_APPROVAL, OrderStatus.PENDING_CONFIRM, OrderStatus.PROCESSING_PROD, OrderStatus.SHIPPED, OrderStatus.DELIVERED].indexOf(selectedOrder.status === OrderStatus.CANCELLED ? OrderStatus.PENDING_PAYMENT : selectedOrder.status) / 5) * 100}%` }}></div>
-                 </div>
+      <div className="p-6 lg:p-10 max-w-[1400px] mx-auto w-full space-y-8 animate-fade-in pb-32">
+          {/* Stepper */}
+          <div className="bg-white dark:bg-[#1C1C1E] p-8 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-x-auto">
+             <div className="flex justify-between items-start relative min-w-[800px]">
+                 <div className="absolute top-5 left-0 w-full h-1 bg-gray-100 dark:bg-white/10 -z-0 rounded-full"></div>
+                 {steps.map((step) => (
+                    <div key={step.id} onClick={() => !step.disabled && setActiveStepModal(step.id)} className={`flex flex-col items-center gap-3 relative z-10 flex-1 transition-all ${step.disabled ? 'opacity-40 grayscale cursor-not-allowed' : 'cursor-pointer hover:scale-105'}`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md ${step.status === 'Completed' ? 'bg-green-500 text-white' : step.status === 'Current' ? 'bg-[#0071E3] dark:bg-[#0A84FF] text-white ring-4 ring-blue-100 dark:ring-red-900/30 shadow-lg scale-110' : 'bg-white dark:bg-[#2C2C2E] border-2 border-gray-200 dark:border-gray-600 text-gray-400'}`}>
+                            {step.status === 'Locked' ? <Lock className="w-4 h-4" /> : <step.icon className="w-5 h-5" />}
+                        </div>
+                        <div className="text-center">
+                            <div className={`text-sm font-bold ${step.status === 'Completed' ? 'text-green-600' : step.status === 'Current' ? 'text-[#0071E3] dark:text-[#0A84FF]' : 'text-gray-400'}`}>{step.label}</div>
+                            {step.status === 'Current' && <div className="text-[10px] text-blue-500 font-bold animate-pulse mt-0.5">点击处理</div>}
+                        </div>
+                    </div>
+                 ))}
              </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Left Column: Details */}
               <div className="lg:col-span-2 space-y-8">
-                  
-                  {/* Action Card */}
-                  {selectedOrder.status !== OrderStatus.DELIVERED && selectedOrder.status !== OrderStatus.CANCELLED && (
-                    <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-blue-100/50 dark:border-white/10 relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-1 h-full bg-[#0071E3] dark:bg-[#FF2D55]"></div>
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                            <Settings className="w-5 h-5 text-gray-500 dark:text-gray-400" /> 待处理任务
-                        </h3>
-                        <div className="space-y-4">
-                            {/* Actions Logic */}
-                            {selectedOrder.status === OrderStatus.PENDING_PAYMENT && (
-                                <div className="flex justify-between items-center bg-gray-50 dark:bg-white/5 p-4 rounded-2xl">
-                                    <div className="text-sm text-gray-600 dark:text-gray-300">等待录入支付信息</div>
-                                    <ActionButton label="录入支付" icon={CreditCard} onClick={openPaymentModal} disabled={!canManagePayment} />
-                                </div>
-                            )}
-                            {selectedOrder.status === OrderStatus.PENDING_APPROVAL && (
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div className={`p-4 rounded-2xl border ${selectedOrder.approval.salesApproved ? 'bg-green-50 border-green-100 dark:bg-green-900/20 dark:border-green-800' : 'bg-gray-50 border-gray-100 dark:bg-white/5 dark:border-white/5'}`}>
-                                        <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">销售审批</div>
-                                        {!selectedOrder.approval.salesApproved ? (
-                                            <div className="flex gap-2"><ActionButton label="通过" variant="primary" onClick={()=>handleApprove('sales','Approve')} disabled={!canApproveSales}/><ActionButton label="拒绝" variant="secondary" onClick={()=>handleApprove('sales','Reject')} disabled={!canApproveSales}/></div>
-                                        ) : <span className="text-green-600 dark:text-green-400 text-sm font-bold flex items-center gap-1"><CheckCircle className="w-4 h-4"/> 已通过</span>}
-                                    </div>
-                                    
-                                     <div className={`p-4 rounded-2xl border ${selectedOrder.approval.businessApproved ? 'bg-green-50 border-green-100 dark:bg-green-900/20 dark:border-green-800' : 'bg-gray-50 border-gray-100 dark:bg-white/5 dark:border-white/5'} ${!selectedOrder.approval.salesApproved && 'opacity-50'}`}>
-                                        <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">商务审批</div>
-                                        {!selectedOrder.approval.businessApproved ? (
-                                            <div className="flex gap-2"><ActionButton label="通过" variant="primary" onClick={()=>handleApprove('business','Approve')} disabled={!canApproveBusiness||!selectedOrder.approval.salesApproved}/><ActionButton label="拒绝" variant="secondary" onClick={()=>handleApprove('business','Reject')} disabled={!canApproveBusiness||!selectedOrder.approval.salesApproved}/></div>
-                                        ) : <span className="text-green-600 dark:text-green-400 text-sm font-bold flex items-center gap-1"><CheckCircle className="w-4 h-4"/> 已通过</span>}
-                                    </div>
-                                     <div className={`p-4 rounded-2xl border ${selectedOrder.approval.financeApproved ? 'bg-green-50 border-green-100 dark:bg-green-900/20 dark:border-green-800' : 'bg-gray-50 border-gray-100 dark:bg-white/5 dark:border-white/5'} ${!selectedOrder.approval.businessApproved && 'opacity-50'}`}>
-                                        <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">财务审批</div>
-                                        {!selectedOrder.approval.financeApproved ? (
-                                            <div className="flex gap-2"><ActionButton label="通过" variant="primary" onClick={()=>handleApprove('finance','Approve')} disabled={!canApproveFinance||!selectedOrder.approval.businessApproved}/><ActionButton label="拒绝" variant="secondary" onClick={()=>handleApprove('finance','Reject')} disabled={!canApproveFinance||!selectedOrder.approval.businessApproved}/></div>
-                                        ) : <span className="text-green-600 dark:text-green-400 text-sm font-bold flex items-center gap-1"><CheckCircle className="w-4 h-4"/> 已通过</span>}
-                                    </div>
-                                </div>
-                            )}
-                            {selectedOrder.status === OrderStatus.PENDING_CONFIRM && (
-                                <div className="flex justify-between items-center bg-gray-50 dark:bg-white/5 p-4 rounded-2xl">
-                                    <div className="text-sm text-gray-600 dark:text-gray-300">所有审批已完成，准备生产。</div>
-                                    <ActionButton label="确认生产" icon={CheckSquare} onClick={handleConfirmOrder} disabled={!canConfirmOrder} />
-                                </div>
-                            )}
-                             {/* Processing/Shipping Logic */}
-                             {selectedOrder.status === OrderStatus.PROCESSING_PROD && (
-                                 <div className="space-y-3 p-4 bg-gray-50 dark:bg-white/5 rounded-2xl">
-                                     <div className="flex gap-4">
-                                        <button onClick={handleConfirmPackage} disabled={selectedOrder.isPackageConfirmed} className={`flex-1 py-2 rounded-xl text-sm font-bold transition ${selectedOrder.isPackageConfirmed ? 'bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-100' : 'bg-white dark:bg-[#1C1C1E] shadow-sm dark:text-white hover:bg-gray-50 dark:hover:bg-white/10'}`}>安装包确认</button>
-                                        <button onClick={handleBurnCD} disabled={selectedOrder.isCDBurned} className={`flex-1 py-2 rounded-xl text-sm font-bold transition ${selectedOrder.isCDBurned ? 'bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-100' : 'bg-white dark:bg-[#1C1C1E] shadow-sm dark:text-white hover:bg-gray-50 dark:hover:bg-white/10'}`}>光盘刻录</button>
-                                     </div>
-                                     <div className="pt-2 border-t border-gray-200 dark:border-white/10 flex gap-2">
-                                         <input placeholder="物流公司" value={shippingCarrier} onChange={e=>setShippingCarrier(e.target.value)} className="flex-1 p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black text-sm dark:text-white" />
-                                         <input placeholder="单号" value={shippingTracking} onChange={e=>setShippingTracking(e.target.value)} className="flex-1 p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-black text-sm dark:text-white" />
-                                         <ActionButton label="发货" onClick={handleShipOrder} disabled={!shippingCarrier || !shippingTracking || !selectedOrder.isPackageConfirmed || !selectedOrder.isCDBurned} />
-                                     </div>
-                                 </div>
-                             )}
-                             {selectedOrder.status === OrderStatus.SHIPPED && (
-                                 <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-2xl flex justify-between items-center">
-                                     <div>
-                                         <div className="text-sm font-bold text-gray-900 dark:text-white">运输中</div>
-                                         <div className="text-xs text-gray-500 dark:text-gray-400">{shippingCarrier} - {shippingTracking}</div>
-                                     </div>
-                                     <ActionButton label="确认送达" icon={CheckCircle} onClick={handleConfirmDelivery} disabled={!canManageShipping} />
-                                 </div>
-                             )}
-                        </div>
-                    </div>
-                  )}
-
-                  {/* Items List */}
+                  {/* Order Items Table */}
                   <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden">
-                      <div className="p-6 border-b border-gray-100 dark:border-white/10">
-                          <h3 className="text-lg font-bold text-gray-900 dark:text-white">购买清单</h3>
-                      </div>
+                      <div className="p-6 border-b border-gray-100 dark:border-white/10"><h3 className="text-lg font-bold text-gray-900 dark:text-white">订单商品明细</h3></div>
                       <table className="w-full text-left">
-                          <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wider">
-                              <tr>
-                                  <th className="p-5 pl-6">产品</th>
-                                  <th className="p-5">规格</th>
-                                  <th className="p-5 text-center">数量</th>
-                                  <th className="p-5 text-right">小计</th>
-                                  <th className="p-5 w-1/3">交付信息</th>
-                              </tr>
+                          <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 text-[10px] uppercase font-bold tracking-wider">
+                              <tr><th className="p-5">商品与规格</th><th className="p-5 text-center">数量</th><th className="p-5 text-right">单价/小计</th><th className="p-5">交付</th></tr>
                           </thead>
                           <tbody className="divide-y divide-gray-50 dark:divide-white/5">
                               {selectedOrder.items.map((item, idx) => (
-                                  <tr key={idx}>
-                                      <td className="p-5 pl-6">
+                                  <tr key={idx} className="group text-sm">
+                                      <td className="p-5">
                                           <div className="font-bold text-gray-900 dark:text-white">{item.productName}</div>
-                                          {item.installPackageName && <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.installPackageName}</div>}
+                                          <div className="text-[11px] text-gray-500 mt-0.5 flex items-center gap-1.5"><Box className="w-3 h-3"/>{item.skuName}</div>
                                       </td>
-                                      <td className="p-5 text-sm text-gray-600 dark:text-gray-300">{item.skuName}</td>
-                                      <td className="p-5 text-center font-medium dark:text-white">{item.quantity}</td>
-                                      <td className="p-5 text-right font-bold text-gray-900 dark:text-white">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
-                                      <td className="p-5 text-xs">
-                                          {fulfillmentItemIndex === idx ? (
-                                              <div className="flex flex-col gap-2">
-                                                  <textarea className="border border-gray-200 dark:border-white/10 p-2 rounded-lg w-full bg-white dark:bg-black text-gray-900 dark:text-white" value={fulfillmentContent} onChange={e=>setFulfillmentContent(e.target.value)}></textarea>
-                                                  <button onClick={saveFulfillment} className="bg-black dark:bg-white text-white dark:text-black px-3 py-1 rounded-lg self-end">保存</button>
-                                              </div>
-                                          ) : (
-                                              <div className="space-y-1">
-                                                  {item.deliveredContent?.map((c,i) => <div key={i} className="font-mono bg-gray-50 dark:bg-white/10 px-2 py-1 rounded inline-block mr-1 text-gray-700 dark:text-gray-300">{c}</div>)}
-                                                  {selectedOrder.status !== OrderStatus.CANCELLED && (
-                                                      <button onClick={()=>startFulfillment(idx, item)} className="block mt-1 text-[#0071E3] dark:text-[#FF2D55] hover:underline">编辑交付内容</button>
+                                      <td className="p-5 text-center dark:text-white font-medium">{item.quantity}</td>
+                                      <td className="p-5 text-right">
+                                          <div className="text-xs text-gray-400">¥{item.priceAtPurchase.toLocaleString()}</div>
+                                          <div className="font-bold dark:text-white">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</div>
+                                      </td>
+                                      <td className="p-5">
+                                          <div className="flex flex-col gap-1.5">
+                                              {item.deliveredContent?.map((c, i) => <div key={i} className="text-[10px] font-mono bg-gray-50 dark:bg-white/10 p-1.5 rounded border border-gray-100 dark:border-white/5 truncate max-w-[150px]">{c}</div>)}
+                                              <div className="flex gap-2">
+                                                  <button onClick={() => startFulfillment(idx, item)} className="text-[10px] text-blue-600 hover:underline">管理授权</button>
+                                                  {selectedOrder.isPaid && selectedOrder.confirmedDate && (
+                                                      <button onClick={() => { setSelectedCertificateItem(item); setIsCertPreviewMode(true); }} className="text-[10px] text-orange-600 hover:underline flex items-center gap-0.5"><Award className="w-3 h-3"/> 电子授权书</button>
                                                   )}
                                               </div>
-                                          )}
+                                          </div>
                                       </td>
                                   </tr>
                               ))}
@@ -384,216 +482,554 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                       </table>
                   </div>
 
-                  {/* Operations History (Timeline) - Updated */}
-                  <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10">
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                          <Activity className="w-5 h-5 text-gray-500" /> 操作记录
-                      </h3>
-                      <div className="space-y-6 relative pl-2">
-                           {/* Vertical Line */}
-                          <div className="absolute left-[19px] top-2 bottom-4 w-0.5 bg-gray-100 dark:bg-white/10"></div>
-                          
-                          {selectedOrder.approvalRecords?.map(rec => (
-                              <div key={rec.id} className="relative pl-10">
-                                  <div className={`absolute left-0 top-0 w-10 h-10 rounded-full border-4 border-white dark:border-[#1C1C1E] shadow-sm flex items-center justify-center z-10 bg-white dark:bg-gray-800`}>
-                                      <img 
-                                        src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${rec.operatorName}`} 
-                                        className="w-full h-full rounded-full object-cover" 
-                                        alt=""
-                                      />
-                                  </div>
-                                  <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
-                                      <div className="flex justify-between mb-1">
-                                          <span className="font-bold text-gray-900 dark:text-white text-sm">{rec.operatorName} <span className="text-xs font-normal text-gray-500 dark:text-gray-400">({rec.operatorRole})</span></span>
-                                          <span className="text-xs text-gray-400">{new Date(rec.timestamp).toLocaleString()}</span>
-                                      </div>
-                                      <div className="text-sm text-gray-600 dark:text-gray-300 flex items-center gap-2 mb-1">
-                                          <span className="font-medium">{rec.actionType}</span>
-                                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getResultBadgeColor(rec.result)}`}>{rec.result}</span>
-                                      </div>
-                                      {rec.comment && <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic border-t border-gray-200 dark:border-white/10 pt-2">"{rec.comment}"</div>}
+                  {/* Commerce & Acceptance Bento Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Delivery & Acceptance Info */}
+                      <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-5">
+                          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2"><Truck className="w-4 h-4"/> 交付与验收详情</h4>
+                          <div className="space-y-4">
+                              <div className="p-4 bg-gray-50 dark:bg-black/20 rounded-2xl border border-gray-100 dark:border-white/5">
+                                  <div className="text-gray-400 text-[10px] uppercase font-bold mb-1.5">收货信息</div>
+                                  <div className="text-gray-900 dark:text-white text-sm font-medium">{selectedOrder.shippingAddress || '无地址信息'}</div>
+                                  <div className="text-gray-500 dark:text-gray-400 text-xs mt-1 flex items-center gap-2">
+                                      <UserIcon className="w-3 h-3"/> {selectedOrder.acceptanceInfo?.contactName} · <div className="flex items-center gap-1"><span className="w-3 h-3 block bg-gray-300 rounded-full" /> {selectedOrder.acceptanceInfo?.contactPhone}</div>
                                   </div>
                               </div>
-                          ))}
-                          
-                          {(!selectedOrder.approvalRecords || selectedOrder.approvalRecords.length === 0) && (
-                              <div className="text-center py-8 text-gray-400 text-sm italic pl-8">暂无操作记录</div>
+                              <div className="grid grid-cols-2 gap-3">
+                                  <div className="p-3 border dark:border-white/10 rounded-xl">
+                                      <div className="text-gray-400 text-[10px] uppercase font-bold mb-1">验收方式</div>
+                                      <div className="text-xs font-bold dark:text-white">{selectedOrder.acceptanceInfo?.method === 'OnSite' ? '现场' : '远程' || '远程'}</div>
+                                  </div>
+                                  <div className="p-3 border dark:border-white/10 rounded-xl">
+                                      <div className="text-gray-400 text-[10px] uppercase font-bold mb-1">验收计划</div>
+                                      <div className="text-xs font-bold dark:text-white">{selectedOrder.acceptanceConfig?.type === 'Phased' ? '分期验收' : '整体验收'}</div>
+                                  </div>
+                              </div>
+                              {/* Acceptance Phases List */}
+                              {selectedOrder.acceptanceConfig?.phases && (
+                                  <div className="space-y-2 pt-2 border-t dark:border-white/5">
+                                      {selectedOrder.acceptanceConfig.phases.map(p => (
+                                          <div key={p.id} className="flex justify-between items-center text-[11px]">
+                                              <span className="text-gray-500">{p.name} ({p.percentage}%)</span>
+                                              {p.status === 'Accepted' ? 
+                                                <span className="text-green-600 font-bold flex items-center gap-1"><CheckCircle className="w-3 h-3"/> 已完成</span> :
+                                                <span className="text-gray-400 flex items-center gap-1"><Clock className="w-3 h-3"/> 待验收</span>
+                                              }
+                                          </div>
+                                      ))}
+                                  </div>
+                              )}
+                          </div>
+                      </div>
+
+                      {/* Invoice Details */}
+                      <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-5">
+                          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2"><Receipt className="w-4 h-4"/> 开票明细</h4>
+                          {selectedOrder.invoiceInfo ? (
+                              <div className="space-y-4">
+                                  <div className="p-4 bg-blue-50/50 dark:bg-blue-900/5 rounded-2xl border border-blue-100 dark:border-blue-900/10">
+                                      <div className="text-blue-600 dark:text-blue-400 text-[10px] uppercase font-bold mb-1">发票抬头</div>
+                                      <div className="text-gray-900 dark:text-white text-sm font-bold">{selectedOrder.invoiceInfo.title}</div>
+                                  </div>
+                                  <div className="space-y-2.5 px-1 text-sm">
+                                      <div className="flex justify-between">
+                                          <span className="text-gray-500 text-xs">纳税人识别号</span>
+                                          <span className="font-mono text-xs dark:text-white">{selectedOrder.invoiceInfo.taxId}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                          <span className="text-gray-500 text-xs">发票类型</span>
+                                          <span className="text-xs dark:text-white">增值税专用发票</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                          <span className="text-gray-500 text-xs">开户行</span>
+                                          <span className="text-xs dark:text-white">{selectedOrder.invoiceInfo.bankName || '-'}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                          <span className="text-gray-500 text-xs">银行账号</span>
+                                          <span className="font-mono text-xs dark:text-white">{selectedOrder.invoiceInfo.accountNumber || '-'}</span>
+                                      </div>
+                                  </div>
+                              </div>
+                          ) : (
+                              <div className="flex flex-col items-center justify-center py-10 text-gray-400 italic text-xs">
+                                  <FileText className="w-8 h-8 mb-2 opacity-20"/>
+                                  暂无开票信息
+                              </div>
                           )}
                       </div>
                   </div>
               </div>
 
-              {/* Right Column: Info Cards */}
+              {/* Sidebar Info */}
               <div className="space-y-6">
-                  <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10">
-                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">客户信息</h4>
-                      <div className="flex items-center gap-3 mb-4 cursor-pointer hover:opacity-80 transition" onClick={()=>navigate(`/customers/${selectedOrder.customerId}`)}>
-                          <div className="w-12 h-12 bg-gray-100 dark:bg-white/10 rounded-full flex items-center justify-center">
-                              <Building2 className="w-6 h-6 text-gray-400" />
-                          </div>
-                          <div>
-                              <div className="font-bold text-gray-900 dark:text-white">{selectedOrder.customerName}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">ID: {selectedOrder.customerId}</div>
-                          </div>
-                          <ChevronRight className="w-4 h-4 ml-auto text-gray-300 dark:text-gray-600" />
-                      </div>
-                      {/* Opportunity Info if exists */}
-                      {selectedOrder.opportunityId && (
-                           <div className="flex items-center gap-3 mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800 cursor-pointer" onClick={() => navigate(`/opportunities/${selectedOrder.opportunityId}`)}>
-                                <div className="text-blue-500 dark:text-blue-400">
-                                    <Target className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <div className="text-xs text-blue-600 dark:text-blue-300 font-bold uppercase">关联商机</div>
-                                    <div className="text-xs text-gray-700 dark:text-gray-300 font-medium">{selectedOrder.opportunityName || selectedOrder.opportunityId}</div>
-                                </div>
-                           </div>
-                      )}
-
-                      <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-white/10 text-sm">
-                          <div>
-                              <div className="text-gray-400 text-xs mb-0.5">销售负责人</div>
-                              <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                                  {ownerUser ? (
-                                      <img src={ownerUser.avatar} className="w-5 h-5 rounded-full border border-gray-100 dark:border-white/10 bg-white" alt=""/>
+                  {/* Full Customer Info - Updated to use Snapshot data */}
+                  <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-4">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">客户档案档案</h4>
+                      
+                      <div className="space-y-4">
+                          <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center border border-indigo-100 dark:border-indigo-800 shrink-0">
+                                  {fullCustomer?.logo ? (
+                                      <img src={fullCustomer.logo} className="w-full h-full object-cover rounded-2xl" alt="" />
                                   ) : (
-                                      <UserIcon className="w-3 h-3 text-blue-500" />
+                                      <Building className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
                                   )}
-                                  {selectedOrder.salesRepName || '未分配'}
                               </div>
-                              {selectedOrder.salesDepartmentId && <div className="text-xs text-gray-400 ml-7 mt-0.5">{getDepartmentPath(selectedOrder.salesDepartmentId)}</div>}
+                              <div>
+                                  <div className="text-sm font-bold text-gray-900 dark:text-white leading-tight">{selectedOrder.customerName}</div>
+                                  <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
+                                      {selectedOrder.customerIndustry || '行业未知'} · {selectedOrder.customerType || '类型未知'}
+                                  </div>
+                              </div>
+                          </div>
+                          
+                          <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/5 space-y-2">
+                              <div className="flex justify-between items-center text-xs">
+                                  <span className="text-gray-500">客户编码</span>
+                                  <span className="font-mono text-gray-700 dark:text-gray-300">{selectedOrder.customerId}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-xs">
+                                  <span className="text-gray-500">客户等级</span>
+                                  <span className="font-bold text-indigo-600 dark:text-indigo-400">{selectedOrder.customerLevel || '-'}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-xs pt-2 border-t border-gray-200 dark:border-white/10">
+                                  <span className="text-gray-500">所在区域</span>
+                                  <span className="text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                                      <MapPin className="w-3 h-3" /> {selectedOrder.customerRegion || '未知'}
+                                  </span>
+                              </div>
+                          </div>
+
+                          <button onClick={() => navigate(`/customers/${selectedOrder.customerId}`)} className="w-full py-2 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 transition">
+                              查看最新完整档案
+                          </button>
+                      </div>
+                  </div>
+
+                  {/* Business Overview */}
+                  <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-4">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">业务归属</h4>
+                      <div className="space-y-4">
+                          <div>
+                              <div className="text-[10px] text-gray-400 uppercase font-bold">销售负责人</div>
+                              <div className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white mt-1.5">
+                                  <UserIcon className="w-4 h-4 text-blue-500" /> {selectedOrder.salesRepName || '未分配'}
+                              </div>
                           </div>
                           <div>
-                              <div className="text-gray-400 text-xs mb-0.5">商务跟单</div>
-                              <div className="font-medium text-gray-900 dark:text-white">{selectedOrder.businessManagerName || '-'}</div>
+                              <div className="text-[10px] text-gray-400 uppercase font-bold">商务经理</div>
+                              <div className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white mt-1.5">
+                                  <Briefcase className="w-4 h-4 text-orange-500" /> 王强
+                              </div>
                           </div>
                       </div>
                   </div>
 
-                  <div className="bg-[#1D1D1F] dark:bg-white p-6 rounded-3xl shadow-lg text-white dark:text-black">
-                      <h4 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">订单总金额</h4>
-                      <div className="text-3xl font-bold tracking-tight">¥{selectedOrder.total.toLocaleString()}</div>
-                      {selectedOrder.isPaid ? (
-                          <div className="mt-4 flex items-center gap-2 text-green-400 dark:text-green-600 text-sm font-medium">
-                              <CheckCircle className="w-4 h-4" /> 已支付
-                          </div>
-                      ) : (
-                          <div className="mt-4 flex items-center gap-2 text-orange-400 dark:text-orange-600 text-sm font-medium">
-                              <Clock className="w-4 h-4" /> 待支付
-                          </div>
-                      )}
+                  <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2"><History className="w-4 h-4"/> 流转日志</h4>
+                      <div className="space-y-4 max-h-[300px] overflow-y-auto no-scrollbar">
+                          {selectedOrder.approvalRecords.map((log, idx) => (
+                              <div key={idx} className="relative pl-4 border-l border-gray-100 dark:border-white/10 pb-4 last:pb-0">
+                                  <div className="absolute -left-[4.5px] top-1 w-2 h-2 rounded-full bg-indigo-500"></div>
+                                  <div className="text-[10px] font-bold dark:text-white">{log.actionType}</div>
+                                  <div className="text-[9px] text-gray-400 font-mono mt-0.5">{new Date(log.timestamp).toLocaleString()}</div>
+                                  <div className="text-[10px] text-gray-500 mt-1">{log.operatorName}: {log.comment}</div>
+                              </div>
+                          ))}
+                      </div>
                   </div>
               </div>
           </div>
       </div>
 
-      {/* Payment Modal (Apple Style) */}
-      {isPaymentModalOpen && (
-         <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 animate-fade-in p-4">
-            <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-modal-enter border border-white/10">
-                <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">录入支付</h3>
-                    <button onClick={() => setIsPaymentModalOpen(false)} className="p-1 bg-gray-100 dark:bg-white/10 rounded-full hover:bg-gray-200 dark:hover:bg-white/20"><X className="w-4 h-4 text-gray-500 dark:text-gray-400" /></button>
-                </div>
-                <div className="p-6 space-y-4">
-                    <input className="w-full p-3 bg-gray-50 dark:bg-black border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white" placeholder="银行名称" value={paymentForm.bankName} onChange={e=>setPaymentForm({...paymentForm, bankName:e.target.value})} />
-                    <input className="w-full p-3 bg-gray-50 dark:bg-black border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white" placeholder="交易流水号" value={paymentForm.transactionId} onChange={e=>setPaymentForm({...paymentForm, transactionId:e.target.value})} />
-                    <input className="w-full p-3 bg-gray-50 dark:bg-black border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white" placeholder="付款人" value={paymentForm.payerName} onChange={e=>setPaymentForm({...paymentForm, payerName:e.target.value})} />
-                    <textarea className="w-full p-3 bg-gray-50 dark:bg-black border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white resize-none" placeholder="备注 (可选)" rows={2} value={paymentForm.remarks} onChange={e=>setPaymentForm({...paymentForm, remarks:e.target.value})} />
-                </div>
-                <div className="p-6 bg-gray-50/50 dark:bg-white/5 flex justify-end gap-3">
-                    <button onClick={() => setIsPaymentModalOpen(false)} className="px-5 py-2.5 text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-white/10 rounded-full">取消</button>
-                    <button onClick={handleConfirmPayment} className="px-5 py-2.5 bg-black dark:bg-white text-white dark:text-black font-medium rounded-full shadow-lg hover:bg-gray-800 dark:hover:bg-gray-200">确认</button>
-                </div>
-            </div>
-         </div>
+      {/* --- Action Drawer --- */}
+      {activeStepModal && (
+          <div className="fixed inset-0 z-50 flex justify-end">
+              <div className={`absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity ${isDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={handleCloseDrawer}></div>
+              <div className={`relative w-full max-w-md h-full bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col ${isDrawerClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
+                  <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center shrink-0">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                          {activeStepModal === 'REFUND_REQUEST' ? '发起退款申请' : `${steps.find(s => s.id === activeStepModal)?.label || '步骤'}处理`}
+                      </h3>
+                      <button onClick={handleCloseDrawer} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full text-gray-400"><X className="w-5 h-5"/></button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                      {activeStepModal === 'APPROVAL' && (
+                          <div className="space-y-6">
+                               <div className="p-4 bg-yellow-50 dark:bg-yellow-900/10 rounded-2xl border border-yellow-100 dark:border-yellow-900/20 text-xs text-yellow-700 dark:text-yellow-400">
+                                   请按顺序完成以下审批。财务审批通过后，订单将进入确认阶段。
+                               </div>
+                               
+                               {/* Sales Approval Node */}
+                               <div className={`p-4 rounded-2xl border transition-all ${selectedOrder.approval.salesApproved ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-white border-gray-200 dark:bg-black dark:border-white/10'}`}>
+                                   <div className="flex justify-between items-center mb-3">
+                                       <div className="font-bold text-gray-900 dark:text-white flex items-center gap-2">1. 销售审批</div>
+                                       {selectedOrder.approval.salesApproved ? <CheckCircle className="w-5 h-5 text-green-600"/> : <span className="text-xs text-orange-500 font-bold">待处理</span>}
+                                   </div>
+                                   {!selectedOrder.approval.salesApproved && (
+                                       <div className="space-y-3">
+                                           <textarea value={approvalComment} onChange={e => setApprovalComment(e.target.value)} placeholder="审批意见..." className="w-full p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-transparent dark:border-white/10 text-sm outline-none resize-none h-20 dark:text-white" />
+                                           <div className="flex gap-2">
+                                               <button onClick={() => handleApproveAction('sales', 'Reject')} className="flex-1 py-2 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 text-xs transition">拒绝</button>
+                                               <button onClick={() => handleApproveAction('sales', 'Approve')} className="flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 text-xs transition">同意</button>
+                                           </div>
+                                       </div>
+                                   )}
+                                   {selectedOrder.approval.salesApproved && <div className="text-xs text-gray-500">已于 {new Date(selectedOrder.approval.salesApprovedDate!).toLocaleString()} 通过</div>}
+                               </div>
+
+                               {/* Business Approval Node */}
+                               <div className={`p-4 rounded-2xl border transition-all ${selectedOrder.approval.businessApproved ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : (selectedOrder.approval.salesApproved ? 'bg-white border-gray-200 dark:bg-black dark:border-white/10' : 'opacity-50 bg-gray-50 dark:bg-white/5 border-gray-200')}`}>
+                                   <div className="flex justify-between items-center mb-3">
+                                       <div className="font-bold text-gray-900 dark:text-white flex items-center gap-2">2. 商务审批</div>
+                                       {selectedOrder.approval.businessApproved ? <CheckCircle className="w-5 h-5 text-green-600"/> : (selectedOrder.approval.salesApproved ? <span className="text-xs text-orange-500 font-bold">待处理</span> : <Lock className="w-4 h-4 text-gray-400"/>)}
+                                   </div>
+                                   {selectedOrder.approval.salesApproved && !selectedOrder.approval.businessApproved && (
+                                       <div className="space-y-3">
+                                           <textarea value={approvalComment} onChange={e => setApprovalComment(e.target.value)} placeholder="审批意见..." className="w-full p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-transparent dark:border-white/10 text-sm outline-none resize-none h-20 dark:text-white" />
+                                           <div className="flex gap-2">
+                                               <button onClick={() => handleApproveAction('business', 'Reject')} className="flex-1 py-2 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 text-xs transition">拒绝</button>
+                                               <button onClick={() => handleApproveAction('business', 'Approve')} className="flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 text-xs transition">同意</button>
+                                           </div>
+                                       </div>
+                                   )}
+                                   {selectedOrder.approval.businessApproved && <div className="text-xs text-gray-500">已于 {new Date(selectedOrder.approval.businessApprovedDate!).toLocaleString()} 通过</div>}
+                               </div>
+
+                               {/* Finance Approval Node */}
+                               <div className={`p-4 rounded-2xl border transition-all ${selectedOrder.approval.financeApproved ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : (selectedOrder.approval.businessApproved ? 'bg-white border-gray-200 dark:bg-black dark:border-white/10' : 'opacity-50 bg-gray-50 dark:bg-white/5 border-gray-200')}`}>
+                                   <div className="flex justify-between items-center mb-3">
+                                       <div className="font-bold text-gray-900 dark:text-white flex items-center gap-2">3. 财务审批</div>
+                                       {selectedOrder.approval.financeApproved ? <CheckCircle className="w-5 h-5 text-green-600"/> : (selectedOrder.approval.businessApproved ? <span className="text-xs text-orange-500 font-bold">待处理</span> : <Lock className="w-4 h-4 text-gray-400"/>)}
+                                   </div>
+                                   {selectedOrder.approval.businessApproved && !selectedOrder.approval.financeApproved && (
+                                       <div className="space-y-3">
+                                           <textarea value={approvalComment} onChange={e => setApprovalComment(e.target.value)} placeholder="审批意见..." className="w-full p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-transparent dark:border-white/10 text-sm outline-none resize-none h-20 dark:text-white" />
+                                           <div className="flex gap-2">
+                                               <button onClick={() => handleApproveAction('finance', 'Reject')} className="flex-1 py-2 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 text-xs transition">拒绝</button>
+                                               <button onClick={() => handleApproveAction('finance', 'Approve')} className="flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 text-xs transition">同意</button>
+                                           </div>
+                                       </div>
+                                   )}
+                                   {selectedOrder.approval.financeApproved && <div className="text-xs text-gray-500">已于 {new Date(selectedOrder.approval.financeApprovedDate!).toLocaleString()} 通过</div>}
+                               </div>
+                          </div>
+                      )}
+                      {activeStepModal === 'CONFIRM' && (
+                          <div className="space-y-6 text-center py-10">
+                              <CheckSquare className="w-16 h-16 text-blue-500 mx-auto" />
+                              <h4 className="text-lg font-bold dark:text-white">确认订单转备货</h4>
+                              <p className="text-sm text-gray-500">确认后，系统将通知交付中心开始准备安装包与授权光盘。</p>
+                              <button onClick={handleConfirmOrder} className="w-full py-4 bg-black dark:bg-white text-white dark:text-black rounded-full font-bold shadow-xl">确认并启动备货</button>
+                          </div>
+                      )}
+                      {activeStepModal === 'STOCK_PREP' && (
+                          <div className="space-y-6">
+                               <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs rounded-xl border border-blue-100 dark:border-blue-900/30">
+                                   请依次完成以下备货环节。光盘刻录需在安装包确认后进行。
+                               </div>
+
+                               {/* 1. Authorization Confirmation */}
+                               <div className={`p-4 rounded-2xl border-2 transition-all ${selectedOrder.isAuthConfirmed ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-white dark:bg-black border-gray-100 dark:border-white/10'}`}>
+                                   <div className="flex justify-between items-center mb-3">
+                                       <div className="font-bold text-gray-900 dark:text-white flex items-center gap-2"><Key className="w-4 h-4"/> 授权确认</div>
+                                       {selectedOrder.isAuthConfirmed && <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400"/>}
+                                   </div>
+                                   {!selectedOrder.isAuthConfirmed && (
+                                       <>
+                                           <div className="bg-gray-50 dark:bg-white/5 p-3 rounded-lg text-xs mb-3 border border-gray-100 dark:border-white/5 space-y-1">
+                                               {selectedOrder.items.slice(0, 3).map((item, i) => (
+                                                   <div key={i} className="flex justify-between text-gray-600 dark:text-gray-400">
+                                                       <span className="truncate w-2/3">{item.productName}</span>
+                                                       <span>x{item.quantity}</span>
+                                                   </div>
+                                               ))}
+                                               {selectedOrder.items.length > 3 && <div className="text-gray-400 italic">...等共 {selectedOrder.items.length} 项</div>}
+                                           </div>
+                                           <button onClick={() => handlePreviewAuth(selectedOrder.items[0])} className="w-full py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition flex items-center justify-center gap-1">
+                                               <Eye className="w-3.5 h-3.5"/> 生成并预览授权证书
+                                           </button>
+                                       </>
+                                   )}
+                               </div>
+
+                               {/* 2. Package Confirmation */}
+                               <div className={`p-4 rounded-2xl border-2 transition-all ${selectedOrder.isPackageConfirmed ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-white dark:bg-black border-gray-100 dark:border-white/10'}`}>
+                                   <div className="flex justify-between items-center mb-3">
+                                       <div className="font-bold text-gray-900 dark:text-white flex items-center gap-2"><Package className="w-4 h-4"/> 安装包核验</div>
+                                       {selectedOrder.isPackageConfirmed && <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400"/>}
+                                   </div>
+                                   {!selectedOrder.isPackageConfirmed && (
+                                       <button onClick={() => handleStockAction('package')} className="w-full py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-xl text-xs font-bold hover:bg-blue-100 transition">确认安装包就绪</button>
+                                   )}
+                               </div>
+
+                               {/* 3. Shipping Bill Confirmation */}
+                               <div className={`p-4 rounded-2xl border-2 transition-all ${selectedOrder.isShippingConfirmed ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-white dark:bg-black border-gray-100 dark:border-white/10'}`}>
+                                   <div className="flex justify-between items-center mb-3">
+                                       <div className="font-bold text-gray-900 dark:text-white flex items-center gap-2"><Truck className="w-4 h-4"/> 快递单确认</div>
+                                       {selectedOrder.isShippingConfirmed && <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400"/>}
+                                   </div>
+                                   {!selectedOrder.isShippingConfirmed && (
+                                       <div className="space-y-3">
+                                           <input placeholder="快递服务商 (如: 顺丰)" value={shippingCarrier} onChange={e => setShippingCarrier(e.target.value)} className="w-full p-2.5 bg-gray-50 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10 text-xs dark:text-white" />
+                                           <input placeholder="物流单号" value={shippingTracking} onChange={e => setShippingTracking(e.target.value)} className="w-full p-2.5 bg-gray-50 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10 text-xs font-mono dark:text-white" />
+                                           <button onClick={() => handleStockAction('shipping_confirm')} className="w-full py-2 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-xl text-xs font-bold hover:bg-orange-100 transition">保存并确认物流信息</button>
+                                       </div>
+                                   )}
+                                   {selectedOrder.isShippingConfirmed && (
+                                       <div className="text-xs text-gray-600 dark:text-gray-400">{selectedOrder.carrier}: {selectedOrder.trackingNumber}</div>
+                                   )}
+                               </div>
+
+                               {/* 4. CD Burning (Dependent) */}
+                               <div className={`p-4 rounded-2xl border-2 transition-all ${selectedOrder.isCDBurned ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : !selectedOrder.isPackageConfirmed ? 'opacity-50 grayscale bg-gray-50 border-gray-200 dark:bg-white/5 dark:border-white/5' : 'bg-white dark:bg-black border-gray-100 dark:border-white/10'}`}>
+                                   <div className="flex justify-between items-center mb-3">
+                                       <div className="font-bold text-gray-900 dark:text-white flex items-center gap-2"><Disc className="w-4 h-4"/> 光盘刻录</div>
+                                       {selectedOrder.isCDBurned && <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400"/>}
+                                   </div>
+                                   {!selectedOrder.isCDBurned && (
+                                       <button 
+                                          onClick={() => handleStockAction('cd')} 
+                                          disabled={!selectedOrder.isPackageConfirmed}
+                                          className="w-full py-2 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-xl text-xs font-bold hover:bg-purple-100 disabled:cursor-not-allowed transition"
+                                       >
+                                           {selectedOrder.isPackageConfirmed ? '完成刻录' : '等待安装包确认...'}
+                                       </button>
+                                   )}
+                               </div>
+
+                               {/* Final Complete Button */}
+                               {selectedOrder.isAuthConfirmed && selectedOrder.isPackageConfirmed && selectedOrder.isCDBurned && selectedOrder.isShippingConfirmed && (
+                                   <button 
+                                      onClick={handleStockComplete} 
+                                      className="w-full py-4 bg-[#0071E3] dark:bg-[#0A84FF] text-white rounded-full font-bold shadow-lg animate-pulse hover:opacity-80 transition mt-4"
+                                   >
+                                       备货状态更新为：已备货完成
+                                   </button>
+                               )}
+                          </div>
+                      )}
+                      {activeStepModal === 'PAYMENT' && (
+                          <div className="space-y-6">
+                              <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/20 text-blue-700">
+                                  <div className="text-[10px] font-bold uppercase mb-1">应收账款</div>
+                                  <div className="text-2xl font-bold font-mono">¥{selectedOrder.total.toLocaleString()}</div>
+                              </div>
+                              <div className="space-y-4">
+                                  <input placeholder="收款银行" value={paymentForm.bankName} onChange={e=>setPaymentForm({...paymentForm, bankName:e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-black rounded-xl border border-transparent dark:border-white/10 dark:text-white text-sm" />
+                                  <input placeholder="交易流水号" value={paymentForm.transactionId} onChange={e=>setPaymentForm({...paymentForm, transactionId:e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-black rounded-xl border border-transparent dark:border-white/10 dark:text-white text-sm font-mono" />
+                              </div>
+                              <button onClick={handleConfirmPayment} className="w-full py-4 bg-green-500 text-white rounded-full font-bold shadow-lg hover:opacity-80 transition mt-6">确认到账</button>
+                          </div>
+                      )}
+                      {activeStepModal === 'SHIPPING' && (
+                          <div className="space-y-6 text-center py-6">
+                               <Truck className="w-12 h-12 text-blue-500 mx-auto" />
+                               <div className="space-y-2 text-left bg-gray-50 dark:bg-white/10 p-4 rounded-2xl text-xs">
+                                   <div className="flex justify-between"><span>财务状态</span><span className={selectedOrder.isPaid ? 'text-green-600 font-bold' : 'text-red-500 font-bold'}>{selectedOrder.isPaid ? '已结清' : '未支付'}</span></div>
+                                   <div className="flex justify-between"><span>备货状态</span><span className={(selectedOrder.isPackageConfirmed && selectedOrder.isCDBurned && selectedOrder.isAuthConfirmed && selectedOrder.isShippingConfirmed) ? 'text-green-600 font-bold' : 'text-orange-500 font-bold'}>{(selectedOrder.isPackageConfirmed && selectedOrder.isCDBurned && selectedOrder.isAuthConfirmed && selectedOrder.isShippingConfirmed) ? '已备货' : '备货中'}</span></div>
+                               </div>
+                               <button 
+                                  onClick={handleShipOrder} 
+                                  disabled={!selectedOrder.isPaid || !selectedOrder.isPackageConfirmed || !selectedOrder.isCDBurned || !selectedOrder.isAuthConfirmed || !selectedOrder.isShippingConfirmed} 
+                                  className="w-full py-4 bg-black dark:bg-white text-white dark:text-black rounded-full font-bold shadow-xl disabled:opacity-30 disabled:cursor-not-allowed"
+                               >
+                                  确认执行发货
+                               </button>
+                          </div>
+                      )}
+                      {activeStepModal === 'ACCEPTANCE' && (
+                          <div className="space-y-6">
+                               <div className="text-center">
+                                   <ClipboardCheck className="w-12 h-12 text-indigo-500 mx-auto mb-2" />
+                                   <h4 className="font-bold dark:text-white">验收环节确认</h4>
+                               </div>
+                               
+                               {/* Mock Upload Section */}
+                               <div className="p-4 bg-gray-50 dark:bg-white/5 border border-dashed border-gray-300 dark:border-white/20 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 transition" onClick={handleUploadAcceptanceDoc}>
+                                   <UploadCloud className="w-6 h-6 text-gray-400" />
+                                   <span className="text-xs text-gray-500">点击上传已签署的验收单 (PDF/IMG)</span>
+                               </div>
+
+                               <div className="space-y-3">
+                                   {selectedOrder.acceptanceConfig?.phases.map(p => (
+                                       <div key={p.id} className="p-4 border dark:border-white/10 rounded-2xl flex justify-between items-center bg-white dark:bg-black/20">
+                                           <div>
+                                               <div className="text-sm font-bold dark:text-white">{p.name} ({p.percentage}%)</div>
+                                               <div className="text-[10px] text-gray-500 mt-0.5">金额: ¥{p.amount.toLocaleString()}</div>
+                                           </div>
+                                           {p.status === 'Accepted' ? (
+                                               <span className="text-xs text-green-600 font-bold flex items-center gap-1"><CheckCircle className="w-3 h-3"/> 已验收</span>
+                                           ) : (
+                                               <button onClick={() => handleAcceptPhase(p.id)} className="px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition">通过验收</button>
+                                           )}
+                                       </div>
+                                   ))}
+                               </div>
+                               
+                               <button 
+                                  onClick={handleCompleteAcceptance} 
+                                  className="w-full py-4 bg-green-600 text-white rounded-full font-bold shadow-lg hover:bg-green-700 transition mt-4"
+                               >
+                                  确认完成验收
+                               </button>
+                          </div>
+                      )}
+                      {activeStepModal === 'REFUND_REQUEST' && (
+                          <div className="space-y-6">
+                              <div className="text-center">
+                                  <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
+                                      <AlertOctagon className="w-6 h-6 text-red-500" />
+                                  </div>
+                                  <h4 className="font-bold dark:text-white text-lg">申请退款</h4>
+                                  <p className="text-xs text-gray-500 mt-1">请填写退款原因及金额，提交后需经过财务审批。</p>
+                              </div>
+                              <div className="space-y-4">
+                                  <div>
+                                      <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 block">退款原因</label>
+                                      <textarea 
+                                          className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none resize-none focus:ring-2 focus:ring-red-100 dark:text-white"
+                                          rows={3}
+                                          placeholder="例如：客户需求变更、产品质量问题..."
+                                          value={refundReason}
+                                          onChange={e => setRefundReason(e.target.value)}
+                                      />
+                                  </div>
+                                  <div>
+                                      <label className="text-xs font-bold text-gray-500 uppercase mb-1.5 block">退款金额 (最大 ¥{selectedOrder.total.toLocaleString()})</label>
+                                      <input 
+                                          type="number"
+                                          className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none font-bold focus:ring-2 focus:ring-red-100 dark:text-white"
+                                          value={refundAmount}
+                                          onChange={e => setRefundAmount(Math.min(Number(e.target.value), selectedOrder.total))}
+                                      />
+                                  </div>
+                              </div>
+                              <button 
+                                  onClick={handleRefundSubmit} 
+                                  className="w-full py-4 bg-red-600 text-white rounded-full font-bold shadow-lg hover:bg-red-700 transition"
+                              >
+                                  提交退款申请
+                              </button>
+                          </div>
+                      )}
+                  </div>
+              </div>
+          </div>
       )}
 
-      {/* Certificate */}
-      {isCertificateOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in">
-              <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl relative animate-modal-enter overflow-y-auto max-h-[90vh]">
-                   <button onClick={() => setIsCertificateOpen(false)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full z-10 hover:bg-gray-200 transition"><X className="w-5 h-5 text-gray-600" /></button>
+      {/* License Cert Drawer */}
+      {selectedCertificateItem && (
+          <div className="fixed inset-0 z-50 flex justify-end">
+              <div className={`absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity ${isCertDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={handleCloseCertDrawer}></div>
+              <div className={`relative w-full max-w-4xl h-full bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col ${isCertDrawerClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
+                   {/* Cert Header */}
+                   <div className="p-4 border-b border-gray-100 dark:border-white/10 flex justify-between items-center print:hidden bg-white dark:bg-white/5">
+                       <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                           <Award className="w-5 h-5 text-orange-500"/> {isCertPreviewMode ? '授权证书预览与确认' : '软件授权证书'}
+                       </h3>
+                       <div className="flex gap-2">
+                           {!isCertPreviewMode && (
+                               <button onClick={() => window.print()} className="px-4 py-2 bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200 rounded-lg flex items-center gap-2 text-sm font-medium transition"><Printer className="w-4 h-4"/> 打印证书</button>
+                           )}
+                           <button onClick={handleCloseCertDrawer} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-gray-600 dark:text-gray-300"><X className="w-5 h-5"/></button>
+                       </div>
+                   </div>
                    
-                   <div className="p-12 m-4 text-center relative overflow-hidden">
-                        {/* Decorative Border */}
-                        <div className="absolute inset-0 border-[12px] border-double border-[#C5A572] pointer-events-none"></div>
-                        <div className="absolute inset-3 border border-[#C5A572] pointer-events-none"></div>
-
-                        {/* Header */}
-                        <div className="mb-10">
-                            <div className="flex justify-center mb-4">
-                                <Award className="w-16 h-16 text-[#C5A572]" />
+                   {/* Cert Content */}
+                   <div className="flex-1 p-8 overflow-y-auto bg-gray-50 dark:bg-black/50">
+                        {/* Certificate Paper */}
+                        <div id="cert-content" className="relative bg-white text-gray-900 border-[12px] border-white shadow-xl mx-auto max-w-[800px] p-12 min-h-[1000px]">
+                            {/* Watermark */}
+                            <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none overflow-hidden">
+                                <ShieldCheck className="w-[500px] h-[500px]" />
                             </div>
-                            <h1 className="text-4xl font-serif font-bold text-gray-900 mb-2 tracking-wide">正版软件授权书</h1>
-                            <div className="text-xs font-serif text-[#C5A572] uppercase tracking-[0.3em]">Certificate of Authorization</div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="mb-8 text-left space-y-6 px-8 font-serif text-gray-800 leading-relaxed">
-                            <p>
-                                兹证明：<span className="font-bold text-xl underline decoration-[#C5A572] underline-offset-4 px-2">{selectedOrder.customerName}</span>
-                            </p>
-                            <p>
-                                已获得北京金山办公软件股份有限公司旗下相关产品的合法使用授权。该授权受中华人民共和国法律保护，请放心使用。
-                            </p>
                             
-                            {/* Product Table */}
-                            <div className="mt-8 border-t border-b border-gray-200 py-4">
-                                <table className="w-full text-left">
-                                    <thead>
-                                        <tr className="text-sm text-gray-500 border-b border-gray-100">
-                                            <th className="pb-2 font-normal">授权产品</th>
-                                            <th className="pb-2 font-normal">规格/版本</th>
-                                            <th className="pb-2 font-normal text-center">数量</th>
-                                            <th className="pb-2 font-normal text-right">授权期限</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="text-base font-bold">
-                                        {selectedOrder.items.map((item, idx) => {
-                                            const template = products.find(p => p.id === item.productId)?.licenseTemplate;
-                                            return (
-                                                <tr key={idx}>
-                                                    <td className="py-3">{item.productName}</td>
-                                                    <td className="py-3 font-medium text-gray-600 text-sm">{item.skuName}</td>
-                                                    <td className="py-3 text-center">{item.quantity}</td>
-                                                    <td className="py-3 text-right">
-                                                        {template?.showLicensePeriod ? (item.skuName.includes('年') ? '1 年' : '永久') : '永久有效'}
-                                                    </td>
-                                                </tr>
-                                            )
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                            <div className="relative z-10 text-center space-y-10">
+                                 <div className="flex flex-col items-center gap-3">
+                                     <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl font-black italic shadow-lg">W</div>
+                                     <div className="text-xs font-bold tracking-[0.3em] text-blue-600 uppercase">WPS Enterprise Systems</div>
+                                 </div>
+                                 
+                                 <div className="space-y-1">
+                                    <h2 className="text-4xl font-serif text-gray-900 font-medium tracking-wide">软件产品授权证书</h2>
+                                    <div className="text-[10px] text-gray-400 uppercase tracking-widest">Certificate of Software License</div>
+                                 </div>
 
-                        {/* Footer */}
-                        <div className="mt-16 flex justify-between items-end px-8">
-                            <div className="text-left text-sm text-gray-500 font-serif">
-                                <div>授权编号：{selectedOrder.id}</div>
-                                <div>颁发日期：{new Date().toLocaleDateString()}</div>
-                            </div>
-                            <div className="text-center relative">
-                                {/* Digital Stamp */}
-                                <div className="w-32 h-32 rounded-full border-4 border-red-600 text-red-600 flex items-center justify-center absolute -top-20 -left-10 opacity-80 rotate-[-15deg] pointer-events-none mix-blend-multiply">
-                                    <div className="w-28 h-28 rounded-full border border-red-600 flex items-center justify-center relative">
-                                        <div className="text-[10px] absolute top-2 tracking-widest font-bold">北京金山办公软件</div>
-                                        <div className="font-bold text-lg border-t border-b border-red-600 py-1">业务专用章</div>
-                                        <div className="text-[8px] absolute bottom-3 tracking-widest">1101080000000</div>
-                                    </div>
-                                </div>
-                                <div className="font-bold font-serif text-gray-900 relative z-10 mt-4">北京金山办公软件股份有限公司</div>
+                                 <div className="text-left text-base leading-loose text-gray-700 space-y-8 pt-6 border-t border-gray-100">
+                                     <div>
+                                         <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">授权用户 (Licensee)</p>
+                                         <h3 className="text-2xl font-bold text-gray-900 underline underline-offset-8 decoration-blue-500/30 decoration-2">{selectedOrder.customerName}</h3>
+                                     </div>
+                                     
+                                     <div className="grid grid-cols-2 gap-6 text-left bg-gray-50 p-6 rounded-xl border border-gray-100">
+                                         <div>
+                                             <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">产品名称 (Product)</div>
+                                             <div className="text-lg font-bold text-gray-900">{selectedCertificateItem.productName}</div>
+                                         </div>
+                                         <div>
+                                             <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">规格型号 (SKU)</div>
+                                             <div className="text-base font-medium text-gray-900">{selectedCertificateItem.skuName}</div>
+                                         </div>
+                                         <div>
+                                             <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">授权数量 (Quantity)</div>
+                                             <div className="text-base font-mono font-bold text-gray-900">{selectedCertificateItem.quantity}</div>
+                                         </div>
+                                         <div>
+                                             <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">生效日期 (Date)</div>
+                                             <div className="text-base font-mono font-medium text-gray-900">{new Date(selectedOrder.confirmedDate || Date.now()).toLocaleDateString()}</div>
+                                         </div>
+                                         <div className="col-span-2 pt-2 border-t border-gray-200/50">
+                                             <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">授权许可码 (License Key)</div>
+                                             <div className="font-mono text-sm text-blue-600 bg-white p-2 rounded border border-blue-100 break-all">
+                                                 {selectedCertificateItem.deliveredContent?.[0] || 'PREVIEW-LICENSE-KEY-GENERATED-001'}
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </div>
+
+                                 <div className="flex justify-between items-end pt-12 text-left">
+                                     <div className="space-y-1">
+                                         <div className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Authorized Signature</div>
+                                         <div className="h-12 w-32 border-b border-gray-300 relative">
+                                             <div className="absolute bottom-1 left-0 text-2xl font-serif italic text-blue-800 opacity-80 rotate-[-5deg]">WPS Inc.</div>
+                                         </div>
+                                         <div className="text-xs font-bold">WPS Systems Ltd.</div>
+                                     </div>
+                                     <div className="text-right">
+                                         <div className="w-20 h-20 border-4 border-blue-600 rounded-full flex items-center justify-center relative rotate-[-12deg] opacity-80 mask-stamp">
+                                             <div className="text-[8px] uppercase font-bold tracking-widest text-blue-600 absolute top-2">Official Seal</div>
+                                             <ShieldCheck className="w-8 h-8 text-blue-600" />
+                                             <div className="text-[8px] uppercase font-bold tracking-widest text-blue-600 absolute bottom-2">Verified</div>
+                                         </div>
+                                     </div>
+                                 </div>
                             </div>
                         </div>
                    </div>
-                   
-                   {/* Actions */}
-                   <div className="bg-gray-50 p-4 flex justify-end gap-3 border-t border-gray-100">
-                       <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition text-sm font-medium">
-                           <Download className="w-4 h-4" /> 打印/下载
-                       </button>
-                   </div>
+
+                   {/* Footer Actions for Preview Mode */}
+                   {isCertPreviewMode && (
+                        <div className="p-4 bg-white dark:bg-[#1C1C1E] border-t border-gray-100 dark:border-white/10 flex justify-end gap-3 shrink-0">
+                            <button onClick={handleCloseCertDrawer} className="px-5 py-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition font-medium">取消</button>
+                            <button onClick={() => handleStockAction('auth')} className="px-6 py-2.5 bg-[#0071E3] dark:bg-[#0A84FF] text-white rounded-full hover:bg-blue-600 dark:hover:bg-[#0A84FF]/80 transition shadow-lg font-bold">确认授权无误</button>
+                        </div>
+                   )}
+              </div>
+          </div>
+      )}
+
+      {/* Fulfillment Modal */}
+      {fulfillmentItemIndex !== null && (
+          <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-modal-enter border border-white/10">
+                  <div className="p-6 border-b dark:border-white/10 flex justify-between items-center"><h3 className="font-bold dark:text-white">配置交付内容</h3><button onClick={() => setFulfillmentItemIndex(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5"/></button></div>
+                  <div className="p-6 space-y-4">
+                      <label className="text-xs font-bold text-gray-400 uppercase block">授权码 / 链接 (每行一个)</label>
+                      <textarea value={fulfillmentContent} onChange={e => setFulfillmentContent(e.target.value)} placeholder="例如：XXXXX-XXXXX-XXXXX" className="w-full p-4 bg-gray-50 dark:bg-black border border-transparent dark:border-white/10 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-blue-100 dark:text-white min-h-[160px] resize-none font-mono" />
+                      <button onClick={saveFulfillment} className="w-full py-3 bg-black dark:bg-white text-white dark:text-black rounded-full font-bold shadow-lg hover:opacity-80 transition">保存</button>
+                  </div>
               </div>
           </div>
       )}

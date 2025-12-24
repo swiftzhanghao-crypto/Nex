@@ -17,7 +17,19 @@ interface DashboardProps {
 }
 
 const COLORS = ['#0071E3', '#34C759', '#FF9500', '#FF3B30', '#AF52DE', '#8E8E93'];
-const COLORS_DARK = ['#FF2D55', '#32D74B', '#FF9F0A', '#FF453A', '#BF5AF2', '#8E8E93'];
+const COLORS_DARK = ['#0A84FF', '#32D74B', '#FF9F0A', '#FF453A', '#BF5AF2', '#8E8E93'];
+
+const statusMap: Record<string, string> = {
+    [OrderStatus.PENDING_APPROVAL]: '待审批',
+    [OrderStatus.PENDING_CONFIRM]: '待确认',
+    [OrderStatus.PROCESSING_PROD]: '备货中',
+    [OrderStatus.PENDING_PAYMENT]: '待支付',
+    [OrderStatus.SHIPPED]: '已发货',
+    [OrderStatus.DELIVERED]: '已完成',
+    [OrderStatus.CANCELLED]: '已取消',
+    [OrderStatus.REFUND_PENDING]: '退款中',
+    [OrderStatus.REFUNDED]: '已退款',
+};
 
 const Dashboard: React.FC<DashboardProps> = ({ orders, totalRevenue, totalOrders, totalCustomers }) => {
   const navigate = useNavigate();
@@ -58,7 +70,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, totalRevenue, totalOrders
         counts[order.status] = (counts[order.status] || 0) + 1;
     });
     const simpleData = [
-        { name: '已完成/送达', value: (counts[OrderStatus.DELIVERED] || 0) + (counts[OrderStatus.SHIPPED] || 0) },
+        { name: '已完成/发货', value: (counts[OrderStatus.DELIVERED] || 0) + (counts[OrderStatus.SHIPPED] || 0) },
         { name: '处理中/生产', value: (counts[OrderStatus.PROCESSING_PROD] || 0) + (counts[OrderStatus.PENDING_CONFIRM] || 0) },
         { name: '待审批/支付', value: (counts[OrderStatus.PENDING_APPROVAL] || 0) + (counts[OrderStatus.PENDING_PAYMENT] || 0) },
         { name: '已取消', value: counts[OrderStatus.CANCELLED] || 0 },
@@ -110,7 +122,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, totalRevenue, totalOrders
         <button 
             onClick={handleGenerateInsight}
             disabled={loadingInsight}
-            className="flex items-center gap-2 bg-[#0071E3] dark:bg-[#FF2D55] text-white px-5 py-2.5 rounded-full shadow-lg hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 transition disabled:opacity-50 text-sm font-medium"
+            className="flex items-center gap-2 bg-[#0071E3] dark:bg-[#0A84FF] text-white px-5 py-2.5 rounded-md shadow-lg hover:bg-blue-600 dark:hover:bg-[#0A84FF]/80 transition disabled:opacity-50 text-sm font-medium"
         >
             {loadingInsight ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             {loadingInsight ? "分析中..." : "AI 商业洞察"}
@@ -119,12 +131,12 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, totalRevenue, totalOrders
 
       {/* AI Insight Panel */}
       {insight && (
-        <div className="bg-white/60 dark:bg-[#1C1C1E]/60 backdrop-blur-xl border border-white/40 dark:border-white/10 p-6 rounded-3xl shadow-apple animate-modal-enter relative overflow-hidden">
+        <div className="bg-white/60 dark:bg-[#1C1C1E]/60 backdrop-blur-xl border border-white/40 dark:border-white/10 p-6 rounded-xl shadow-apple animate-modal-enter relative overflow-hidden">
             <div className="absolute top-0 right-0 p-8 opacity-[0.03] dark:opacity-[0.1]">
                 <Sparkles className="w-64 h-64 rotate-12 text-black dark:text-white" />
             </div>
             <div className="relative z-10 flex gap-5">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0071E3] to-purple-600 dark:from-[#FF2D55] dark:to-orange-500 flex items-center justify-center shadow-md shrink-0">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0071E3] to-purple-600 dark:from-[#0A84FF] dark:to-blue-500 flex items-center justify-center shadow-md shrink-0">
                     <Sparkles className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -143,7 +155,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, totalRevenue, totalOrders
             icon={<DollarSign className="w-6 h-6 text-white" />} 
             trend="+12.5%" 
             trendUp={true}
-            color="bg-[#0071E3] dark:bg-[#FF2D55]"
+            color="bg-[#0071E3] dark:bg-[#0A84FF]"
         />
         <StatCard 
             title="总订单数" 
@@ -174,10 +186,10 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, totalRevenue, totalOrders
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Revenue Trend */}
-        <div className="lg:col-span-2 bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 flex flex-col">
+        <div className="lg:col-span-2 bg-white dark:bg-[#1C1C1E] p-6 rounded-xl shadow-apple border border-gray-100/50 dark:border-white/10 flex flex-col">
           <div className="flex justify-between items-center mb-8">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">收入趋势</h3>
-              <span className="text-xs font-medium text-gray-400 bg-gray-100 dark:bg-white/10 dark:text-gray-300 px-3 py-1 rounded-full">近6个月</span>
+              <span className="text-xs font-medium text-gray-400 bg-gray-100 dark:bg-white/10 dark:text-gray-300 px-3 py-1 rounded-sm">近6个月</span>
           </div>
           <div className="flex-1 min-h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -192,7 +204,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, totalRevenue, totalOrders
                 <XAxis dataKey="name" stroke="#8E8E93" fontSize={12} tickLine={false} axisLine={false} dy={10} />
                 <YAxis stroke="#8E8E93" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `¥${value/1000}k`} />
                 <RechartsTooltip 
-                    contentStyle={{ backgroundColor: 'var(--tooltip-bg)', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', fontSize: '12px', color: 'var(--tooltip-text)' }}
+                    contentStyle={{ backgroundColor: 'var(--tooltip-bg)', borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', fontSize: '12px', color: 'var(--tooltip-text)' }}
                     itemStyle={{ color: 'var(--chart-color)', fontWeight: 600 }}
                     formatter={(value: number) => [`¥${value.toLocaleString()}`, '']}
                 />
@@ -204,7 +216,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, totalRevenue, totalOrders
                     fillOpacity={1} 
                     fill="url(#colorRevenue)" 
                     activeDot={{ r: 5, strokeWidth: 0, fill: 'var(--chart-color)' }}
-                    className="stroke-[#0071E3] dark:stroke-[#FF2D55] fill-[#0071E3] dark:fill-[#FF2D55]"
+                    className="stroke-[#0071E3] dark:stroke-[#0A84FF] fill-[#0071E3] dark:fill-[#0A84FF]"
                     style={{
                         '--chart-color': 'currentColor' 
                     } as React.CSSProperties}
@@ -215,7 +227,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, totalRevenue, totalOrders
         </div>
 
         {/* Order Status */}
-        <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 flex flex-col">
+        <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-xl shadow-apple border border-gray-100/50 dark:border-white/10 flex flex-col">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 tracking-tight">订单状态</h3>
           <div className="flex-1 min-h-[320px] relative">
             <ResponsiveContainer width="100%" height="100%">
@@ -228,7 +240,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, totalRevenue, totalOrders
                   outerRadius={90}
                   paddingAngle={5}
                   dataKey="value"
-                  cornerRadius={6}
+                  cornerRadius={4}
                 >
                   {statusData.map((entry, index) => (
                     <Cell 
@@ -239,7 +251,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, totalRevenue, totalOrders
                   ))}
                 </Pie>
                 <RechartsTooltip 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
                 />
                 <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={8} formatter={(value) => <span className="text-gray-500 dark:text-gray-400 text-xs ml-1">{value}</span>} />
               </PieChart>
@@ -255,10 +267,10 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, totalRevenue, totalOrders
       {/* Bottom Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Recent Transactions */}
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col">
             <div className="p-6 border-b border-gray-100/50 dark:border-white/10 flex justify-between items-center">
                 <h3 className="font-bold text-gray-900 dark:text-white">最新交易</h3>
-                <button onClick={() => navigate('/orders')} className="text-[#0071E3] dark:text-[#FF2D55] text-sm hover:underline flex items-center gap-1 font-medium">
+                <button onClick={() => navigate('/orders')} className="text-[#0071E3] dark:text-[#0A84FF] text-sm hover:underline flex items-center gap-1 font-medium">
                     查看全部 <ArrowRight className="w-3 h-3" />
                 </button>
             </div>
@@ -274,17 +286,17 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, totalRevenue, totalOrders
                     </thead>
                     <tbody className="divide-y divide-gray-50/50 dark:divide-white/5">
                         {recentOrders.map(order => (
-                            <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition cursor-pointer" onClick={() => navigate(`/orders/${order.id}`)}>
+                            <tr key={order.id} className="cursor-pointer hover:bg-gray-100/80 dark:hover:bg-white/[0.08] even:bg-gray-50/50 dark:even:bg-white/[0.02] transition-colors" onClick={() => navigate(`/orders/${order.id}`)}>
                                 <td className="p-4 pl-6 font-medium text-gray-900 dark:text-gray-200">{order.id}</td>
                                 <td className="p-4 text-gray-500 dark:text-gray-400">{order.customerName}</td>
                                 <td className="p-4 font-semibold text-gray-900 dark:text-gray-200">¥{order.total.toLocaleString()}</td>
                                 <td className="p-4">
-                                    <span className={`text-[10px] px-2.5 py-1 rounded-full font-medium ${
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-sm font-medium ${
                                         order.status === OrderStatus.DELIVERED ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
                                         order.status === OrderStatus.PENDING_PAYMENT ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' :
                                         'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                                     }`}>
-                                        {order.status}
+                                        {statusMap[order.status] || order.status}
                                     </span>
                                 </td>
                             </tr>
@@ -295,14 +307,14 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, totalRevenue, totalOrders
         </div>
 
         {/* Top Categories */}
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col">
              <div className="p-6 border-b border-gray-100/50 dark:border-white/10">
                 <h3 className="font-bold text-gray-900 dark:text-white">热销类别</h3>
             </div>
             <div className="p-6 space-y-5">
                 {topCategories.map((cat, index) => (
                     <div key={index} className="flex items-center gap-4">
-                        <div className="w-8 h-8 rounded-full bg-gray-50 dark:bg-white/10 flex items-center justify-center font-bold text-gray-400 text-xs shadow-inner">
+                        <div className="w-8 h-8 rounded-md bg-gray-50 dark:bg-white/10 flex items-center justify-center font-bold text-gray-400 text-xs shadow-inner">
                             {index + 1}
                         </div>
                         <div className="flex-1">
@@ -329,14 +341,23 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, totalRevenue, totalOrders
   );
 };
 
-const StatCard = ({ title, value, icon, color, trend, trendUp }: any) => (
-  <div className="p-6 rounded-3xl shadow-apple bg-white dark:bg-[#1C1C1E] border border-gray-100/50 dark:border-white/10 transition duration-300 hover:shadow-apple-hover flex flex-col justify-between h-[160px] group">
+interface StatCardProps {
+  title: string;
+  value: string;
+  icon: React.ReactNode;
+  color: string;
+  trend?: string;
+  trendUp?: boolean;
+}
+
+const StatCard = ({ title, value, icon, color, trend, trendUp }: StatCardProps) => (
+  <div className="p-6 rounded-xl shadow-apple bg-white dark:bg-[#1C1C1E] border border-gray-100/50 dark:border-white/10 transition duration-300 hover:shadow-apple-hover flex flex-col justify-between h-[160px] group">
     <div className="flex justify-between items-start">
-        <div className={`p-3 rounded-2xl ${color} shadow-lg shadow-gray-200 dark:shadow-none transition-transform group-hover:scale-105`}>
+        <div className={`p-3 rounded-lg ${color} shadow-lg shadow-gray-200 dark:shadow-none transition-transform group-hover:scale-105`}>
             {icon}
         </div>
         {trend && (
-            <div className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ${
+            <div className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-sm ${
                 trendUp 
                 ? 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400' 
                 : 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'

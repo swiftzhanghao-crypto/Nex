@@ -111,7 +111,7 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">管理客户档案、查看财务信息及历史订单。</p>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
-            <div className="bg-white dark:bg-[#1C1C1E] p-2.5 rounded-lg shadow-sm border border-gray-100 dark:border-white/10 flex items-center gap-3 flex-1 md:w-64">
+            <div className="bg-white dark:bg-[#1C1C1E] p-2.5 rounded-sm shadow-sm border border-gray-100 dark:border-white/10 flex items-center gap-3 flex-1 md:w-64">
                 <Search className="w-5 h-5 text-gray-400" />
                 <input 
                     type="text" 
@@ -124,7 +124,7 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
             {setCustomers && (
                 <button 
                     onClick={() => setIsCreateOpen(true)}
-                    className="bg-[#0071E3] dark:bg-[#FF2D55] text-white px-4 py-2.5 rounded-lg flex items-center gap-2 hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 transition shadow-sm whitespace-nowrap text-sm font-medium"
+                    className="bg-[#0071E3] dark:bg-[#FF2D55] text-white px-4 py-2.5 rounded-sm flex items-center gap-2 hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 transition shadow-sm whitespace-nowrap text-sm font-medium"
                 >
                     <Plus className="w-4 h-4" /> 新增客户
                 </button>
@@ -132,48 +132,48 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
         </div>
       </div>
 
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden flex flex-col">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden flex flex-col">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400 font-medium text-xs uppercase">
+            <thead className="bg-gray-50/80 dark:bg-white/5 backdrop-blur border-b border-gray-200/50 dark:border-white/10 text-gray-500 dark:text-gray-400 font-medium text-sm uppercase">
               <tr>
-                <th className="p-4 border-b border-gray-100 dark:border-white/10 pl-6">企业名称 / 行业</th>
-                <th className="p-4 border-b border-gray-100 dark:border-white/10">客户类型</th>
-                <th className="p-4 border-b border-gray-100 dark:border-white/10">主要联系人</th>
-                <th className="p-4 border-b border-gray-100 dark:border-white/10">归属销售</th>
-                <th className="p-4 border-b border-gray-100 dark:border-white/10">合作状态</th>
-                <th className="p-4 border-b border-gray-100 dark:border-white/10 text-right pr-6">操作</th>
+                <th className="p-4 pl-6">企业名称 / 行业</th>
+                <th className="p-4">客户类型</th>
+                <th className="p-4">主要联系人</th>
+                <th className="p-4">归属销售</th>
+                <th className="p-4">合作状态</th>
+                <th className="p-4 text-right pr-6">操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+            <tbody className="divide-y divide-gray-100 dark:divide-white/5 text-base">
               {currentCustomers.map(customer => {
                 const primaryContact = getPrimaryContact(customer);
                 return (
                   <tr 
                       key={customer.id} 
-                      className="hover:bg-gray-50 dark:hover:bg-white/5 transition group cursor-pointer"
+                      className="group cursor-pointer hover:bg-gray-100/80 dark:hover:bg-white/[0.08] even:bg-gray-50/50 dark:even:bg-white/[0.02] transition-colors"
                       onClick={() => navigate(`/customers/${customer.id}`)}
                   >
                     <td className="p-4 pl-6">
                       <div className="flex items-center gap-3">
                           {/* Logo removed as requested */}
                           <div>
-                              <div className="font-bold text-gray-800 dark:text-white group-hover:text-[#0071E3] dark:group-hover:text-[#FF2D55] transition flex items-center gap-2 text-sm">
+                              <div className="font-bold text-gray-800 dark:text-white group-hover:text-[#0071E3] dark:group-hover:text-[#FF2D55] transition flex items-center gap-2 text-base">
                                   {customer.companyName}
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded border ${getLevelBadge(customer.level)}`}>{customer.level}</span>
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-sm border ${getLevelBadge(customer.level)}`}>{customer.level}</span>
                               </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">{customer.region} | {customer.industry}</div>
+                              <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{customer.region} | {customer.industry}</div>
                           </div>
                       </div>
                     </td>
                     <td className="p-4">
-                       <span className="text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-white/10 px-2 py-1 rounded">{customer.customerType}</span>
+                       <span className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-white/10 px-2 py-1 rounded-sm">{customer.customerType}</span>
                     </td>
                     <td className="p-4">
                       {primaryContact ? (
                           <>
                             <div className="font-medium text-gray-700 dark:text-gray-200 text-sm">{primaryContact.name}</div>
-                            <div className="text-xs text-gray-400 flex flex-col">
+                            <div className="text-sm text-gray-400 flex flex-col">
                                 <span>{primaryContact.phone}</span>
                             </div>
                           </>
@@ -186,17 +186,17 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
                            <div className="flex items-center gap-2">
                                <img 
                                   src={getOwnerAvatar(customer.ownerId) || `https://api.dicebear.com/9.x/avataaars/svg?seed=${customer.ownerName}`} 
-                                  className="w-6 h-6 rounded-full border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-800"
+                                  className="w-7 h-7 rounded-full border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-800"
                                   alt=""
                                />
                                <span className="text-sm text-gray-700 dark:text-gray-300">{customer.ownerName}</span>
                            </div>
                        ) : (
-                           <span className="text-xs text-gray-400 italic">未分配</span>
+                           <span className="text-sm text-gray-400 italic">未分配</span>
                        )}
                     </td>
                     <td className="p-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-sm text-xs font-medium border ${
                           customer.status === 'Active' 
                           ? 'bg-green-50 text-green-700 border-green-100 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' 
                           : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
@@ -210,7 +210,7 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
                               e.stopPropagation();
                               navigate(`/customers/${customer.id}`);
                           }}
-                          className="p-2 text-gray-400 hover:text-[#0071E3] dark:hover:text-[#FF2D55] hover:bg-blue-50 dark:hover:bg-white/10 rounded-full transition"
+                          className="p-2 text-gray-400 hover:text-[#0071E3] dark:hover:text-[#FF2D55] hover:bg-blue-50 dark:hover:bg-white/10 rounded-md transition"
                       >
                           <Eye className="w-5 h-5" />
                       </button>
@@ -220,7 +220,7 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
               })}
               {currentCustomers.length === 0 && (
                   <tr>
-                      <td colSpan={6} className="p-8 text-center text-gray-400">未找到符合条件的客户。</td>
+                      <td colSpan={6} className="p-8 text-center text-gray-400 text-base">未找到符合条件的客户。</td>
                   </tr>
               )}
             </tbody>
@@ -232,7 +232,7 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
                 <button 
                     onClick={() => handlePageChange(currentPage - 1)}
                     disabled={currentPage === 1}
-                    className="px-3 py-1 rounded border border-gray-300 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-sm"
+                    className="px-3 py-1.5 rounded-sm border border-gray-300 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-sm font-medium"
                 >
                     上一页
                 </button>
@@ -242,7 +242,7 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
                 <button 
                     onClick={() => handlePageChange(currentPage + 1)}
                     disabled={currentPage === totalPages}
-                    className="px-3 py-1 rounded border border-gray-300 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-sm"
+                    className="px-3 py-1.5 rounded-sm border border-gray-300 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-sm font-medium"
                 >
                     下一页
                 </button>
@@ -253,10 +253,10 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
       {/* Create Customer Modal */}
       {isCreateOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col animate-modal-enter max-h-[90vh] border border-white/10">
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col animate-modal-enter max-h-[90vh] border border-white/10">
             <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5">
               <h3 className="text-xl font-bold text-gray-800 dark:text-white">新增企业客户</h3>
-              <button onClick={() => setIsCreateOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">&times;</button>
+              <button onClick={() => setIsCreateOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5"/></button>
             </div>
             
             <div className="p-6 overflow-y-auto">
@@ -271,7 +271,7 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
                                     type="text" 
                                     value={formData.companyName}
                                     onChange={e => setFormData({...formData, companyName: e.target.value})}
-                                    className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded p-2 text-sm focus:ring-2 focus:ring-[#0071E3] outline-none dark:text-white"
+                                    className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-sm p-2 text-sm focus:ring-2 focus:ring-[#0071E3] outline-none dark:text-white"
                                 />
                             </div>
                              {/* ... other inputs styled similarly ... */}
@@ -281,7 +281,7 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
                                     type="text" 
                                     value={formData.industry}
                                     onChange={e => setFormData({...formData, industry: e.target.value})}
-                                    className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded p-2 text-sm focus:ring-2 focus:ring-[#0071E3] outline-none dark:text-white"
+                                    className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-sm p-2 text-sm focus:ring-2 focus:ring-[#0071E3] outline-none dark:text-white"
                                 />
                             </div>
                             {/* ... select inputs ... */}
@@ -290,7 +290,7 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
                                 <select 
                                     value={formData.customerType}
                                     onChange={e => setFormData({...formData, customerType: e.target.value as CustomerType})}
-                                    className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded p-2 text-sm focus:ring-2 focus:ring-[#0071E3] outline-none dark:text-white"
+                                    className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-sm p-2 text-sm focus:ring-2 focus:ring-[#0071E3] outline-none dark:text-white"
                                 >
                                     <option value="Enterprise">企业 (Enterprise)</option>
                                     <option value="Government">政府 (Government)</option>
@@ -306,11 +306,11 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
             </div>
 
             <div className="p-6 bg-gray-50 dark:bg-white/5 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
-              <button onClick={() => setIsCreateOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition font-medium">取消</button>
+              <button onClick={() => setIsCreateOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 rounded-md transition font-medium">取消</button>
               <button 
                 onClick={handleCreate} 
                 disabled={!formData.companyName}
-                className="px-4 py-2 bg-[#0071E3] dark:bg-[#FF2D55] text-white rounded-lg hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 transition font-medium shadow-md disabled:opacity-50"
+                className="px-4 py-2 bg-[#0071E3] dark:bg-[#FF2D55] text-white rounded-md hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 transition font-medium shadow-md disabled:opacity-50"
               >
                   创建客户
               </button>
