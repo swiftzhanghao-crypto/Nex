@@ -32,7 +32,7 @@ const statusMap: Record<string, string> = {
     [OrderStatus.REFUNDED]: '已退款',
 };
 
-const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, customers, currentUser }) => {
+const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, customers, currentUser, users, departments }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -75,6 +75,8 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, customer
   }
 
   const fullCustomer = customers.find(c => c.id === selectedOrder.customerId);
+  const salesUser = users.find(u => u.id === selectedOrder.salesRepId);
+  const salesDept = departments.find(d => d.id === salesUser?.departmentId);
 
   const updateOrder = (updatedOrder: Order) => {
       setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
@@ -390,6 +392,53 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, customer
       setFulfillmentItemIndex(null);
   };
 
+  const getApproverDisplay = (role: 'Sales' | 'Business' | 'Finance') => {
+      // Find the approval record
+      const record = selectedOrder.approvalRecords.find(r => {
+          const type = r.actionType;
+          // Match variations of action names
+          const matchSales = (type.includes('Sales') || type.includes('销售')) && role === 'Sales';
+          const matchBiz = (type.includes('Business') || type.includes('商务')) && role === 'Business';
+          const matchFin = (type.includes('Finance') || type.includes('财务')) && role === 'Finance';
+          return (matchSales || matchBiz || matchFin) && r.result === 'Approved';
+      });
+
+      if (!record) {
+          // Fallback if record is missing but status is true (legacy data or partial mock)
+          const date = role === 'Sales' ? selectedOrder.approval.salesApprovedDate 
+                     : role === 'Business' ? selectedOrder.approval.businessApprovedDate 
+                     : selectedOrder.approval.financeApprovedDate;
+          if (!date) return null;
+          return <div className="text-xs text-gray-500 mt-2">已于 {new Date(date).toLocaleString()} 通过 (系统自动)</div>;
+      }
+
+      const user = users.find(u => u.id === record.operatorId);
+
+      return (
+          <div className="mt-3 flex items-center justify-between bg-green-50/50 dark:bg-green-900/10 p-2.5 rounded-xl border border-green-100 dark:border-green-900/20">
+              <div className="flex items-center gap-2.5">
+                  <img 
+                      src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${record.operatorName}`} 
+                      className="w-8 h-8 rounded-full border-2 border-white dark:border-[#1C1C1E] shadow-sm bg-gray-100" 
+                      alt="" 
+                  />
+                  <div>
+                      <div className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1">
+                          {record.operatorName} 
+                          <span className="text-[10px] font-normal text-gray-500 bg-white dark:bg-white/10 px-1.5 rounded-sm border border-gray-100 dark:border-white/5">
+                              {role}
+                          </span>
+                      </div>
+                      <div className="text-[10px] text-gray-400 font-mono mt-0.5">{new Date(record.timestamp).toLocaleString()}</div>
+                  </div>
+              </div>
+              <div className="text-green-600 dark:text-green-400 bg-white dark:bg-black/20 p-1 rounded-full">
+                  <CheckCircle className="w-4 h-4" />
+              </div>
+          </div>
+      );
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-[#F5F5F7] dark:bg-black">
       {/* Header */}
@@ -444,44 +493,49 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, customer
              </div>
           </div>
 
+          {/* Order Items Table (Full Width) */}
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden">
+              <div className="p-6 border-b border-gray-100 dark:border-white/10"><h3 className="text-lg font-bold text-gray-900 dark:text-white">订单商品明细</h3></div>
+              <table className="w-full text-left">
+                  <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 text-[10px] uppercase font-bold tracking-wider">
+                      <tr><th className="p-5">商品与规格</th><th className="p-5 text-center">数量</th><th className="p-5 text-right">单价/小计</th><th className="p-5">交付</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                      {selectedOrder.items.map((item, idx) => (
+                          <tr key={idx} className="group text-sm">
+                              <td className="p-5">
+                                  <button 
+                                    onClick={() => navigate(`/products/${item.productId}`)}
+                                    className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline text-left"
+                                  >
+                                      {item.productName}
+                                  </button>
+                                  <div className="text-[11px] text-gray-500 mt-0.5 flex items-center gap-1.5"><Box className="w-3 h-3"/>{item.skuName}</div>
+                              </td>
+                              <td className="p-5 text-center dark:text-white font-medium">{item.quantity}</td>
+                              <td className="p-5 text-right">
+                                  <div className="text-xs text-gray-400">¥{item.priceAtPurchase.toLocaleString()}</div>
+                                  <div className="font-bold dark:text-white">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</div>
+                              </td>
+                              <td className="p-5">
+                                  <div className="flex flex-col gap-1.5">
+                                      {item.deliveredContent?.map((c, i) => <div key={i} className="text-[10px] font-mono bg-gray-50 dark:bg-white/10 p-1.5 rounded border border-gray-100 dark:border-white/5 truncate max-w-[150px]">{c}</div>)}
+                                      <div className="flex gap-2">
+                                          <button onClick={() => startFulfillment(idx, item)} className="text-[10px] text-blue-600 hover:underline">管理授权</button>
+                                          {selectedOrder.isPaid && selectedOrder.confirmedDate && (
+                                              <button onClick={() => { setSelectedCertificateItem(item); setIsCertPreviewMode(true); }} className="text-[10px] text-orange-600 hover:underline flex items-center gap-0.5"><Award className="w-3 h-3"/> 电子授权书</button>
+                                          )}
+                                      </div>
+                                  </div>
+                              </td>
+                          </tr>
+                      ))}
+                  </tbody>
+              </table>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2 space-y-8">
-                  {/* Order Items Table */}
-                  <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden">
-                      <div className="p-6 border-b border-gray-100 dark:border-white/10"><h3 className="text-lg font-bold text-gray-900 dark:text-white">订单商品明细</h3></div>
-                      <table className="w-full text-left">
-                          <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 text-[10px] uppercase font-bold tracking-wider">
-                              <tr><th className="p-5">商品与规格</th><th className="p-5 text-center">数量</th><th className="p-5 text-right">单价/小计</th><th className="p-5">交付</th></tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-50 dark:divide-white/5">
-                              {selectedOrder.items.map((item, idx) => (
-                                  <tr key={idx} className="group text-sm">
-                                      <td className="p-5">
-                                          <div className="font-bold text-gray-900 dark:text-white">{item.productName}</div>
-                                          <div className="text-[11px] text-gray-500 mt-0.5 flex items-center gap-1.5"><Box className="w-3 h-3"/>{item.skuName}</div>
-                                      </td>
-                                      <td className="p-5 text-center dark:text-white font-medium">{item.quantity}</td>
-                                      <td className="p-5 text-right">
-                                          <div className="text-xs text-gray-400">¥{item.priceAtPurchase.toLocaleString()}</div>
-                                          <div className="font-bold dark:text-white">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</div>
-                                      </td>
-                                      <td className="p-5">
-                                          <div className="flex flex-col gap-1.5">
-                                              {item.deliveredContent?.map((c, i) => <div key={i} className="text-[10px] font-mono bg-gray-50 dark:bg-white/10 p-1.5 rounded border border-gray-100 dark:border-white/5 truncate max-w-[150px]">{c}</div>)}
-                                              <div className="flex gap-2">
-                                                  <button onClick={() => startFulfillment(idx, item)} className="text-[10px] text-blue-600 hover:underline">管理授权</button>
-                                                  {selectedOrder.isPaid && selectedOrder.confirmedDate && (
-                                                      <button onClick={() => { setSelectedCertificateItem(item); setIsCertPreviewMode(true); }} className="text-[10px] text-orange-600 hover:underline flex items-center gap-0.5"><Award className="w-3 h-3"/> 电子授权书</button>
-                                                  )}
-                                              </div>
-                                          </div>
-                                      </td>
-                                  </tr>
-                              ))}
-                          </tbody>
-                      </table>
-                  </div>
-
                   {/* Commerce & Acceptance Bento Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Delivery & Acceptance Info */}
@@ -615,6 +669,9 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, customer
                               <div className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white mt-1.5">
                                   <UserIcon className="w-4 h-4 text-blue-500" /> {selectedOrder.salesRepName || '未分配'}
                               </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
+                                  <Building className="w-3 h-3"/> {salesDept?.name || '未知部门'}
+                              </div>
                           </div>
                           <div>
                               <div className="text-[10px] text-gray-400 uppercase font-bold">商务经理</div>
@@ -675,7 +732,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, customer
                                            </div>
                                        </div>
                                    )}
-                                   {selectedOrder.approval.salesApproved && <div className="text-xs text-gray-500">已于 {new Date(selectedOrder.approval.salesApprovedDate!).toLocaleString()} 通过</div>}
+                                   {selectedOrder.approval.salesApproved && getApproverDisplay('Sales')}
                                </div>
 
                                {/* Business Approval Node */}
@@ -693,7 +750,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, customer
                                            </div>
                                        </div>
                                    )}
-                                   {selectedOrder.approval.businessApproved && <div className="text-xs text-gray-500">已于 {new Date(selectedOrder.approval.businessApprovedDate!).toLocaleString()} 通过</div>}
+                                   {selectedOrder.approval.businessApproved && getApproverDisplay('Business')}
                                </div>
 
                                {/* Finance Approval Node */}
@@ -711,7 +768,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, customer
                                            </div>
                                        </div>
                                    )}
-                                   {selectedOrder.approval.financeApproved && <div className="text-xs text-gray-500">已于 {new Date(selectedOrder.approval.financeApprovedDate!).toLocaleString()} 通过</div>}
+                                   {selectedOrder.approval.financeApproved && getApproverDisplay('Finance')}
                                </div>
                           </div>
                       )}

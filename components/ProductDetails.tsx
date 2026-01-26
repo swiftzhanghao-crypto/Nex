@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Product, ProductSku, SkuPricingOption, RightPackage, LicenseType, LicenseUnit, LicenseTypeDefinition } from '../types';
-import { ArrowLeft, Package, ShieldCheck, Edit3, Plus, Trash2, List, Check, Box, Zap, User as UserIcon, Shield, Layers, Clock, Calendar, ToggleLeft, ToggleRight, Key, Sliders, Tag, PackageOpen, ChevronRight, Home, CreditCard, Save, X } from 'lucide-react';
+import { ArrowLeft, Package, ShieldCheck, Edit3, Plus, Trash2, List, Check, Box, Zap, User as UserIcon, Shield, Layers, Clock, Calendar, ToggleLeft, ToggleRight, Key, Sliders, Tag, PackageOpen, ChevronRight, Home, CreditCard, Save, X, Download } from 'lucide-react';
 
 interface ProductDetailsProps {
   products: Product[];
@@ -283,6 +283,31 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ products, setProducts, 
                                   </div>
                               ))}
                           </div>
+                      </div>
+
+                      {/* Install Packages Section */}
+                      <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10">
+                          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">安装包信息</h3>
+                          {productForm.installPackages && productForm.installPackages.length > 0 ? (
+                              <div className="space-y-3">
+                                  {productForm.installPackages.map((pkg) => (
+                                      <div key={pkg.id} className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg border border-gray-100 dark:border-white/5 group">
+                                          <div className="flex justify-between items-start mb-1">
+                                              <div className="font-bold text-sm text-gray-800 dark:text-gray-200">{pkg.name}</div>
+                                              <a href={pkg.url} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 p-1 bg-blue-50 dark:bg-blue-900/20 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/40 transition">
+                                                  <Download className="w-3.5 h-3.5" />
+                                              </a>
+                                          </div>
+                                          <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                                              <span>{pkg.version}</span>
+                                              <span className="font-mono text-[10px]">{pkg.id}</span>
+                                          </div>
+                                      </div>
+                                  ))}
+                              </div>
+                          ) : (
+                              <div className="text-sm text-gray-400 italic">暂无安装包信息</div>
+                          )}
                       </div>
                   </div>
 

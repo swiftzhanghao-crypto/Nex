@@ -126,7 +126,11 @@ function App() {
             license: { type: 'Subscription', period: 1, periodUnit: 'Year', scope: '5 Users' } 
         },
       ],
-      licenseTemplate: { showLicensePeriod: true, showLicenseScope: true }
+      licenseTemplate: { showLicensePeriod: true, showLicenseScope: true },
+      installPackages: [
+          { id: 'PKG-WIN-001', name: 'WPS 365 Windows 客户端', version: 'v13.5.0', url: 'https://package.wps.cn/wps365_x64.exe' },
+          { id: 'PKG-MAC-001', name: 'WPS 365 Mac 客户端', version: 'v6.2.1', url: 'https://package.wps.cn/wps365_mac.dmg' }
+      ]
     },
     { 
       id: 'PROD-002', 
@@ -152,7 +156,11 @@ function App() {
             license: { type: 'Perpetual', period: 1, periodUnit: 'Forever', scope: '1 Device' } 
         }
       ],
-      licenseTemplate: { showLicensePeriod: false, showLicenseScope: true }
+      licenseTemplate: { showLicensePeriod: false, showLicenseScope: true },
+      installPackages: [
+          { id: 'PKG-LINUX-DEB', name: 'WPS 2023 Linux (Deb)', version: 'v11.8.2.1098', url: 'https://linux.wps.cn/wps-office_11.8.2.1098_amd64.deb' },
+          { id: 'PKG-LINUX-RPM', name: 'WPS 2023 Linux (Rpm)', version: 'v11.8.2.1098', url: 'https://linux.wps.cn/wps-office-11.8.2.1098-1.x86_64.rpm' }
+      ]
     },
     {
       id: 'PROD-003',
@@ -178,6 +186,9 @@ function App() {
               license: { type: 'Perpetual', period: 1, periodUnit: 'Forever', scope: '1 Device' } 
           }
       ],
+      installPackages: [
+          { id: 'PKG-WIN-PRO', name: 'WPS 2023 Pro Installer', version: 'v12.1.0', url: 'https://ent.wps.cn/win_setup.exe' }
+      ]
     },
     { 
       id: 'PROD-004', name: '私有云协作平台', category: '私有云', tags: ['私有云', 'Server'], description: '面向大型组织的私有化部署协作平台。', status: 'OnShelf',

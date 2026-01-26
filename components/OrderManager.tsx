@@ -544,6 +544,15 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
       return <span className="text-gray-400 text-[10px] whitespace-nowrap">详情</span>;
   };
 
+  const getSalesInfo = (order: Order) => {
+      const user = users.find(u => u.id === order.salesRepId);
+      const dept = departments.find(d => d.id === user?.departmentId);
+      return {
+          name: order.salesRepName || user?.name || '未分配',
+          deptName: dept?.name || '未知部门'
+      };
+  };
+
   const clearAdvancedFilters = () => {
       setFilterDateStart('');
       setFilterDateEnd('');
@@ -714,6 +723,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                 <th className="p-5 whitespace-nowrap">订单号</th>
                 <th className="p-5 whitespace-nowrap">客户 / 买方</th>
                 <th className="p-5 hidden lg:table-cell whitespace-nowrap">商品信息</th>
+                <th className="p-5 hidden xl:table-cell whitespace-nowrap">销售 / 部门</th>
                 <th className="p-5 hidden xl:table-cell whitespace-nowrap">来源</th>
                 <th className="p-5 hidden 2xl:table-cell whitespace-nowrap">销售模式</th>
                 <th className="p-5 hidden md:table-cell whitespace-nowrap">日期</th>
@@ -775,6 +785,17 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                               </div>
                           )}
                       </div>
+                  </td>
+                  <td className="p-5 hidden xl:table-cell whitespace-nowrap">
+                      {(() => {
+                          const info = getSalesInfo(order);
+                          return (
+                              <div className="flex flex-col">
+                                  <span className="font-medium text-gray-900 dark:text-white text-xs">{info.name}</span>
+                                  <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{info.deptName}</span>
+                              </div>
+                          );
+                      })()}
                   </td>
                   <td className="p-5 hidden xl:table-cell whitespace-nowrap">{getSourceBadge(order.source)}</td>
                   <td className="p-5 hidden 2xl:table-cell whitespace-nowrap">
