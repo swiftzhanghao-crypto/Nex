@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import Dashboard from './components/Dashboard';
 import ProductManager from './components/ProductManager';
 import OrderManager from './components/OrderManager';
 import CustomerManager from './components/CustomerManager';
@@ -16,12 +15,16 @@ import CustomerDetails from './components/CustomerDetails';
 import MerchandiseDetails from './components/MerchandiseDetails';
 import ChannelDetails from './components/ChannelDetails';
 import OpportunityDetails from './components/OpportunityDetails';
+import OperationsManager from './components/OperationsManager';
+import ProductPreview from './components/ProductPreview';
+import ProductCenter from './components/ProductCenter';
 import { 
     SalesMerchandise, Product, Customer, Order, User, Channel, 
     Opportunity, Department, AtomicCapability, 
     ProductRightDefinition, RightPackage, OrderStatus, OrderItem,
     ApprovalRecord, CustomerType, CustomerLevel, InvoiceInfo,
-    OrderApproval, OrderSource, LicenseTypeDefinition, RoleDefinition
+    OrderApproval, OrderSource, LicenseTypeDefinition, RoleDefinition,
+    BuyerType
 } from './types';
 
 function App() {
@@ -88,158 +91,192 @@ function App() {
       { id: 'LT005', name: '平台订阅 (Server)', code: 'SUB-PLAT', type: 'Subscription', period: 1, periodUnit: 'Year', scope: 'Platform', description: '服务器端平台授权' },
   ]);
 
-  // --- 1. Products Mock Data (Expanded to 20+ SPUs) ---
+  // --- 1. Products Mock Data (Aligned with new categories) ---
   const [products, setProducts] = useState<Product[]>([
+    // WPS365公有云
     { 
-      id: 'PROD-001', 
-      name: 'WPS 365 商业版', 
-      category: '公网套餐', 
-      tags: ['公有云', 'SaaS'],
-      description: '适合中小企业的公网SaaS办公方案，开箱即用。', 
-      status: 'OnShelf',
-      packageId: 'PKG001', 
-      composition: [atomicCapabilities[0], atomicCapabilities[5], atomicCapabilities[7]],
-      skus: [
-        { 
-            id: 'spec1', 
-            code: 'SPEC-365-BIZ-Y', 
-            name: '商业版/人', 
-            price: 365.0, 
-            pricingOptions: [
-                { id: 'opt1-1', title: '年度订阅', price: 365.0, license: { type: 'Subscription', period: 1, periodUnit: 'Year', scope: '1 User' } },
-                { id: 'opt1-2', title: '月度订阅', price: 39.0, license: { type: 'Subscription', period: 1, periodUnit: 'Month', scope: '1 User' } }
-            ],
-            stock: 99999, 
-            status: 'Active', 
-            license: { type: 'Subscription', period: 1, periodUnit: 'Year', scope: '1 User' } 
-        },
-        { 
-            id: 'spec2', 
-            code: 'SPEC-365-BIZ-PKG', 
-            name: '商业版/5人团队包', 
-            price: 999.0, 
-            pricingOptions: [
-                { id: 'opt2-1', title: '年度订阅', price: 999.0, license: { type: 'Subscription', period: 1, periodUnit: 'Year', scope: '5 Users' } }
-            ],
-            stock: 5000, 
-            status: 'Active', 
-            license: { type: 'Subscription', period: 1, periodUnit: 'Year', scope: '5 Users' } 
-        },
-      ],
-      licenseTemplate: { showLicensePeriod: true, showLicenseScope: true },
-      installPackages: [
-          { id: 'PKG-WIN-001', name: 'WPS 365 Windows 客户端', version: 'v13.5.0', url: 'https://package.wps.cn/wps365_x64.exe' },
-          { id: 'PKG-MAC-001', name: 'WPS 365 Mac 客户端', version: 'v6.2.1', url: 'https://package.wps.cn/wps365_mac.dmg' }
-      ]
-    },
-    { 
-      id: 'PROD-002', 
-      name: 'WPS Office 2023 专业版', 
-      category: '端类产品', 
-      tags: ['信创端', 'Linux', 'UOS'],
-      description: '适配国产信创环境的本地客户端，包含基础编辑能力。', 
-      status: 'OnShelf',
-      packageId: 'PKG002', 
-      composition: [atomicCapabilities[0], atomicCapabilities[2], atomicCapabilities[1]],
-      skus: [
-        { 
-            id: 'spec3', 
-            code: 'SPEC-LINUX-PER', 
-            name: '信创单机授权', 
-            price: 498.0, 
-            pricingOptions: [
-                { id: 'opt3-1', title: '永久授权 (买断)', price: 498.0, license: { type: 'Perpetual', period: 1, periodUnit: 'Forever', scope: '1 Device' } },
-                { id: 'opt3-2', title: '年度场地授权 (100台)', price: 15000.0, license: { type: 'FlatRate', period: 1, periodUnit: 'Year', scope: '100 Devices' } }
-            ],
-            stock: 2000, 
-            status: 'Active', 
-            license: { type: 'Perpetual', period: 1, periodUnit: 'Forever', scope: '1 Device' } 
-        }
-      ],
-      licenseTemplate: { showLicensePeriod: false, showLicenseScope: true },
-      installPackages: [
-          { id: 'PKG-LINUX-DEB', name: 'WPS 2023 Linux (Deb)', version: 'v11.8.2.1098', url: 'https://linux.wps.cn/wps-office_11.8.2.1098_amd64.deb' },
-          { id: 'PKG-LINUX-RPM', name: 'WPS 2023 Linux (Rpm)', version: 'v11.8.2.1098', url: 'https://linux.wps.cn/wps-office-11.8.2.1098-1.x86_64.rpm' }
-      ]
-    },
-    {
-      id: 'PROD-003',
-      name: 'WPS Office 2023 专业增强版',
-      category: '端类产品', 
-      tags: ['Win端', '企业版'],
-      description: 'Windows 平台高级企业版，支持更多定制化功能。',
-      status: 'OnShelf',
-      packageId: 'PKG003', 
-      composition: [atomicCapabilities[0], atomicCapabilities[1], atomicCapabilities[6]],
-      skus: [
-          { 
-              id: 'spec4', 
-              code: 'SPEC-WIN-PRO-PLUS', 
-              name: '增强版授权', 
-              price: 698.0, 
-              pricingOptions: [
-                  { id: 'opt4-1', title: '永久授权', price: 698.0, license: { type: 'Perpetual', period: 1, periodUnit: 'Forever', scope: '1 Device' } },
-                  { id: 'opt4-2', title: '三年期订阅', price: 299.0, license: { type: 'Subscription', period: 3, periodUnit: 'Year', scope: '1 Device' } }
-              ],
-              stock: 5000, 
-              status: 'Active', 
-              license: { type: 'Perpetual', period: 1, periodUnit: 'Forever', scope: '1 Device' } 
-          }
-      ],
-      installPackages: [
-          { id: 'PKG-WIN-PRO', name: 'WPS 2023 Pro Installer', version: 'v12.1.0', url: 'https://ent.wps.cn/win_setup.exe' }
-      ]
-    },
-    { 
-      id: 'PROD-004', name: '私有云协作平台', category: '私有云', tags: ['私有云', 'Server'], description: '面向大型组织的私有化部署协作平台。', status: 'OnShelf',
-      composition: [atomicCapabilities[4], atomicCapabilities[7]], 
-      rights: [
-          { definitionId: 'PR001', name: '云存储空间', value: 10000, unit: 'GB' },
-          { definitionId: 'PR003', name: 'API 调用次数', value: 100000, unit: '次/天' },
-          { definitionId: 'PR004', name: '专属客户经理', value: true }
-      ],
+      id: 'PROD-PUB-001', name: 'WPS 365 标准版 (政府)', category: 'WPS365公有云', subCategory: 'WPS365标准版（政府）（服务）', status: 'OnShelf', tags: ['IM', 'AI', '生态'],
       skus: [{ 
-          id: 'spec5', 
-          code: 'SPEC-PVT-CORE', 
-          name: '核心平台授权', 
-          price: 150000.0, 
-          pricingOptions: [
-              { id: 'opt5-1', title: '永久平台授权', price: 150000.0, license: { type: 'Perpetual', period: 1, periodUnit: 'Forever', scope: 'Platform' } },
-              { id: 'opt5-2', title: '年度订阅授权', price: 60000.0, license: { type: 'Subscription', period: 1, periodUnit: 'Year', scope: 'Platform' } }
-          ],
-          stock: 50, 
-          status: 'Active', 
-          license: { type: 'Perpetual', period: 1, periodUnit: 'Forever', scope: 'Platform' } 
-      }]
+        id: 's1', code: 'S1', name: '标准版', price: 299, 
+        pricingOptions: [
+          {id:'o1-1', title:'年度订阅', price:299, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}},
+          {id:'o1-2', title:'三年订阅', price:799, license:{type:'Subscription', period:3, periodUnit:'Year', scope:'1 User'}},
+          {id:'o1-3', title:'五年订阅', price:1299, license:{type:'Subscription', period:5, periodUnit:'Year', scope:'1 User'}}
+        ] 
+      }],
+      installPackages: [
+        { id: 'pkg1-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#' },
+        { id: 'pkg1-2', name: 'WPS 365 Mac端', version: 'v6.0.1', url: '#' }
+      ]
     },
     { 
-        id: 'PROD-005', name: 'WPS AI 助手 (企业版)', category: '人工智能', tags: ['AI', '效率'], description: '内置于文档中的智能写作、润色与分析工具。', status: 'OnShelf',
-        composition: [atomicCapabilities[5]], 
-        skus: [{ id: 'spec6', code: 'SPEC-AI-ANNUAL', name: 'AI 授权', price: 199.0, pricingOptions: [{id:'opt6-1', title:'年度订阅', price: 199.0, license:{ type: 'Subscription', period: 1, periodUnit: 'Year', scope: '1 User' }}], stock: 100000, status: 'Active', license: { type: 'Subscription', period: 1, periodUnit: 'Year', scope: '1 User' } }]
+      id: 'PROD-PUB-001-2', name: 'WPS 365 基础版 (政府)', category: 'WPS365公有云', subCategory: 'WPS365标准版（政府）（服务）', status: 'OnShelf', tags: ['IM', '生态'],
+      skus: [{ 
+        id: 's1-2', code: 'S1-2', name: '基础版', price: 199, 
+        pricingOptions: [
+          {id:'o1-2-1', title:'年度订阅', price:199, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}},
+          {id:'o1-2-2', title:'月度订阅', price:19, license:{type:'Subscription', period:1, periodUnit:'Month', scope:'1 User'}}
+        ] 
+      }],
+      installPackages: [{ id: 'pkg1-2-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#' }]
     },
-    { id: 'PROD-006', name: '金山协作 (KIM) 标准版', category: '即时通讯', tags: ['协作', 'IM'], description: '企业专属即时通讯与办公门户。', status: 'OnShelf', composition: [atomicCapabilities[7]], skus: [{ id: 'spec7', code: 'SPEC-KIM-FREE', name: '基础版', price: 0, stock: 99999, status: 'Active', license: { type: 'FlatRate', period: 1, periodUnit: 'Forever', scope: 'Standard' }, pricingOptions: [{id: 'opt7', title: '基础版', price: 0, license: { type: 'FlatRate', period: 1, periodUnit: 'Forever', scope: 'Standard' }}] }] },
+    { 
+      id: 'PROD-PUB-002', name: 'WPS 365 高级版', category: 'WPS365公有云', subCategory: 'WPS365高级版', status: 'OnShelf', tags: ['AI', '生态'],
+      skus: [{ 
+        id: 's2', code: 'S2', name: '标准版', price: 499, 
+        pricingOptions: [
+          {id:'o2-1', title:'年度订阅', price:499, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}},
+          {id:'o2-2', title:'三年订阅', price:1299, license:{type:'Subscription', period:3, periodUnit:'Year', scope:'1 User'}}
+        ] 
+      }],
+      installPackages: [
+        { id: 'pkg2-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#' },
+        { id: 'pkg2-2', name: 'WPS 365 移动端', version: 'v11.5.0', url: '#' }
+      ]
+    },
+    { 
+      id: 'PROD-PUB-002-2', name: 'WPS 365 高级版 (教育)', category: 'WPS365公有云', subCategory: 'WPS365高级版', status: 'OnShelf', tags: ['AI', '生态'],
+      skus: [{ 
+        id: 's2-2', code: 'S2-2', name: '教育版', price: 299, 
+        pricingOptions: [
+          {id:'o2-2-1', title:'年度订阅', price:299, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}},
+          {id:'o2-2-2', title:'永久授权', price:999, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 User'}}
+        ] 
+      }],
+      installPackages: [{ id: 'pkg2-2-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#' }]
+    },
+
+    // WPS365私有云
+    { 
+      id: 'PROD-PVT-001', name: 'WPS 365 高级版 (私有云)', category: 'WPS365私有云', subCategory: 'WPS365高级版（私有云）', status: 'OnShelf', tags: ['IM', 'AI'],
+      skus: [{ 
+        id: 's5', code: 'S5', name: '标准版', price: 50000, 
+        pricingOptions: [
+          {id:'o5-1', title:'永久授权', price:50000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}},
+          {id:'o5-2', title:'年度订阅', price:15000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
+        ] 
+      }],
+      installPackages: [{ id: 'pkg5-1', name: '私有云部署包', version: 'v7.0.0', url: '#' }]
+    },
+    { 
+      id: 'PROD-PVT-001-2', name: 'WPS 365 基础版 (私有云)', category: 'WPS365私有云', subCategory: 'WPS365高级版（私有云）', status: 'OnShelf', tags: ['IM'],
+      skus: [{ 
+        id: 's5-2', code: 'S5-2', name: '基础版', price: 20000, 
+        pricingOptions: [
+          {id:'o5-2-1', title:'永久授权', price:20000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}},
+          {id:'o5-2-2', title:'年度订阅', price:8000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
+        ] 
+      }],
+      installPackages: [{ id: 'pkg5-2-1', name: '私有云部署包', version: 'v7.0.0', url: '#' }]
+    },
+
+    // 私有云单品
+    { 
+      id: 'PROD-ITEM-001', name: 'Web Office 核心组件', category: '私有云单品', subCategory: 'Web Office', status: 'OnShelf', tags: ['生态'],
+      skus: [{ 
+        id: 's8', code: 'S8', name: '标准版', price: 20000, 
+        pricingOptions: [
+          {id:'o8-1', title:'永久授权', price:20000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}},
+          {id:'o8-2', title:'年度订阅', price:6000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
+        ] 
+      }],
+      installPackages: [{ id: 'pkg8-1', name: 'WebOffice SDK', version: 'v3.2.1', url: '#' }]
+    },
+    { 
+      id: 'PROD-ITEM-001-2', name: 'Web Office 增强组件', category: '私有云单品', subCategory: 'Web Office', status: 'OnShelf', tags: ['生态', 'AI'],
+      skus: [{ 
+        id: 's8-2', code: 'S8-2', name: '增强版', price: 35000, 
+        pricingOptions: [
+          {id:'o8-2-1', title:'永久授权', price:35000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}},
+          {id:'o8-2-2', title:'年度订阅', price:12000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
+        ] 
+      }],
+      installPackages: [{ id: 'pkg8-2-1', name: 'WebOffice SDK', version: 'v3.2.1', url: '#' }]
+    },
+
+    // Win端
+    { 
+      id: 'PROD-WIN-001', name: 'WPS Office 2019 专业版', category: 'Win端', subCategory: 'Win2019', status: 'OnShelf', tags: ['生态'],
+      skus: [{ 
+        id: 's12', code: 'S12', name: '标准版', price: 498, 
+        pricingOptions: [
+          {id:'o12-1', title:'永久授权', price:498, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},
+          {id:'o12-2', title:'年度订阅', price:158, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
+        ] 
+      }],
+      installPackages: [{ id: 'pkg12-1', name: 'WPS 2019 安装包', version: 'v11.1.0', url: '#' }]
+    },
+    { 
+      id: 'PROD-WIN-001-2', name: 'WPS Office 2019 增强版', category: 'Win端', subCategory: 'Win2019', status: 'OnShelf', tags: ['生态', 'AI'],
+      skus: [{ 
+        id: 's12-2', code: 'S12-2', name: '增强版', price: 698, 
+        pricingOptions: [
+          {id:'o12-2-1', title:'永久授权', price:698, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},
+          {id:'o12-2-2', title:'年度订阅', price:218, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
+        ] 
+      }],
+      installPackages: [{ id: 'pkg12-2-1', name: 'WPS 2019 安装包', version: 'v11.1.0', url: '#' }]
+    },
+
+    // 其他软件
+    { 
+      id: 'PROD-OTH-001', name: 'WPS for Mac 专业版', category: '其他软件', subCategory: 'WPS for Mac', status: 'OnShelf', tags: ['生态'],
+      skus: [{ 
+        id: 's15', code: 'S15', name: '标准版', price: 498, 
+        pricingOptions: [
+          {id:'o15-1', title:'永久授权', price:498, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},
+          {id:'o15-2', title:'年度订阅', price:158, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
+        ] 
+      }],
+      installPackages: [{ id: 'pkg15-1', name: 'WPS Mac 安装包', version: 'v6.0.1', url: '#' }]
+    },
+    { 
+      id: 'PROD-OTH-001-2', name: 'WPS for Mac 个人版', category: '其他软件', subCategory: 'WPS for Mac', status: 'OnShelf', tags: ['生态'],
+      skus: [{ 
+        id: 's15-2', code: 'S15-2', name: '个人版', price: 0, 
+        pricingOptions: [
+          {id:'o15-2-1', title:'免费版', price:0, license:{type:'FlatRate', period:1, periodUnit:'Forever', scope:'1 User'}},
+          {id:'o15-2-2', title:'会员订阅', price:89, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}}
+        ] 
+      }],
+      installPackages: [{ id: 'pkg15-2-1', name: 'WPS Mac 安装包', version: 'v6.0.1', url: '#' }]
+    },
+
+    // 退市商品
+    { 
+      id: 'PROD-OFF-001', name: 'WPS Office 2016 (已退市)', category: 'Win端', subCategory: 'Win2019', status: 'OffShelf', tags: ['生态'],
+      skus: [{ 
+        id: 's20', code: 'S20', name: '标准版', price: 398, 
+        pricingOptions: [
+          {id:'o20-1', title:'永久授权', price:398, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},
+          {id:'o20-2', title:'年度订阅', price:128, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
+        ] 
+      }],
+      installPackages: [{ id: 'pkg20-1', name: 'WPS 2016 安装包', version: 'v10.1.0', url: '#' }]
+    }
   ]);
 
   // --- 1.5 Sales Merchandise Mock Data ---
   const [merchandises, setMerchandises] = useState<SalesMerchandise[]>([
       { 
-          id: 'M001', name: 'WPS 365 商业版', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 365.0, status: 'Active',
-          items: [{ productId: 'PROD-001', productName: 'WPS 365 商业版', skuId: 'spec1', skuName: '商业版/人', quantity: 1 }]
+          id: 'M001', name: 'WPS 365 商业基础版', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 199.0, status: 'Active',
+          items: [{ productId: 'PROD-001', productName: 'WPS 365 商业基础版', skuId: 'spec1', skuName: '标准版', quantity: 1 }]
       },
       { 
-          id: 'M002', name: 'WPS 365 团队包', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 999.0, status: 'Active',
-          items: [{ productId: 'PROD-001', productName: 'WPS 365 商业版', skuId: 'spec2', skuName: '商业版/5人团队包', quantity: 1 }]
+          id: 'M002', name: 'WPS 365 商业标准版', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 365.0, status: 'Active',
+          items: [{ productId: 'PROD-002', productName: 'WPS 365 商业标准版', skuId: 'spec2', skuName: '标准版', quantity: 1 }]
       },
       { 
-          id: 'M004', name: 'WPS Office 2023 信创采购组合', salesType: ['Channel', 'Direct'], pricingPolicy: 'Negotiable', price: 1100.0, status: 'Active',
-          items: [
-              { productId: 'PROD-002', productName: 'WPS Office 2023 专业版', skuId: 'spec3', skuName: '单机永久授权', quantity: 1 },
-              { productId: 'PROD-003', productName: 'WPS Office 2023 专业增强版', skuId: 'spec4', skuName: '增强版永久授权', quantity: 1 }
-          ]
+          id: 'M003', name: 'WPS 365 旗舰版', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 599.0, status: 'Active',
+          items: [{ productId: 'PROD-003', productName: 'WPS 365 旗舰版', skuId: 'spec3', skuName: '标准版', quantity: 1 }]
       },
       { 
-          id: 'M006', name: '私有云平台交付服务', salesType: ['Direct'], pricingPolicy: 'Negotiable', price: 150000.0, status: 'Active',
-          items: [{ productId: 'PROD-004', productName: '私有云协作平台', skuId: 'spec5', skuName: '核心平台授权', quantity: 1 }]
+          id: 'M004', name: 'WPS Office 2023 专业版', salesType: ['Channel', 'Direct'], pricingPolicy: 'Fixed', price: 598.0, status: 'Active',
+          items: [{ productId: 'PROD-005', productName: 'WPS Office 2023 专业版', skuId: 'spec5', skuName: '标准版', quantity: 1 }]
+      },
+      { 
+          id: 'M005', name: '私有云平台交付服务', salesType: ['Direct'], pricingPolicy: 'Negotiable', price: 150000.0, status: 'Active',
+          items: [{ productId: 'PROD-007', productName: '私有云协作平台', skuId: 'spec7', skuName: '标准版', quantity: 1 }]
       },
   ]);
 
@@ -376,7 +413,7 @@ function App() {
         const statuses = Object.values(OrderStatus);
         const sources: OrderSource[] = ['Sales', 'ChannelPortal', 'OnlineStore', 'APISync'];
 
-        for (let i = 1; i <= 200; i++) {
+        for (let i = 1; i <= 100; i++) {
             const customer = customers[i % customers.length];
             const merchandise = merchandises[i % merchandises.length]; 
             const quantity = Math.floor(Math.random() * 20) + 1;
@@ -393,7 +430,7 @@ function App() {
             const isSelfDeal = Math.random() > 0.8; 
             
             // Logic to determine buyerType based on merchandise capabilities
-            let buyerType: any = 'Customer';
+            let buyerType: BuyerType = 'Customer';
             const supportsChannel = merchandise?.salesType.includes('Channel');
             const supportsDirect = merchandise?.salesType.includes('Direct');
 
@@ -508,7 +545,6 @@ function App() {
 
                 buyerType: buyerType as any,
                 buyerId,
-                buyerName,
                 source,
                 date: dateStr,
                 status,
@@ -544,7 +580,24 @@ function App() {
                     method: 'Remote'
                 },
                 opportunityId: oppId,
-                opportunityName: oppName
+                opportunityName: oppName,
+                
+                // New Business Fields from image
+                buyerName: '北京小优易教科技有限公司',
+                directChannel: '-',
+                terminalChannel: '-',
+                orderType: '订单',
+                creatorName: '苏雪松',
+                creatorPhone: '17610166961',
+                industryLine: '大客央国企',
+                province: '浙江省',
+                city: '嘉兴市',
+                district: '桐乡市',
+                reportTag: 'EA',
+                sellerName: '珠海金山办公软件有限公司',
+                sellerContact: '李海瑞 (00019829)',
+                customerStatus: '已覆盖',
+                channelService: '否'
             });
         }
         return mockOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -556,13 +609,14 @@ function App() {
     <Router>
       <Layout currentUser={currentUser} users={users} setCurrentUser={setCurrentUser}>
         <Routes>
-          <Route path="/" element={<Dashboard orders={orders} totalRevenue={orders.reduce((acc,o)=>acc+o.total,0)} totalOrders={orders.length} totalCustomers={customers.length} />} />
+          <Route path="/" element={<Navigate to="/orders" replace />} />
           
+          <Route path="/product-center" element={<ProductCenter products={products} />} />
+          <Route path="/catalog/:id/preview" element={<ProductPreview products={products} />} />
           <Route path="/products" element={
             <ProductManager 
                 products={products} setProducts={setProducts} 
                 atomicCapabilities={atomicCapabilities} setAtomicCapabilities={setAtomicCapabilities}
-                merchandises={merchandises} setMerchandises={setMerchandises}
                 productRights={productRights} setProductRights={setProductRights}
                 rightPackages={rightPackages} setRightPackages={setRightPackages}
                 licenseDefs={licenseDefs} setLicenseDefs={setLicenseDefs}
@@ -575,7 +629,6 @@ function App() {
             <OrderManager 
                 orders={orders} setOrders={setOrders} 
                 products={products}
-                merchandises={merchandises} 
                 customers={customers} 
                 currentUser={currentUser}
                 users={users}
@@ -595,7 +648,8 @@ function App() {
           <Route path="/customers" element={<CustomerManager customers={customers} setCustomers={setCustomers} users={users} />} />
           <Route path="/customers/:id" element={<CustomerDetails customers={customers} setCustomers={setCustomers} orders={orders} users={users} />} />
 
-          <Route path="/users" element={<UserManager users={users} setUsers={setUsers} departments={departments} roles={roles} setRoles={setRoles} />} />
+          <Route path="/users" element={<UserManager users={users} setUsers={setUsers} departments={departments} roles={roles} setRoles={setRoles} channels={channels} defaultTab="USERS" />} />
+          <Route path="/roles" element={<UserManager users={users} setUsers={setUsers} departments={departments} roles={roles} setRoles={setRoles} channels={channels} defaultTab="ROLES" />} />
           <Route path="/organization" element={<OrganizationManager departments={departments} setDepartments={setDepartments} users={users} />} />
           
           <Route path="/channels" element={<ChannelManager channels={channels} setChannels={setChannels} />} />
@@ -603,6 +657,8 @@ function App() {
 
           <Route path="/opportunities" element={<OpportunityManager opportunities={opportunities} setOpportunities={setOpportunities} customers={customers} />} />
           <Route path="/opportunities/:id" element={<OpportunityDetails opportunities={opportunities} setOpportunities={setOpportunities} customers={customers} />} />
+
+          <Route path="/operations" element={<OperationsManager />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

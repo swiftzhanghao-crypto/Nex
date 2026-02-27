@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   define: {
     // Polyfill process.env for client-side usage of API keys
-    'process.env': process.env
+    'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY)
   },
   resolve: {
     alias: {

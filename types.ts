@@ -124,6 +124,7 @@ export interface Product {
     id: string;
     name: string;
     category: string;
+    subCategory?: string;
     description?: string;
     status: 'OnShelf' | 'OffShelf';
     tags?: string[];
@@ -201,12 +202,30 @@ export interface Customer {
 export type UserRole = 'Admin' | 'Sales' | 'Business' | 'Technical' | 'Logistics' | string; // Updated to allow dynamic strings
 export type UserType = 'Internal' | 'External';
 
+export type PermissionResource = 'Order' | 'Customer' | 'Opportunity';
+export type PermissionDimension = 'departmentId' | 'productId' | 'customerIndustry' | 'customerLevel' | 'channelId' | 'buyerType';
+
+export interface RowPermissionRule {
+    id: string;
+    resource: PermissionResource;
+    dimension: PermissionDimension;
+    values: string[];
+}
+
+export interface ColumnPermissionRule {
+    id: string;
+    resource: PermissionResource;
+    allowedColumns: string[];
+}
+
 export interface RoleDefinition {
     id: string;
     name: string;
     description: string;
     permissions: string[];
     isSystem?: boolean; // System roles cannot be deleted
+    rowPermissions?: RowPermissionRule[];
+    columnPermissions?: ColumnPermissionRule[];
 }
 
 export interface User {
@@ -411,6 +430,22 @@ export interface Order {
     opportunityId?: string;
     opportunityName?: string;
     
+    // Extended Business Fields
+    directChannel?: string;
+    terminalChannel?: string;
+    orderType?: string;
+    creatorName?: string;
+    creatorPhone?: string;
+    industryLine?: string;
+    province?: string;
+    city?: string;
+    district?: string;
+    reportTag?: string;
+    sellerName?: string;
+    sellerContact?: string;
+    customerStatus?: string;
+    channelService?: string;
+
     originalOrderId?: string; 
     confirmedDate?: string;
     

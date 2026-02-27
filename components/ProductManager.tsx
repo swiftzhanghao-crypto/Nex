@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Product, ProductSku, InstallPackage, AtomicCapability, CapabilityType, SalesMerchandise, ProductRightDefinition, RightPackage, RightValue, RightDataType, SkuPricingOption, LicenseTypeDefinition, LicenseType, LicenseUnit } from '../types';
-import { Plus, Trash2, Search, Sparkles, Loader2, Tag, Box, ArrowUpCircle, ArrowDownCircle, Archive, Eye, ShieldCheck, X, Download, Layers, Component, ShoppingBag, List, Clock, Briefcase, Package as PackageIcon, Check, Key } from 'lucide-react';
+import { Product, ProductSku, InstallPackage, AtomicCapability, CapabilityType, ProductRightDefinition, RightPackage, RightValue, RightDataType, LicenseTypeDefinition } from '../types';
+import { Plus, Trash2, Search, Sparkles, Loader2, ArrowUpCircle, ArrowDownCircle, Archive, Eye, X, Layers, Component, Key, Package as PackageIcon } from 'lucide-react';
 import { generateProductDescription, suggestCategory } from '../services/geminiService';
 import { useNavigate } from 'react-router-dom';
 
@@ -10,8 +10,6 @@ interface ProductManagerProps {
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
   atomicCapabilities: AtomicCapability[];
   setAtomicCapabilities: React.Dispatch<React.SetStateAction<AtomicCapability[]>>;
-  merchandises: SalesMerchandise[];
-  setMerchandises: React.Dispatch<React.SetStateAction<SalesMerchandise[]>>;
   productRights: ProductRightDefinition[];
   setProductRights: React.Dispatch<React.SetStateAction<ProductRightDefinition[]>>;
   rightPackages: RightPackage[];
@@ -23,7 +21,6 @@ interface ProductManagerProps {
 const ProductManager: React.FC<ProductManagerProps> = ({ 
     products, setProducts, 
     atomicCapabilities, setAtomicCapabilities, 
-    merchandises, setMerchandises,
     productRights, setProductRights,
     rightPackages, setRightPackages,
     licenseDefs, setLicenseDefs
@@ -40,7 +37,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
   // SPU State
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 20;
   
   const [tempPrice, setTempPrice] = useState<number>(0);
   const [tempStock, setTempStock] = useState<number>(0);
@@ -250,7 +247,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
       }
   };
 
-  const handleUpdatePkgRightValue = (defId: string, val: any) => {
+  const handleUpdatePkgRightValue = (defId: string, val: string | number | boolean) => {
       setTempPkgRights(prev => prev.map(r => r.definitionId === defId ? { ...r, value: val } : r));
   };
 
@@ -303,10 +300,6 @@ const ProductManager: React.FC<ProductManagerProps> = ({
   const pageItems = currentItems.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(currentItems.length / itemsPerPage);
 
-  const handlePageChange = (pageNumber: number) => {
-    setCurrentPage(pageNumber);
-  };
-
   React.useEffect(() => {
       setCurrentPage(1);
   }, [searchTerm, activeTab]);
@@ -321,13 +314,18 @@ const ProductManager: React.FC<ProductManagerProps> = ({
       return `¥${min.toLocaleString()} - ¥${max.toLocaleString()}`;
   };
 
+  const getTagColor = (tag: string) => {
+      const t = tag.toUpperCase();
+      if (t.includes('IM')) return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
+      if (t.includes('AI')) return 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800';
+      if (t.includes('SAAS')) return 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
+      if (t.includes('信创')) return 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800';
+      return 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-white/10 dark:text-gray-400 dark:border-white/5';
+  };
+
   return (
-    <div className="p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
-        <div>
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight">商品中心</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">管理商品、规格及授权定价体系。</p>
-        </div>
+    <div className="p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 animate-fade-in relative">
+      <div className="flex justify-between items-center gap-4">
         <div className="flex bg-gray-100 dark:bg-white/10 p-1 rounded-md overflow-x-auto">
             {['SPU', 'SKU', 'LicenseTypes', 'Rights', 'Packages', 'Atomic'].map((tab) => (
                 <button 
@@ -342,6 +340,21 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                      tab === 'Packages' ? '权益套餐' : '原子能力'}
                 </button>
             ))}
+        </div>
+
+        {/* View Toggle */}
+        <div className="flex bg-gray-100 dark:bg-white/10 p-1 rounded-lg border border-gray-200 dark:border-white/10">
+            <button 
+                onClick={() => navigate('/product-center')}
+                className="px-4 py-1.5 text-sm font-medium rounded-md text-gray-600 dark:text-white/70 hover:bg-white/50 dark:hover:bg-white/10 transition-colors"
+            >
+                销售视图
+            </button>
+            <button 
+                className="px-4 py-1.5 text-sm font-medium rounded-md bg-white dark:bg-[#1C1C1E] text-[#2B5EEA] dark:text-white shadow-sm transition-colors"
+            >
+                商品管理视图
+            </button>
         </div>
       </div>
 
@@ -400,7 +413,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                         <td className="p-4">
                             <div className="flex flex-wrap gap-1">
                                 {product.tags?.map(t => (
-                                    <span key={t} className="text-[10px] bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded-sm border border-gray-200 dark:border-white/5">
+                                    <span key={t} className={`text-[10px] px-2 py-0.5 rounded-sm border font-bold ${getTagColor(t)}`}>
                                         {t}
                                     </span>
                                 ))}
@@ -450,7 +463,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                             </button>
                             <button 
                                 onClick={() => handleToggleStatus(product)}
-                                title={product.status === 'OnShelf' ? "下架产品" : "上架产品"}
+                                title={product.status === 'OnShelf' ? "下架商品" : "上架商品"}
                                 className={`p-2 rounded-full transition ${
                                     product.status === 'OnShelf' 
                                     ? 'text-orange-400 hover:text-orange-600 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30' 
@@ -468,6 +481,32 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                     ))}
                     </tbody>
                 </table>
+                {totalPages > 1 && (
+                    <div className="flex justify-between items-center p-4 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                            共 {currentItems.length} 条数据
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <button 
+                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                disabled={currentPage === 1}
+                                className="px-3 py-1 rounded-md bg-white dark:bg-black border border-gray-200 dark:border-white/10 text-sm disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/5 transition"
+                            >
+                                上一页
+                            </button>
+                            <span className="text-sm text-gray-600 dark:text-gray-300">
+                                {currentPage} / {totalPages}
+                            </span>
+                            <button 
+                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                disabled={currentPage === totalPages}
+                                className="px-3 py-1 rounded-md bg-white dark:bg-black border border-gray-200 dark:border-white/10 text-sm disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/5 transition"
+                            >
+                                下一页
+                            </button>
+                        </div>
+                    </div>
+                )}
               </div>
           )}
 
@@ -502,6 +541,32 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                           ))}
                       </tbody>
                   </table>
+                  {totalPages > 1 && (
+                      <div className="flex justify-between items-center p-4 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5">
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                              共 {currentItems.length} 条数据
+                          </div>
+                          <div className="flex items-center gap-4">
+                              <button 
+                                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                  disabled={currentPage === 1}
+                                  className="px-3 py-1 rounded-md bg-white dark:bg-black border border-gray-200 dark:border-white/10 text-sm disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/5 transition"
+                              >
+                                  上一页
+                              </button>
+                              <span className="text-sm text-gray-600 dark:text-gray-300">
+                                  {currentPage} / {totalPages}
+                              </span>
+                              <button 
+                                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                  disabled={currentPage === totalPages}
+                                  className="px-3 py-1 rounded-md bg-white dark:bg-black border border-gray-200 dark:border-white/10 text-sm disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/5 transition"
+                              >
+                                  下一页
+                              </button>
+                          </div>
+                      </div>
+                  )}
               </div>
           )}
 
@@ -511,7 +576,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                   <div className="flex justify-between items-center">
                       <div>
                           <h3 className="text-lg font-bold text-gray-900 dark:text-white">授权类型定义</h3>
-                          <p className="text-sm text-gray-500">配置产品规格可引用的标准化授权模式。</p>
+                          <p className="text-sm text-gray-500">配置商品规格可引用的标准化授权模式。</p>
                       </div>
                       <button 
                         onClick={() => setIsLicenseModalOpen(true)}
@@ -550,7 +615,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                   <div className="flex justify-between items-center">
                       <div>
                           <h3 className="text-lg font-bold text-gray-900 dark:text-white">权益定义 (Rights Definition)</h3>
-                          <p className="text-sm text-gray-500">定义产品中可控的权益项，如存储空间、并发数等。</p>
+                          <p className="text-sm text-gray-500">定义商品中可控的权益项，如存储空间、并发数等。</p>
                       </div>
                       <button 
                         onClick={() => setIsRightsModalOpen(true)}
@@ -583,7 +648,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                   <div className="flex justify-between items-center">
                       <div>
                           <h3 className="text-lg font-bold text-gray-900 dark:text-white">权益套餐 (Rights Packages)</h3>
-                          <p className="text-sm text-gray-500">组合多个权益项，形成标准化的产品权益配置。</p>
+                          <p className="text-sm text-gray-500">组合多个权益项，形成标准化的商品权益配置。</p>
                       </div>
                       <button 
                         onClick={handleOpenPkgModal}
@@ -628,7 +693,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                   <div className="flex justify-between items-center">
                       <div>
                           <h3 className="text-lg font-bold text-gray-900 dark:text-white">原子能力列表</h3>
-                          <p className="text-sm text-gray-500">这些是构成产品的最小功能单元。</p>
+                          <p className="text-sm text-gray-500">这些是构成商品的最小功能单元。</p>
                       </div>
                       <button 
                         onClick={() => setIsAtomModalOpen(true)}

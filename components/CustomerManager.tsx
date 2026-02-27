@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Customer, User, CustomerType, CustomerLevel, CustomerContact, ContactRole } from '../types';
-import { Search, Eye, Building2, Mail, Phone, User as UserIcon, Plus, X } from 'lucide-react';
+import { Search, Eye, Plus, X } from 'lucide-react';
 
 interface CustomerManagerProps {
   customers: Customer[];
@@ -14,7 +14,7 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 20;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   // New Customer Form State
@@ -226,97 +226,113 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
             </tbody>
           </table>
         </div>
-        {/* Pagination Controls */}
+
         {totalPages > 1 && (
             <div className="flex justify-between items-center p-4 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5">
-                <button 
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1.5 rounded-sm border border-gray-300 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-sm font-medium"
-                >
-                    上一页
-                </button>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                    第 {currentPage} 页 / 共 {totalPages} 页
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                    共 {filteredCustomers.length} 条数据
                 </div>
-                <button 
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1.5 rounded-sm border border-gray-300 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-sm font-medium"
-                >
-                    下一页
-                </button>
+                <div className="flex items-center gap-4">
+                    <button 
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1 rounded-sm border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-sm font-medium"
+                    >
+                        上一页
+                    </button>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                        第 {currentPage} 页 / 共 {totalPages} 页
+                    </div>
+                    <button 
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1 rounded-sm border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-sm font-medium"
+                    >
+                        下一页
+                    </button>
+                </div>
             </div>
         )}
       </div>
 
-      {/* Create Customer Modal */}
       {isCreateOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col animate-modal-enter max-h-[90vh] border border-white/10">
-            <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5">
-              <h3 className="text-xl font-bold text-gray-800 dark:text-white">新增企业客户</h3>
-              <button onClick={() => setIsCreateOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5"/></button>
-            </div>
-            
-            <div className="p-6 overflow-y-auto">
-                <div className="space-y-6">
-                    {/* Basic Info */}
-                    <div>
-                        <h4 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">基本信息</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">企业名称 <span className="text-red-500">*</span></label>
-                                <input 
-                                    type="text" 
-                                    value={formData.companyName}
-                                    onChange={e => setFormData({...formData, companyName: e.target.value})}
-                                    className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-sm p-2 text-sm focus:ring-2 focus:ring-[#0071E3] outline-none dark:text-white"
-                                />
-                            </div>
-                             {/* ... other inputs styled similarly ... */}
-                             <div>
-                                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">所属行业</label>
-                                <input 
-                                    type="text" 
-                                    value={formData.industry}
-                                    onChange={e => setFormData({...formData, industry: e.target.value})}
-                                    className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-sm p-2 text-sm focus:ring-2 focus:ring-[#0071E3] outline-none dark:text-white"
-                                />
-                            </div>
-                            {/* ... select inputs ... */}
-                            <div>
-                                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">客户类型</label>
-                                <select 
-                                    value={formData.customerType}
-                                    onChange={e => setFormData({...formData, customerType: e.target.value as CustomerType})}
-                                    className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-sm p-2 text-sm focus:ring-2 focus:ring-[#0071E3] outline-none dark:text-white"
-                                >
-                                    <option value="Enterprise">企业 (Enterprise)</option>
-                                    <option value="Government">政府 (Government)</option>
-                                    <option value="Education">教育 (Education)</option>
-                                    <option value="Partner">合作伙伴 (Partner)</option>
-                                    <option value="SMB">中小企业 (SMB)</option>
-                                </select>
-                            </div>
-                            {/* ... more fields ... */}
-                        </div>
-                    </div>
-                </div>
-            </div>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+              <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col animate-modal-enter border border-white/10">
+                  <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5">
+                      <h3 className="text-xl font-bold text-gray-800 dark:text-white">新增企业客户</h3>
+                      <button onClick={() => setIsCreateOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-white"><X className="w-5 h-5"/></button>
+                  </div>
+                  
+                  <div className="p-6 space-y-6">
+                      <div className="grid grid-cols-2 gap-6">
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">企业名称</label>
+                              <input value={formData.companyName} onChange={e => setFormData({...formData, companyName: e.target.value})} className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-sm p-2.5 outline-none text-gray-900 dark:text-white" placeholder="请输入完整公司名" />
+                          </div>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">所属行业</label>
+                              <input value={formData.industry} onChange={e => setFormData({...formData, industry: e.target.value})} className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-sm p-2.5 outline-none text-gray-900 dark:text-white" placeholder="如: 互联网, 金融" />
+                          </div>
+                      </div>
 
-            <div className="p-6 bg-gray-50 dark:bg-white/5 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
-              <button onClick={() => setIsCreateOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 rounded-md transition font-medium">取消</button>
-              <button 
-                onClick={handleCreate} 
-                disabled={!formData.companyName}
-                className="px-4 py-2 bg-[#0071E3] dark:bg-[#FF2D55] text-white rounded-md hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 transition font-medium shadow-md disabled:opacity-50"
-              >
-                  创建客户
-              </button>
-            </div>
+                      <div className="grid grid-cols-2 gap-6">
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">客户类型</label>
+                              <select value={formData.customerType} onChange={e => setFormData({...formData, customerType: e.target.value as CustomerType})} className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-sm p-2.5 outline-none text-gray-900 dark:text-white">
+                                  <option value="Enterprise">企业 (Enterprise)</option>
+                                  <option value="SMB">中小企业 (SMB)</option>
+                                  <option value="Government">政府 (Government)</option>
+                                  <option value="Education">教育 (Education)</option>
+                                  <option value="Partner">合作伙伴 (Partner)</option>
+                              </select>
+                          </div>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">客户等级</label>
+                              <select value={formData.level} onChange={e => setFormData({...formData, level: e.target.value as CustomerLevel})} className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-sm p-2.5 outline-none text-gray-900 dark:text-white">
+                                  <option value="KA">KA (Key Account)</option>
+                                  <option value="A">A 级</option>
+                                  <option value="B">B 级</option>
+                                  <option value="C">C 级</option>
+                              </select>
+                          </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-6">
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">所在区域</label>
+                              <input value={formData.region} onChange={e => setFormData({...formData, region: e.target.value})} className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-sm p-2.5 outline-none text-gray-900 dark:text-white" placeholder="省/市" />
+                          </div>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">详细地址</label>
+                              <input value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-sm p-2.5 outline-none text-gray-900 dark:text-white" placeholder="办公地址" />
+                          </div>
+                      </div>
+
+                      <div className="border-t border-gray-100 dark:border-white/10 pt-4">
+                          <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-3">首要联系人</h4>
+                          <div className="grid grid-cols-3 gap-4">
+                              <div>
+                                  <label className="block text-xs font-medium text-gray-500 mb-1">姓名</label>
+                                  <input value={formData.contactName} onChange={e => setFormData({...formData, contactName: e.target.value})} className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-sm p-2 text-sm outline-none text-gray-900 dark:text-white" />
+                              </div>
+                              <div>
+                                  <label className="block text-xs font-medium text-gray-500 mb-1">电话</label>
+                                  <input value={formData.contactPhone} onChange={e => setFormData({...formData, contactPhone: e.target.value})} className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-sm p-2 text-sm outline-none text-gray-900 dark:text-white" />
+                              </div>
+                              <div>
+                                  <label className="block text-xs font-medium text-gray-500 mb-1">邮箱</label>
+                                  <input value={formData.contactEmail} onChange={e => setFormData({...formData, contactEmail: e.target.value})} className="w-full border border-gray-300 dark:border-white/10 bg-white dark:bg-black rounded-sm p-2 text-sm outline-none text-gray-900 dark:text-white" />
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div className="p-6 bg-gray-50 dark:bg-white/5 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
+                      <button onClick={() => setIsCreateOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 rounded-md transition font-medium">取消</button>
+                      <button onClick={handleCreate} disabled={!formData.companyName} className="px-4 py-2 bg-[#0071E3] dark:bg-[#FF2D55] text-white rounded-md hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 transition font-medium shadow-md disabled:opacity-50">创建客户</button>
+                  </div>
+              </div>
           </div>
-        </div>
       )}
     </div>
   );

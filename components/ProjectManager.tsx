@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Project, ProjectStatus, Customer } from '../types';
-import { Search, Plus, FolderKanban, Clock, CheckCircle, AlertCircle, Calendar, User as UserIcon } from 'lucide-react';
+import { Search, Plus, FolderKanban, Clock, CheckCircle, AlertCircle, Calendar, User as UserIcon, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface ProjectManagerProps {
@@ -15,6 +15,9 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({ projects, setProjects, 
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+  
   const [formData, setFormData] = useState<Partial<Project>>({
       name: '',
       customerId: '',
@@ -27,6 +30,13 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({ projects, setProjects, 
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.customerName.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filtered.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+
+  const handlePageChange = (page: number) => setCurrentPage(page);
 
   const handleSave = () => {
       if (!formData.name || !formData.customerId) return;
@@ -95,7 +105,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({ projects, setProjects, 
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50 dark:divide-white/5">
-                        {filtered.map(proj => (
+                        {currentItems.map(proj => (
                             <tr 
                                 key={proj.id} 
                                 className="group cursor-pointer hover:bg-gray-100/80 dark:hover:bg-white/[0.08] even:bg-gray-50/50 dark:even:bg-white/[0.02] transition-colors"
@@ -130,14 +140,40 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({ projects, setProjects, 
                     </tbody>
                 </table>
             </div>
-        </div>
+            {totalPages > 1 && (
+                <div className="flex justify-between items-center p-4 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                        共 {filtered.length} 条数据
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); handlePageChange(currentPage - 1); }}
+                            disabled={currentPage === 1}
+                            className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium"
+                        >
+                            上一页
+                        </button>
+                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                            第 {currentPage} 页 / 共 {totalPages} 页
+                        </div>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); handlePageChange(currentPage + 1); }}
+                            disabled={currentPage === totalPages}
+                            className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium"
+                        >
+                            下一页
+                        </button>
+                    </div>
+                </div>
+            )}
+            </div>
 
         {isModalOpen && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
                 <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-modal-enter border border-white/10">
                     <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-white dark:bg-white/5">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">新建项目</h3>
-                        <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><Plus className="w-5 h-5 rotate-45"/></button>
+                        <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5"/></button>
                     </div>
                     <div className="p-6 space-y-4">
                         <div>

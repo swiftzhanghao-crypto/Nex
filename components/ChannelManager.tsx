@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Channel, ChannelType } from '../types';
-import { Search, Plus, MapPin, Phone, Mail, Edit, Trash2, Network, ChevronRight } from 'lucide-react';
+import { Search, Plus, MapPin, Phone, Mail, Edit, Trash2, Network, ChevronRight, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface ChannelManagerProps {
@@ -12,7 +12,7 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ channels, setChannels }
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 20;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -207,23 +207,28 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ channels, setChannels }
 
             {totalPages > 1 && (
                 <div className="flex justify-between items-center p-4 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5">
-                    <button 
-                        onClick={() => handlePageChange(currentPage - 1)}
-                        disabled={currentPage === 1}
-                        className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium"
-                    >
-                        上一页
-                    </button>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                        第 {currentPage} 页 / 共 {totalPages} 页
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                        共 {filteredChannels.length} 条数据
                     </div>
-                    <button 
-                        onClick={() => handlePageChange(currentPage + 1)}
-                        disabled={currentPage === totalPages}
-                        className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium"
-                    >
-                        下一页
-                    </button>
+                    <div className="flex items-center gap-4">
+                        <button 
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium"
+                        >
+                            上一页
+                        </button>
+                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                            第 {currentPage} 页 / 共 {totalPages} 页
+                        </div>
+                        <button 
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                            className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium"
+                        >
+                            下一页
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
@@ -234,7 +239,7 @@ const ChannelManager: React.FC<ChannelManagerProps> = ({ channels, setChannels }
                 <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-modal-enter border border-white/10">
                     <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-white dark:bg-white/5">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">{editingId ? '编辑渠道' : '新增渠道'}</h3>
-                        <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><Trash2 className="w-5 h-5 rotate-45"/></button>
+                        <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5"/></button>
                     </div>
                     
                     <div className="p-6 space-y-4">
