@@ -145,75 +145,54 @@ const ProductCenter: React.FC<ProductCenterProps> = ({ products }) => {
                 </div>
             )}
 
-            {/* Hero Section */}
-            <div className="bg-[#0071E3] text-white py-6 px-10 flex items-center shrink-0 shadow-sm">
-                <div className="flex items-center gap-6 w-full max-w-7xl mx-auto">
-                    <h1 className="text-2xl font-bold tracking-tight whitespace-nowrap">商品中心</h1>
-                    <div className="h-8 w-px bg-white/30 hidden md:block"></div>
-                    <div className="relative flex-1 max-w-3xl">
+            {/* Header Section */}
+            <div className="bg-white dark:bg-[#1C1C1E] border-b border-gray-100 dark:border-white/10 py-4 px-8 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-6 flex-1">
+                    <h1 className="text-xl font-bold text-gray-900 dark:text-white whitespace-nowrap">商品展示</h1>
+                    <div className="relative flex-1 max-w-2xl">
                         <input 
                             type="text" 
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             placeholder="搜索WPS商品关键词" 
-                            className="w-full pl-6 pr-12 py-2.5 rounded-full text-gray-900 bg-white outline-none shadow-lg focus:ring-4 focus:ring-white/20 transition-all text-sm"
+                            className="w-full pl-10 pr-10 py-2 rounded-xl text-gray-900 dark:text-white bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-sm"
                         />
-                        {isSearching ? (
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        {isSearching && (
                             <button 
                                 onClick={() => setSearchTerm('')}
-                                className="absolute right-12 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
-                        ) : null}
-                        <Search className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        )}
                     </div>
-                    
-                    {/* View Toggle - Aligned with search box */}
-                    <div className="flex bg-white/20 p-1 rounded-lg backdrop-blur-sm border border-white/20 shrink-0 ml-auto">
+                </div>
+                
+                <div className="flex items-center gap-4 ml-4">
+                    <div className="flex bg-gray-100 dark:bg-white/5 p-1 rounded-lg border border-gray-200 dark:border-white/10">
                         <button 
-                            className="px-4 py-1.5 text-xs font-medium rounded-md bg-white text-[#0071E3] shadow-sm transition-colors"
+                            onClick={() => setActiveTab('ON_SHELF')}
+                            className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
+                                activeTab === 'ON_SHELF' 
+                                ? 'bg-white dark:bg-white/10 text-[#0071E3] dark:text-blue-400 shadow-sm' 
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                            }`}
                         >
-                            销售视图
+                            在架商品
                         </button>
                         <button 
-                            onClick={() => navigate('/products')}
-                            className="px-4 py-1.5 text-xs font-medium rounded-md text-white/90 hover:bg-white/10 transition-colors"
+                            onClick={() => setActiveTab('OFF_SHELF')}
+                            className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
+                                activeTab === 'OFF_SHELF' 
+                                ? 'bg-white dark:bg-white/10 text-[#0071E3] dark:text-blue-400 shadow-sm' 
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                            }`}
                         >
-                            产品管理视图
+                            退市商品
                         </button>
                     </div>
                 </div>
-            </div>
-
-            {/* Top Tabs for Catalog */}
-            <div className="flex items-center gap-8 px-8 border-b border-gray-100 dark:border-white/10 shrink-0 bg-white dark:bg-[#1C1C1E]">
-                <button 
-                onClick={() => setActiveTab('ON_SHELF')}
-                className={`py-4 text-base font-bold relative transition-colors ${
-                    activeTab === 'ON_SHELF' 
-                    ? 'text-gray-900 dark:text-white' 
-                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                }`}
-                >
-                在架商品
-                {activeTab === 'ON_SHELF' && (
-                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#0071E3] dark:bg-[#0A84FF] rounded-t-full"></div>
-                )}
-                </button>
-                <button 
-                onClick={() => setActiveTab('OFF_SHELF')}
-                className={`py-4 text-base font-bold relative transition-colors ${
-                    activeTab === 'OFF_SHELF' 
-                    ? 'text-gray-900 dark:text-white' 
-                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                }`}
-                >
-                退市商品
-                {activeTab === 'OFF_SHELF' && (
-                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#0071E3] dark:bg-[#0A84FF] rounded-t-full"></div>
-                )}
-                </button>
             </div>
 
             {/* Main Content Area */}

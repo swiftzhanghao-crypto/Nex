@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Product, ProductSku, InstallPackage, AtomicCapability, CapabilityType, ProductRightDefinition, RightPackage, RightValue, RightDataType, LicenseTypeDefinition } from '../types';
+import { Product, ProductSku, InstallPackage, AtomicCapability, CapabilityType, ProductRightDefinition, RightPackage, RightValue, RightDataType, LicenseTypeDefinition, LicenseType, LicenseUnit } from '../types';
 import { Plus, Trash2, Search, Sparkles, Loader2, ArrowUpCircle, ArrowDownCircle, Archive, Eye, X, Layers, Component, Key, Package as PackageIcon } from 'lucide-react';
 import { generateProductDescription, suggestCategory } from '../services/geminiService';
 import { useNavigate } from 'react-router-dom';
@@ -375,7 +375,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                   {activeTab === 'SPU' && (
                       <button 
                         onClick={handleOpenModal}
-                        className="bg-[#0071E3] dark:bg-[#FF2D55] text-white px-4 py-2.5 rounded-md flex items-center gap-2 hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 transition shadow-sm text-sm font-medium"
+                        className="unified-button-primary"
                         >
                         <Plus className="w-4 h-4" /> 新增商品
                       </button>
@@ -385,9 +385,9 @@ const ProductManager: React.FC<ProductManagerProps> = ({
 
           {/* SPU (Product) List */}
           {activeTab === 'SPU' && (
-              <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
+              <div className="unified-card">
                 <table className="w-full text-left">
-                    <thead className="bg-gray-50/80 dark:bg-white/5 backdrop-blur border-b border-gray-200/50 dark:border-white/10 text-gray-500 dark:text-gray-400 font-medium text-sm uppercase">
+                    <thead className="unified-table-header">
                     <tr>
                         <th className="p-4 pl-6">商品名称 / ID</th>
                         <th className="p-4">标签</th>
@@ -420,11 +420,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                             </div>
                         </td>
                         <td className="p-4">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-sm text-xs font-medium ${
-                                product.status === 'OnShelf' 
-                                ? 'bg-green-100 text-green-700 border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' 
-                                : 'bg-gray-200 text-gray-600 border border-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600'
-                            }`}>
+                            <span className={product.status === 'OnShelf' ? 'unified-tag-green' : 'unified-tag-gray'}>
                                 {product.status === 'OnShelf' ? <ArrowUpCircle className="w-3 h-3" /> : <Archive className="w-3 h-3" />}
                                 {product.status === 'OnShelf' ? '已上架' : '已下架'}
                             </span>
@@ -432,13 +428,13 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                         <td className="p-4">
                             <div className="flex flex-col gap-1 max-w-[200px]">
                                 {product.packageId && (
-                                    <div className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-sm w-fit mb-1 border border-purple-100">
+                                    <div className="unified-tag-indigo mb-1">
                                         {rightPackages.find(p=>p.id===product.packageId)?.name}
                                     </div>
                                 )}
                                 <div className="flex flex-wrap gap-1">
                                     {product.composition?.slice(0, 2).map((c, i) => (
-                                        <span key={i} className="text-[10px] bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300 px-1.5 py-0.5 rounded-sm border border-blue-100 dark:border-blue-800">
+                                        <span key={i} className="unified-tag-blue">
                                             {c.name}
                                         </span>
                                     ))}
@@ -525,7 +521,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 dark:divide-white/5 text-base">
-                          {(pageItems as any[]).map(sku => (
+                          {(pageItems as (ProductSku & { parentName: string; parentId: string })[]).map(sku => (
                               <tr key={sku.id} className="group hover:bg-gray-100/80 dark:hover:bg-white/[0.08] even:bg-gray-50/50 dark:even:bg-white/[0.02] transition-colors">
                                   <td className="p-4 pl-6 font-mono text-sm text-gray-500 dark:text-gray-400">{sku.code}</td>
                                   <td className="p-4 font-medium text-gray-900 dark:text-white">{sku.name}</td>
@@ -918,7 +914,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                       <div className="grid grid-cols-2 gap-3">
                           <div>
                               <label className="block text-xs font-medium text-gray-500 mb-1">类型</label>
-                              <select value={licenseForm.type} onChange={e => setLicenseForm({...licenseForm, type: e.target.value as any})} className="w-full border rounded-sm p-2 dark:bg-black dark:border-white/10 dark:text-white">
+                              <select value={licenseForm.type} onChange={e => setLicenseForm({...licenseForm, type: e.target.value as LicenseType})} className="w-full border rounded-sm p-2 dark:bg-black dark:border-white/10 dark:text-white">
                                   <option value="Subscription">订阅 (Subscription)</option>
                                   <option value="Perpetual">永久 (Perpetual)</option>
                                   <option value="FlatRate">固定价 (FlatRate)</option>
@@ -927,7 +923,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                           </div>
                           <div>
                               <label className="block text-xs font-medium text-gray-500 mb-1">单位</label>
-                              <select value={licenseForm.periodUnit} onChange={e => setLicenseForm({...licenseForm, periodUnit: e.target.value as any})} className="w-full border rounded-sm p-2 dark:bg-black dark:border-white/10 dark:text-white">
+                              <select value={licenseForm.periodUnit} onChange={e => setLicenseForm({...licenseForm, periodUnit: e.target.value as LicenseUnit})} className="w-full border rounded-sm p-2 dark:bg-black dark:border-white/10 dark:text-white">
                                   <option value="Year">年</option>
                                   <option value="Month">月</option>
                                   <option value="Day">日</option>

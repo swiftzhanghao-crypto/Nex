@@ -44,6 +44,8 @@ export interface OrderItem extends MerchandiseItem {
     // Snapshot of Atomic Capabilities for this order (Layer 4 realization)
     capabilitiesSnapshot?: string[]; 
 
+    licenseType?: string;
+
     // Pricing Option selected
     pricingOptionId?: string;
     pricingOptionName?: string;
@@ -118,6 +120,9 @@ export interface InstallPackage {
     name: string;
     version: string;
     url: string;
+    cpu?: string;
+    os?: string;
+    arch?: string;
 }
 
 export interface Product {
@@ -266,40 +271,33 @@ export type OpportunityStage = 'New' | 'Qualification' | 'Proposal' | 'Negotiati
 
 export interface Opportunity {
     id: string;
+    crmId?: string; // 商机名称(CRM)
     name: string;
     customerId: string;
     customerName: string;
-    expectedRevenue: number;
-    stage: OpportunityStage;
+    productType?: string; // 产品类型/授权方式
+    stage: OpportunityStage | string;
     probability: number;
+    amount?: number; // 商机金额
+    expectedRevenue: number;
+    finalUserRevenue?: number; // 最终用户成交额
     closeDate: string;
     ownerId: string;
     ownerName: string;
     createdAt: string;
 }
 
-export type OrderStatus = 
-    | 'PENDING_APPROVAL' 
-    | 'PENDING_CONFIRM' 
-    | 'PROCESSING_PROD' 
-    | 'PENDING_PAYMENT' 
-    | 'SHIPPED' 
-    | 'DELIVERED' 
-    | 'CANCELLED' 
-    | 'REFUND_PENDING' 
-    | 'REFUNDED';
-
-export const OrderStatus = {
-    PENDING_APPROVAL: 'PENDING_APPROVAL' as OrderStatus,
-    PENDING_CONFIRM: 'PENDING_CONFIRM' as OrderStatus,
-    PROCESSING_PROD: 'PROCESSING_PROD' as OrderStatus,
-    PENDING_PAYMENT: 'PENDING_PAYMENT' as OrderStatus,
-    SHIPPED: 'SHIPPED' as OrderStatus,
-    DELIVERED: 'DELIVERED' as OrderStatus,
-    CANCELLED: 'CANCELLED' as OrderStatus,
-    REFUND_PENDING: 'REFUND_PENDING' as OrderStatus,
-    REFUNDED: 'REFUNDED' as OrderStatus,
-};
+export enum OrderStatus {
+    PENDING_APPROVAL = 'PENDING_APPROVAL',
+    PENDING_CONFIRM = 'PENDING_CONFIRM',
+    PROCESSING_PROD = 'PROCESSING_PROD',
+    PENDING_PAYMENT = 'PENDING_PAYMENT',
+    SHIPPED = 'SHIPPED',
+    DELIVERED = 'DELIVERED',
+    CANCELLED = 'CANCELLED',
+    REFUND_PENDING = 'REFUND_PENDING',
+    REFUNDED = 'REFUNDED',
+}
 
 export type OrderSource = 'Sales' | 'ChannelPortal' | 'OnlineStore' | 'APISync' | 'Renewal';
 export type BuyerType = 'Customer' | 'Channel' | 'SelfDeal' | 'Direct';
@@ -394,6 +392,9 @@ export interface Order {
     buyerId?: string; // ID of the Channel or Customer buying the product
     
     shippingAddress?: string;
+    receivingParty?: string;
+    receivingCompany?: string;
+    receivingMethod?: string;
     deliveryMethod?: DeliveryMethod;
     
     isPaid: boolean;
@@ -447,6 +448,8 @@ export interface Order {
     channelService?: string;
 
     originalOrderId?: string; 
+    smsOriginalOrderId?: string;
+    saasOriginalOrderId?: string;
     confirmedDate?: string;
     
     refundReason?: string;

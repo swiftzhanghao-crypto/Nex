@@ -98,7 +98,7 @@ const ChannelDetails: React.FC<ChannelDetailsProps> = ({ channels, setChannels }
                             </div>
                             <div>
                                 <label className="text-xs text-gray-500 mb-1 block">等级</label>
-                                <select value={formData.level} onChange={e=>setFormData({...formData, level: e.target.value as any})} className="w-full border p-2 rounded-lg text-sm bg-white">
+                                <select value={formData.level} onChange={e=>setFormData({...formData, level: e.target.value as 'Tier1' | 'Tier2' | 'Tier3'})} className="w-full border p-2 rounded-lg text-sm bg-white">
                                     <option value="Tier1">Tier 1</option>
                                     <option value="Tier2">Tier 2</option>
                                     <option value="Tier3">Tier 3</option>

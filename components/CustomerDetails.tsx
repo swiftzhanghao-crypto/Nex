@@ -388,7 +388,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customers, setCustome
                                 </div>
                                 <div>
                                       <label className="text-xs text-gray-500 mb-1 block">状态</label>
-                                      <select value={basicForm.status} onChange={e => setBasicForm({...basicForm, status: e.target.value as any})} className="w-full border p-1.5 rounded text-sm bg-white">
+                                      <select value={basicForm.status} onChange={e => setBasicForm({...basicForm, status: e.target.value as 'Active' | 'Inactive'})} className="w-full border p-1.5 rounded text-sm bg-white">
                                           <option value="Active">合作中</option>
                                           <option value="Inactive">暂停/非活跃</option>
                                       </select>
@@ -486,7 +486,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customers, setCustome
                           <table className="w-full text-left text-sm">
                               <thead className="bg-gray-50 text-gray-500">
                                   <tr>
-                                      <th className="p-4 font-medium">订单号</th>
+                                      <th className="p-4 font-medium">订单编号</th>
                                       <th className="p-4 font-medium">日期</th>
                                       <th className="p-4 font-medium">包含产品</th>
                                       <th className="p-4 font-medium">金额</th>

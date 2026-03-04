@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, Bell, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers } from 'lucide-react';
 import { User } from '../types';
+import WPSLogo from './WPSLogo';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -15,7 +16,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [activeTopNav, setActiveTopNav] = useState<'ORDER_CENTER' | 'PRODUCT_CENTER' | 'WPS_OPERATIONS' | 'SYSTEM_CONFIG'>('ORDER_CENTER');
+  const [activeTopNav, setActiveTopNav] = useState<'DASHBOARD' | 'ORDER_CENTER' | 'PRODUCT_CENTER' | 'WPS_OPERATIONS' | 'SYSTEM_CONFIG' | 'LEADS_CENTER'>('DASHBOARD');
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
         const saved = localStorage.getItem('theme');
@@ -27,7 +28,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
 
   const location = useLocation();
   const navigate = useNavigate();
-  const hideSidebar = location.pathname === '/product-center' || location.pathname.includes('/preview');
+  const hideSidebar = location.pathname.includes('/preview');
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -41,9 +42,13 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
   }, [isDarkMode]);
 
   useEffect(() => {
-      if (location.pathname.startsWith('/operations')) {
-          setActiveTopNav('WPS_OPERATIONS');
-      } else if (location.pathname.startsWith('/organization') || location.pathname.startsWith('/users') || location.pathname.startsWith('/roles')) {
+    if (location.pathname === '/' || location.pathname.startsWith('/dashboard')) {
+        setActiveTopNav('DASHBOARD');
+    } else if (location.pathname.startsWith('/leads')) {
+        setActiveTopNav('LEADS_CENTER');
+    } else if (location.pathname.startsWith('/wps-ops')) {
+        setActiveTopNav('WPS_OPERATIONS');
+    } else if (location.pathname.startsWith('/organization') || location.pathname.startsWith('/users') || location.pathname.startsWith('/roles')) {
           setActiveTopNav('SYSTEM_CONFIG');
       } else if (location.pathname.startsWith('/products') || location.pathname.startsWith('/merchandises') || location.pathname.startsWith('/catalog') || location.pathname.startsWith('/product-center')) {
           setActiveTopNav('PRODUCT_CENTER');
@@ -111,20 +116,21 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
                 <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full p-2 transition">
                     <Menu className="w-5 h-5" />
                 </button>
-                <div className="flex items-center gap-2.5 group cursor-pointer" onClick={() => navigate('/')}>
-                    <div className="w-9 h-9 bg-gradient-to-br from-[#0071E3] to-[#42A5F5] dark:from-[#0A84FF] dark:to-[#5E5CE6] rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform duration-300">
-                       <span className="text-white font-black text-xs tracking-tighter">WPS</span>
-                    </div>
-                    <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight hidden sm:block">WPS365</span>
+                <div className="flex items-center gap-1.5 group cursor-pointer" onClick={() => navigate('/')}>
+                    <WPSLogo className="h-7 w-auto group-hover:scale-105 transition-transform duration-300" />
+                    <div className="h-5 w-px bg-gray-200 dark:bg-white/10 mx-0.5 hidden sm:block"></div>
+                    <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight hidden sm:block">业务平台</span>
                 </div>
               </div>
 
               {/* Desktop Tabs */}
               <nav className="hidden md:flex items-center gap-1 ml-6">
                   {[
-                      { id: 'ORDER_CENTER', label: '订单中心', path: '/' },
+                      { id: 'DASHBOARD', label: '数据看板', path: '/' },
+                      { id: 'ORDER_CENTER', label: '订单中心', path: '/orders' },
                       { id: 'PRODUCT_CENTER', label: '商品中心', path: '/product-center' },
-                      { id: 'WPS_OPERATIONS', label: 'WPS运营', path: '/operations' },
+                      { id: 'LEADS_CENTER', label: '线索中心', path: '/leads' },
+                      { id: 'WPS_OPERATIONS', label: 'WPS运营', path: '/wps-ops' },
                       { id: 'SYSTEM_CONFIG', label: '系统配置', path: '/organization' }
                   ].map((item) => (
                       <button 
@@ -239,21 +245,36 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
                   </div>
 
                   <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto no-scrollbar">
+                    {activeTopNav === 'DASHBOARD' && (
+                        <>
+                            <div className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2 mt-6 transition-all duration-300 ${isCollapsed ? 'lg:opacity-0 lg:h-0 lg:mb-0 lg:mt-0 lg:overflow-hidden' : ''}`}>业务概览</div>
+                            <NavItem to="/" icon={LayoutDashboard} label="数据看板" />
+                        </>
+                    )}
+
                     {activeTopNav === 'ORDER_CENTER' && (
                         <>
-                            <div className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2 mt-6 transition-all duration-300 ${isCollapsed ? 'lg:opacity-0 lg:h-0 lg:mb-0 lg:mt-0 lg:overflow-hidden' : ''}`}>销售与交付</div>
-                            <NavItem to="/opportunities" icon={Target} label="商机管理" />
+                            <div className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2 mt-6 transition-all duration-300 ${isCollapsed ? 'lg:opacity-0 lg:h-0 lg:mb-0 lg:mt-0 lg:overflow-hidden' : ''}`}>订单中心</div>
                             <NavItem to="/orders" icon={ShoppingCart} label="订单中心" />
                             
-                            <div className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2 mt-6 transition-all duration-300 ${isCollapsed ? 'lg:opacity-0 lg:h-0 lg:mb-0 lg:mt-0 lg:overflow-hidden' : ''}`}>资源中心</div>
-                            <NavItem to="/customers" icon={Users} label="客户档案" />
+                            <div className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2 mt-6 transition-all duration-300 ${isCollapsed ? 'lg:opacity-0 lg:h-0 lg:mb-0 lg:mt-0 lg:overflow-hidden' : ''}`}>资源管理</div>
+                            <NavItem to="/opportunities" icon={Target} label="商机信息" />
+                            <NavItem to="/customers" icon={Users} label="客户信息" />
                             <NavItem to="/channels" icon={Network} label="渠道管理" />
+                        </>
+                    )}
+
+                    {activeTopNav === 'LEADS_CENTER' && (
+                        <>
+                            <div className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2 mt-1 transition-all duration-300 ${isCollapsed ? 'lg:opacity-0 lg:h-0 lg:mb-0 lg:mt-0 lg:overflow-hidden' : ''}`}>线索管理</div>
+                            <NavItem to="/leads" icon={Target} label="线索列表" />
                         </>
                     )}
 
                     {activeTopNav === 'PRODUCT_CENTER' && (
                         <>
                             <div className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2 mt-1 transition-all duration-300 ${isCollapsed ? 'lg:opacity-0 lg:h-0 lg:mb-0 lg:mt-0 lg:overflow-hidden' : ''}`}>商品管理</div>
+                            <NavItem to="/product-center" icon={Layers} label="商品展示" />
                             <NavItem to="/products" icon={Package} label="商品列表" />
                         </>
                     )}
@@ -261,7 +282,10 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
                     {activeTopNav === 'WPS_OPERATIONS' && (
                         <>
                             <div className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2 mt-1 transition-all duration-300 ${isCollapsed ? 'lg:opacity-0 lg:h-0 lg:mb-0 lg:mt-0 lg:overflow-hidden' : ''}`}>运营中心</div>
-                            <NavItem to="/operations" icon={Settings} label="运营管理" />
+                            <div className="px-4 py-8 text-center">
+                                <Activity className="w-12 h-12 text-gray-200 dark:text-white/5 mx-auto mb-3" />
+                                <p className="text-xs text-gray-400">WPS 运营中心正在建设中</p>
+                            </div>
                         </>
                     )}
 

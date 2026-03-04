@@ -124,9 +124,15 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, departments,
           id: 'order_center',
           label: '订单中心',
           permissions: [
+              { id: 'order_view_all', label: '查看全部订单' },
+              { id: 'order_view_pending_approval', label: '查看待审批' },
+              { id: 'order_view_pending_confirm', label: '查看待确认' },
+              { id: 'order_view_auth_confirm', label: '查看授权确认' },
+              { id: 'order_view_stock_prep', label: '查看备货流程' },
+              { id: 'order_view_payment', label: '查看待支付' },
+              { id: 'order_view_completed', label: '查看已完成' },
               { id: 'order_create', label: '创建订单' },
               { id: 'order_approve', label: '审批订单' },
-              { id: 'order_view_all', label: '查看所有订单' },
           ]
       },
       {
@@ -898,7 +904,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, departments,
                           </div>
                           <div>
                               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">状态</label>
-                              <select value={userForm.status} onChange={e => setUserForm({...userForm, status: e.target.value as any})} className="w-full p-3 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white">
+                              <select value={userForm.status} onChange={e => setUserForm({...userForm, status: e.target.value as 'Active' | 'Inactive'})} className="w-full p-3 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white">
                                   <option value="Active">Active</option>
                                   <option value="Inactive">Inactive</option>
                               </select>

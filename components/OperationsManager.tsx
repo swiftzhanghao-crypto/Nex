@@ -1,84 +1,278 @@
 
-import React from 'react';
-import { Activity, BarChart2, Zap, Settings, Globe, Server } from 'lucide-react';
+import React, { useState } from 'react';
+import { Order, OrderStatus } from '../types';
+import { Package, CheckCircle, FileText, Truck, Disc, Search, ChevronRight, Clock, AlertCircle, CreditCard, CheckSquare, ClipboardCheck, Lock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-const OperationsManager = () => {
+interface OperationsManagerProps {
+  orders: Order[];
+  setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
+}
+
+const OperationsManager: React.FC<OperationsManagerProps> = ({ orders, setOrders }) => {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'AUTH' | 'PKG' | 'SHIP' | 'CD'>('AUTH');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Overall workflow steps for visual context
+  const mainSteps = [
+    { id: 'PAYMENT', label: '支付', icon: CreditCard, status: 'Completed' },
+    { id: 'APPROVAL', label: '审批', icon: FileText, status: 'Completed' },
+    { id: 'CONFIRM', label: '确认', icon: CheckSquare, status: 'Completed' },
+    { id: 'AUTH', label: '授权确认', icon: CheckCircle, status: activeTab === 'AUTH' ? 'Current' : 'Completed' },
+    { id: 'PKG', label: '安装包核验', icon: FileText, status: activeTab === 'PKG' ? 'Current' : (['SHIP', 'CD'].includes(activeTab) ? 'Completed' : 'Locked') },
+    { id: 'SHIP', label: '快递单填写', icon: Truck, status: activeTab === 'SHIP' ? 'Current' : (activeTab === 'CD' ? 'Completed' : 'Locked') },
+    { id: 'CD', label: '光盘刻录', icon: Disc, status: activeTab === 'CD' ? 'Current' : 'Locked' },
+    { id: 'SHIPPING', label: '发货', icon: Truck, status: 'Locked' },
+    { id: 'ACCEPTANCE', label: '验收', icon: ClipboardCheck, status: 'Locked' },
+  ];
+
+  // Filter orders that are in PROCESSING_PROD status
+  const processingOrders = orders.filter(o => o.status === OrderStatus.PROCESSING_PROD);
+
+  // Filter based on active tab requirements
+  const getTabOrders = () => {
+    switch (activeTab) {
+      case 'AUTH':
+        return processingOrders.filter(o => !o.isAuthConfirmed);
+      case 'PKG':
+        return processingOrders.filter(o => o.isAuthConfirmed && !o.isPackageConfirmed);
+      case 'SHIP':
+        return processingOrders.filter(o => o.isPackageConfirmed && !o.isShippingConfirmed);
+      case 'CD':
+        return processingOrders.filter(o => o.isShippingConfirmed && !o.isCDBurned);
+      default:
+        return [];
+    }
+  };
+
+  const filteredOrders = getTabOrders().filter(o => 
+    o.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    o.customerName.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleAction = (orderId: string, action: 'AUTH' | 'PKG' | 'SHIP' | 'CD') => {
+    const now = new Date().toISOString();
+    const updatedOrders = orders.map(o => {
+      if (o.id === orderId) {
+        const updated = { ...o };
+        if (action === 'AUTH') {
+          updated.isAuthConfirmed = true;
+          updated.authConfirmedDate = now;
+        } else if (action === 'PKG') {
+          updated.isPackageConfirmed = true;
+          updated.packageConfirmedDate = now;
+        } else if (action === 'SHIP') {
+          updated.isShippingConfirmed = true;
+          updated.shippingConfirmedDate = now;
+          updated.carrier = 'SF Express';
+          updated.trackingNumber = `SF${Date.now()}`;
+        } else if (action === 'CD') {
+          updated.isCDBurned = true;
+          updated.cdBurnedDate = now;
+          // If all steps done, maybe auto-ship? 
+          // The user didn't specify auto-ship, but usually CD burning is the last step before SHIPPED.
+          // Let's keep it in PROCESSING_PROD until manual ship or we can auto-ship if it's the last step.
+          // For now, let's just mark it done.
+        }
+        
+        updated.approvalRecords = [{
+          id: `op-${action.toLowerCase()}-${Date.now()}`,
+          operatorId: 'u4', // Zhao Min (Technical)
+          operatorName: '赵敏',
+          operatorRole: 'Technical',
+          actionType: `Stock Prep: ${action}`,
+          result: 'Completed',
+          timestamp: now,
+          comment: `完成备货流程: ${action}`
+        }, ...o.approvalRecords];
+        
+        return updated;
+      }
+      return o;
+    });
+    setOrders(updatedOrders);
+  };
+
+  const tabs = [
+    { id: 'AUTH', label: '授权确认', icon: CheckCircle, count: processingOrders.filter(o => !o.isAuthConfirmed).length },
+    { id: 'PKG', label: '安装包核验', icon: FileText, count: processingOrders.filter(o => o.isAuthConfirmed && !o.isPackageConfirmed).length },
+    { id: 'SHIP', label: '快递单填写', icon: Truck, count: processingOrders.filter(o => o.isPackageConfirmed && !o.isShippingConfirmed).length },
+    { id: 'CD', label: '光盘刻录', icon: Disc, count: processingOrders.filter(o => o.isShippingConfirmed && !o.isCDBurned).length },
+  ];
+
   return (
-    <div className="p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
-        <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">运营管理</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">WPS 365 平台运营数据监控与配置。</p>
-        </div>
-        <div className="flex gap-2">
-            <span className="px-3 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full text-xs font-bold flex items-center gap-1">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> 系统运行正常
-            </span>
+    <div className="p-6 lg:p-8 max-w-[1600px] mx-auto space-y-8 animate-fade-in">
+      {/* Overall Workflow Stepper */}
+      <div className="bg-white dark:bg-[#1C1C1E] p-8 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-x-auto">
+        <div className="flex justify-between items-start relative min-w-[700px]">
+          <div className="absolute top-6 left-0 w-full h-1 bg-gray-100 dark:bg-white/10 -z-0 rounded-full overflow-hidden">
+            <div className="h-full bg-green-500 transition-all duration-1000" style={{ width: '60%' }}></div>
+          </div>
+          {mainSteps.map((step, idx) => (
+            <div 
+              key={step.id} 
+              className={`flex flex-col items-center gap-3 relative z-10 flex-1 transition-all group ${
+                step.status === 'Locked' ? 'opacity-40 grayscale' : ''
+              }`}
+            >
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-md ${
+                step.status === 'Completed' ? 'bg-green-500 text-white ring-4 ring-green-100 dark:ring-green-900/20' : 
+                step.status === 'Current' ? 'bg-[#0071E3] dark:bg-[#0A84FF] text-white ring-8 ring-blue-100 dark:ring-blue-900/30 shadow-xl scale-110' : 
+                'bg-white dark:bg-[#2C2C2E] border-2 border-gray-200 dark:border-gray-600 text-gray-400'
+              }`}>
+                {step.status === 'Locked' ? <Lock className="w-5 h-5" /> : <step.icon className="w-6 h-6" />}
+              </div>
+              <div className="text-center">
+                <div className={`text-sm font-bold ${step.status === 'Completed' ? 'text-green-600' : step.status === 'Current' ? 'text-[#0071E3] dark:text-[#0A84FF]' : 'text-gray-400'}`}>{step.label}</div>
+                {step.status === 'Current' && (
+                  <div className="text-[10px] text-white bg-[#0071E3] dark:bg-[#0A84FF] px-2 py-0.5 rounded-full font-bold shadow-md mt-1 animate-bounce">点击处理</div>
+                )}
+                {step.status === 'Completed' && (
+                  <div className="text-[9px] text-gray-400 font-mono mt-0.5">
+                    {new Date().toLocaleDateString()}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-xl shadow-apple border border-gray-100/50 dark:border-white/10">
-            <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg"><Activity className="w-5 h-5"/></div>
-                <h3 className="font-bold text-gray-900 dark:text-white">活跃用户 (DAU)</h3>
-            </div>
-            <div className="text-3xl font-bold text-gray-900 dark:text-white">12,450</div>
-            <div className="text-xs text-green-600 mt-1 font-medium flex items-center gap-1">
-                <TrendingUpIcon className="w-3 h-3" /> 较昨日 +5.2%
-            </div>
+
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">备货处理</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">处理待备货订单的授权、安装包及物流准备工作。</p>
         </div>
         
-        <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-xl shadow-apple border border-gray-100/50 dark:border-white/10">
-            <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 rounded-lg"><Zap className="w-5 h-5"/></div>
-                <h3 className="font-bold text-gray-900 dark:text-white">API 调用量</h3>
-            </div>
-            <div className="text-3xl font-bold text-gray-900 dark:text-white">1.2M</div>
-            <div className="text-xs text-gray-500 mt-1">今日累计</div>
-        </div>
-
-        <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-xl shadow-apple border border-gray-100/50 dark:border-white/10">
-            <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-orange-50 dark:bg-orange-900/20 text-orange-600 rounded-lg"><Server className="w-5 h-5"/></div>
-                <h3 className="font-bold text-gray-900 dark:text-white">租户实例</h3>
-            </div>
-            <div className="text-3xl font-bold text-gray-900 dark:text-white">856</div>
-            <div className="text-xs text-gray-500 mt-1">运行中</div>
+        <div className="flex items-center gap-3 w-full lg:w-auto">
+          <div className="relative flex-1 lg:w-64">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input 
+              type="text" 
+              placeholder="搜索订单或客户..."
+              className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white transition"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-xl shadow-apple border border-gray-100/50 dark:border-white/10">
-              <h3 className="font-bold text-gray-900 dark:text-white mb-4">运营配置</h3>
-              <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
-                      <div className="flex items-center gap-3">
-                          <Globe className="w-5 h-5 text-gray-400" />
-                          <div className="text-sm font-medium dark:text-white">全站公告配置</div>
-                      </div>
-                      <button className="text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline">管理</button>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
-                      <div className="flex items-center gap-3">
-                          <Settings className="w-5 h-5 text-gray-400" />
-                          <div className="text-sm font-medium dark:text-white">功能开关控制</div>
-                      </div>
-                      <button className="text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline">配置</button>
-                  </div>
+      {/* Workflow Tabs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as 'AUTH' | 'PKG' | 'SHIP' | 'CD')}
+              className={`relative p-4 rounded-2xl border transition-all duration-300 text-left group
+                ${isActive 
+                  ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20' 
+                  : 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-blue-300 dark:hover:border-blue-900'}
+              `}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className={`p-2 rounded-lg ${isActive ? 'bg-white/20' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600'}`}>
+                  <tab.icon className="w-5 h-5" />
+                </div>
+                {tab.count > 0 && (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isActive ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400'}`}>
+                    {tab.count}
+                  </span>
+                )}
               </div>
-          </div>
-          
-          <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-xl shadow-apple border border-gray-100/50 dark:border-white/10 flex items-center justify-center text-gray-400 text-sm">
-              更多运营指标图表加载中...
-          </div>
+              <div className={`text-sm font-bold ${isActive ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{tab.label}</div>
+              <div className={`text-[10px] mt-1 ${isActive ? 'text-white/70' : 'text-gray-400'}`}>
+                {tab.id === 'AUTH' && '生成并确认产品授权码'}
+                {tab.id === 'PKG' && '核对安装包版本及完整性'}
+                {tab.id === 'SHIP' && '填写快递单及物流信息'}
+                {tab.id === 'CD' && '刻录物理光盘介质'}
+              </div>
+              {isActive && (
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-white rounded-full"></div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Order List */}
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5">
+                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">订单信息</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">客户名称</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">商品摘要</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">提单时间</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+              {filteredOrders.length > 0 ? (
+                filteredOrders.map((order) => (
+                  <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-blue-600 transition-colors">#{order.id}</span>
+                        <span className="text-[10px] text-gray-400">金额: ¥{order.total.toLocaleString()}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">{order.customerName}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-1">
+                        {order.items.map((item, idx) => (
+                          <span key={idx} className="px-2 py-0.5 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 rounded text-[10px]">
+                            {item.productName} x{item.quantity}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                        <Clock className="w-3 h-3" />
+                        {new Date(order.date).toLocaleDateString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={() => navigate(`/orders/${order.id}`)}
+                          className="px-3 py-1.5 text-xs font-bold text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition"
+                        >
+                          详情
+                        </button>
+                        <button 
+                          onClick={() => handleAction(order.id, activeTab)}
+                          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition shadow-sm"
+                        >
+                          确认完成
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3 text-gray-400">
+                      <Package className="w-12 h-12 opacity-20" />
+                      <p className="text-sm">暂无待处理订单</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
 };
-
-const TrendingUpIcon = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-);
 
 export default OperationsManager;

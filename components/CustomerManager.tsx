@@ -45,10 +45,10 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
 
   const getLevelBadge = (level: string) => {
       switch(level) {
-          case 'KA': return 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800';
-          case 'A': return 'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800';
-          case 'B': return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
-          default: return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700';
+          case 'KA': return 'unified-tag-indigo';
+          case 'A': return 'unified-tag-blue';
+          case 'B': return 'unified-tag-gray';
+          default: return 'unified-tag-gray';
       }
   };
 
@@ -124,7 +124,7 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
             {setCustomers && (
                 <button 
                     onClick={() => setIsCreateOpen(true)}
-                    className="bg-[#0071E3] dark:bg-[#FF2D55] text-white px-4 py-2.5 rounded-sm flex items-center gap-2 hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 transition shadow-sm whitespace-nowrap text-sm font-medium"
+                    className="unified-button-primary"
                 >
                     <Plus className="w-4 h-4" /> 新增客户
                 </button>
@@ -132,10 +132,10 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
         </div>
       </div>
 
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden flex flex-col">
+      <div className="unified-card flex flex-col">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50/80 dark:bg-white/5 backdrop-blur border-b border-gray-200/50 dark:border-white/10 text-gray-500 dark:text-gray-400 font-medium text-sm uppercase">
+            <thead className="unified-table-header">
               <tr>
                 <th className="p-4 pl-6">企业名称 / 行业</th>
                 <th className="p-4">客户类型</th>
@@ -160,14 +160,14 @@ const CustomerManager: React.FC<CustomerManagerProps> = ({ customers, setCustome
                           <div>
                               <div className="font-bold text-gray-800 dark:text-white group-hover:text-[#0071E3] dark:group-hover:text-[#FF2D55] transition flex items-center gap-2 text-base">
                                   {customer.companyName}
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-sm border ${getLevelBadge(customer.level)}`}>{customer.level}</span>
+                                  <span className={getLevelBadge(customer.level)}>{customer.level}</span>
                               </div>
                               <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{customer.region} | {customer.industry}</div>
                           </div>
                       </div>
                     </td>
                     <td className="p-4">
-                       <span className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-white/10 px-2 py-1 rounded-sm">{customer.customerType}</span>
+                       <span className="unified-tag-gray">{customer.customerType}</span>
                     </td>
                     <td className="p-4">
                       {primaryContact ? (

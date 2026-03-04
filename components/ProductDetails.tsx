@@ -298,9 +298,12 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ products, setProducts, 
                                                   <Download className="w-3.5 h-3.5" />
                                               </a>
                                           </div>
-                                          <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
-                                              <span>{pkg.version}</span>
-                                              <span className="font-mono text-[10px]">{pkg.id}</span>
+                                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-gray-500 dark:text-gray-400 mt-2">
+                                              <div className="flex justify-between"><span>版本:</span><span className="dark:text-gray-300">{pkg.version}</span></div>
+                                              <div className="flex justify-between"><span>编号:</span><span className="font-mono dark:text-gray-300">{pkg.id}</span></div>
+                                              <div className="flex justify-between"><span>CPU:</span><span className="dark:text-gray-300">{pkg.cpu || '-'}</span></div>
+                                              <div className="flex justify-between"><span>OS:</span><span className="dark:text-gray-300">{pkg.os || '-'}</span></div>
+                                              <div className="flex justify-between"><span>架构:</span><span className="dark:text-gray-300">{pkg.arch || '-'}</span></div>
                                           </div>
                                       </div>
                                   ))}
@@ -442,7 +445,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ products, setProducts, 
                                       <label className="text-xs text-gray-500 mb-1 block">授权类型</label>
                                       <select 
                                         value={licenseForm.license?.type} 
-                                        onChange={e=>setLicenseForm({...licenseForm, license: {...licenseForm.license, type: e.target.value as LicenseType} as any})} 
+                                        onChange={e=>setLicenseForm({...licenseForm, license: {...licenseForm.license, type: e.target.value as LicenseType} as SkuPricingOption['license']})} 
                                         className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"
                                       >
                                           <option value="PerUser">PerUser</option>
@@ -455,7 +458,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ products, setProducts, 
                                       <label className="text-xs text-gray-500 mb-1 block">单位 (Period Unit)</label>
                                       <select 
                                         value={licenseForm.license?.periodUnit} 
-                                        onChange={e=>setLicenseForm({...licenseForm, license: {...licenseForm.license, periodUnit: e.target.value as LicenseUnit} as any})} 
+                                        onChange={e=>setLicenseForm({...licenseForm, license: {...licenseForm.license, periodUnit: e.target.value as LicenseUnit} as SkuPricingOption['license']})} 
                                         className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"
                                       >
                                           <option value="Day">Day</option>
@@ -466,11 +469,11 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ products, setProducts, 
                                   </div>
                                   <div>
                                       <label className="text-xs text-gray-500 mb-1 block">期限值 (Period)</label>
-                                      <input type="number" value={licenseForm.license?.period} onChange={e=>setLicenseForm({...licenseForm, license: {...licenseForm.license, period: parseInt(e.target.value)} as any})} className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"/>
+                                      <input type="number" value={licenseForm.license?.period} onChange={e=>setLicenseForm({...licenseForm, license: {...licenseForm.license, period: parseInt(e.target.value)} as SkuPricingOption['license']})} className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"/>
                                   </div>
                                   <div>
                                       <label className="text-xs text-gray-500 mb-1 block">适用范围 (Scope)</label>
-                                      <input value={licenseForm.license?.scope} onChange={e=>setLicenseForm({...licenseForm, license: {...licenseForm.license, scope: e.target.value} as any})} className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"/>
+                                      <input value={licenseForm.license?.scope} onChange={e=>setLicenseForm({...licenseForm, license: {...licenseForm.license, scope: e.target.value} as SkuPricingOption['license']})} className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"/>
                                   </div>
                               </div>
                           </div>

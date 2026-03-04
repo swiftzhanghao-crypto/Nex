@@ -1,8 +1,28 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Order, OrderStatus, Product, Customer, OrderItem, ActivationMethod, User, Department, ApprovalRecord, Opportunity, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, Channel } from '../types';
-import { Search, User as UserIcon, Plus, Trash2, ChevronRight, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, Wallet, FileCheck, CheckSquare, Package, Zap, Box, Settings, Filter } from 'lucide-react';
+import { Order, OrderStatus, Product, Customer, OrderItem, ActivationMethod, User, Department, ApprovalRecord, Opportunity, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, Channel, RoleDefinition, DeliveryMethod } from '../types';
+import { Search, User as UserIcon, Plus, Trash2, Disc, ChevronRight, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, Wallet, FileCheck, CheckSquare, Package, Zap, Box, Settings, Filter, MapPin, MessageSquare, ChevronDown, Calendar, Shield } from 'lucide-react';
+
+type FilterMode = '单选' | '多选' | '时间段';
+
+interface FilterCondition {
+    id: string;
+    fieldId: string;
+    mode: FilterMode;
+    value: string | number | boolean | { start: string; end: string } | string[];
+}
+
+const availableFilterFields = [
+    { id: 'renewalType', label: '增续类型', defaultMode: '多选' as FilterMode },
+    { id: 'orderNature', label: '订购性质', defaultMode: '多选' as FilterMode },
+    { id: 'deliveryMethod', label: '发货方式', defaultMode: '单选' as FilterMode },
+    { id: 'businessManager', label: '商务人员', defaultMode: '单选' as FilterMode },
+    { id: 'orderStatus', label: '订单状态', defaultMode: '多选' as FilterMode },
+    { id: 'paymentStatus', label: '付款状态', defaultMode: '单选' as FilterMode },
+    { id: 'stockStatus', label: '备货状态', defaultMode: '单选' as FilterMode },
+    { id: 'licenseType', label: '授权类型', defaultMode: '多选' as FilterMode },
+];
 
 interface OrderManagerProps {
   orders: Order[];
@@ -14,6 +34,7 @@ interface OrderManagerProps {
   departments: Department[];
   opportunities: Opportunity[];
   channels: Channel[];
+  roles: RoleDefinition[];
 }
 
 const statusMap: Record<string, string> = {
@@ -46,14 +67,58 @@ const paymentMethodMap: Record<string, string> = {
     'COD': '货到付款'
 };
 
-const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products, customers, currentUser, users, departments, opportunities, channels }) => {
+const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products, customers, currentUser, users, departments, opportunities, channels, roles }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [filterStatus, setFilterStatus] = useState<string>('All');
+
+  // Permission Check
+  const currentUserRole = roles.find(r => r.id === currentUser.role);
+  const permissions = currentUserRole?.permissions || [];
+  const hasPermission = (perm: string) => permissions.includes('all') || permissions.includes(perm);
+
+  // Pipeline Status Definitions
+  const pipelineStatuses = [
+      { id: OrderStatus.PENDING_APPROVAL, label: '待审批', desc: '等待经理或财务审批', icon: FileCheck, permission: 'order_view_pending_approval' },
+      { id: OrderStatus.PENDING_CONFIRM, label: '待确认', desc: '等待商务确认订单', icon: CheckSquare, permission: 'order_view_pending_confirm' },
+      { id: 'STOCK_AUTH', label: '授权确认', desc: '生成并确认产品授权码', icon: CheckCircle, permission: 'order_view_auth_confirm' },
+      { id: 'STOCK_PKG', label: '安装包核验', desc: '核对安装包版本及完整性', icon: FileText, permission: 'order_view_stock_prep' },
+      { id: 'STOCK_SHIP', label: '快递单填写', desc: '填写快递单及物流信息', icon: Truck, permission: 'order_view_stock_prep' },
+      { id: 'STOCK_CD', label: '光盘刻录', desc: '刻录物理光盘介质', icon: Disc, permission: 'order_view_stock_prep' },
+      { id: OrderStatus.PENDING_PAYMENT, label: '待支付', desc: '等待客户完成支付', icon: CreditCard, permission: 'order_view_payment' }, 
+      { id: OrderStatus.SHIPPED, label: '已发货', desc: '商品已发出，运输中', icon: Truck, permission: 'order_view_completed' },
+      { id: OrderStatus.DELIVERED, label: '已完成', desc: '客户已签收，流程结束', icon: CheckCircle, permission: 'order_view_completed' },
+  ];
+
+  const [filterStatus, setFilterStatus] = useState<string>(() => {
+    if (hasPermission('order_view_all')) return 'All';
+    const firstAllowed = pipelineStatuses.find(step => hasPermission(step.permission));
+    return firstAllowed ? firstAllowed.id : 'All';
+  });
   const [searchTerm, setSearchTerm] = useState('');
   
   // Advanced Filter State
   const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState<FilterCondition[]>([]);
+
+  const addFilterCondition = () => {
+      const unusedField = availableFilterFields.find(f => !advancedFilters.some(af => af.fieldId === f.id));
+      if (unusedField) {
+          setAdvancedFilters([...advancedFilters, {
+              id: Math.random().toString(36).substr(2, 9),
+              fieldId: unusedField.id,
+              mode: unusedField.defaultMode,
+              value: unusedField.defaultMode === '时间段' ? { start: '', end: '' } : '全部'
+          }]);
+      }
+  };
+
+  const removeFilterCondition = (id: string) => {
+      setAdvancedFilters(advancedFilters.filter(f => f.id !== id));
+  };
+
+  const updateFilterCondition = (id: string, updates: Partial<FilterCondition>) => {
+      setAdvancedFilters(advancedFilters.map(f => f.id === id ? { ...f, ...updates } : f));
+  };
   const [filterDateStart, setFilterDateStart] = useState('');
   const [filterDateEnd, setFilterDateEnd] = useState('');
   const [filterAmountMin, setFilterAmountMin] = useState<number | ''>('');
@@ -63,19 +128,23 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   // Column Configuration State
   const [isColumnConfigOpen, setIsColumnConfigOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([
-      'id', 'customer', 'products', 'sales', 'source', 'buyerType', 'date', 'status', 'total', 'action'
+      'id', 'customer', 'products', 'sales', 'businessManager', 'department', 'source', 'buyerType', 'date', 'status', 'paymentStatus', 'stockStatus', 'total', 'delivery', 'action'
   ]);
 
   const allColumns = [
-      { id: 'id', label: '订单号' },
+      { id: 'id', label: '订单编号' },
       { id: 'customer', label: '客户 / 买方' },
       { id: 'products', label: '商品信息' },
-      { id: 'sales', label: '销售 / 部门' },
-      { id: 'source', label: '来源' },
-      { id: 'buyerType', label: '销售模式' },
-      { id: 'date', label: '日期' },
-      { id: 'status', label: '状态' },
-      { id: 'total', label: '金额' },
+      { id: 'sales', label: '销售人员' },
+      { id: 'businessManager', label: '商务人员' },
+      { id: 'department', label: '所属部门' },
+      { id: 'source', label: '订单来源' },
+      { id: 'buyerType', label: '订单类型' },
+      { id: 'date', label: '提单时间' },
+      { id: 'status', label: '订单状态' },
+      { id: 'paymentStatus', label: '付款状态' },
+      { id: 'stockStatus', label: '备货状态' },
+      { id: 'total', label: '订单金额' },
       { id: 'payment', label: '支付方式' },
       { id: 'delivery', label: '发货方式' },
       { id: 'address', label: '收货地址' },
@@ -90,6 +159,36 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
+
+  // User Details Drawer State
+  const [detailsUser, setDetailsUser] = useState<User | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isDrawerClosing, setIsDrawerClosing] = useState(false);
+
+  const closeDrawer = () => {
+      setIsDrawerClosing(true);
+      setTimeout(() => {
+          setIsDrawerOpen(false);
+          setDetailsUser(null);
+          setIsDrawerClosing(false);
+      }, 280);
+  };
+
+  const getDepartmentPath = (deptId?: string) => {
+      if (!deptId) return '-';
+      const path: string[] = [];
+      let currentId = deptId;
+      while (currentId) {
+          const dept = departments.find(d => d.id === currentId);
+          if (dept) {
+              path.unshift(dept.name);
+              currentId = dept.parentId || '';
+          } else {
+              break;
+          }
+      }
+      return path.join(' / ');
+  };
 
   // --- Create Order Wizard State ---
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -121,6 +220,28 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   const selectedSku = selectedProduct?.skus.find(s => s.id === tempSkuId);
   const selectedOption = selectedSku?.pricingOptions?.find(o => o.id === tempPricingOptionId);
 
+  // Reset cascade when parent changes
+  useEffect(() => {
+    setTempSkuId('');
+    setTempPricingOptionId('');
+    setNegotiatedPrice(null);
+  }, [tempProductId]);
+
+  useEffect(() => {
+    setTempPricingOptionId('');
+    setNegotiatedPrice(null);
+  }, [tempSkuId]);
+
+  useEffect(() => {
+    if (selectedOption) {
+      setNegotiatedPrice(selectedOption.price);
+    } else if (selectedSku) {
+      setNegotiatedPrice(selectedSku.price);
+    } else {
+      setNegotiatedPrice(null);
+    }
+  }, [tempPricingOptionId, selectedSku, selectedOption]);
+
   // Renewal tracking
   const [originalOrderId, setOriginalOrderId] = useState<string | undefined>(undefined);
 
@@ -138,7 +259,11 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Transfer');
   const [paymentTerms, setPaymentTerms] = useState('');
-  const [deliveryMethod, setDeliveryMethod] = useState('Online'); // New State
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('Online');
+  const [receivingParty, setReceivingParty] = useState('买方');
+  const [receivingCompany, setReceivingCompany] = useState('');
+  const [receivingMethod, setReceivingMethod] = useState('邮寄');
+  const [shippingAddress, setShippingAddress] = useState('');
 
   const [acceptanceForm, setAcceptanceForm] = useState<AcceptanceInfo>({
       contactName: '',
@@ -160,21 +285,11 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
       { id: 4, label: '商务交付', desc: '合同/验收', icon: ClipboardCheck },
   ];
 
-  // Pipeline Status Definitions
-  const pipelineStatuses = [
-      { id: OrderStatus.PENDING_APPROVAL, label: '待审批', icon: FileCheck },
-      { id: OrderStatus.PENDING_CONFIRM, label: '待确认', icon: CheckSquare },
-      { id: OrderStatus.PROCESSING_PROD, label: '备货中', icon: Package },
-      { id: OrderStatus.PENDING_PAYMENT, label: '待支付', icon: CreditCard }, 
-      { id: OrderStatus.SHIPPED, label: '已发货', icon: Truck },
-      { id: OrderStatus.DELIVERED, label: '已完成', icon: CheckCircle },
-  ];
-  
   // Exception Statuses
   const exceptionStatuses = [
-      { id: OrderStatus.REFUND_PENDING, label: '退款中', icon: RefreshCcw },
-      { id: OrderStatus.REFUNDED, label: '已退款', icon: AlertCircle },
-      { id: OrderStatus.CANCELLED, label: '已取消', icon: X },
+      { id: OrderStatus.REFUND_PENDING, label: '退款中', desc: '处理客户退款申请', icon: RefreshCcw },
+      { id: OrderStatus.REFUNDED, label: '已退款', desc: '退款流程已完成', icon: AlertCircle },
+      { id: OrderStatus.CANCELLED, label: '已取消', desc: '订单已作废', icon: X },
   ];
 
   // --- Handle Renewal Initialization ---
@@ -236,35 +351,64 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   const canCreateOrder = currentUser.role === 'Admin' || currentUser.role === 'Sales';
 
   const getStatusBadge = (status: OrderStatus) => {
-    let color = '';
+    let className = '';
     const text = statusMap[status] || status;
     switch (status) {
-      case OrderStatus.PENDING_PAYMENT: color = 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'; break;
-      case OrderStatus.PENDING_APPROVAL: color = 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'; break;
-      case OrderStatus.PENDING_CONFIRM: color = 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'; break;
-      case OrderStatus.PROCESSING_PROD: color = 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'; break;
-      case OrderStatus.SHIPPED: color = 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'; break;
-      case OrderStatus.DELIVERED: color = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'; break;
-      case OrderStatus.CANCELLED: color = 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'; break;
-      case OrderStatus.REFUND_PENDING: color = 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'; break;
-      case OrderStatus.REFUNDED: color = 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'; break;
-      default: color = 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
+      case OrderStatus.PENDING_PAYMENT: className = 'unified-tag-gray'; break;
+      case OrderStatus.PENDING_APPROVAL: className = 'unified-tag-orange'; break;
+      case OrderStatus.PENDING_CONFIRM: className = 'unified-tag-orange'; break;
+      case OrderStatus.PROCESSING_PROD: className = 'unified-tag-blue'; break;
+      case OrderStatus.SHIPPED: className = 'unified-tag-indigo'; break;
+      case OrderStatus.DELIVERED: className = 'unified-tag-green'; break;
+      case OrderStatus.CANCELLED: className = 'unified-tag-red'; break;
+      case OrderStatus.REFUND_PENDING: className = 'unified-tag-orange'; break;
+      case OrderStatus.REFUNDED: className = 'unified-tag-red'; break;
+      default: className = 'unified-tag-gray';
     }
-    return <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold ${color}`}>{text}</span>;
+    return <span className={`${className} h-6 flex items-center`}>{text}</span>;
+  };
+
+  const getPaymentStatusBadge = (isPaid: boolean) => {
+    return (
+        <span className={`${isPaid ? 'unified-tag-green' : 'unified-tag-gray'} h-6 flex items-center`}>
+            {isPaid ? '已支付' : '待支付'}
+        </span>
+    );
+  };
+
+  const getStockStatusBadge = (order: Order) => {
+    let text = '待处理';
+    let className = 'unified-tag-gray';
+
+    if (order.status === OrderStatus.DELIVERED) {
+        text = '已完成';
+        className = 'unified-tag-green';
+    } else if (order.status === OrderStatus.SHIPPED) {
+        text = '已发货';
+        className = 'unified-tag-indigo';
+    } else if (order.isShippingConfirmed) {
+        text = '待发货';
+        className = 'unified-tag-blue';
+    } else if (order.isAuthConfirmed || order.isPackageConfirmed || order.status === OrderStatus.PROCESSING_PROD) {
+        text = '备货中';
+        className = 'unified-tag-orange';
+    }
+
+    return <span className={`${className} h-6 flex items-center`}>{text}</span>;
   };
 
   const getSourceBadge = (source: OrderSource) => {
       let label = '';
-      let color = '';
+      let className = '';
       switch(source) {
-          case 'Sales': label = '商务代下单'; color = 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'; break;
-          case 'ChannelPortal': label = '渠道下单'; color = 'bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400'; break;
-          case 'OnlineStore': label = '官网下单'; color = 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400'; break;
-          case 'APISync': label = '第三方下单'; color = 'bg-teal-50 text-teal-600 dark:bg-teal-900/20 dark:text-teal-400'; break;
-          case 'Renewal': label = '客户续费'; color = 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400'; break;
-          default: label = source; color = 'bg-gray-50 text-gray-600';
+          case 'Sales': label = '商务代下单'; className = 'unified-tag-blue'; break;
+          case 'ChannelPortal': label = '渠道下单'; className = 'unified-tag-indigo'; break;
+          case 'OnlineStore': label = '官网下单'; className = 'unified-tag-orange'; break;
+          case 'APISync': label = '第三方下单'; className = 'unified-tag-gray'; break;
+          case 'Renewal': label = '客户续费'; className = 'unified-tag-indigo'; break;
+          default: label = source; className = 'unified-tag-gray';
       }
-      return <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border border-transparent ${color}`}>{label}</span>;
+      return <span className={`${className} h-6 flex items-center`}>{label}</span>;
   };
 
   const resetCreateForm = () => {
@@ -286,7 +430,11 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
       setInvoiceForm({ type: 'VAT_Special', title: '', taxId: '', content: '软件产品', bankName: '', accountNumber: '', address: '', phone: '' });
       setPaymentMethod('Transfer');
       setPaymentTerms('');
-      setDeliveryMethod('Online'); // Reset Delivery Method
+      setDeliveryMethod('Online');
+      setReceivingParty('买方');
+      setReceivingCompany('');
+      setReceivingMethod('邮寄');
+      setShippingAddress('');
       setAcceptanceForm({ contactName: '', contactPhone: '', method: 'Remote', email: '' });
       setAcceptanceType('OneTime');
       setPhaseDrafts([{ name: '第一阶段验收', percentage: 30 }, { name: '最终验收', percentage: 70 }]);
@@ -409,9 +557,12 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
         date: new Date().toISOString(),
         status: buyerType === 'SelfDeal' ? OrderStatus.PENDING_PAYMENT : OrderStatus.PENDING_APPROVAL,
         source: orderSource,
-        deliveryMethod: deliveryMethod as any, 
+        deliveryMethod: deliveryMethod, 
+        receivingParty,
+        receivingCompany,
+        receivingMethod,
         originalOrderId: originalOrderId,
-        total: totalAmount, items: newOrderItems, shippingAddress: customer ? customer.address : '',
+        total: totalAmount, items: newOrderItems, shippingAddress: shippingAddress || (customer ? customer.address : ''),
         isPaid: false, 
         isPackageConfirmed: deliveryMethod === 'Online', 
         isCDBurned: deliveryMethod === 'Online', 
@@ -432,14 +583,44 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   };
 
   const filteredOrders = orders.filter(order => {
-    const matchesStatus = filterStatus === 'All' || order.status === filterStatus;
+    let matchesStatus = filterStatus === 'All' || order.status === filterStatus;
+    
+    // Handle sub-status filtering for PROCESSING_PROD
+    if (filterStatus === 'STOCK_AUTH') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && !order.isAuthConfirmed;
+    if (filterStatus === 'STOCK_PKG') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && order.isAuthConfirmed && !order.isPackageConfirmed;
+    if (filterStatus === 'STOCK_SHIP') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && order.isPackageConfirmed && !order.isShippingConfirmed;
+    if (filterStatus === 'STOCK_CD') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && order.isShippingConfirmed && !order.isCDBurned;
+
     const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase()) || order.customerName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSource = filterSource === 'All' || order.source === filterSource;
     const matchesDate = (!filterDateStart || new Date(order.date) >= new Date(filterDateStart)) &&
                         (!filterDateEnd || new Date(order.date) <= new Date(new Date(filterDateEnd).setHours(23, 59, 59, 999)));
     const matchesAmount = (filterAmountMin === '' || order.total >= filterAmountMin) &&
                           (filterAmountMax === '' || order.total <= filterAmountMax);
-    return matchesStatus && matchesSearch && matchesSource && matchesDate && matchesAmount;
+
+    // Dynamic Advanced Filters Logic
+    const matchesAdvanced = advancedFilters.every(filter => {
+        if (filter.value === '全部' || filter.value === '不限') return true;
+        
+        // This is a simplified implementation as we don't have all fields in the Order type yet
+        // In a real app, we would map filter.fieldId to order properties
+        switch (filter.fieldId) {
+            case 'orderStatus':
+                return order.status === filter.value;
+            case 'deliveryMethod':
+                return order.deliveryMethod === filter.value;
+            case 'delayTime':
+                if (filter.mode === '时间段' && filter.value.start && filter.value.end) {
+                    const orderDate = new Date(order.date);
+                    return orderDate >= new Date(filter.value.start) && orderDate <= new Date(filter.value.end);
+                }
+                return true;
+            default:
+                return true;
+        }
+    });
+
+    return matchesStatus && matchesSearch && matchesSource && matchesDate && matchesAmount && matchesAdvanced;
   });
 
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -544,21 +725,13 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   const getAction = (order: Order) => {
       if (order.status === OrderStatus.CANCELLED || order.status === OrderStatus.REFUNDED) return null;
       const navigateToStep = (step: string) => navigate(`/orders/${order.id}`, { state: { openAction: step } });
-      if (order.status === OrderStatus.PENDING_APPROVAL) return <button onClick={(e) => { e.stopPropagation(); navigateToStep('APPROVAL'); }} className="px-2.5 py-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-md text-[10px] font-bold whitespace-nowrap transition">去审批</button>;
-      if (order.status === OrderStatus.PENDING_CONFIRM) return <button onClick={(e) => { e.stopPropagation(); navigateToStep('CONFIRM'); }} className="px-2.5 py-1 bg-orange-100 hover:bg-orange-200 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 rounded-md text-[10px] font-bold whitespace-nowrap transition">去确认</button>;
+      if (order.status === OrderStatus.PENDING_APPROVAL) return <button onClick={(e) => { e.stopPropagation(); navigateToStep('APPROVAL'); }} className="px-2 py-1 bg-yellow-50 hover:bg-yellow-100 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400 rounded-lg text-[10px] font-bold whitespace-nowrap transition border border-yellow-100 dark:border-yellow-800/30">去审批</button>;
+      if (order.status === OrderStatus.PENDING_CONFIRM) return <button onClick={(e) => { e.stopPropagation(); navigateToStep('CONFIRM'); }} className="px-2 py-1 bg-orange-50 hover:bg-orange-100 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400 rounded-lg text-[10px] font-bold whitespace-nowrap transition border border-orange-100 dark:border-orange-800/30">去确认</button>;
       return <span className="text-gray-400 text-[10px] whitespace-nowrap">详情</span>;
   };
 
-  const getSalesInfo = (order: Order) => {
-      const user = users.find(u => u.id === order.salesRepId);
-      const dept = departments.find(d => d.id === user?.departmentId);
-      return {
-          name: order.salesRepName || user?.name || '未分配',
-          deptName: dept?.name || '未知部门'
-      };
-  };
-
   const clearAdvancedFilters = () => {
+      setAdvancedFilters([]);
       setFilterDateStart('');
       setFilterDateEnd('');
       setFilterAmountMin('');
@@ -576,179 +749,191 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
 
   return (
     <div className="p-4 lg:p-8 max-w-[1600px] mx-auto space-y-6 animate-fade-in pb-24">
-      <div className="flex flex-col md:flex-row justify-between items-end gap-4">
-        <div>
+      <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+        <div className="w-full lg:w-auto">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">订单中心</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">管理系统中的所有销售订单及交付流程。</p>
         </div>
-        {canCreateOrder && (
-            <button onClick={() => { setIsCreateOpen(true); resetCreateForm(); }} className="bg-[#0071E3] dark:bg-[#FF2D55] text-white px-5 py-2.5 rounded-full flex items-center gap-2 hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 transition shadow-lg shadow-blue-500/30 text-sm font-bold w-full md:w-auto justify-center">
-                <Plus className="w-4 h-4" /> 新建订单
-            </button>
-        )}
-      </div>
-
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden">
-        {/* Tab Bar Logic */}
-        <div className="flex flex-col xl:flex-row items-center justify-between px-6 py-4 border-b border-gray-100/50 dark:border-white/10 bg-white/50 dark:bg-[#1C1C1E] backdrop-blur gap-4">
-            <div className="flex items-center gap-4 overflow-x-auto no-scrollbar w-full xl:w-auto">
-                <button 
-                    onClick={() => setFilterStatus('All')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm border shrink-0
-                        ${filterStatus === 'All' 
-                            ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white' 
-                            : 'bg-white dark:bg-[#1C1C1E] text-gray-500 border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5'}
-                    `}
-                >
-                    <Layers className="w-3.5 h-3.5"/>
-                    全部
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${filterStatus === 'All' ? 'bg-white/20 text-white dark:text-black' : 'bg-gray-100 text-gray-600 dark:bg-white/10'}`}>
-                        {orders.length}
-                    </span>
-                </button>
-
-                <div className="w-px h-6 bg-gray-200 dark:bg-white/10 shrink-0 hidden md:block"></div>
-
-                <div className="flex items-center bg-gray-50/80 dark:bg-white/5 p-1 rounded-xl border border-gray-200/50 dark:border-white/10 shrink-0">
-                    {pipelineStatuses.map((step, idx) => {
-                        const isActive = filterStatus === step.id;
-                        const count = orders.filter(o => o.status === step.id).length;
-                        return (
-                            <div key={step.id} className="flex items-center">
-                                <button
-                                    onClick={() => setFilterStatus(step.id)}
-                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap
-                                        ${isActive 
-                                            ? 'bg-white dark:bg-[#2C2C2E] text-[#0071E3] dark:text-[#FF2D55] shadow-sm ring-1 ring-gray-200 dark:ring-black' 
-                                            : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10'}
-                                    `}
-                                >
-                                    {step.label}
-                                    {count > 0 && (
-                                        <span className={`px-1.5 rounded-md text-[9px] ${isActive ? 'bg-blue-50 text-blue-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-200 text-gray-600 dark:bg-white/20 dark:text-gray-300'}`}>
-                                            {count}
-                                        </span>
-                                    )}
-                                </button>
-                                {idx < pipelineStatuses.length - 1 && (
-                                    <ChevronRight className="w-3 h-3 text-gray-300 dark:text-gray-600 mx-1 shrink-0" />
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-
-                <div className="w-px h-6 bg-gray-200 dark:bg-white/10 shrink-0 hidden md:block"></div>
-
-                <div className="flex gap-2 shrink-0">
-                    {exceptionStatuses.map(step => {
-                        const isActive = filterStatus === step.id;
-                        const count = orders.filter(o => o.status === step.id).length;
-                        return (
-                            <button 
-                                key={step.id}
-                                onClick={() => setFilterStatus(step.id)}
-                                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all border shrink-0 whitespace-nowrap
-                                    ${isActive 
-                                        ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/30' 
-                                        : 'bg-white dark:bg-[#1C1C1E] text-gray-500 border-gray-200 dark:border-white/10 hover:border-gray-300'}
-                                `}
-                            >
-                                <step.icon className="w-3.5 h-3.5"/>
-                                {step.label}
-                                {count > 0 && <span className="opacity-60">({count})</span>}
-                            </button>
-                        )
-                    })}
-                </div>
+        
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
+            <div className="relative w-full sm:w-64">
+                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                <input 
+                    type="text" 
+                    placeholder="搜索单号或客户..." 
+                    className="w-full pl-9 pr-4 py-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white transition shadow-sm" 
+                    value={searchTerm} 
+                    onChange={(e) => setSearchTerm(e.target.value)} 
+                />
             </div>
             
-            <div className="flex items-center gap-2 w-full xl:w-auto">
-                <div className="relative flex-1 xl:w-64 shrink-0">
-                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                    <input type="text" placeholder="搜索单号或客户..." className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white transition" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                </div>
-                
-                <div className="relative">
-                    <button 
-                        onClick={() => setIsColumnConfigOpen(!isColumnConfigOpen)}
-                        className={`p-2 rounded-lg border transition ${isColumnConfigOpen ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
-                        title="配置列"
-                    >
-                        <Settings className="w-4 h-4" />
-                    </button>
-                    {isColumnConfigOpen && (
-                        <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#2C2C2E] shadow-xl z-50 p-2 rounded-xl border border-gray-100 dark:border-white/10 animate-fade-in max-h-80 overflow-y-auto custom-scrollbar">
-                            <div className="text-xs font-bold text-gray-400 uppercase px-2 py-1 mb-1">显示列配置</div>
-                            {allColumns.map(col => (
-                                <label key={col.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg cursor-pointer transition">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={visibleColumns.includes(col.id)} 
-                                        onChange={() => toggleColumn(col.id)}
-                                        disabled={col.id === 'id' || col.id === 'action'} 
-                                        className="w-4 h-4 rounded-sm border-gray-300 text-blue-600 focus:ring-blue-500"
-                                    />
-                                    <span className="text-sm text-gray-700 dark:text-gray-300">{col.label}</span>
-                                </label>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
+            <div className="relative">
                 <button 
-                    onClick={() => setIsAdvancedFilterOpen(!isAdvancedFilterOpen)}
-                    className={`p-2 rounded-lg border transition ${isAdvancedFilterOpen ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
-                    title="高级筛选"
+                    onClick={() => setIsColumnConfigOpen(!isColumnConfigOpen)}
+                    className={`p-2 rounded-lg border transition shadow-sm ${isColumnConfigOpen ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
+                    title="配置列"
                 >
-                    <Filter className="w-4 h-4" />
+                    <Settings className="w-4 h-4" />
                 </button>
+                {isColumnConfigOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#2C2C2E] shadow-xl z-50 p-2 rounded-xl border border-gray-100 dark:border-white/10 animate-fade-in max-h-80 overflow-y-auto custom-scrollbar">
+                        <div className="text-xs font-bold text-gray-400 uppercase px-2 py-1 mb-1">显示列配置</div>
+                        {allColumns.map(col => (
+                            <label key={col.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg cursor-pointer transition">
+                                <input 
+                                    type="checkbox" 
+                                    checked={visibleColumns.includes(col.id)} 
+                                    onChange={() => toggleColumn(col.id)}
+                                    disabled={col.id === 'id' || col.id === 'action'} 
+                                    className="w-4 h-4 rounded-sm border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-700 dark:text-gray-300">{col.label}</span>
+                            </label>
+                        ))}
+                    </div>
+                )}
             </div>
+
+            <button 
+                onClick={() => {
+                    if (!isAdvancedFilterOpen && advancedFilters.length === 0) {
+                        // Add some default filters from the image
+                        const defaults = [
+                            { id: '1', fieldId: 'renewalType', mode: '多选' as FilterMode, value: '不限' },
+                            { id: '2', fieldId: 'orderNature', mode: '多选' as FilterMode, value: '全部' },
+                            { id: '3', fieldId: 'deliveryMethod', mode: '单选' as FilterMode, value: '全部' },
+                            { id: '4', fieldId: 'businessManager', mode: '单选' as FilterMode, value: '全部' },
+                            { id: '5', fieldId: 'orderStatus', mode: '多选' as FilterMode, value: '全部' },
+                            { id: '6', fieldId: 'paymentStatus', mode: '单选' as FilterMode, value: '全部' },
+                            { id: '7', fieldId: 'stockStatus', mode: '单选' as FilterMode, value: '全部' },
+                            { id: '8', fieldId: 'licenseType', mode: '多选' as FilterMode, value: '全部' },
+                        ];
+                        setAdvancedFilters(defaults);
+                    }
+                    setIsAdvancedFilterOpen(!isAdvancedFilterOpen);
+                }}
+                className={`p-2 rounded-lg border transition shadow-sm ${isAdvancedFilterOpen ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
+                title="高级筛选"
+            >
+                <Filter className="w-4 h-4" />
+            </button>
+
+            <div className="w-px h-6 bg-gray-200 dark:bg-white/10 mx-1 hidden sm:block"></div>
+
+            {hasPermission('order_create') && (
+                <button onClick={() => { setIsCreateOpen(true); resetCreateForm(); }} className="unified-button-primary">
+                    <Plus className="w-4 h-4" /> 新建订单
+                </button>
+            )}
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        {/* Status Cards Grid */}
+        <div className="flex overflow-x-auto gap-2 pb-2 custom-scrollbar no-scrollbar scroll-smooth snap-x snap-mandatory">
+            {/* "All" Card */}
+            {hasPermission('order_view_all') && (
+                <button 
+                    onClick={() => setFilterStatus('All')}
+                    className={`relative p-2 rounded-xl border transition-all duration-300 text-left group min-w-[100px] flex-shrink-0 snap-start
+                        ${filterStatus === 'All' 
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20' 
+                            : 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-blue-300 dark:hover:border-blue-900'}
+                    `}
+                >
+                    <div className="flex items-center justify-between mb-1.5">
+                        <div className={`p-1 rounded-lg ${filterStatus === 'All' ? 'bg-white/20' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600'}`}>
+                            <Layers className="w-3.5 h-3.5" />
+                        </div>
+                        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${filterStatus === 'All' ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400'}`}>
+                            {orders.length}
+                        </span>
+                    </div>
+                    <div className={`text-[11px] font-bold ${filterStatus === 'All' ? 'text-white' : 'text-gray-900 dark:text-white'}`}>全部订单</div>
+                    <div className={`text-[9px] mt-0.5 truncate ${filterStatus === 'All' ? 'text-white/70' : 'text-gray-400'}`}>系统内所有订单</div>
+                    {filterStatus === 'All' && (
+                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-1 bg-white rounded-full"></div>
+                    )}
+                </button>
+            )}
+
+            {pipelineStatuses.filter(step => hasPermission(step.permission)).map((step) => {
+                const isActive = filterStatus === step.id;
+                let count = 0;
+                if (step.id === 'STOCK_AUTH') count = orders.filter(o => o.status === OrderStatus.PROCESSING_PROD && !o.isAuthConfirmed).length;
+                else if (step.id === 'STOCK_PKG') count = orders.filter(o => o.status === OrderStatus.PROCESSING_PROD && o.isAuthConfirmed && !o.isPackageConfirmed).length;
+                else if (step.id === 'STOCK_SHIP') count = orders.filter(o => o.status === OrderStatus.PROCESSING_PROD && o.isPackageConfirmed && !o.isShippingConfirmed).length;
+                else if (step.id === 'STOCK_CD') count = orders.filter(o => o.status === OrderStatus.PROCESSING_PROD && o.isShippingConfirmed && !o.isCDBurned).length;
+                else count = orders.filter(o => o.status === step.id).length;
+
+                return (
+                    <button
+                        key={step.id}
+                        onClick={() => setFilterStatus(step.id)}
+                        className={`relative p-2 rounded-xl border transition-all duration-300 text-left group min-w-[100px] flex-shrink-0 snap-start
+                            ${isActive 
+                                ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20' 
+                                : 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-blue-300 dark:hover:border-blue-900'}
+                        `}
+                    >
+                        <div className="flex items-center justify-between mb-1.5">
+                            <div className={`p-1 rounded-lg ${isActive ? 'bg-white/20' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600'}`}>
+                                <step.icon className="w-3.5 h-3.5" />
+                            </div>
+                            {count > 0 && (
+                                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isActive ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400'}`}>
+                                    {count}
+                                </span>
+                            )}
+                        </div>
+                        <div className={`text-[11px] font-bold ${isActive ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{step.label}</div>
+                        <div className={`text-[9px] mt-0.5 truncate ${isActive ? 'text-white/70' : 'text-gray-400'}`}>{step.desc}</div>
+                        {isActive && (
+                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-1 bg-white rounded-full"></div>
+                        )}
+                    </button>
+                );
+            })}
+
+            {exceptionStatuses.map((step) => {
+                const isActive = filterStatus === step.id;
+                const count = orders.filter(o => o.status === step.id).length;
+                return (
+                    <button
+                        key={step.id}
+                        onClick={() => setFilterStatus(step.id)}
+                        className={`relative p-2 rounded-xl border transition-all duration-300 text-left group min-w-[100px] flex-shrink-0 snap-start
+                            ${isActive 
+                                ? 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-500/20' 
+                                : 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-red-300 dark:hover:border-red-900'}
+                        `}
+                    >
+                        <div className="flex items-center justify-between mb-1.5">
+                            <div className={`p-1 rounded-lg ${isActive ? 'bg-white/20' : 'bg-red-50 dark:bg-red-900/20 text-red-600'}`}>
+                                <step.icon className="w-3.5 h-3.5" />
+                            </div>
+                            {count > 0 && (
+                                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isActive ? 'bg-white text-red-600' : 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'}`}>
+                                    {count}
+                                </span>
+                            )}
+                        </div>
+                        <div className={`text-[11px] font-bold ${isActive ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{step.label}</div>
+                        <div className={`text-[9px] mt-0.5 truncate ${isActive ? 'text-white/70' : 'text-gray-400'}`}>{step.desc}</div>
+                        {isActive && (
+                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-1 bg-white rounded-full"></div>
+                        )}
+                    </button>
+                );
+            })}
         </div>
 
-        {/* Advanced Filters Panel */}
-        {isAdvancedFilterOpen && (
-            <div className="px-6 py-4 bg-gray-50/50 dark:bg-white/5 border-b border-gray-100 dark:border-white/10 grid grid-cols-1 md:grid-cols-4 gap-4 items-end animate-fade-in">
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">创建日期范围</label>
-                    <div className="flex items-center gap-2">
-                        <input type="date" className="w-full p-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs dark:text-white" value={filterDateStart} onChange={e => setFilterDateStart(e.target.value)} />
-                        <span className="text-gray-400">-</span>
-                        <input type="date" className="w-full p-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs dark:text-white" value={filterDateEnd} onChange={e => setFilterDateEnd(e.target.value)} />
-                    </div>
-                </div>
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">订单金额范围</label>
-                    <div className="flex items-center gap-2">
-                        <input type="number" placeholder="Min" className="w-full p-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs dark:text-white" value={filterAmountMin} onChange={e => setFilterAmountMin(e.target.value ? Number(e.target.value) : '')} />
-                        <span className="text-gray-400">-</span>
-                        <input type="number" placeholder="Max" className="w-full p-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs dark:text-white" value={filterAmountMax} onChange={e => setFilterAmountMax(e.target.value ? Number(e.target.value) : '')} />
-                    </div>
-                </div>
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">订单来源</label>
-                    <select className="w-full p-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs dark:text-white" value={filterSource} onChange={e => setFilterSource(e.target.value as any)}>
-                        <option value="All">全部来源</option>
-                        <option value="OnlineStore">官网下单</option>
-                        <option value="ChannelPortal">渠道下单</option>
-                        <option value="APISync">第三方系统下单</option>
-                        <option value="Sales">商务代下单</option>
-                        <option value="Renewal">客户续费</option>
-                    </select>
-                </div>
-                <div>
-                    <button onClick={clearAdvancedFilters} className="px-4 py-2 text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white underline">
-                        重置筛选
-                    </button>
-                </div>
-            </div>
-        )}
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50/80 dark:bg-white/5 backdrop-blur border-b border-gray-200/50 dark:border-white/10 text-gray-400 dark:text-gray-500 font-bold text-[10px] uppercase tracking-wider">
+        <div className="unified-card overflow-hidden">
+            <div className="overflow-x-auto max-h-[calc(100vh-320px)] overflow-y-auto custom-scrollbar">
+          <table className="w-full text-left border-separate border-spacing-0">
+            <thead className="sticky top-0 z-10 unified-table-header backdrop-blur-md shadow-sm">
               <tr>
-                <th className="p-5 w-12 pl-8">
+                <th className="p-5 w-12 pl-8 border-b border-gray-200/50 dark:border-white/10">
                     <input 
                         type="checkbox" 
                         className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -757,9 +942,9 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                     />
                 </th>
                 {allColumns.map(col => visibleColumns.includes(col.id) && (
-                    <th key={col.id} className="p-5 whitespace-nowrap">{col.label}</th>
+                    <th key={col.id} className="p-5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">{col.label}</th>
                 ))}
-                <th className="p-5 pr-8"></th>
+                <th className="p-5 pr-8 border-b border-gray-200/50 dark:border-white/10"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-white/5 text-sm">
@@ -802,13 +987,20 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                   )}
                   {visibleColumns.includes('products') && (
                       <td className="p-5">
-                          <div className="flex flex-col gap-1 max-w-[240px]">
+                          <div className="flex flex-col gap-2 max-w-[240px]">
                               {order.items.slice(0, 2).map((item, idx) => (
-                                  <div key={idx} className="flex items-center justify-between text-xs">
-                                      <div className="truncate font-medium text-gray-700 dark:text-gray-300 max-w-[150px]" title={item.productName}>
-                                          {item.productName}
+                                  <div key={idx} className="flex flex-col text-xs">
+                                      <div className="flex items-center justify-between">
+                                          <div className="truncate font-medium text-gray-700 dark:text-gray-300 max-w-[150px]" title={item.productName}>
+                                              {item.productName}
+                                          </div>
+                                          <span className="text-gray-400 shrink-0 ml-2">x{item.quantity}</span>
                                       </div>
-                                      <span className="text-gray-400 shrink-0 ml-2">x{item.quantity}</span>
+                                      {item.skuName && (
+                                          <div className="text-[10px] text-gray-400 truncate mt-0.5">
+                                              规格: {item.skuName}
+                                          </div>
+                                      )}
                                   </div>
                               ))}
                               {order.items.length > 2 && (
@@ -822,20 +1014,85 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                   {visibleColumns.includes('sales') && (
                       <td className="p-5 whitespace-nowrap">
                           {(() => {
-                              const info = getSalesInfo(order);
+                              const user = users.find(u => u.id === order.salesRepId);
                               return (
-                                  <div className="flex flex-col">
-                                      <span className="font-medium text-gray-900 dark:text-white text-xs">{info.name}</span>
-                                      <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{info.deptName}</span>
+                                  <div 
+                                      className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 rounded-lg transition-all group/user"
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (user) {
+                                              setDetailsUser(user);
+                                              setIsDrawerOpen(true);
+                                          }
+                                      }}
+                                  >
+                                      <div className="relative">
+                                          <img 
+                                              src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${order.salesRepName}`} 
+                                              className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 dark:border-white/10 transition-transform group-hover/user:scale-110" 
+                                              alt=""
+                                          />
+                                          {user?.status === 'Active' && (
+                                              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-[#1C1C1E] rounded-full"></div>
+                                          )}
+                                      </div>
+                                      <div className="flex flex-col">
+                                          <span className="font-bold text-gray-900 dark:text-white text-xs group-hover/user:text-blue-600 transition-colors">{order.salesRepName || '未分配'}</span>
+                                          <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{user?.email || '-'}</span>
+                                      </div>
                                   </div>
                               );
                           })()}
                       </td>
                   )}
+                  {visibleColumns.includes('businessManager') && (
+                      <td className="p-5 whitespace-nowrap">
+                          {(() => {
+                              const user = users.find(u => u.id === order.businessManagerId);
+                              return (
+                                  <div 
+                                      className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 rounded-lg transition-all group/user"
+                                      onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (user) {
+                                              setDetailsUser(user);
+                                              setIsDrawerOpen(true);
+                                          }
+                                      }}
+                                  >
+                                      <div className="relative">
+                                          <img 
+                                              src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${order.businessManagerName}`} 
+                                              className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 dark:border-white/10 transition-transform group-hover/user:scale-110" 
+                                              alt=""
+                                          />
+                                          {user?.status === 'Active' && (
+                                              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-[#1C1C1E] rounded-full"></div>
+                                          )}
+                                      </div>
+                                      <div className="flex flex-col">
+                                          <span className="font-bold text-gray-900 dark:text-white text-xs group-hover/user:text-blue-600 transition-colors">{order.businessManagerName || '未分配'}</span>
+                                          <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{user?.email || '-'}</span>
+                                      </div>
+                                  </div>
+                              );
+                          })()}
+                      </td>
+                  )}
+                  {visibleColumns.includes('department') && (
+                      <td className="p-5 whitespace-nowrap">
+                          <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">
+                              {(() => {
+                                  const user = users.find(u => u.id === order.salesRepId);
+                                  return getDepartmentPath(user?.departmentId);
+                              })()}
+                          </div>
+                      </td>
+                  )}
                   {visibleColumns.includes('source') && <td className="p-5 whitespace-nowrap">{getSourceBadge(order.source)}</td>}
                   {visibleColumns.includes('buyerType') && (
                       <td className="p-5 whitespace-nowrap">
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                          <span className={`px-2.5 py-1 rounded-[8px] text-[10px] font-bold uppercase tracking-wider border h-6 flex items-center w-fit ${
                               order.buyerType === 'Channel' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800' :
                               order.buyerType === 'SelfDeal' ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' :
                               'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800'
@@ -846,6 +1103,8 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                   )}
                   {visibleColumns.includes('date') && <td className="p-5 text-gray-400 dark:text-gray-500 font-mono text-[11px] whitespace-nowrap">{new Date(order.date).toLocaleString('zh-CN', { hour12: false })}</td>}
                   {visibleColumns.includes('status') && <td className="p-5 whitespace-nowrap">{getStatusBadge(order.status)}</td>}
+                  {visibleColumns.includes('paymentStatus') && <td className="p-5 whitespace-nowrap">{getPaymentStatusBadge(order.isPaid)}</td>}
+                  {visibleColumns.includes('stockStatus') && <td className="p-5 whitespace-nowrap">{getStockStatusBadge(order)}</td>}
                   {visibleColumns.includes('total') && <td className="p-5 text-right font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap font-mono">¥{order.total.toLocaleString()}</td>}
                   
                   {visibleColumns.includes('payment') && (
@@ -854,8 +1113,18 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                       </td>
                   )}
                   {visibleColumns.includes('delivery') && (
-                      <td className="p-5 text-gray-600 dark:text-gray-300 text-xs">
-                          {order.deliveryMethod ? deliveryMethodMap[order.deliveryMethod] : '-'}
+                      <td className="p-5">
+                          {order.deliveryMethod ? (
+                              <span className={`px-2.5 py-1 rounded-[8px] text-[10px] font-bold uppercase tracking-wider border h-6 flex items-center w-fit ${
+                                  order.deliveryMethod === 'Online' 
+                                  ? 'bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/30' 
+                                  : order.deliveryMethod === 'Offline'
+                                  ? 'bg-orange-50 text-orange-600 border-orange-100 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800/30'
+                                  : 'bg-purple-50 text-purple-600 border-purple-100 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800/30'
+                              }`}>
+                                  {deliveryMethodMap[order.deliveryMethod]}
+                              </span>
+                          ) : '-'}
                       </td>
                   )}
                   {visibleColumns.includes('address') && (
@@ -896,6 +1165,140 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
             </div>
         )}
       </div>
+    </div>
+
+      {/* Advanced Filters Modal */}
+      {isAdvancedFilterOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-fade-in">
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col border border-white/10 animate-modal-enter">
+            <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">设置筛选条件</h3>
+                <button onClick={() => setIsAdvancedFilterOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full text-gray-400 transition">
+                    <X className="w-5 h-5"/>
+                </button>
+            </div>
+            
+            <div className="p-8 overflow-y-auto max-h-[70vh] custom-scrollbar">
+                <div className="space-y-4 mb-8">
+                    {advancedFilters.length === 0 && (
+                        <div className="text-center py-12 border-2 border-dashed border-gray-100 dark:border-white/5 rounded-2xl">
+                            <p className="text-sm text-gray-400">暂无筛选条件，点击下方按钮添加</p>
+                        </div>
+                    )}
+                    {advancedFilters.map((filter) => (
+                        <div key={filter.id} className="flex items-center gap-4 group animate-fade-in">
+                            {/* Field Selection */}
+                            <div className="w-1/4">
+                                <select 
+                                    className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+                                    value={filter.fieldId}
+                                    onChange={(e) => {
+                                        const field = availableFilterFields.find(f => f.id === e.target.value);
+                                        if (field) {
+                                            updateFilterCondition(filter.id, { 
+                                                fieldId: field.id, 
+                                                mode: field.defaultMode,
+                                                value: field.defaultMode === '时间段' ? { start: '', end: '' } : '全部'
+                                            });
+                                        }
+                                    }}
+                                >
+                                    {availableFilterFields.map(f => (
+                                        <option key={f.id} value={f.id}>{f.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Mode Selection */}
+                            <div className="w-1/6">
+                                <select 
+                                    className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+                                    value={filter.mode}
+                                    onChange={(e) => updateFilterCondition(filter.id, { mode: e.target.value as FilterMode })}
+                                >
+                                    <option value="单选">单选</option>
+                                    <option value="多选">多选</option>
+                                    <option value="时间段">时间段</option>
+                                </select>
+                            </div>
+
+                            {/* Value Input */}
+                            <div className="flex-1">
+                                {filter.mode === '时间段' ? (
+                                    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl">
+                                        <Calendar className="w-4 h-4 text-gray-400" />
+                                        <input 
+                                            type="date" 
+                                            className="bg-transparent text-sm dark:text-white outline-none w-full"
+                                            value={filter.value.start}
+                                            onChange={(e) => updateFilterCondition(filter.id, { value: { ...filter.value, start: e.target.value } })}
+                                        />
+                                        <span className="text-gray-400">-</span>
+                                        <input 
+                                            type="date" 
+                                            className="bg-transparent text-sm dark:text-white outline-none w-full"
+                                            value={filter.value.end}
+                                            onChange={(e) => updateFilterCondition(filter.id, { value: { ...filter.value, end: e.target.value } })}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="relative">
+                                        <select 
+                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none pr-12 transition"
+                                            value={filter.value}
+                                            onChange={(e) => updateFilterCondition(filter.id, { value: e.target.value })}
+                                        >
+                                            <option value="全部">全部</option>
+                                            <option value="不限">不限</option>
+                                            {filter.fieldId === 'orderStatus' && Object.entries(statusMap).map(([k, v]) => (
+                                                <option key={k} value={k}>{v}</option>
+                                            ))}
+                                            {filter.fieldId === 'deliveryMethod' && Object.entries(deliveryMethodMap).map(([k, v]) => (
+                                                <option key={k} value={k}>{v}</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+                                            <ChevronDown className="w-4 h-4 text-gray-400" />
+                                            <MessageSquare className="w-4 h-4 text-gray-400" />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Delete Button */}
+                            <button 
+                                onClick={() => removeFilterCondition(filter.id)}
+                                className="p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
+                            >
+                                <Trash2 className="w-5 h-5" />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+
+                <button 
+                    onClick={addFilterCondition}
+                    className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-xl"
+                >
+                    <Plus className="w-4 h-4" />
+                    添加筛选条件
+                </button>
+            </div>
+
+            <div className="p-6 bg-gray-50 dark:bg-white/5 border-t border-gray-100 dark:border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <button className="px-5 py-2.5 text-sm font-bold text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-white dark:hover:bg-white/10 transition-all shadow-sm">保存视图</button>
+                    <button onClick={clearAdvancedFilters} className="px-5 py-2.5 text-sm font-bold text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-white dark:hover:bg-white/10 transition-all shadow-sm">重置</button>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                    <button onClick={() => setIsAdvancedFilterOpen(false)} className="px-5 py-2.5 text-sm font-bold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">取消</button>
+                    <button onClick={() => setIsAdvancedFilterOpen(false)} className="px-8 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/25">开始查询</button>
+                </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Batch Action Floating Bar */}
       {selectedOrderIds.size > 0 && (
@@ -1320,6 +1723,57 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                             </div>
 
                             <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm space-y-6">
+                                <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><MapPin className="w-5 h-5 text-red-500"/> 收货信息</h4>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">收货方</label>
+                                            <select 
+                                                className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
+                                                value={receivingParty}
+                                                onChange={e => setReceivingParty(e.target.value)}
+                                            >
+                                                <option value="买方">买方</option>
+                                                <option value="代理商">代理商</option>
+                                                <option value="最终用户">最终用户</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">收货方式</label>
+                                            <select 
+                                                className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
+                                                value={receivingMethod}
+                                                onChange={e => setReceivingMethod(e.target.value)}
+                                            >
+                                                <option value="邮寄">邮寄</option>
+                                                <option value="自提">自提</option>
+                                                <option value="送货上门">送货上门</option>
+                                                <option value="电子交付">电子交付</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">收货单位名称</label>
+                                        <input 
+                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20" 
+                                            value={receivingCompany} 
+                                            onChange={e => setReceivingCompany(e.target.value)}
+                                            placeholder="请输入收货单位全称..."
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">收货地址</label>
+                                        <textarea 
+                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20 h-20 resize-none" 
+                                            value={shippingAddress} 
+                                            onChange={e => setShippingAddress(e.target.value)}
+                                            placeholder="请输入详细收货地址及联系人信息..."
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm space-y-6">
                                 <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><ClipboardCheck className="w-5 h-5 text-green-500"/> 验收计划</h4>
                                 <div className="flex bg-gray-100 dark:bg-white/10 p-1.5 rounded-xl">
                                     <button onClick={()=>setAcceptanceType('OneTime')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${acceptanceType === 'OneTime' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}>整体验收</button>
@@ -1370,6 +1824,77 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                         </button>
                     )}
                 </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* User Details Drawer */}
+      {isDrawerOpen && detailsUser && (
+        <div className="fixed inset-0 z-[100] flex justify-end animate-fade-in">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeDrawer}></div>
+          <div className={`relative w-full max-w-md bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col h-full border-l border-white/10 ${isDrawerClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
+            <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">用户详情</h3>
+                <button onClick={closeDrawer} className="p-2 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full text-gray-400 transition">
+                    <X className="w-5 h-5"/>
+                </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+                <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="relative group">
+                        <img src={detailsUser.avatar} className="w-24 h-24 rounded-full bg-gray-100 border-4 border-white dark:border-[#2C2C2E] shadow-xl" alt=""/>
+                        <div className={`absolute bottom-1 right-1 w-5 h-5 rounded-full border-2 border-white dark:border-[#1C1C1E] ${detailsUser.status === 'Active' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                    </div>
+                    <div>
+                        <h4 className="text-xl font-bold text-gray-900 dark:text-white">{detailsUser.name}</h4>
+                        <p className="text-sm text-gray-500 mt-1">{detailsUser.email}</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-xs font-bold border border-blue-100 dark:border-blue-800/30">{detailsUser.role}</span>
+                        <span className="px-3 py-1 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 rounded-full text-xs font-bold border border-gray-200 dark:border-white/20">{detailsUser.userType}</span>
+                    </div>
+                </div>
+
+                <div className="space-y-6 pt-6 border-t border-gray-100 dark:border-white/10">
+                    <div className="grid grid-cols-2 gap-6">
+                        <div className="space-y-1">
+                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">账号 ID</div>
+                            <div className="text-sm font-mono text-gray-900 dark:text-white">{detailsUser.accountId}</div>
+                        </div>
+                        <div className="space-y-1">
+                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">当前状态</div>
+                            <div className={`text-sm font-bold ${detailsUser.status === 'Active' ? 'text-green-600' : 'text-gray-400'}`}>{detailsUser.status}</div>
+                        </div>
+                        <div className="space-y-1 col-span-2">
+                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">所属部门</div>
+                            <div className="text-sm text-gray-900 dark:text-white">{getDepartmentPath(detailsUser.departmentId)}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-4 pt-6 border-t border-gray-100 dark:border-white/10">
+                    <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                        <Shield className="w-3.5 h-3.5"/> 权限概览
+                    </h5>
+                    <div className="p-4 bg-gray-50 dark:bg-black/20 rounded-2xl border border-gray-100 dark:border-white/5">
+                        <p className="text-xs text-gray-500 leading-relaxed">
+                            该用户拥有 <span className="text-blue-600 font-bold">{detailsUser.role}</span> 角色对应的功能权限。
+                            数据权限受限于所属部门 <span className="text-gray-900 dark:text-white font-medium">{getDepartmentPath(detailsUser.departmentId)}</span> 及其下属机构。
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div className="p-6 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 flex gap-3">
+                <button onClick={closeDrawer} className="flex-1 py-3 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold hover:bg-gray-50 transition">关闭</button>
+                <button 
+                  onClick={() => {
+                    closeDrawer();
+                    navigate('/users', { state: { search: detailsUser.accountId } });
+                  }}
+                  className="flex-1 py-3 bg-black dark:bg-white text-white dark:text-black rounded-xl text-sm font-bold hover:opacity-80 transition flex items-center justify-center gap-2"
+                >
+                  <Settings className="w-4 h-4"/> 管理账号
+                </button>
             </div>
           </div>
         </div>

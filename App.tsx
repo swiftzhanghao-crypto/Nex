@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Activity } from 'lucide-react';
 import Layout from './components/Layout';
 import ProductManager from './components/ProductManager';
 import OrderManager from './components/OrderManager';
@@ -15,7 +16,8 @@ import CustomerDetails from './components/CustomerDetails';
 import MerchandiseDetails from './components/MerchandiseDetails';
 import ChannelDetails from './components/ChannelDetails';
 import OpportunityDetails from './components/OpportunityDetails';
-import OperationsManager from './components/OperationsManager';
+import LeadsManager from './components/LeadsManager';
+import Dashboard from './components/Dashboard';
 import ProductPreview from './components/ProductPreview';
 import ProductCenter from './components/ProductCenter';
 import { 
@@ -97,25 +99,25 @@ function App() {
     { 
       id: 'PROD-PUB-001', name: 'WPS 365 标准版 (政府)', category: 'WPS365公有云', subCategory: 'WPS365标准版（政府）（服务）', status: 'OnShelf', tags: ['IM', 'AI', '生态'],
       skus: [{ 
-        id: 's1', code: 'S1', name: '标准版', price: 299, 
+        id: 's1', code: 'S1', name: '标准版', price: 299, status: 'Active', stock: 100,
         pricingOptions: [
-          {id:'o1-1', title:'年度订阅', price:299, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}},
-          {id:'o1-2', title:'三年订阅', price:799, license:{type:'Subscription', period:3, periodUnit:'Year', scope:'1 User'}},
-          {id:'o1-3', title:'五年订阅', price:1299, license:{type:'Subscription', period:5, periodUnit:'Year', scope:'1 User'}}
+          {id:'o1-1', title:'年度订阅 (政府专享)', price:299, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}},
+          {id:'o1-2', title:'三年订阅 (优惠包)', price:799, license:{type:'Subscription', period:3, periodUnit:'Year', scope:'1 User'}},
+          {id:'o1-3', title:'五年订阅 (长期授权)', price:1299, license:{type:'Subscription', period:5, periodUnit:'Year', scope:'1 User'}}
         ] 
       }],
       installPackages: [
-        { id: 'pkg1-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#' },
-        { id: 'pkg1-2', name: 'WPS 365 Mac端', version: 'v6.0.1', url: '#' }
+        { id: 'AZ0006022', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#', cpu: '麒麟', os: 'UOS', arch: '-' },
+        { id: 'pkg1-2', name: 'WPS 365 Mac端', version: 'v6.0.1', url: '#', cpu: 'Intel/M1', os: 'macOS', arch: 'x64/arm64' }
       ]
     },
     { 
       id: 'PROD-PUB-001-2', name: 'WPS 365 基础版 (政府)', category: 'WPS365公有云', subCategory: 'WPS365标准版（政府）（服务）', status: 'OnShelf', tags: ['IM', '生态'],
       skus: [{ 
-        id: 's1-2', code: 'S1-2', name: '基础版', price: 199, 
+        id: 's1-2', code: 'S1-2', name: '基础版', price: 199, status: 'Active', stock: 100,
         pricingOptions: [
-          {id:'o1-2-1', title:'年度订阅', price:199, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}},
-          {id:'o1-2-2', title:'月度订阅', price:19, license:{type:'Subscription', period:1, periodUnit:'Month', scope:'1 User'}}
+          {id:'o1-2-1', title:'年度订阅 (基础版)', price:199, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}},
+          {id:'o1-2-2', title:'月度订阅 (基础版)', price:19, license:{type:'Subscription', period:1, periodUnit:'Month', scope:'1 User'}}
         ] 
       }],
       installPackages: [{ id: 'pkg1-2-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#' }]
@@ -123,10 +125,10 @@ function App() {
     { 
       id: 'PROD-PUB-002', name: 'WPS 365 高级版', category: 'WPS365公有云', subCategory: 'WPS365高级版', status: 'OnShelf', tags: ['AI', '生态'],
       skus: [{ 
-        id: 's2', code: 'S2', name: '标准版', price: 499, 
+        id: 's2', code: 'S2', name: '标准版', price: 499, status: 'Active', stock: 100,
         pricingOptions: [
-          {id:'o2-1', title:'年度订阅', price:499, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}},
-          {id:'o2-2', title:'三年订阅', price:1299, license:{type:'Subscription', period:3, periodUnit:'Year', scope:'1 User'}}
+          {id:'o2-1', title:'年度订阅 (高级版)', price:499, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}},
+          {id:'o2-2', title:'三年订阅 (企业包)', price:1299, license:{type:'Subscription', period:3, periodUnit:'Year', scope:'1 User'}}
         ] 
       }],
       installPackages: [
@@ -137,10 +139,10 @@ function App() {
     { 
       id: 'PROD-PUB-002-2', name: 'WPS 365 高级版 (教育)', category: 'WPS365公有云', subCategory: 'WPS365高级版', status: 'OnShelf', tags: ['AI', '生态'],
       skus: [{ 
-        id: 's2-2', code: 'S2-2', name: '教育版', price: 299, 
+        id: 's2-2', code: 'S2-2', name: '教育版', price: 299, status: 'Active', stock: 100,
         pricingOptions: [
-          {id:'o2-2-1', title:'年度订阅', price:299, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}},
-          {id:'o2-2-2', title:'永久授权', price:999, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 User'}}
+          {id:'o2-2-1', title:'年度订阅 (教育版)', price:299, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}},
+          {id:'o2-2-2', title:'永久授权 (教育版)', price:999, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 User'}}
         ] 
       }],
       installPackages: [{ id: 'pkg2-2-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#' }]
@@ -150,10 +152,10 @@ function App() {
     { 
       id: 'PROD-PVT-001', name: 'WPS 365 高级版 (私有云)', category: 'WPS365私有云', subCategory: 'WPS365高级版（私有云）', status: 'OnShelf', tags: ['IM', 'AI'],
       skus: [{ 
-        id: 's5', code: 'S5', name: '标准版', price: 50000, 
+        id: 's5', code: 'S5', name: '标准版', price: 50000, status: 'Active', stock: 100,
         pricingOptions: [
-          {id:'o5-1', title:'永久授权', price:50000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}},
-          {id:'o5-2', title:'年度订阅', price:15000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
+          {id:'o5-1', title:'永久授权 (私有云)', price:50000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}},
+          {id:'o5-2', title:'年度订阅 (私有云)', price:15000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
         ] 
       }],
       installPackages: [{ id: 'pkg5-1', name: '私有云部署包', version: 'v7.0.0', url: '#' }]
@@ -161,10 +163,10 @@ function App() {
     { 
       id: 'PROD-PVT-001-2', name: 'WPS 365 基础版 (私有云)', category: 'WPS365私有云', subCategory: 'WPS365高级版（私有云）', status: 'OnShelf', tags: ['IM'],
       skus: [{ 
-        id: 's5-2', code: 'S5-2', name: '基础版', price: 20000, 
+        id: 's5-2', code: 'S5-2', name: '基础版', price: 20000, status: 'Active', stock: 100,
         pricingOptions: [
-          {id:'o5-2-1', title:'永久授权', price:20000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}},
-          {id:'o5-2-2', title:'年度订阅', price:8000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
+          {id:'o5-2-1', title:'永久授权 (私有云基础)', price:20000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}},
+          {id:'o5-2-2', title:'年度订阅 (私有云基础)', price:8000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
         ] 
       }],
       installPackages: [{ id: 'pkg5-2-1', name: '私有云部署包', version: 'v7.0.0', url: '#' }]
@@ -174,10 +176,10 @@ function App() {
     { 
       id: 'PROD-ITEM-001', name: 'Web Office 核心组件', category: '私有云单品', subCategory: 'Web Office', status: 'OnShelf', tags: ['生态'],
       skus: [{ 
-        id: 's8', code: 'S8', name: '标准版', price: 20000, 
+        id: 's8', code: 'S8', name: '标准版', price: 20000, status: 'Active', stock: 100,
         pricingOptions: [
-          {id:'o8-1', title:'永久授权', price:20000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}},
-          {id:'o8-2', title:'年度订阅', price:6000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
+          {id:'o8-1', title:'永久授权 (WebOffice)', price:20000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}},
+          {id:'o8-2', title:'年度订阅 (WebOffice)', price:6000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
         ] 
       }],
       installPackages: [{ id: 'pkg8-1', name: 'WebOffice SDK', version: 'v3.2.1', url: '#' }]
@@ -185,10 +187,10 @@ function App() {
     { 
       id: 'PROD-ITEM-001-2', name: 'Web Office 增强组件', category: '私有云单品', subCategory: 'Web Office', status: 'OnShelf', tags: ['生态', 'AI'],
       skus: [{ 
-        id: 's8-2', code: 'S8-2', name: '增强版', price: 35000, 
+        id: 's8-2', code: 'S8-2', name: '增强版', price: 35000, status: 'Active', stock: 100,
         pricingOptions: [
-          {id:'o8-2-1', title:'永久授权', price:35000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}},
-          {id:'o8-2-2', title:'年度订阅', price:12000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
+          {id:'o8-2-1', title:'永久授权 (WebOffice增强)', price:35000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}},
+          {id:'o8-2-2', title:'年度订阅 (WebOffice增强)', price:12000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
         ] 
       }],
       installPackages: [{ id: 'pkg8-2-1', name: 'WebOffice SDK', version: 'v3.2.1', url: '#' }]
@@ -198,10 +200,10 @@ function App() {
     { 
       id: 'PROD-WIN-001', name: 'WPS Office 2019 专业版', category: 'Win端', subCategory: 'Win2019', status: 'OnShelf', tags: ['生态'],
       skus: [{ 
-        id: 's12', code: 'S12', name: '标准版', price: 498, 
+        id: 's12', code: 'S12', name: '标准版', price: 498, status: 'Active', stock: 100,
         pricingOptions: [
-          {id:'o12-1', title:'永久授权', price:498, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},
-          {id:'o12-2', title:'年度订阅', price:158, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
+          {id:'o12-1', title:'永久授权 (单机版)', price:498, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},
+          {id:'o12-2', title:'年度订阅 (单机版)', price:158, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
         ] 
       }],
       installPackages: [{ id: 'pkg12-1', name: 'WPS 2019 安装包', version: 'v11.1.0', url: '#' }]
@@ -209,7 +211,7 @@ function App() {
     { 
       id: 'PROD-WIN-001-2', name: 'WPS Office 2019 增强版', category: 'Win端', subCategory: 'Win2019', status: 'OnShelf', tags: ['生态', 'AI'],
       skus: [{ 
-        id: 's12-2', code: 'S12-2', name: '增强版', price: 698, 
+        id: 's12-2', code: 'S12-2', name: '增强版', price: 698, status: 'Active', stock: 100,
         pricingOptions: [
           {id:'o12-2-1', title:'永久授权', price:698, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},
           {id:'o12-2-2', title:'年度订阅', price:218, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
@@ -222,10 +224,10 @@ function App() {
     { 
       id: 'PROD-OTH-001', name: 'WPS for Mac 专业版', category: '其他软件', subCategory: 'WPS for Mac', status: 'OnShelf', tags: ['生态'],
       skus: [{ 
-        id: 's15', code: 'S15', name: '标准版', price: 498, 
+        id: 's15', code: 'S15', name: '标准版', price: 498, status: 'Active', stock: 100,
         pricingOptions: [
-          {id:'o15-1', title:'永久授权', price:498, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},
-          {id:'o15-2', title:'年度订阅', price:158, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
+          {id:'o15-1', title:'永久授权 (Mac版)', price:498, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},
+          {id:'o15-2', title:'年度订阅 (Mac版)', price:158, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
         ] 
       }],
       installPackages: [{ id: 'pkg15-1', name: 'WPS Mac 安装包', version: 'v6.0.1', url: '#' }]
@@ -233,10 +235,10 @@ function App() {
     { 
       id: 'PROD-OTH-001-2', name: 'WPS for Mac 个人版', category: '其他软件', subCategory: 'WPS for Mac', status: 'OnShelf', tags: ['生态'],
       skus: [{ 
-        id: 's15-2', code: 'S15-2', name: '个人版', price: 0, 
+        id: 's15-2', code: 'S15-2', name: '个人版', price: 0, status: 'Active', stock: 100,
         pricingOptions: [
-          {id:'o15-2-1', title:'免费版', price:0, license:{type:'FlatRate', period:1, periodUnit:'Forever', scope:'1 User'}},
-          {id:'o15-2-2', title:'会员订阅', price:89, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}}
+          {id:'o15-2-1', title:'免费版 (Mac个人)', price:0, license:{type:'FlatRate', period:1, periodUnit:'Forever', scope:'1 User'}},
+          {id:'o15-2-2', title:'会员订阅 (Mac个人)', price:89, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}}
         ] 
       }],
       installPackages: [{ id: 'pkg15-2-1', name: 'WPS Mac 安装包', version: 'v6.0.1', url: '#' }]
@@ -246,7 +248,7 @@ function App() {
     { 
       id: 'PROD-OFF-001', name: 'WPS Office 2016 (已退市)', category: 'Win端', subCategory: 'Win2019', status: 'OffShelf', tags: ['生态'],
       skus: [{ 
-        id: 's20', code: 'S20', name: '标准版', price: 398, 
+        id: 's20', code: 'S20', name: '标准版', price: 398, status: 'Active', stock: 100,
         pricingOptions: [
           {id:'o20-1', title:'永久授权', price:398, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},
           {id:'o20-2', title:'年度订阅', price:128, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
@@ -259,24 +261,24 @@ function App() {
   // --- 1.5 Sales Merchandise Mock Data ---
   const [merchandises, setMerchandises] = useState<SalesMerchandise[]>([
       { 
-          id: 'M001', name: 'WPS 365 商业基础版', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 199.0, status: 'Active',
-          items: [{ productId: 'PROD-001', productName: 'WPS 365 商业基础版', skuId: 'spec1', skuName: '标准版', quantity: 1 }]
+          id: 'M001', name: 'WPS 365 标准版 (政府)', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 299.0, status: 'Active',
+          items: [{ productId: 'PROD-PUB-001', productName: 'WPS 365 标准版 (政府)', skuId: 's1', skuName: '标准版', quantity: 1 }]
       },
       { 
-          id: 'M002', name: 'WPS 365 商业标准版', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 365.0, status: 'Active',
-          items: [{ productId: 'PROD-002', productName: 'WPS 365 商业标准版', skuId: 'spec2', skuName: '标准版', quantity: 1 }]
+          id: 'M002', name: 'WPS 365 基础版 (政府)', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 199.0, status: 'Active',
+          items: [{ productId: 'PROD-PUB-001-2', productName: 'WPS 365 基础版 (政府)', skuId: 's1-2', skuName: '基础版', quantity: 1 }]
       },
       { 
-          id: 'M003', name: 'WPS 365 旗舰版', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 599.0, status: 'Active',
-          items: [{ productId: 'PROD-003', productName: 'WPS 365 旗舰版', skuId: 'spec3', skuName: '标准版', quantity: 1 }]
+          id: 'M003', name: 'WPS 365 高级版', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 499.0, status: 'Active',
+          items: [{ productId: 'PROD-PUB-002', productName: 'WPS 365 高级版', skuId: 's2', skuName: '标准版', quantity: 1 }]
       },
       { 
-          id: 'M004', name: 'WPS Office 2023 专业版', salesType: ['Channel', 'Direct'], pricingPolicy: 'Fixed', price: 598.0, status: 'Active',
-          items: [{ productId: 'PROD-005', productName: 'WPS Office 2023 专业版', skuId: 'spec5', skuName: '标准版', quantity: 1 }]
+          id: 'M004', name: 'WPS 365 高级版 (私有云)', salesType: ['Channel', 'Direct'], pricingPolicy: 'Fixed', price: 50000.0, status: 'Active',
+          items: [{ productId: 'PROD-PVT-001', productName: 'WPS 365 高级版 (私有云)', skuId: 's5', skuName: '标准版', quantity: 1 }]
       },
       { 
-          id: 'M005', name: '私有云平台交付服务', salesType: ['Direct'], pricingPolicy: 'Negotiable', price: 150000.0, status: 'Active',
-          items: [{ productId: 'PROD-007', productName: '私有云协作平台', skuId: 'spec7', skuName: '标准版', quantity: 1 }]
+          id: 'M005', name: 'Web Office 核心组件', salesType: ['Direct'], pricingPolicy: 'Negotiable', price: 20000.0, status: 'Active',
+          items: [{ productId: 'PROD-ITEM-001', productName: 'Web Office 核心组件', skuId: 's8', skuName: '标准版', quantity: 1 }]
       },
   ]);
 
@@ -295,10 +297,10 @@ function App() {
   // --- 3. Users and Roles ---
   const [roles, setRoles] = useState<RoleDefinition[]>([
       { id: 'Admin', name: '管理员 (Admin)', description: '拥有系统所有权限', isSystem: true, permissions: ['all'] },
-      { id: 'Sales', name: '销售经理 (Sales)', description: '负责客户跟进与订单录入', isSystem: true, permissions: ['order_create', 'customer_view', 'opportunity_manage'] },
-      { id: 'Business', name: '商务经理 (Business)', description: '负责合同审批与收款确认', isSystem: true, permissions: ['order_approve', 'payment_manage'] },
-      { id: 'Technical', name: '技术支持 (Technical)', description: '负责生产授权与安装包', isSystem: true, permissions: ['stock_prep', 'license_gen'] },
-      { id: 'Logistics', name: '物流专员 (Logistics)', description: '负责发货与物流跟踪', isSystem: true, permissions: ['shipping_manage'] },
+      { id: 'Sales', name: '销售经理 (Sales)', description: '负责客户跟进与订单录入', isSystem: true, permissions: ['order_view_all', 'order_create', 'order_view_payment', 'order_view_completed', 'customer_view', 'opportunity_manage'] },
+      { id: 'Business', name: '商务经理 (Business)', description: '负责合同审批与收款确认', isSystem: true, permissions: ['order_view_pending_approval', 'order_view_pending_confirm', 'order_approve', 'payment_manage'] },
+      { id: 'Technical', name: '技术支持 (Technical)', description: '负责生产授权与安装包', isSystem: true, permissions: ['order_view_auth_confirm', 'order_view_stock_prep', 'stock_prep', 'license_gen'] },
+      { id: 'Logistics', name: '物流专员 (Logistics)', description: '负责发货与物流跟踪', isSystem: true, permissions: ['order_view_stock_prep', 'shipping_manage'] },
   ]);
 
   const [users, setUsers] = useState<User[]>([
@@ -307,8 +309,8 @@ function App() {
     { id: 'u3', accountId: '10000003', name: '王强 (Business)', email: 'wangqiang@nexorder.com', role: 'Business', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=WangQiang', departmentId: 'c3-d1' },
     { id: 'u4', accountId: '10000004', name: '赵敏 (Technical)', email: 'zhaomin@nexorder.com', role: 'Technical', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhaoMin', departmentId: 'root' },
     { id: 'u5', accountId: '10000005', name: '孙涛 (Logistics)', email: 'suntao@nexorder.com', role: 'Logistics', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=SunTao', departmentId: 'c3-d2' },
-    { id: 'u6', accountId: '10000006', name: '周杰 (Sales)', email: 'zhoujie@nexorder.com', role: 'Sales', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhouJie', departmentId: 'c2-d1' },
-    { id: 'u7', accountId: '10000007', name: '吴刚 (Sales)', email: 'wugang@nexorder.com', role: 'Sales', userType: 'Internal', status: 'Inactive', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=WuGang', departmentId: 'c2-d1' },
+    { id: 'u6', accountId: '10000006', name: '周杰 (Sales)', email: 'zhoujie@nexorder.com', role: 'Sales', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Felix', departmentId: 'c2-d1' },
+    { id: 'u7', accountId: '10000007', name: '吴刚 (Sales)', email: 'wugang@nexorder.com', role: 'Sales', userType: 'Internal', status: 'Inactive', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Aneka', departmentId: 'c2-d1' },
     { id: 'u8', accountId: '10000008', name: '郑华 (Finance)', email: 'zhenghua@nexorder.com', role: 'Business', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhengHua', departmentId: 'c3-d1' },
     { id: 'u9', accountId: '20000001', name: '陈总 (Partner)', email: 'chen@partner.com', role: 'Sales', userType: 'External', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ChenPartner', departmentId: '' },
   ]);
@@ -371,6 +373,16 @@ function App() {
   const [channels, setChannels] = useState<Channel[]>([
       { id: 'CH00000001', name: '神州数码', type: 'Distributor', level: 'Tier1', contactName: '刘总', contactPhone: '13888888888', email: 'liu@digitalchina.com', region: '全国', status: 'Active', agreementDate: '2023-01-01' },
       { id: 'CH00000002', name: '伟仕佳杰', type: 'Distributor', level: 'Tier1', contactName: '陈总', contactPhone: '13999999999', email: 'chen@vst.com', region: '全国', status: 'Active', agreementDate: '2023-02-15' },
+      { id: 'CH00000003', name: '中软国际', type: 'Distributor', level: 'Tier1', contactName: '王总', contactPhone: '13777777777', email: 'wang@chinasoft.com', region: '华东', status: 'Active', agreementDate: '2023-03-10' },
+      { id: 'CH00000004', name: '软通动力', type: 'Distributor', level: 'Tier2', contactName: '李总', contactPhone: '13666666666', email: 'li@isoftstone.com', region: '华南', status: 'Active', agreementDate: '2023-04-20' },
+      { id: 'CH00000005', name: '东华软件', type: 'Reseller', level: 'Tier2', contactName: '张总', contactPhone: '13555555555', email: 'zhang@dhcc.com', region: '华北', status: 'Active', agreementDate: '2023-05-12' },
+      { id: 'CH00000006', name: '太极股份', type: 'Reseller', level: 'Tier2', contactName: '孙总', contactPhone: '13444444444', email: 'sun@taiji.com', region: '华北', status: 'Active', agreementDate: '2023-06-18' },
+      { id: 'CH00000007', name: '汉得信息', type: 'Reseller', level: 'Tier3', contactName: '周总', contactPhone: '13333333333', email: 'zhou@hand-china.com', region: '华东', status: 'Active', agreementDate: '2023-07-25' },
+      { id: 'CH00000008', name: '用友网络', type: 'Distributor', level: 'Tier1', contactName: '吴总', contactPhone: '13222222222', email: 'wu@yonyou.com', region: '全国', status: 'Active', agreementDate: '2023-08-30' },
+      { id: 'CH00000009', name: '金蝶软件', type: 'Distributor', level: 'Tier1', contactName: '郑总', contactPhone: '13111111111', email: 'zheng@kingdee.com', region: '全国', status: 'Active', agreementDate: '2023-09-15' },
+      { id: 'CH00000010', name: '浪潮软件', type: 'Distributor', level: 'Tier1', contactName: '冯总', contactPhone: '13000000000', email: 'feng@inspur.com', region: '华北', status: 'Active', agreementDate: '2023-10-05' },
+      { id: 'CH00000011', name: '北明软件', type: 'Reseller', level: 'Tier2', contactName: '褚总', contactPhone: '18999999999', email: 'chu@bmsoft.com', region: '华南', status: 'Active', agreementDate: '2023-11-20' },
+      { id: 'CH00000012', name: '诚迈科技', type: 'Reseller', level: 'Tier3', contactName: '卫总', contactPhone: '18888888888', email: 'wei@archermind.com', region: '华东', status: 'Active', agreementDate: '2023-12-10' },
   ]);
 
   // --- 7. Opportunities Mock Data (Enhanced) ---
@@ -379,9 +391,57 @@ function App() {
       if (customers.length === 0) return;
       
       const opps: Opportunity[] = [
-          { id: 'OPP001', name: '华兴科技-WPS 365 年度采购', customerId: customers[0]?.id, customerName: customers[0]?.companyName, expectedRevenue: 500000, stage: 'Negotiation', probability: 80, closeDate: '2024-06-30', ownerId: 'u2', ownerName: '李娜', createdAt: '2024-01-10' },
-          { id: 'OPP002', name: '信达发展-信创终端替换一期', customerId: customers[1]?.id, customerName: customers[1]?.companyName, expectedRevenue: 850000, stage: 'Proposal', probability: 60, closeDate: '2024-07-15', ownerId: 'u6', ownerName: '周杰', createdAt: '2024-02-05' },
-          { id: 'OPP003', name: '中科网络-私有云扩容', customerId: customers[2]?.id, customerName: customers[2]?.companyName, expectedRevenue: 300000, stage: 'Qualification', probability: 40, closeDate: '2024-08-01', ownerId: 'u2', ownerName: '李娜', createdAt: '2024-03-12' },
+          { 
+            id: 'OPP001', 
+            crmId: 'PR-00199303',
+            name: '华兴科技-WPS 365 年度采购', 
+            customerId: customers[0]?.id, 
+            customerName: customers[0]?.companyName, 
+            productType: '数科OFD用户端/随机数量授权 linux版云混合Lic（X+L）（政府）/年授权（1+L）',
+            expectedRevenue: 500000, 
+            amount: 1000000,
+            finalUserRevenue: 2000000,
+            stage: 'Negotiation', 
+            probability: 80,
+            closeDate: '2026-03-20', 
+            ownerId: 'u2', 
+            ownerName: '李娜', 
+            createdAt: '2024-01-10' 
+          },
+          { 
+            id: 'OPP002', 
+            crmId: 'PR-00199304',
+            name: '信达发展-信创终端替换一期', 
+            customerId: customers[1]?.id, 
+            customerName: customers[1]?.companyName, 
+            productType: 'WPS Office 专业版/永久授权',
+            expectedRevenue: 850000, 
+            amount: 850000,
+            finalUserRevenue: 1200000,
+            stage: 'Proposal', 
+            probability: 60,
+            closeDate: '2024-07-15', 
+            ownerId: 'u6', 
+            ownerName: '周杰', 
+            createdAt: '2024-02-05' 
+          },
+          { 
+            id: 'OPP003', 
+            crmId: 'PR-00199305',
+            name: '中科网络-私有云扩容', 
+            customerId: customers[2]?.id, 
+            customerName: customers[2]?.companyName, 
+            productType: 'WPS 365 私有云/年度订阅',
+            expectedRevenue: 300000, 
+            amount: 300000,
+            finalUserRevenue: 450000,
+            stage: 'Qualification', 
+            probability: 40,
+            closeDate: '2024-08-01', 
+            ownerId: 'u2', 
+            ownerName: '李娜', 
+            createdAt: '2024-03-12' 
+          },
           { id: 'OPP004', name: '远洋贸易-海外版部署咨询', customerId: customers[3]?.id, customerName: customers[3]?.companyName, expectedRevenue: 120000, stage: 'New', probability: 10, closeDate: '2024-12-31', ownerId: 'u2', ownerName: '李娜', createdAt: '2024-04-10' },
           { id: 'OPP005', name: '天行实业-全员订阅升级', customerId: customers[4]?.id, customerName: customers[4]?.companyName, expectedRevenue: 2000000, stage: 'Closed Won', probability: 100, closeDate: '2024-05-20', ownerId: 'u6', ownerName: '周杰', createdAt: '2023-11-20' },
           { id: 'OPP006', name: '博大教育-校园正版化', customerId: customers[5]?.id, customerName: customers[5]?.companyName, expectedRevenue: 450000, stage: 'Negotiation', probability: 75, closeDate: '2024-09-10', ownerId: 'u1', ownerName: '张伟', createdAt: '2024-01-22' },
@@ -528,10 +588,19 @@ function App() {
 
             // Determine detailed stock flags based on overall status
             const isCompleted = status === OrderStatus.SHIPPED || status === OrderStatus.DELIVERED;
-            const isAuthConfirmed = isCompleted || (status === OrderStatus.PROCESSING_PROD && Math.random() > 0.5);
-            const isPackageConfirmed = isCompleted || (status === OrderStatus.PROCESSING_PROD && Math.random() > 0.5);
-            const isCDBurned = isCompleted || (isPackageConfirmed && Math.random() > 0.5);
-            const isShippingConfirmed = isCompleted || (status === OrderStatus.PROCESSING_PROD && Math.random() > 0.3);
+            let isAuthConfirmed = isCompleted;
+            let isPackageConfirmed = isCompleted;
+            let isShippingConfirmed = isCompleted;
+            let isCDBurned = isCompleted;
+
+            if (status === OrderStatus.PROCESSING_PROD) {
+                // Randomly assign progress for variety
+                const progress = Math.floor(Math.random() * 5); // 0: Auth, 1: Pkg, 2: Ship, 3: CD, 4: Done (but still in PROCESSING_PROD)
+                if (progress >= 1) isAuthConfirmed = true;
+                if (progress >= 2) isPackageConfirmed = true;
+                if (progress >= 3) isShippingConfirmed = true;
+                if (progress >= 4) isCDBurned = true;
+            }
 
             mockOrders.push({
                 id: `S${i.toString().padStart(8, '0')}`,
@@ -543,7 +612,7 @@ function App() {
                 customerIndustry: customer.industry,
                 customerRegion: customer.region,
 
-                buyerType: buyerType as any,
+                buyerType: buyerType as BuyerType,
                 buyerId,
                 source,
                 date: dateStr,
@@ -572,8 +641,11 @@ function App() {
                 approvalRecords: approvalRecords.reverse(),
                 salesRepId: salesRep?.id,
                 salesRepName: salesRep?.name,
-                businessManagerName: '王强',
+                businessManagerId: 'u3',
+                businessManagerName: '王强 (Business)',
                 invoiceInfo,
+                smsOriginalOrderId: i % 5 === 0 ? `S00713${162 + i}` : undefined,
+                saasOriginalOrderId: i % 5 === 0 ? `P2026030319575500000${i % 10}` : undefined,
                 acceptanceInfo: { 
                     contactName: customer.contacts[0]?.name || 'Unknown', 
                     contactPhone: customer.contacts[0]?.phone || '',
@@ -609,7 +681,7 @@ function App() {
     <Router>
       <Layout currentUser={currentUser} users={users} setCurrentUser={setCurrentUser}>
         <Routes>
-          <Route path="/" element={<Navigate to="/orders" replace />} />
+          <Route path="/" element={<Dashboard />} />
           
           <Route path="/product-center" element={<ProductCenter products={products} />} />
           <Route path="/catalog/:id/preview" element={<ProductPreview products={products} />} />
@@ -635,6 +707,7 @@ function App() {
                 departments={departments}
                 opportunities={opportunities}
                 channels={channels}
+                roles={roles}
             />
           } />
           <Route path="/orders/:id" element={
@@ -658,7 +731,15 @@ function App() {
           <Route path="/opportunities" element={<OpportunityManager opportunities={opportunities} setOpportunities={setOpportunities} customers={customers} />} />
           <Route path="/opportunities/:id" element={<OpportunityDetails opportunities={opportunities} setOpportunities={setOpportunities} customers={customers} />} />
 
-          <Route path="/operations" element={<OperationsManager />} />
+          <Route path="/leads" element={<LeadsManager />} />
+
+          <Route path="/wps-ops" element={
+            <div className="p-12 text-center">
+              <Activity className="w-16 h-16 text-blue-500 mx-auto mb-4 opacity-20" />
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">WPS 运营中心</h2>
+              <p className="text-gray-500 mt-2">该模块正在建设中，敬请期待。</p>
+            </div>
+          } />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
