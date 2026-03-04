@@ -170,7 +170,6 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ departments, 
       <div className="flex justify-between items-center shrink-0 mb-6">
         <div>
             <h1 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight">组织架构管理</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">查看和管理公司的多级部门结构。</p>
         </div>
         <button 
           onClick={() => handleOpenModal()}

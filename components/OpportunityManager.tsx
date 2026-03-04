@@ -79,7 +79,6 @@ const OpportunityManager: React.FC<OpportunityManagerProps> = ({ opportunities, 
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">商机管理</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">追踪销售线索，管理销售漏斗与预测。</p>
             </div>
             <button onClick={() => setIsModalOpen(true)} className="bg-[#0071E3] dark:bg-[#FF2D55] text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 transition shadow-sm">
                 <Plus className="w-4 h-4" /> 新建商机

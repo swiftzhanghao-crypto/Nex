@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, Bell, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers } from 'lucide-react';
-import { User } from '../types';
+import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, Bell, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList } from 'lucide-react';
+import { User, RoleDefinition } from '../types';
 import WPSLogo from './WPSLogo';
 
 interface LayoutProps {
@@ -10,13 +10,14 @@ interface LayoutProps {
   currentUser: User;
   users: User[];
   setCurrentUser: (user: User) => void;
+  roles: RoleDefinition[];
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurrentUser }) => {
+const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurrentUser, roles }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [activeTopNav, setActiveTopNav] = useState<'DASHBOARD' | 'ORDER_CENTER' | 'PRODUCT_CENTER' | 'WPS_OPERATIONS' | 'SYSTEM_CONFIG' | 'LEADS_CENTER'>('DASHBOARD');
+  const [activeTopNav, setActiveTopNav] = useState<'DASHBOARD' | 'ORDER_CENTER' | 'PRODUCT_CENTER' | 'OPERATIONS_CENTER' | 'SYSTEM_CONFIG' | 'LEADS_CENTER'>('DASHBOARD');
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
         const saved = localStorage.getItem('theme');
@@ -46,8 +47,8 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
         setActiveTopNav('DASHBOARD');
     } else if (location.pathname.startsWith('/leads')) {
         setActiveTopNav('LEADS_CENTER');
-    } else if (location.pathname.startsWith('/wps-ops')) {
-        setActiveTopNav('WPS_OPERATIONS');
+    } else if (location.pathname.startsWith('/wps-ops') || location.pathname.startsWith('/ops')) {
+        setActiveTopNav('OPERATIONS_CENTER');
     } else if (location.pathname.startsWith('/organization') || location.pathname.startsWith('/users') || location.pathname.startsWith('/roles')) {
           setActiveTopNav('SYSTEM_CONFIG');
       } else if (location.pathname.startsWith('/products') || location.pathname.startsWith('/merchandises') || location.pathname.startsWith('/catalog') || location.pathname.startsWith('/product-center')) {
@@ -66,6 +67,19 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
   }, []);
 
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
+
+  const currentUserRole = roles.find(r => r.id === currentUser.role);
+  const permissions = currentUserRole?.permissions || [];
+  const hasPermission = (perm: string) => permissions.includes('all') || permissions.includes(perm);
+
+  const topNavItems = [
+      { id: 'DASHBOARD', label: '数据看板', path: '/', permissions: ['dashboard_view'] },
+      { id: 'ORDER_CENTER', label: '订单中心', path: '/orders', permissions: ['order_view_all', 'order_view_pending_approval', 'order_view_pending_confirm', 'order_view_auth_confirm', 'order_view_stock_prep', 'customer_view', 'opportunity_manage', 'channel_view'] },
+      { id: 'PRODUCT_CENTER', label: '商品中心', path: '/product-center', permissions: ['product_view', 'merchandise_view'] },
+      { id: 'LEADS_CENTER', label: '线索中心', path: '/leads', permissions: ['leads_view'] },
+      { id: 'OPERATIONS_CENTER', label: '运营中心', path: '/wps-ops', permissions: ['wps_ops_view'] },
+      { id: 'SYSTEM_CONFIG', label: '系统配置', path: '/organization', permissions: ['admin_view', 'user_manage', 'role_manage', 'org_manage'] }
+  ].filter(item => item.permissions.some(p => hasPermission(p)));
 
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
@@ -125,14 +139,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
 
               {/* Desktop Tabs */}
               <nav className="hidden md:flex items-center gap-1 ml-6">
-                  {[
-                      { id: 'DASHBOARD', label: '数据看板', path: '/' },
-                      { id: 'ORDER_CENTER', label: '订单中心', path: '/orders' },
-                      { id: 'PRODUCT_CENTER', label: '商品中心', path: '/product-center' },
-                      { id: 'LEADS_CENTER', label: '线索中心', path: '/leads' },
-                      { id: 'WPS_OPERATIONS', label: 'WPS运营', path: '/wps-ops' },
-                      { id: 'SYSTEM_CONFIG', label: '系统配置', path: '/organization' }
-                  ].map((item) => (
+                  {topNavItems.map((item) => (
                       <button 
                           key={item.id}
                           onClick={() => navigate(item.path)}
@@ -186,7 +193,6 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
                     <div className="absolute right-0 top-full mt-3 w-64 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-2xl rounded-2xl shadow-apple border border-gray-200/50 dark:border-white/10 p-2 z-50 animate-modal-enter origin-top-right">
                         <div className="px-3 py-2 border-b border-gray-100 dark:border-white/10 mb-1">
                             <p className="text-sm font-bold text-gray-900 dark:text-white">{currentUser.name}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{currentUser.email}</p>
                         </div>
                         <div className="max-h-64 overflow-y-auto custom-scrollbar">
                             <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">切换账号</div>
@@ -204,7 +210,6 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
                                     <img src={user.avatar} className="w-6 h-6 rounded-full" alt="" />
                                     <div className="flex-1 min-w-0">
                                         <div className={`text-xs font-medium truncate ${currentUser.id === user.id ? 'text-[#0071E3] dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>{user.name}</div>
-                                        <div className="text-[10px] text-gray-400">{user.role}</div>
                                     </div>
                                     {currentUser.id === user.id && <div className="w-1.5 h-1.5 rounded-full bg-[#0071E3] dark:bg-[#0A84FF]"></div>}
                                 </button>
@@ -279,13 +284,26 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
                         </>
                     )}
 
-                    {activeTopNav === 'WPS_OPERATIONS' && (
+                    {activeTopNav === 'OPERATIONS_CENTER' && (
                         <>
                             <div className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2 mt-1 transition-all duration-300 ${isCollapsed ? 'lg:opacity-0 lg:h-0 lg:mb-0 lg:mt-0 lg:overflow-hidden' : ''}`}>运营中心</div>
-                            <div className="px-4 py-8 text-center">
-                                <Activity className="w-12 h-12 text-gray-200 dark:text-white/5 mx-auto mb-3" />
-                                <p className="text-xs text-gray-400">WPS 运营中心正在建设中</p>
-                            </div>
+                            <NavItem to="/ops/dashboard" icon={BarChart3} label="指标看板" />
+                            <NavItem to="/ops/enterprise" icon={Building2} label="企业管理" />
+                            <NavItem to="/ops/crm" icon={Users} label="CRM" />
+                            <NavItem to="/ops/orders" icon={ShoppingCart} label="订单管理" />
+                            <NavItem to="/ops/ops-mgmt" icon={Activity} label="运营管理" />
+                            <NavItem to="/ops/strategy" icon={Target} label="策略管理" />
+                            <NavItem to="/ops/menu-mgmt" icon={LayoutList} label="企业后台菜单管理" />
+                            <NavItem to="/ops/client" icon={Monitor} label="企业专属客户端" />
+                            <NavItem to="/ops/stats" icon={PieChart} label="数据统计" />
+                            <NavItem to="/ops/portrait" icon={Contact2} label="企业画像" />
+                            <NavItem to="/ops/efficiency" icon={Zap} label="效率平台" />
+                            <NavItem to="/ops/logs" icon={FileText} label="日志管理" />
+                            <NavItem to="/ops/isolation" icon={ArrowUpCircle} label="升级隔离" />
+                            <NavItem to="/ops/settings" icon={Settings} label="系统设置" />
+                            <NavItem to="/ops/migration" icon={Database} label="数据迁移" />
+                            <NavItem to="/ops/connector" icon={LinkIcon} label="连接器" />
+                            <NavItem to="/ops/connector-admin" icon={Settings2} label="连接器-管理后台" />
                         </>
                     )}
 

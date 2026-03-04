@@ -16,7 +16,6 @@ const LeadsManager: React.FC = () => {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">线索中心</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">管理并跟进潜在的业务机会与客户线索。</p>
         </div>
         
         <div className="flex items-center gap-3 w-full lg:w-auto">

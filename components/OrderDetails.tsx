@@ -421,9 +421,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                   <div>
                       <div className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1">
                           {record.operatorName} 
-                          <span className="text-[10px] font-normal text-gray-500 bg-white dark:bg-white/10 px-1.5 rounded-md border border-gray-100 dark:border-white/5">
-                              {role}
-                          </span>
                       </div>
                       <div className="text-[10px] text-gray-400 font-mono mt-0.5">{new Date(record.timestamp).toLocaleString()}</div>
                   </div>

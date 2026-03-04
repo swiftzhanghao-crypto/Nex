@@ -128,12 +128,13 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   // Column Configuration State
   const [isColumnConfigOpen, setIsColumnConfigOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([
-      'id', 'customer', 'products', 'sales', 'businessManager', 'department', 'source', 'buyerType', 'date', 'status', 'paymentStatus', 'stockStatus', 'total', 'delivery', 'action'
+      'id', 'customer', 'buyer', 'products', 'sales', 'businessManager', 'department', 'source', 'buyerType', 'date', 'status', 'paymentStatus', 'stockStatus', 'total', 'delivery', 'action'
   ]);
 
   const allColumns = [
       { id: 'id', label: '订单编号' },
-      { id: 'customer', label: '客户 / 买方' },
+      { id: 'customer', label: '客户名称' },
+      { id: 'buyer', label: '买方名称' },
       { id: 'products', label: '商品信息' },
       { id: 'sales', label: '销售人员' },
       { id: 'businessManager', label: '商务人员' },
@@ -287,9 +288,9 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
 
   // Exception Statuses
   const exceptionStatuses = [
-      { id: OrderStatus.REFUND_PENDING, label: '退款中', desc: '处理客户退款申请', icon: RefreshCcw },
-      { id: OrderStatus.REFUNDED, label: '已退款', desc: '退款流程已完成', icon: AlertCircle },
-      { id: OrderStatus.CANCELLED, label: '已取消', desc: '订单已作废', icon: X },
+      { id: OrderStatus.REFUND_PENDING, label: '退款中', desc: '处理客户退款申请', icon: RefreshCcw, permission: 'order_view_refund_pending' },
+      { id: OrderStatus.REFUNDED, label: '已退款', desc: '退款流程已完成', icon: AlertCircle, permission: 'order_view_refunded' },
+      { id: OrderStatus.CANCELLED, label: '已取消', desc: '订单已作废', icon: X, permission: 'order_view_cancelled' },
   ];
 
   // --- Handle Renewal Initialization ---
@@ -752,7 +753,6 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
       <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
         <div className="w-full lg:w-auto">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">订单中心</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">管理系统中的所有销售订单及交付流程。</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
@@ -850,7 +850,6 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                         </span>
                     </div>
                     <div className={`text-[11px] font-bold ${filterStatus === 'All' ? 'text-white' : 'text-gray-900 dark:text-white'}`}>全部订单</div>
-                    <div className={`text-[9px] mt-0.5 truncate ${filterStatus === 'All' ? 'text-white/70' : 'text-gray-400'}`}>系统内所有订单</div>
                     {filterStatus === 'All' && (
                         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-1 bg-white rounded-full"></div>
                     )}
@@ -887,7 +886,6 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                             )}
                         </div>
                         <div className={`text-[11px] font-bold ${isActive ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{step.label}</div>
-                        <div className={`text-[9px] mt-0.5 truncate ${isActive ? 'text-white/70' : 'text-gray-400'}`}>{step.desc}</div>
                         {isActive && (
                             <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-1 bg-white rounded-full"></div>
                         )}
@@ -895,7 +893,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                 );
             })}
 
-            {exceptionStatuses.map((step) => {
+            {exceptionStatuses.filter(step => hasPermission(step.permission)).map((step) => {
                 const isActive = filterStatus === step.id;
                 const count = orders.filter(o => o.status === step.id).length;
                 return (
@@ -919,7 +917,6 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                             )}
                         </div>
                         <div className={`text-[11px] font-bold ${isActive ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{step.label}</div>
-                        <div className={`text-[9px] mt-0.5 truncate ${isActive ? 'text-white/70' : 'text-gray-400'}`}>{step.desc}</div>
                         {isActive && (
                             <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-1 bg-white rounded-full"></div>
                         )}
@@ -971,16 +968,25 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                         >
                             {order.customerName}
                         </div>
-                        {order.buyerType === 'Channel' && (
+                      </td>
+                  )}
+                  {visibleColumns.includes('buyer') && (
+                      <td className="p-5 max-w-[200px]">
+                        {order.buyerType === 'Channel' ? (
                             <div 
-                                className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-0.5 hover:underline cursor-pointer truncate"
+                                className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer truncate"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     const channelId = order.buyerId || channels.find(c => c.name === order.buyerName)?.id;
                                     if (channelId) navigate(`/channels/${channelId}`);
                                 }}
+                                title={order.buyerName}
                             >
-                                代理: {order.buyerName}
+                                {order.buyerName}
+                            </div>
+                        ) : (
+                            <div className="text-sm text-gray-500 dark:text-gray-400 truncate" title={order.customerName}>
+                                {order.customerName}
                             </div>
                         )}
                       </td>
@@ -1038,7 +1044,6 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                       </div>
                                       <div className="flex flex-col">
                                           <span className="font-bold text-gray-900 dark:text-white text-xs group-hover/user:text-blue-600 transition-colors">{order.salesRepName || '未分配'}</span>
-                                          <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{user?.email || '-'}</span>
                                       </div>
                                   </div>
                               );
@@ -1072,7 +1077,6 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                       </div>
                                       <div className="flex flex-col">
                                           <span className="font-bold text-gray-900 dark:text-white text-xs group-hover/user:text-blue-600 transition-colors">{order.businessManagerName || '未分配'}</span>
-                                          <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{user?.email || '-'}</span>
                                       </div>
                                   </div>
                               );
@@ -1847,10 +1851,8 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                     </div>
                     <div>
                         <h4 className="text-xl font-bold text-gray-900 dark:text-white">{detailsUser.name}</h4>
-                        <p className="text-sm text-gray-500 mt-1">{detailsUser.email}</p>
                     </div>
                     <div className="flex gap-2">
-                        <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-xs font-bold border border-blue-100 dark:border-blue-800/30">{detailsUser.role}</span>
                         <span className="px-3 py-1 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 rounded-full text-xs font-bold border border-gray-200 dark:border-white/20">{detailsUser.userType}</span>
                     </div>
                 </div>

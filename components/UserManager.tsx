@@ -131,6 +131,9 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, departments,
               { id: 'order_view_stock_prep', label: '查看备货流程' },
               { id: 'order_view_payment', label: '查看待支付' },
               { id: 'order_view_completed', label: '查看已完成' },
+              { id: 'order_view_refund_pending', label: '查看退款中' },
+              { id: 'order_view_refunded', label: '查看已退款' },
+              { id: 'order_view_cancelled', label: '查看已取消' },
               { id: 'order_create', label: '创建订单' },
               { id: 'order_approve', label: '审批订单' },
           ]
@@ -443,9 +446,6 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, departments,
             <h1 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight">
                 {activeTab === 'USERS' ? '用户管理' : '角色管理'}
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                {activeTab === 'USERS' ? '管理系统账号、人员类型及部门归属。' : '配置系统角色及对应的数据/功能权限。'}
-            </p>
         </div>
       </div>
 
@@ -470,7 +470,6 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, departments,
                           <tr>
                               <th className="p-4 pl-6">用户</th>
                               <th className="p-4">账号ID</th>
-                              <th className="p-4">角色</th>
                               <th className="p-4">部门</th>
                               <th className="p-4">类型</th>
                               <th className="p-4">状态</th>
@@ -480,7 +479,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, departments,
                       <tbody className="divide-y divide-gray-100 dark:divide-white/5 text-sm">
                           {currentUsers.map(user => (
                               <tr key={user.id} className="group hover:bg-gray-50 dark:hover:bg-white/5 transition">
-                                  <td className="p-4 pl-6">
+                                   <td className="p-4 pl-6">
                                       <div className="flex items-center gap-3">
                                           <img 
                                               src={user.avatar} 
@@ -495,7 +494,6 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, departments,
                                       </div>
                                   </td>
                                   <td className="p-4 font-mono text-gray-600 dark:text-gray-300">{user.accountId}</td>
-                                  <td className="p-4"><span className="px-2 py-1 bg-gray-100 dark:bg-white/10 rounded-md text-xs font-medium dark:text-gray-300">{getRoleName(user.role)}</span></td>
                                   <td className="p-4 text-gray-600 dark:text-gray-300">{getDepartmentName(user.departmentId)}</td>
                                   <td className="p-4"><span className={`px-2 py-0.5 text-[10px] rounded border ${user.userType === 'Internal' ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400' : 'bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-900/30 dark:border-orange-800 dark:text-orange-400'}`}>{user.userType}</span></td>
                                   <td className="p-4"><span className={`flex items-center gap-1.5 text-xs font-medium ${user.status === 'Active' ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`}><div className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-green-500' : 'bg-gray-400'}`}></div> {user.status}</span></td>

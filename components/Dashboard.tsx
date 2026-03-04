@@ -49,7 +49,6 @@ const Dashboard: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">数据看板</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">实时监控业务指标与销售趋势</p>
         </div>
         <div className="flex items-center gap-2 bg-white dark:bg-[#1C1C1E] p-1 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm">
           <button className="px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-lg">今日</button>

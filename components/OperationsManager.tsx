@@ -142,7 +142,6 @@ const OperationsManager: React.FC<OperationsManagerProps> = ({ orders, setOrders
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">备货处理</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">处理待备货订单的授权、安装包及物流准备工作。</p>
         </div>
         
         <div className="flex items-center gap-3 w-full lg:w-auto">

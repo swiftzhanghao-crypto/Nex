@@ -297,22 +297,22 @@ function App() {
   // --- 3. Users and Roles ---
   const [roles, setRoles] = useState<RoleDefinition[]>([
       { id: 'Admin', name: '管理员 (Admin)', description: '拥有系统所有权限', isSystem: true, permissions: ['all'] },
-      { id: 'Sales', name: '销售经理 (Sales)', description: '负责客户跟进与订单录入', isSystem: true, permissions: ['order_view_all', 'order_create', 'order_view_payment', 'order_view_completed', 'customer_view', 'opportunity_manage'] },
-      { id: 'Business', name: '商务经理 (Business)', description: '负责合同审批与收款确认', isSystem: true, permissions: ['order_view_pending_approval', 'order_view_pending_confirm', 'order_approve', 'payment_manage'] },
-      { id: 'Technical', name: '技术支持 (Technical)', description: '负责生产授权与安装包', isSystem: true, permissions: ['order_view_auth_confirm', 'order_view_stock_prep', 'stock_prep', 'license_gen'] },
-      { id: 'Logistics', name: '物流专员 (Logistics)', description: '负责发货与物流跟踪', isSystem: true, permissions: ['order_view_stock_prep', 'shipping_manage'] },
+      { id: 'Sales', name: '销售经理 (Sales)', description: '负责客户跟进与订单录入', isSystem: true, permissions: ['dashboard_view', 'order_view_all', 'order_create', 'order_view_payment', 'order_view_completed', 'order_view_refund_pending', 'order_view_refunded', 'order_view_cancelled', 'customer_view', 'opportunity_manage', 'product_view', 'leads_view'] },
+      { id: 'Business', name: '商务经理 (Business)', description: '负责合同审批与收款确认', isSystem: true, permissions: ['dashboard_view', 'order_view_pending_approval', 'order_view_pending_confirm', 'order_approve', 'payment_manage', 'product_view', 'order_view_refund_pending', 'order_view_refunded', 'order_view_cancelled'] },
+      { id: 'Technical', name: '技术支持 (Technical)', description: '负责生产授权与安装包', isSystem: true, permissions: ['dashboard_view', 'order_view_auth_confirm', 'order_view_stock_prep', 'stock_prep', 'license_gen', 'product_view', 'wps_ops_view'] },
+      { id: 'Logistics', name: '物流专员 (Logistics)', description: '负责发货与物流跟踪', isSystem: true, permissions: ['dashboard_view', 'order_view_stock_prep', 'shipping_manage'] },
   ]);
 
   const [users, setUsers] = useState<User[]>([
-    { id: 'u1', accountId: '10000001', name: '张伟 (Admin)', email: 'zhangwei@nexorder.com', role: 'Admin', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhangWei', departmentId: 'root' },
-    { id: 'u2', accountId: '10000002', name: '李娜 (Sales)', email: 'lina@nexorder.com', role: 'Sales', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=LiNa', departmentId: 'c2-d1-r1-t1' },
-    { id: 'u3', accountId: '10000003', name: '王强 (Business)', email: 'wangqiang@nexorder.com', role: 'Business', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=WangQiang', departmentId: 'c3-d1' },
-    { id: 'u4', accountId: '10000004', name: '赵敏 (Technical)', email: 'zhaomin@nexorder.com', role: 'Technical', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhaoMin', departmentId: 'root' },
-    { id: 'u5', accountId: '10000005', name: '孙涛 (Logistics)', email: 'suntao@nexorder.com', role: 'Logistics', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=SunTao', departmentId: 'c3-d2' },
-    { id: 'u6', accountId: '10000006', name: '周杰 (Sales)', email: 'zhoujie@nexorder.com', role: 'Sales', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Felix', departmentId: 'c2-d1' },
-    { id: 'u7', accountId: '10000007', name: '吴刚 (Sales)', email: 'wugang@nexorder.com', role: 'Sales', userType: 'Internal', status: 'Inactive', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Aneka', departmentId: 'c2-d1' },
-    { id: 'u8', accountId: '10000008', name: '郑华 (Finance)', email: 'zhenghua@nexorder.com', role: 'Business', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhengHua', departmentId: 'c3-d1' },
-    { id: 'u9', accountId: '20000001', name: '陈总 (Partner)', email: 'chen@partner.com', role: 'Sales', userType: 'External', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ChenPartner', departmentId: '' },
+    { id: 'u1', accountId: '10000001', name: '张伟 (Admin)', email: 'zhangwei@wps.cn', role: 'Admin', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhangWei', departmentId: 'root' },
+    { id: 'u2', accountId: '10000002', name: '李娜 (Sales)', email: 'lina@wps.cn', role: 'Sales', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=LiNa', departmentId: 'c2-d1-r1-t1' },
+    { id: 'u3', accountId: '10000003', name: '王强 (Business)', email: 'wangqiang@wps.cn', role: 'Business', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=WangQiang', departmentId: 'c3-d1' },
+    { id: 'u4', accountId: '10000004', name: '赵敏 (Technical)', email: 'zhaomin@wps.cn', role: 'Technical', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhaoMin', departmentId: 'root' },
+    { id: 'u5', accountId: '10000005', name: '孙涛 (Logistics)', email: 'suntao@wps.cn', role: 'Logistics', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=SunTao', departmentId: 'c3-d2' },
+    { id: 'u6', accountId: '10000006', name: '周杰 (Sales)', email: 'zhoujie@wps.cn', role: 'Sales', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Felix', departmentId: 'c2-d1' },
+    { id: 'u7', accountId: '10000007', name: '吴刚 (Sales)', email: 'wugang@wps.cn', role: 'Sales', userType: 'Internal', status: 'Inactive', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Aneka', departmentId: 'c2-d1' },
+    { id: 'u8', accountId: '10000008', name: '郑华 (Finance)', email: 'zhenghua@wps.cn', role: 'Business', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhengHua', departmentId: 'c3-d1' },
+    { id: 'u9', accountId: '20000001', name: '陈总 (Partner)', email: 'chen@wps.cn', role: 'Sales', userType: 'External', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ChenPartner', departmentId: '' },
   ]);
   const [currentUser, setCurrentUser] = useState<User>(users[0]);
 
@@ -371,18 +371,18 @@ function App() {
 
   // --- 6. Channels Mock Data ---
   const [channels, setChannels] = useState<Channel[]>([
-      { id: 'CH00000001', name: '神州数码', type: 'Distributor', level: 'Tier1', contactName: '刘总', contactPhone: '13888888888', email: 'liu@digitalchina.com', region: '全国', status: 'Active', agreementDate: '2023-01-01' },
-      { id: 'CH00000002', name: '伟仕佳杰', type: 'Distributor', level: 'Tier1', contactName: '陈总', contactPhone: '13999999999', email: 'chen@vst.com', region: '全国', status: 'Active', agreementDate: '2023-02-15' },
-      { id: 'CH00000003', name: '中软国际', type: 'Distributor', level: 'Tier1', contactName: '王总', contactPhone: '13777777777', email: 'wang@chinasoft.com', region: '华东', status: 'Active', agreementDate: '2023-03-10' },
-      { id: 'CH00000004', name: '软通动力', type: 'Distributor', level: 'Tier2', contactName: '李总', contactPhone: '13666666666', email: 'li@isoftstone.com', region: '华南', status: 'Active', agreementDate: '2023-04-20' },
-      { id: 'CH00000005', name: '东华软件', type: 'Reseller', level: 'Tier2', contactName: '张总', contactPhone: '13555555555', email: 'zhang@dhcc.com', region: '华北', status: 'Active', agreementDate: '2023-05-12' },
-      { id: 'CH00000006', name: '太极股份', type: 'Reseller', level: 'Tier2', contactName: '孙总', contactPhone: '13444444444', email: 'sun@taiji.com', region: '华北', status: 'Active', agreementDate: '2023-06-18' },
-      { id: 'CH00000007', name: '汉得信息', type: 'Reseller', level: 'Tier3', contactName: '周总', contactPhone: '13333333333', email: 'zhou@hand-china.com', region: '华东', status: 'Active', agreementDate: '2023-07-25' },
-      { id: 'CH00000008', name: '用友网络', type: 'Distributor', level: 'Tier1', contactName: '吴总', contactPhone: '13222222222', email: 'wu@yonyou.com', region: '全国', status: 'Active', agreementDate: '2023-08-30' },
-      { id: 'CH00000009', name: '金蝶软件', type: 'Distributor', level: 'Tier1', contactName: '郑总', contactPhone: '13111111111', email: 'zheng@kingdee.com', region: '全国', status: 'Active', agreementDate: '2023-09-15' },
-      { id: 'CH00000010', name: '浪潮软件', type: 'Distributor', level: 'Tier1', contactName: '冯总', contactPhone: '13000000000', email: 'feng@inspur.com', region: '华北', status: 'Active', agreementDate: '2023-10-05' },
-      { id: 'CH00000011', name: '北明软件', type: 'Reseller', level: 'Tier2', contactName: '褚总', contactPhone: '18999999999', email: 'chu@bmsoft.com', region: '华南', status: 'Active', agreementDate: '2023-11-20' },
-      { id: 'CH00000012', name: '诚迈科技', type: 'Reseller', level: 'Tier3', contactName: '卫总', contactPhone: '18888888888', email: 'wei@archermind.com', region: '华东', status: 'Active', agreementDate: '2023-12-10' },
+      { id: 'CH00000001', name: '神州数码', type: 'Distributor', level: 'Tier1', contactName: '刘总', contactPhone: '13888888888', email: 'liu@wps.cn', region: '全国', status: 'Active', agreementDate: '2023-01-01' },
+      { id: 'CH00000002', name: '伟仕佳杰', type: 'Distributor', level: 'Tier1', contactName: '陈总', contactPhone: '13999999999', email: 'chen@wps.cn', region: '全国', status: 'Active', agreementDate: '2023-02-15' },
+      { id: 'CH00000003', name: '中软国际', type: 'Distributor', level: 'Tier1', contactName: '王总', contactPhone: '13777777777', email: 'wang@wps.cn', region: '华东', status: 'Active', agreementDate: '2023-03-10' },
+      { id: 'CH00000004', name: '软通动力', type: 'Distributor', level: 'Tier2', contactName: '李总', contactPhone: '13666666666', email: 'li@wps.cn', region: '华南', status: 'Active', agreementDate: '2023-04-20' },
+      { id: 'CH00000005', name: '东华软件', type: 'Reseller', level: 'Tier2', contactName: '张总', contactPhone: '13555555555', email: 'zhang@wps.cn', region: '华北', status: 'Active', agreementDate: '2023-05-12' },
+      { id: 'CH00000006', name: '太极股份', type: 'Reseller', level: 'Tier2', contactName: '孙总', contactPhone: '13444444444', email: 'sun@wps.cn', region: '华北', status: 'Active', agreementDate: '2023-06-18' },
+      { id: 'CH00000007', name: '汉得信息', type: 'Reseller', level: 'Tier3', contactName: '周总', contactPhone: '13333333333', email: 'zhou@wps.cn', region: '华东', status: 'Active', agreementDate: '2023-07-25' },
+      { id: 'CH00000008', name: '用友网络', type: 'Distributor', level: 'Tier1', contactName: '吴总', contactPhone: '13222222222', email: 'wu@wps.cn', region: '全国', status: 'Active', agreementDate: '2023-08-30' },
+      { id: 'CH00000009', name: '金蝶软件', type: 'Distributor', level: 'Tier1', contactName: '郑总', contactPhone: '13111111111', email: 'zheng@wps.cn', region: '全国', status: 'Active', agreementDate: '2023-09-15' },
+      { id: 'CH00000010', name: '浪潮软件', type: 'Distributor', level: 'Tier1', contactName: '冯总', contactPhone: '13000000000', email: 'feng@wps.cn', region: '华北', status: 'Active', agreementDate: '2023-10-05' },
+      { id: 'CH00000011', name: '北明软件', type: 'Reseller', level: 'Tier2', contactName: '褚总', contactPhone: '18999999999', email: 'chu@wps.cn', region: '华南', status: 'Active', agreementDate: '2023-11-20' },
+      { id: 'CH00000012', name: '诚迈科技', type: 'Reseller', level: 'Tier3', contactName: '卫总', contactPhone: '18888888888', email: 'wei@wps.cn', region: '华东', status: 'Active', agreementDate: '2023-12-10' },
   ]);
 
   // --- 7. Opportunities Mock Data (Enhanced) ---
@@ -679,7 +679,7 @@ function App() {
 
   return (
     <Router>
-      <Layout currentUser={currentUser} users={users} setCurrentUser={setCurrentUser}>
+      <Layout currentUser={currentUser} users={users} setCurrentUser={setCurrentUser} roles={roles}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           
