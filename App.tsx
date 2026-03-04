@@ -603,7 +603,7 @@ function App() {
             }
 
             mockOrders.push({
-                id: `S${i.toString().padStart(8, '0')}`,
+                id: `S${date.getFullYear().toString().slice(-2)}${(date.getMonth()+1).toString().padStart(2,'0')}${date.getDate().toString().padStart(2,'0')}${Math.floor(Math.random() * 1e12).toString().padStart(12,'0')}`,
                 customerId: customer.id,
                 customerName: customer.companyName,
                 // Snapshot Data

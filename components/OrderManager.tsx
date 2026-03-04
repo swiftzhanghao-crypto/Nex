@@ -352,64 +352,53 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   const canCreateOrder = currentUser.role === 'Admin' || currentUser.role === 'Sales';
 
   const getStatusBadge = (status: OrderStatus) => {
-    let className = '';
     const text = statusMap[status] || status;
+    let className = '';
+    let dotColor = '';
     switch (status) {
-      case OrderStatus.PENDING_PAYMENT: className = 'unified-tag-gray'; break;
-      case OrderStatus.PENDING_APPROVAL: className = 'unified-tag-orange'; break;
-      case OrderStatus.PENDING_CONFIRM: className = 'unified-tag-orange'; break;
-      case OrderStatus.PROCESSING_PROD: className = 'unified-tag-blue'; break;
-      case OrderStatus.SHIPPED: className = 'unified-tag-indigo'; break;
-      case OrderStatus.DELIVERED: className = 'unified-tag-green'; break;
-      case OrderStatus.CANCELLED: className = 'unified-tag-red'; break;
-      case OrderStatus.REFUND_PENDING: className = 'unified-tag-orange'; break;
-      case OrderStatus.REFUNDED: className = 'unified-tag-red'; break;
-      default: className = 'unified-tag-gray';
+      case OrderStatus.PENDING_PAYMENT:   className = 'unified-tag-gray';   dotColor = 'bg-gray-400'; break;
+      case OrderStatus.PENDING_APPROVAL:  className = 'unified-tag-orange';  dotColor = 'bg-orange-500'; break;
+      case OrderStatus.PENDING_CONFIRM:   className = 'unified-tag-orange';  dotColor = 'bg-orange-500'; break;
+      case OrderStatus.PROCESSING_PROD:   className = 'unified-tag-blue';    dotColor = 'bg-blue-500'; break;
+      case OrderStatus.SHIPPED:           className = 'unified-tag-indigo';  dotColor = 'bg-indigo-500'; break;
+      case OrderStatus.DELIVERED:         className = 'unified-tag-green';   dotColor = 'bg-green-500'; break;
+      case OrderStatus.CANCELLED:         className = 'unified-tag-red';     dotColor = 'bg-red-500'; break;
+      case OrderStatus.REFUND_PENDING:    className = 'unified-tag-orange';  dotColor = 'bg-orange-500'; break;
+      case OrderStatus.REFUNDED:          className = 'unified-tag-red';     dotColor = 'bg-red-400'; break;
+      default: className = 'unified-tag-gray'; dotColor = 'bg-gray-400';
     }
-    return <span className={`${className} h-6 flex items-center`}>{text}</span>;
+    return <span className={className}><span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />{text}</span>;
   };
 
   const getPaymentStatusBadge = (isPaid: boolean) => {
-    return (
-        <span className={`${isPaid ? 'unified-tag-green' : 'unified-tag-gray'} h-6 flex items-center`}>
-            {isPaid ? '已支付' : '待支付'}
-        </span>
+    return isPaid ? (
+        <span className="unified-tag-green"><CheckCircle className="w-3 h-3" />已支付</span>
+    ) : (
+        <span className="unified-tag-gray"><Clock className="w-3 h-3" />待支付</span>
     );
   };
 
   const getStockStatusBadge = (order: Order) => {
-    let text = '待处理';
-    let className = 'unified-tag-gray';
-
-    if (order.status === OrderStatus.DELIVERED) {
-        text = '已完成';
-        className = 'unified-tag-green';
-    } else if (order.status === OrderStatus.SHIPPED) {
-        text = '已发货';
-        className = 'unified-tag-indigo';
-    } else if (order.isShippingConfirmed) {
-        text = '待发货';
-        className = 'unified-tag-blue';
-    } else if (order.isAuthConfirmed || order.isPackageConfirmed || order.status === OrderStatus.PROCESSING_PROD) {
-        text = '备货中';
-        className = 'unified-tag-orange';
-    }
-
-    return <span className={`${className} h-6 flex items-center`}>{text}</span>;
+    if (order.status === OrderStatus.DELIVERED)
+        return <span className="unified-tag-green"><CheckCircle className="w-3 h-3" />已完成</span>;
+    if (order.status === OrderStatus.SHIPPED)
+        return <span className="unified-tag-indigo"><Truck className="w-3 h-3" />已发货</span>;
+    if (order.isShippingConfirmed)
+        return <span className="unified-tag-blue"><Package className="w-3 h-3" />待发货</span>;
+    if (order.isAuthConfirmed || order.isPackageConfirmed || order.status === OrderStatus.PROCESSING_PROD)
+        return <span className="unified-tag-orange"><Box className="w-3 h-3" />备货中</span>;
+    return <span className="unified-tag-gray"><Clock className="w-3 h-3" />待处理</span>;
   };
 
   const getSourceBadge = (source: OrderSource) => {
-      let label = '';
-      let className = '';
       switch(source) {
-          case 'Sales': label = '商务代下单'; className = 'unified-tag-blue'; break;
-          case 'ChannelPortal': label = '渠道下单'; className = 'unified-tag-indigo'; break;
-          case 'OnlineStore': label = '官网下单'; className = 'unified-tag-orange'; break;
-          case 'APISync': label = '第三方下单'; className = 'unified-tag-gray'; break;
-          case 'Renewal': label = '客户续费'; className = 'unified-tag-indigo'; break;
-          default: label = source; className = 'unified-tag-gray';
+          case 'Sales':        return <span className="unified-tag-blue"><UserIcon className="w-3 h-3" />商务代下单</span>;
+          case 'ChannelPortal':return <span className="unified-tag-indigo"><Network className="w-3 h-3" />渠道下单</span>;
+          case 'OnlineStore':  return <span className="unified-tag-orange"><Globe className="w-3 h-3" />官网下单</span>;
+          case 'APISync':      return <span className="unified-tag-gray"><Zap className="w-3 h-3" />第三方下单</span>;
+          case 'Renewal':      return <span className="unified-tag-green"><RefreshCcw className="w-3 h-3" />客户续费</span>;
+          default:             return <span className="unified-tag-gray">{source}</span>;
       }
-      return <span className={`${className} h-6 flex items-center`}>{label}</span>;
   };
 
   const resetCreateForm = () => {
@@ -1021,6 +1010,9 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                       <td className="p-5 whitespace-nowrap">
                           {(() => {
                               const user = users.find(u => u.id === order.salesRepId);
+                              const rawName = order.salesRepName || '未分配';
+                              const displayName = rawName.replace(/\s*\(.*\)\s*$/, '');
+                              const initials = displayName.slice(0, 1);
                               return (
                                   <div 
                                       className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 rounded-lg transition-all group/user"
@@ -1032,18 +1024,28 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                           }
                                       }}
                                   >
-                                      <div className="relative">
+                                      <div className="relative shrink-0">
                                           <img 
-                                              src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${order.salesRepName}`} 
-                                              className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 dark:border-white/10 transition-transform group-hover/user:scale-110" 
-                                              alt=""
+                                              src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${rawName}`} 
+                                              className="w-8 h-8 rounded-full object-cover bg-gray-100 border border-gray-200 dark:border-white/10 transition-transform group-hover/user:scale-110" 
+                                              alt={displayName}
+                                              onError={(e) => {
+                                                  const target = e.currentTarget;
+                                                  target.style.display = 'none';
+                                                  const fallback = target.nextElementSibling as HTMLElement;
+                                                  if (fallback) fallback.style.display = 'flex';
+                                              }}
                                           />
+                                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 items-center justify-center text-white text-xs font-bold" style={{ display: 'none' }}>
+                                              {initials}
+                                          </div>
                                           {user?.status === 'Active' && (
                                               <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-[#1C1C1E] rounded-full"></div>
                                           )}
                                       </div>
-                                      <div className="flex flex-col">
-                                          <span className="font-bold text-gray-900 dark:text-white text-xs group-hover/user:text-blue-600 transition-colors">{order.salesRepName || '未分配'}</span>
+                                      <div className="flex flex-col min-w-0">
+                                          <span className="font-bold text-gray-900 dark:text-white text-xs group-hover/user:text-blue-600 transition-colors truncate">{displayName}</span>
+                                          {user?.email && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[120px]">{user.email}</span>}
                                       </div>
                                   </div>
                               );
@@ -1054,6 +1056,9 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                       <td className="p-5 whitespace-nowrap">
                           {(() => {
                               const user = users.find(u => u.id === order.businessManagerId);
+                              const rawName = order.businessManagerName || '未分配';
+                              const displayName = rawName.replace(/\s*\(.*\)\s*$/, '');
+                              const initials = displayName.slice(0, 1);
                               return (
                                   <div 
                                       className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 rounded-lg transition-all group/user"
@@ -1065,18 +1070,28 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                           }
                                       }}
                                   >
-                                      <div className="relative">
+                                      <div className="relative shrink-0">
                                           <img 
-                                              src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${order.businessManagerName}`} 
-                                              className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 dark:border-white/10 transition-transform group-hover/user:scale-110" 
-                                              alt=""
+                                              src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${rawName}`} 
+                                              className="w-8 h-8 rounded-full object-cover bg-gray-100 border border-gray-200 dark:border-white/10 transition-transform group-hover/user:scale-110" 
+                                              alt={displayName}
+                                              onError={(e) => {
+                                                  const target = e.currentTarget;
+                                                  target.style.display = 'none';
+                                                  const fallback = target.nextElementSibling as HTMLElement;
+                                                  if (fallback) fallback.style.display = 'flex';
+                                              }}
                                           />
+                                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 items-center justify-center text-white text-xs font-bold" style={{ display: 'none' }}>
+                                              {initials}
+                                          </div>
                                           {user?.status === 'Active' && (
                                               <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-[#1C1C1E] rounded-full"></div>
                                           )}
                                       </div>
-                                      <div className="flex flex-col">
-                                          <span className="font-bold text-gray-900 dark:text-white text-xs group-hover/user:text-blue-600 transition-colors">{order.businessManagerName || '未分配'}</span>
+                                      <div className="flex flex-col min-w-0">
+                                          <span className="font-bold text-gray-900 dark:text-white text-xs group-hover/user:text-blue-600 transition-colors truncate">{displayName}</span>
+                                          {user?.email && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[120px]">{user.email}</span>}
                                       </div>
                                   </div>
                               );
@@ -1085,24 +1100,28 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                   )}
                   {visibleColumns.includes('department') && (
                       <td className="p-5 whitespace-nowrap">
-                          <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">
-                              {(() => {
-                                  const user = users.find(u => u.id === order.salesRepId);
-                                  return getDepartmentPath(user?.departmentId);
-                              })()}
-                          </div>
+                          {(() => {
+                              const user = users.find(u => u.id === order.salesRepId);
+                              const fullPath = getDepartmentPath(user?.departmentId);
+                              if (fullPath === '-') return <span className="text-xs text-gray-400">-</span>;
+                              const leaf = fullPath.split(' / ').pop() || fullPath;
+                              const parent = fullPath.split(' / ').slice(-2, -1)[0];
+                              return (
+                                  <div className="flex flex-col gap-0.5" title={fullPath}>
+                                      <span className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate max-w-[140px]">{leaf}</span>
+                                      {parent && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[140px]">{parent}</span>}
+                                  </div>
+                              );
+                          })()}
                       </td>
                   )}
                   {visibleColumns.includes('source') && <td className="p-5 whitespace-nowrap">{getSourceBadge(order.source)}</td>}
                   {visibleColumns.includes('buyerType') && (
                       <td className="p-5 whitespace-nowrap">
-                          <span className={`px-2.5 py-1 rounded-[8px] text-[10px] font-bold uppercase tracking-wider border h-6 flex items-center w-fit ${
-                              order.buyerType === 'Channel' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800' :
-                              order.buyerType === 'SelfDeal' ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' :
-                              'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800'
-                          }`}>
-                              {buyerTypeMap[order.buyerType] || '客户直签'}
-                          </span>
+                          {order.buyerType === 'Channel'   && <span className="unified-tag-indigo"><Network className="w-3 h-3" />{buyerTypeMap['Channel']}</span>}
+                          {order.buyerType === 'SelfDeal'  && <span className="unified-tag-orange"><Target className="w-3 h-3" />{buyerTypeMap['SelfDeal']}</span>}
+                          {order.buyerType === 'Customer'  && <span className="unified-tag-blue"><UserIcon className="w-3 h-3" />{buyerTypeMap['Customer']}</span>}
+                          {!order.buyerType                && <span className="unified-tag-gray">{buyerTypeMap['Customer']}</span>}
                       </td>
                   )}
                   {visibleColumns.includes('date') && <td className="p-5 text-gray-400 dark:text-gray-500 font-mono text-[11px] whitespace-nowrap">{new Date(order.date).toLocaleString('zh-CN', { hour12: false })}</td>}
@@ -1846,7 +1865,20 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
             <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
                 <div className="flex flex-col items-center text-center space-y-4">
                     <div className="relative group">
-                        <img src={detailsUser.avatar} className="w-24 h-24 rounded-full bg-gray-100 border-4 border-white dark:border-[#2C2C2E] shadow-xl" alt=""/>
+                        <img 
+                            src={detailsUser.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${detailsUser.name}`} 
+                            className="w-24 h-24 rounded-full object-cover bg-gray-100 border-4 border-white dark:border-[#2C2C2E] shadow-xl" 
+                            alt={detailsUser.name}
+                            onError={(e) => {
+                                const target = e.currentTarget;
+                                target.style.display = 'none';
+                                const fallback = target.nextElementSibling as HTMLElement;
+                                if (fallback) fallback.style.display = 'flex';
+                            }}
+                        />
+                        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 items-center justify-center text-white text-2xl font-bold border-4 border-white dark:border-[#2C2C2E] shadow-xl" style={{ display: 'none' }}>
+                            {detailsUser.name.replace(/\s*\(.*\)\s*$/, '').slice(0, 1)}
+                        </div>
                         <div className={`absolute bottom-1 right-1 w-5 h-5 rounded-full border-2 border-white dark:border-[#1C1C1E] ${detailsUser.status === 'Active' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
                     </div>
                     <div>
