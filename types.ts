@@ -45,10 +45,37 @@ export interface OrderItem extends MerchandiseItem {
     capabilitiesSnapshot?: string[]; 
 
     licenseType?: string;
+    productType?: string;
 
     // Pricing Option selected
     pricingOptionId?: string;
     pricingOptionName?: string;
+
+    // Pricing details
+    finalUserUnitPrice?: number;
+    pricingUnitPrice?: number;
+    finalUserPricingUnitPrice?: number;
+    lineRemarks?: string;
+
+    // Price reference
+    channelLevel?: string;
+    agreementNo?: string;
+    matchedPriceType?: string;
+    matchedPrice?: number;
+    matchedPriceId?: string;
+    suggestedRetailPrice?: number;
+
+    // Delivery info
+    distributionMode?: string;
+    supplyOrgInfo?: string;
+    upgradeWarrantyPeriod?: string;
+
+    // License info
+    licensee?: string;
+    licenseTerms?: string;
+    licenseStartMethod?: string;
+    licenseEndDate?: string;
+    subUnitLicenseAllowed?: boolean;
 }
 
 export type CapabilityType = 'Component' | 'Feature' | 'Rights' | 'Service';
@@ -120,9 +147,11 @@ export interface InstallPackage {
     name: string;
     version: string;
     url: string;
+    platform?: string;
     cpu?: string;
     os?: string;
     arch?: string;
+    remarks?: string;
 }
 
 export interface Product {
@@ -238,6 +267,7 @@ export interface User {
     accountId: string; // 8-digit numeric ID
     name: string;
     email: string;
+    phone?: string;
     role: UserRole;
     userType: UserType;
     status: 'Active' | 'Inactive';
@@ -435,6 +465,7 @@ export interface Order {
     directChannel?: string;
     terminalChannel?: string;
     orderType?: string;
+    creatorId?: string;
     creatorName?: string;
     creatorPhone?: string;
     industryLine?: string;

@@ -6,7 +6,7 @@ import {
     ArrowLeft, Box, Printer, Award, X, Lock, CheckCircle, Truck, ClipboardCheck, 
     UploadCloud, AlertOctagon, RefreshCcw, Key, Package, Disc, Receipt, FileText, 
     Briefcase, History, Eye, CheckSquare, CreditCard, ShieldCheck, User as UserIcon, Building,
-    ChevronRight, AlertCircle, Clock, MapPin, Target
+    ChevronRight, AlertCircle, Clock, MapPin, Target, Users
 } from 'lucide-react';
 
 interface OrderDetailsProps {
@@ -50,6 +50,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
   const [isCertPreviewMode, setIsCertPreviewMode] = useState(false);
   const [certView, setCertView] = useState<'paper' | 'structured'>('paper');
   const [selectedItemForDetails, setSelectedItemForDetails] = useState<OrderItem | null>(null);
+  const [selectedItemIndex, setSelectedItemIndex] = useState<number>(0);
   const [isItemDetailsClosing, setIsItemDetailsClosing] = useState(false);
   const [isLogDrawerOpen, setIsLogDrawerOpen] = useState(false);
   const [isLogDrawerClosing, setIsLogDrawerClosing] = useState(false);
@@ -440,11 +441,25 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
            <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
                <button onClick={() => navigate('/orders')} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition text-gray-500 dark:text-gray-400 shrink-0"><ArrowLeft className="w-5 h-5" /></button>
                <div className="flex flex-col min-w-0">
-                   <div className="flex items-center gap-3">
+                   <div className="flex items-center gap-2 flex-wrap">
                        <h1 className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white tracking-tight truncate">订单 {selectedOrder.id}</h1>
                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 ${
                            selectedOrder.status === OrderStatus.REFUND_PENDING ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                        }`}>{statusMap[selectedOrder.status] || selectedOrder.status}</span>
+                       {selectedOrder.isPaid
+                           ? <span className="unified-tag-green shrink-0">已支付</span>
+                           : <span className="unified-tag-gray shrink-0">待支付</span>
+                       }
+                       {selectedOrder.status === OrderStatus.DELIVERED
+                           ? <span className="unified-tag-green shrink-0">已完成</span>
+                           : selectedOrder.status === OrderStatus.SHIPPED
+                               ? <span className="unified-tag-indigo shrink-0">已发货</span>
+                               : selectedOrder.isShippingConfirmed
+                                   ? <span className="unified-tag-blue shrink-0">待发货</span>
+                                   : (selectedOrder.isAuthConfirmed || selectedOrder.isPackageConfirmed || selectedOrder.status === OrderStatus.PROCESSING_PROD)
+                                       ? <span className="unified-tag-orange shrink-0">备货中</span>
+                                       : <span className="unified-tag-gray shrink-0">待处理</span>
+                       }
                    </div>
                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-[200px] md:max-w-none flex items-center gap-2">
                        <span>{selectedOrder.customerName}</span>
@@ -472,13 +487,33 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                            <div className="text-xs font-bold text-gray-900 dark:text-white">{selectedOrder.businessManagerName || '未分配'}</div>
                        </div>
                    </div>
+                   {selectedOrder.creatorName && (
+                       <div className="flex items-center gap-2 border-l border-gray-200 dark:border-white/10 pl-6">
+                           <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-100 dark:border-white/10 shrink-0">
+                               <img
+                                   src={users.find(u => u.id === selectedOrder.creatorId)?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${selectedOrder.creatorName || 'Creator'}`}
+                                   alt=""
+                                   className="w-full h-full object-cover"
+                               />
+                           </div>
+                           <div>
+                               <div className="text-[10px] text-gray-400 uppercase font-bold">制单人</div>
+                               <div className="text-xs font-bold text-gray-900 dark:text-white">{selectedOrder.creatorName}</div>
+                               {selectedOrder.creatorPhone && (
+                                   <div className="text-[10px] text-gray-400 font-mono mt-0.5">{selectedOrder.creatorPhone}</div>
+                               )}
+                           </div>
+                       </div>
+                   )}
                </div>
            </div>
            <div className="flex gap-4 items-center w-full md:w-auto justify-between md:justify-end shrink-0">
-               <div className="text-right block bg-gray-50 dark:bg-white/5 px-4 py-2 rounded-xl">
-                   <div className="text-[10px] text-gray-400 uppercase font-bold mb-0.5">应收总额</div>
-                   <div className="text-xl font-bold text-orange-600 dark:text-orange-400 font-mono tracking-tight">¥{selectedOrder.total.toLocaleString()}</div>
-               </div>
+               {selectedOrder.isPaid && (
+                   <div className="text-right block bg-gray-50 dark:bg-white/5 px-4 py-2 rounded-xl">
+                       <div className="text-[10px] text-gray-400 uppercase font-bold mb-0.5">订单实付金额</div>
+                       <div className="text-xl font-bold text-orange-600 dark:text-orange-400 font-mono tracking-tight">¥{selectedOrder.total.toLocaleString()}</div>
+                   </div>
+               )}
                <div className="flex gap-2 shrink-0">
                    <button 
                        onClick={handleOpenLogDrawer}
@@ -501,42 +536,44 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
 
       {/* Tabs Navigation */}
       <div className="bg-white dark:bg-[#1C1C1E] border-b border-gray-200 dark:border-white/10 px-4 md:px-10 shrink-0 sticky top-[73px] md:top-[81px] z-10">
-           <div className="flex gap-8 overflow-x-auto no-scrollbar">
-               {[
-                   { id: 'MANAGEMENT', label: '订单管理' },
-                   { id: 'SNAPSHOT', label: '订单快照' },
-                   { id: 'FULFILLMENT', label: '订单交付' },
-                   { id: 'EMAIL', label: '发货邮件' },
-               ].map(tab => (
-                   <button
-                       key={tab.id}
-                       onClick={() => setActiveTab(tab.id as 'MANAGEMENT' | 'SNAPSHOT' | 'FULFILLMENT' | 'EMAIL')}
-                       className={`py-4 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
-                           activeTab === tab.id 
-                           ? 'border-[#0071E3] text-[#0071E3] dark:border-[#0A84FF] dark:text-[#0A84FF]' 
-                           : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                       }`}
-                   >
-                       {tab.label}
-                   </button>
-               ))}
-           </div>
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pt-2.5 pb-0 items-end">
+              {[
+                  { id: 'MANAGEMENT', label: '订单管理' },
+                  { id: 'SNAPSHOT', label: '订单快照' },
+                  { id: 'FULFILLMENT', label: '订单交付' },
+                  { id: 'EMAIL', label: '发货邮件' },
+              ].map(tab => (
+                  <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as 'MANAGEMENT' | 'SNAPSHOT' | 'FULFILLMENT' | 'EMAIL')}
+                      className={`relative px-5 py-1.5 rounded-t-lg text-sm font-semibold transition-all whitespace-nowrap ${
+                          activeTab === tab.id
+                          ? 'bg-white dark:bg-[#2C2C2E] text-[#0071E3] dark:text-[#0A84FF] border border-gray-200 dark:border-white/10 border-b-white dark:border-b-[#2C2C2E] -mb-px'
+                          : 'bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-gray-200 mb-0 rounded-t-lg'
+                      }`}
+                  >
+                      {tab.label}
+                      {activeTab === tab.id && (
+                          <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0071E3] dark:bg-[#0A84FF]" />
+                      )}
+                  </button>
+              ))}
+          </div>
       </div>
 
-      <div className="p-4 lg:p-10 max-w-[2400px] mx-auto w-full space-y-8 animate-fade-in pb-32">
+      <div className="p-4 lg:p-6 max-w-[2400px] mx-auto w-full space-y-4 animate-fade-in pb-20">
           {activeTab === 'MANAGEMENT' && (
             <>
               {/* Stepper */}
-              <div className="bg-white dark:bg-[#1C1C1E] p-8 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-x-auto">
+              <div className="bg-white dark:bg-[#1C1C1E] px-6 py-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-x-auto">
              <div className="flex justify-between items-start relative min-w-[700px]">
-                 <div className="absolute top-5 left-0 w-full h-1 bg-gray-100 dark:bg-white/10 -z-0 rounded-full overflow-hidden">
-                     {/* Progress bar logic could be added here for precise width */}
+                 <div className="absolute top-6 left-0 w-full h-1 bg-gray-100 dark:bg-white/10 -z-0 rounded-full overflow-hidden">
                  </div>
                  {steps.map((step, idx) => (
                     <div 
                         key={step.id} 
                         onClick={() => !step.disabled && setActiveStepModal(step.id)} 
-                        className={`flex flex-col items-center gap-3 relative z-10 flex-1 transition-all group ${
+                        className={`flex flex-col items-center gap-1.5 relative z-10 flex-1 transition-all group ${
                             step.disabled 
                             ? 'opacity-40 grayscale cursor-not-allowed' 
                             : 'cursor-pointer hover:scale-105'
@@ -556,8 +593,8 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                     {new Date(step.completedAt).toLocaleDateString()} {new Date(step.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </div>
                             )}
-                            {step.status === 'Current' && <div className="text-[10px] text-white bg-[#0071E3] dark:bg-[#0A84FF] px-2 py-0.5 rounded-full font-bold shadow-md mt-1 animate-bounce">点击处理</div>}
-                            {step.status === 'Completed' && <div className="text-[9px] text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full font-bold mt-1 opacity-0 group-hover:opacity-100 transition-opacity">查看信息</div>}
+                            {step.status === 'Current' && <div className="text-[10px] text-white bg-[#0071E3] dark:bg-[#0A84FF] px-2 py-0.5 rounded-full font-bold shadow-md mt-0.5 animate-bounce">点击处理</div>}
+                            {step.status === 'Completed' && <div className="text-[9px] text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full font-bold mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">查看信息</div>}
                         </div>
                     </div>
                  ))}
@@ -566,15 +603,16 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
 
           {/* Order Items Table (Full Width) */}
           <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden">
-              <div className="p-8 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
-                  <Package className="w-5 h-5 text-gray-400" />
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">订单商品明细</h3>
+              <div className="p-5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                  <Package className="w-5 h-5 text-orange-500" />
+                  <h3 className="text-[18px] font-semibold text-gray-900 dark:text-white">订单商品明细</h3>
               </div>
               <div className="overflow-x-auto">
                   <table className="w-full text-left min-w-[600px]">
-                      <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 text-[10px] uppercase font-bold tracking-wider">
+                      <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 text-sm uppercase font-bold tracking-wider">
                           <tr>
-                              <th className="p-8 pl-10">商品与规格</th>
+                              <th className="p-8 pl-10 text-center w-20 whitespace-nowrap">明细编号</th>
+                              <th className="p-8">商品与规格</th>
                               <th className="p-8">授权类型</th>
                               <th className="p-8 text-center">数量</th>
                               <th className="p-8 text-right">单价/小计</th>
@@ -582,16 +620,25 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50 dark:divide-white/5">
-                          {selectedOrder.items.map((item, idx) => (
+                          {selectedOrder.items.map((item, idx) => {
+                              const lineNo = String(idx + 1).padStart(3, '0');
+                              return (
                               <tr 
                                 key={idx} 
-                                className="group text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                                onClick={() => setSelectedItemForDetails(item)}
+                                className="group text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                               >
-                                  <td className="p-8 pl-10">
+                                  <td className="p-8 pl-10 text-center">
+                                      <button
+                                          onClick={() => { setSelectedItemForDetails(item); setSelectedItemIndex(idx); }}
+                                          className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-xs font-bold font-mono text-[#0071E3] dark:text-[#0A84FF] transition-all"
+                                      >
+                                          {lineNo}
+                                      </button>
+                                  </td>
+                                  <td className="p-8">
                                       <button 
-                                        onClick={(e) => { e.stopPropagation(); navigate(`/products/${item.productId}`); }}
-                                        className="font-bold text-gray-900 dark:text-white hover:text-[#0071E3] dark:hover:text-[#0A84FF] hover:underline text-left text-base"
+                                        onClick={() => navigate(`/products/${item.productId}`)}
+                                        className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline text-left text-base"
                                       >
                                           {item.productName}
                                       </button>
@@ -605,13 +652,13 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                   </td>
                                   <td className="p-8 text-center dark:text-white font-medium text-lg">x {item.quantity}</td>
                                   <td className="p-8 text-right">
-                                      <div className="text-xs text-gray-400">¥{item.priceAtPurchase.toLocaleString()}</div>
-                                      <div className="font-bold dark:text-white text-lg">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</div>
+                                      <div className="text-xs text-orange-400 dark:text-orange-300 font-mono">¥{item.priceAtPurchase.toLocaleString()}</div>
+                                      <div className="font-bold text-lg text-orange-600 dark:text-orange-400 font-mono">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</div>
                                   </td>
                                   <td className="p-8">
                                       {selectedOrder.isPaid && selectedOrder.confirmedDate && (
                                           <button 
-                                            onClick={(e) => { e.stopPropagation(); setSelectedCertificateItem(item); setIsCertPreviewMode(true); }} 
+                                            onClick={() => { setSelectedCertificateItem(item); setIsCertPreviewMode(true); }} 
                                             className="text-xs font-bold text-[#0071E3] hover:text-blue-700 dark:text-[#0A84FF] hover:underline flex items-center gap-1"
                                           >
                                               <Award className="w-3.5 h-3.5"/> 电子授权
@@ -619,112 +666,126 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                       )}
                                   </td>
                               </tr>
-                          ))}
+                              );
+                          })}
                       </tbody>
                   </table>
               </div>
               <div className="p-6 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex justify-end">
-                  <div className="w-full max-w-sm space-y-3 text-sm">
-                      <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
-                          <span>产品总金额</span>
-                          <span className="font-mono">¥{selectedOrder.items.reduce((sum, item) => sum + (item.priceAtPurchase * item.quantity), 0).toLocaleString()}</span>
+                      <div className="w-full max-w-sm space-y-3 text-sm">
+                          <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
+                              <span>产品总金额</span>
+                              <span className="font-mono text-orange-600 dark:text-orange-400">¥{selectedOrder.items.reduce((sum, item) => sum + (item.priceAtPurchase * item.quantity), 0).toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
+                              <span>优惠折扣</span>
+                              <span className="font-mono">100%</span>
+                          </div>
+                          <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
+                              <span>返利折扣</span>
+                              <span className="font-mono">0%</span>
+                          </div>
+                          <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
+                              <span>优惠金额</span>
+                              <span className="font-mono text-orange-600 dark:text-orange-400">- ¥0</span>
+                          </div>
+                          <div className="pt-3 border-t border-gray-200 dark:border-white/10 flex justify-between items-center">
+                              <span className="font-bold text-gray-900 dark:text-white">订单需付金额</span>
+                              <span className="font-bold text-xl text-orange-600 dark:text-orange-400 font-mono">¥{selectedOrder.total.toLocaleString()}</span>
+                          </div>
                       </div>
-                      <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
-                          <span>优惠折扣</span>
-                          <span className="font-mono">100%</span>
-                      </div>
-                      <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
-                          <span>返利折扣</span>
-                          <span className="font-mono">0%</span>
-                      </div>
-                      <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
-                          <span>优惠金额</span>
-                          <span className="font-mono">- ¥0</span>
-                      </div>
-                      <div className="pt-3 border-t border-gray-200 dark:border-white/10 flex justify-between items-center">
-                          <span className="font-bold text-gray-900 dark:text-white">订单实付金额</span>
-                          <span className="font-bold text-xl text-[#0071E3] dark:text-[#0A84FF] font-mono">¥{selectedOrder.total.toLocaleString()}</span>
-                      </div>
-                  </div>
               </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {/* Customer & Business Info (Medium - 2/3) */}
-              <div className="md:col-span-2 bg-white dark:bg-[#1C1C1E] p-8 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-6">
-                  <div className="flex items-center justify-between border-b border-gray-100 dark:border-white/10 pb-4">
-                      <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                          <Building className="w-5 h-5 text-[#0071E3]" /> 客户及业务信息
-                      </h4>
-                      <button onClick={() => navigate(`/customers/${selectedOrder.customerId}`)} className="text-xs font-bold text-[#0071E3] hover:underline flex items-center gap-1">
-                          查看完整档案 <ChevronRight className="w-3 h-3"/>
-                      </button>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Customer Info */}
+              <div className="md:col-span-2 space-y-4">
+                  {/* 客户信息卡片 */}
+                  <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-4">
+                      <div className="border-b border-gray-100 dark:border-white/10 pb-3">
+                          <h4 className="text-[18px] font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                              <Building className="w-5 h-5 text-[#0071E3]" /> 客户信息
+                          </h4>
+                      </div>
+                      {(() => {
+                          const fields = [
+                              { label: '客户名称', value: selectedOrder.customerName, isLink: true, linkTo: `/customers/${selectedOrder.customerId}` },
+                              { label: '客户类型', value: selectedOrder.customerType === 'Enterprise' ? '央企' : selectedOrder.customerType },
+                              { label: '行业条线', value: selectedOrder.industryLine },
+                              { label: '所在地区', value: [selectedOrder.province, selectedOrder.city, selectedOrder.district].filter(Boolean).join(' / ') || undefined },
+                              { label: '报备标签', value: selectedOrder.reportTag },
+                              { label: '是否授权覆盖客户', value: selectedOrder.customerStatus },
+                          ];
+                          return (
+                              <div className="grid grid-cols-2 gap-x-6">
+                                  {fields.map((item, idx) => (
+                                      <div key={idx} className={`flex items-center gap-8 py-2 ${idx < fields.length - 2 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}>
+                                          <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-28 shrink-0">{item.label}</span>
+                                          {item.isLink ? (
+                                              <button onClick={() => navigate(item.linkTo!)} className="text-sm font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline text-left flex-1">
+                                                  {item.value || '-'}
+                                              </button>
+                                          ) : (
+                                              <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{item.value || '-'}</span>
+                                          )}
+                                      </div>
+                                  ))}
+                              </div>
+                          );
+                      })()}
                   </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                      {[
-                          { label: '买方名称', value: selectedOrder.buyerName },
-                          { label: '直接下级渠道', value: selectedOrder.directChannel },
-                          { label: '终端渠道', value: selectedOrder.terminalChannel },
-                          { label: '订单类型', value: selectedOrder.orderType },
-                          { label: '制单人员', value: selectedOrder.creatorName },
-                          { label: '制单人员电话', value: selectedOrder.creatorPhone },
-                          { label: '客户名称', value: selectedOrder.customerName },
-                          { label: '企业ID', value: selectedOrder.items[0]?.enterpriseId || '-' },
-                          { label: '行业条线', value: selectedOrder.industryLine },
-                          { label: '客户类型', value: selectedOrder.customerType === 'Enterprise' ? '央企' : selectedOrder.customerType },
-                          { label: '所在省份', value: selectedOrder.province },
-                          { label: '报备标签', value: selectedOrder.reportTag },
-                          { label: '所在城市', value: selectedOrder.city },
-                          { label: '所在区县', value: selectedOrder.district },
-                          { label: '卖方名称', value: selectedOrder.sellerName },
-                          { label: '卖方业务联系人', value: selectedOrder.sellerContact },
-                          { label: '新老客户', value: selectedOrder.customerStatus },
-                          { label: '渠道是否提供服务', value: selectedOrder.channelService },
-                      ].map((item, idx) => (
-                          <div key={idx} className="flex items-start gap-4 py-1">
-                              <span className="text-gray-400 text-sm min-w-[120px] shrink-0">{item.label}:</span>
-                              <span className="text-gray-900 dark:text-white text-sm font-medium">{item.value || '-'}</span>
-                          </div>
-                      ))}
+
+                  {/* 交易方信息卡片 */}
+                  <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-4">
+                      <div className="border-b border-gray-100 dark:border-white/10 pb-3">
+                          <h4 className="text-[18px] font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                              <Users className="w-5 h-5 text-indigo-500" /> 交易方信息
+                          </h4>
+                      </div>
+                      {(() => {
+                          const fields = [
+                              { label: '买方名称', value: selectedOrder.buyerName },
+                              { label: '直接下单渠道', value: selectedOrder.directChannel },
+                              { label: '终端渠道', value: selectedOrder.terminalChannel },
+                              { label: '渠道是否提供服务', value: selectedOrder.channelService },
+                          ];
+                          return (
+                              <div className="grid grid-cols-2 gap-x-6">
+                                  {fields.map((item, idx) => (
+                                      <div key={idx} className={`flex items-center gap-8 py-2 ${idx < fields.length - 2 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}>
+                                          <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-28 shrink-0">{item.label}</span>
+                                          <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{item.value || '-'}</span>
+                                      </div>
+                                  ))}
+                              </div>
+                          );
+                      })()}
                   </div>
               </div>
 
               {/* Opportunity Information (Small - 1/3) */}
               {selectedOrder.opportunityId && (
-                  <div className="md:col-span-1 bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-5">
-                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2"><Target className="w-4 h-4 text-orange-500"/> 商机信息</h4>
+                  <div className="md:col-span-1 bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-3">
+                      <div className="border-b border-gray-100 dark:border-white/10 pb-3">
+                          <h4 className="text-[18px] font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Target className="w-5 h-5 text-orange-500"/> 商机信息</h4>
+                      </div>
                       {(() => {
                           const opp = opportunities.find(o => o.id === selectedOrder.opportunityId);
                           if (!opp) return null;
                           return (
-                              <div className="space-y-4">
-                                  <div className="p-4 bg-gradient-to-br from-orange-50 to-white dark:from-orange-900/10 dark:to-transparent rounded-2xl border border-orange-100 dark:border-orange-900/10">
-                                      <div className="text-orange-600 dark:text-orange-400 text-[10px] uppercase font-bold mb-1">商机名称</div>
-                                      <div className="text-gray-900 dark:text-white text-sm font-bold truncate" title={opp.name}>{opp.name}</div>
-                                      <div className="text-[10px] text-gray-400 font-mono mt-1">CRM ID: {opp.crmId || opp.id}</div>
-                                  </div>
-                                  
-                                  <div className="space-y-3 px-1">
-                                      <div className="flex justify-between border-b border-gray-50 dark:border-white/5 pb-2">
-                                          <span className="text-gray-400 text-[10px] uppercase font-bold">商机阶段</span>
-                                          <span className="bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400 px-2 py-0.5 rounded text-[10px] font-bold">
-                                              {opp.stage === 'Negotiation' ? '商务洽谈' : 
-                                               opp.stage === 'Qualification' ? '资格确定' :
-                                               opp.stage === 'Proposal' ? '方案建议' :
-                                               opp.stage === 'Closed Won' ? '已赢单' :
-                                               opp.stage === 'Closed Lost' ? '已输单' : opp.stage}
-                                          </span>
+                              <div className="divide-y divide-gray-50 dark:divide-white/5">
+                                  {[
+                                      { label: '商机名称', value: opp.name },
+                                      { label: 'CRM ID', value: opp.crmId || opp.id },
+                                      { label: '商机阶段', value: opp.stage === 'Negotiation' ? '商务洽谈' : opp.stage === 'Qualification' ? '资格确定' : opp.stage === 'Proposal' ? '方案建议' : opp.stage === 'Closed Won' ? '已赢单' : opp.stage === 'Closed Lost' ? '已输单' : opp.stage },
+                                      { label: '商机金额', value: `¥${(opp.amount || opp.expectedRevenue).toLocaleString()}` },
+                                      { label: '结单日期', value: opp.closeDate },
+                                  ].map((item, idx) => (
+                                      <div key={idx} className="flex items-center gap-8 py-2">
+                                          <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-28 shrink-0">{item.label}</span>
+                                          <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{item.value || '-'}</span>
                                       </div>
-                                      <div className="flex justify-between border-b border-gray-50 dark:border-white/5 pb-2">
-                                          <span className="text-gray-400 text-[10px] uppercase font-bold">商机金额</span>
-                                          <span className="text-sm font-bold text-gray-900 dark:text-white font-mono">¥{(opp.amount || opp.expectedRevenue).toLocaleString()}</span>
-                                      </div>
-                                      <div className="flex justify-between border-b border-gray-50 dark:border-white/5 pb-2">
-                                          <span className="text-gray-400 text-[10px] uppercase font-bold">结单日期</span>
-                                          <span className="text-sm font-medium dark:text-white font-mono">{opp.closeDate}</span>
-                                      </div>
-                                  </div>
+                                  ))}
                               </div>
                           );
                       })()}
@@ -732,24 +793,22 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
               )}
 
               {/* Invoice Details (Small - 1/3) */}
-              <div className="md:col-span-1 bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-5">
-                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2"><Receipt className="w-4 h-4"/> 开票明细</h4>
+              <div className="md:col-span-1 bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-3">
+                  <div className="border-b border-gray-100 dark:border-white/10 pb-3">
+                      <h4 className="text-[18px] font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Receipt className="w-5 h-5 text-green-500"/> 开票明细</h4>
+                  </div>
                   {selectedOrder.invoiceInfo ? (
-                      <div className="space-y-4">
-                          <div className="p-4 bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/10 dark:to-transparent rounded-2xl border border-blue-100 dark:border-blue-900/10">
-                              <div className="text-blue-600 dark:text-blue-400 text-[10px] uppercase font-bold mb-1">发票抬头</div>
-                              <div className="text-gray-900 dark:text-white text-sm font-bold">{selectedOrder.invoiceInfo.title}</div>
-                          </div>
-                          <div className="space-y-3 px-1 text-sm">
-                              <div className="flex justify-between border-b border-gray-50 dark:border-white/5 pb-2">
-                                  <span className="text-gray-500 text-xs">纳税人识别号</span>
-                                  <span className="font-mono text-xs dark:text-white font-medium">{selectedOrder.invoiceInfo.taxId}</span>
+                      <div className="divide-y divide-gray-50 dark:divide-white/5">
+                          {[
+                              { label: '发票抬头', value: selectedOrder.invoiceInfo.title },
+                              { label: '纳税人识别号', value: selectedOrder.invoiceInfo.taxId },
+                              { label: '发票类型', value: '增值税专用发票' },
+                          ].map((item, idx) => (
+                              <div key={idx} className="flex items-center gap-8 py-3">
+                                  <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-28 shrink-0">{item.label}</span>
+                                  <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{item.value || '-'}</span>
                               </div>
-                              <div className="flex justify-between border-b border-gray-50 dark:border-white/5 pb-2">
-                                  <span className="text-gray-500 text-xs">发票类型</span>
-                                  <span className="text-xs dark:text-white font-medium">增值税专用发票</span>
-                              </div>
-                          </div>
+                          ))}
                       </div>
                   ) : (
                       <div className="flex flex-col items-center justify-center py-10 text-gray-400 italic text-xs">
@@ -760,17 +819,20 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
               </div>
 
               {/* Original Order Numbers (Small - 1/3) */}
-              <div className="md:col-span-1 bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-5">
-                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2"><History className="w-4 h-4"/> 订单原订单编号</h4>
-                  <div className="space-y-4">
-                      <div className="p-4 bg-gradient-to-br from-purple-50 to-white dark:from-purple-900/10 dark:to-transparent rounded-2xl border border-purple-100 dark:border-purple-900/10">
-                          <div className="text-purple-600 dark:text-purple-400 text-[10px] uppercase font-bold mb-1">SMS原订单编号</div>
-                          <div className="text-gray-900 dark:text-white text-sm font-bold font-mono">{selectedOrder.smsOriginalOrderId || 'S00713162'}</div>
-                      </div>
-                      <div className="p-4 bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-900/10 dark:to-transparent rounded-2xl border border-indigo-100 dark:border-indigo-900/10">
-                          <div className="text-indigo-600 dark:text-indigo-400 text-[10px] uppercase font-bold mb-1">SaaS原订单编号</div>
-                          <div className="text-gray-900 dark:text-white text-sm font-bold font-mono break-all">{selectedOrder.saasOriginalOrderId || 'P20260303195755000001'}</div>
-                      </div>
+              <div className="md:col-span-1 bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-3">
+                  <div className="border-b border-gray-100 dark:border-white/10 pb-3">
+                      <h4 className="text-[18px] font-semibold text-gray-900 dark:text-white flex items-center gap-2"><History className="w-5 h-5 text-purple-500"/> 关联原始订单</h4>
+                  </div>
+                  <div className="divide-y divide-gray-50 dark:divide-white/5">
+                      {[
+                          { label: 'SMS原订单编号', value: selectedOrder.smsOriginalOrderId || 'S00713162' },
+                          { label: 'SaaS原订单编号', value: selectedOrder.saasOriginalOrderId || 'P20260303195755000001' },
+                      ].map((item, idx) => (
+                          <div key={idx} className="flex items-start gap-8 py-3">
+                              <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-28 shrink-0">{item.label}</span>
+                              <span className="text-base font-medium font-mono text-gray-900 dark:text-white flex-1 break-all">{item.value}</span>
+                          </div>
+                      ))}
                   </div>
               </div>
             </div>
@@ -900,7 +962,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
           {activeTab === 'FULFILLMENT' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
              {/* Delivery Info (Medium - 2/3) */}
-             <div className="md:col-span-2 bg-white dark:bg-[#1C1C1E] p-6 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-5">
+             <div className="md:col-span-2 bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-3">
                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2"><Truck className="w-4 h-4"/> 交付信息</h4>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                      <div className="p-4 bg-gray-50 dark:bg-black/20 rounded-2xl border border-gray-100 dark:border-white/5 space-y-3">
@@ -1175,12 +1237,11 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                        <table className="w-full text-left text-xs">
                                            <thead className="bg-gray-50 dark:bg-white/5 text-gray-400 uppercase font-bold">
                                                <tr>
-                                                   <th className="p-3">安装包编号</th>
+                                                   <th className="p-3">编号</th>
                                                    <th className="p-3">安装包名称</th>
-                                                   <th className="p-3">版本</th>
-                                                   <th className="p-3">CPU</th>
+                                                   <th className="p-3">发布平台</th>
                                                    <th className="p-3">操作系统</th>
-                                                   <th className="p-3">架构</th>
+                                                   <th className="p-3">CPU</th>
                                                </tr>
                                            </thead>
                                            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
@@ -1190,16 +1251,15 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                                        <tr key={pkg.id} className="hover:bg-gray-50 dark:hover:bg-white/5">
                                                            <td className="p-3 font-mono text-blue-600 dark:text-blue-400">{pkg.id}</td>
                                                            <td className="p-3 dark:text-white font-medium">{pkg.name}</td>
-                                                           <td className="p-3 dark:text-gray-300">{pkg.version}</td>
-                                                           <td className="p-3 dark:text-gray-300">{pkg.cpu || '-'}</td>
+                                                           <td className="p-3 dark:text-gray-300">{pkg.platform || '-'}</td>
                                                            <td className="p-3 dark:text-gray-300">{pkg.os || '-'}</td>
-                                                           <td className="p-3 dark:text-gray-300">{pkg.arch || '-'}</td>
+                                                           <td className="p-3 dark:text-gray-300">{pkg.cpu || '-'}</td>
                                                        </tr>
                                                    ));
                                                })}
                                                {selectedOrder.items.every(item => !products.find(p => p.id === item.productId)?.installPackages?.length) && (
                                                    <tr>
-                                                       <td colSpan={6} className="p-8 text-center text-gray-400 italic">暂无关联安装包信息</td>
+                                                       <td colSpan={5} className="p-8 text-center text-gray-400 italic">暂无关联安装包信息</td>
                                                    </tr>
                                                )}
                                            </tbody>
@@ -1632,7 +1692,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
 
       {/* Order Item Details Drawer */}
       {selectedItemForDetails && (
-          <div className="fixed inset-0 z-[70] flex justify-end">
+          <div className="fixed inset-y-0 right-0 left-[240px] z-[70] flex justify-end">
               <div 
                   className={`absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity duration-300 ${isItemDetailsClosing ? 'opacity-0' : 'opacity-100'}`}
                   onClick={() => {
@@ -1643,14 +1703,19 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                       }, 300);
                   }}
               />
-              <div className={`w-full max-w-7xl bg-white dark:bg-[#1C1C1E] h-full shadow-2xl flex flex-col transform transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${isItemDetailsClosing ? 'translate-x-full' : 'translate-x-0'} relative z-10 border-l border-gray-100 dark:border-white/10`}>
+              <div className={`w-full bg-white dark:bg-[#1C1C1E] h-full shadow-2xl flex flex-col transform transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${isItemDetailsClosing ? 'translate-x-full' : 'translate-x-0'} relative z-10`}>
                   <div className="p-8 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-white dark:bg-[#1C1C1E] shrink-0">
                       <div className="flex items-center gap-4">
                           <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
                               <Package className="w-6 h-6 text-blue-500" />
                           </div>
                           <div>
-                              <h3 className="text-xl font-bold text-gray-900 dark:text-white">订单商品明细详情</h3>
+                              <div className="flex items-center gap-3">
+                                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">订单商品明细详情</h3>
+                                  <span className="px-2.5 py-0.5 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 text-[10px] font-bold font-mono border border-orange-100 dark:border-orange-800/30">
+                                      {selectedOrder.id}-{String(selectedItemIndex + 1).padStart(3, '0')}
+                                  </span>
+                              </div>
                               <p className="text-xs text-gray-500 mt-0.5">查看商品规格、授权及交付状态</p>
                           </div>
                       </div>
@@ -1669,218 +1734,204 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                   </div>
                   
                   <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-gray-50/30 dark:bg-black/20">
-                      <div className="max-w-6xl mx-auto space-y-8">
-                          {/* Header Info Card */}
-                          <div className="bg-white dark:bg-[#1C1C1E] p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                              <div className="space-y-1">
-                                  <div className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">当前查看商品</div>
-                                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedItemForDetails.productName}</h2>
-                                  <div className="flex items-center gap-3 mt-2">
-                                      <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-xs font-bold rounded-lg border border-blue-100 dark:border-blue-800/30">{selectedItemForDetails.skuName}</span>
-                                      <span className="text-xs font-mono text-gray-400">{selectedItemForDetails.skuCode}</span>
+                      <div className="grid grid-cols-3 gap-6">
+
+                          {/* 左侧大列 (2/3)：商品交易信息、商品交付信息、商品授权信息 纵向排列 */}
+                          <div className="col-span-2 space-y-6">
+
+                              {/* 商品交易信息 */}
+                              <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
+                                  <div className="p-5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                      <Box className="w-5 h-5 text-blue-500" />
+                                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">商品交易信息</h4>
+                                  </div>
+                                  <div className="p-5">
+                                      {(() => {
+                                          const fields = [
+                                              { label: '商品名称', value: selectedItemForDetails.productName || '-', isAmount: false },
+                                              { label: '商品规格', value: [selectedItemForDetails.skuName, selectedItemForDetails.skuCode].filter(Boolean).join('  ·  ') || '-', isAmount: false },
+                                              { label: '授权类型', value: selectedItemForDetails.pricingOptionName || selectedItemForDetails.licenseType || '-', isAmount: false },
+                                              { label: '商品类型', value: selectedItemForDetails.productType || '-', isAmount: false },
+                                              { label: '数量', value: String(selectedItemForDetails.quantity), isAmount: false },
+                                              { label: '单价', value: `¥${selectedItemForDetails.priceAtPurchase.toLocaleString()}`, isAmount: true },
+                                              { label: '最终用户成交单价', value: selectedItemForDetails.finalUserUnitPrice != null ? `¥${selectedItemForDetails.finalUserUnitPrice.toLocaleString()}` : '-', isAmount: true },
+                                              { label: '计价单价', value: selectedItemForDetails.pricingUnitPrice != null ? `¥${selectedItemForDetails.pricingUnitPrice.toLocaleString()}` : '-', isAmount: true },
+                                              { label: '最终用户成交计价单价', value: selectedItemForDetails.finalUserPricingUnitPrice != null ? `¥${selectedItemForDetails.finalUserPricingUnitPrice.toLocaleString()}` : '-', isAmount: true },
+                                              { label: '订单明细备注', value: selectedItemForDetails.lineRemarks || '-', isAmount: false },
+                                          ];
+                                          return (
+                                              <div className="grid grid-cols-2 gap-x-6">
+                                                  {fields.map((f, idx) => (
+                                                      <div key={idx} className={`flex items-start gap-4 py-2.5 ${idx < fields.length - 2 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}>
+                                                          <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-36 shrink-0">{f.label}</span>
+                                                          <span className={`text-sm font-medium flex-1 ${f.isAmount ? 'text-orange-600 dark:text-orange-400' : 'text-gray-900 dark:text-white'}`}>{f.value}</span>
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          );
+                                      })()}
                                   </div>
                               </div>
-                              <div className="flex items-center gap-8 pr-4">
-                                  <div className="text-right">
-                                      <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">购买数量</div>
-                                      <div className="text-2xl font-bold text-gray-900 dark:text-white">x {selectedItemForDetails.quantity}</div>
+
+                              {/* 商品交付信息 */}
+                              <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
+                                  <div className="p-5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                      <Truck className="w-5 h-5 text-indigo-500" />
+                                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">商品交付信息</h4>
                                   </div>
-                                  <div className="w-px h-10 bg-gray-100 dark:bg-white/10"></div>
-                                  <div className="text-right">
-                                      <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">小计金额</div>
-                                      <div className="text-2xl font-bold text-[#0071E3] dark:text-[#0A84FF]">¥{(selectedItemForDetails.priceAtPurchase * selectedItemForDetails.quantity).toLocaleString()}</div>
+                                  <div className="p-5">
+                                      {(() => {
+                                          const activationLabel = selectedItemForDetails.activationMethod === 'LicenseKey' ? '授权码激活'
+                                              : selectedItemForDetails.activationMethod === 'Online' ? '在线激活' : '加密狗';
+                                          const fields = [
+                                              { label: '分发模式', value: selectedItemForDetails.distributionMode || '-' },
+                                              { label: '激活方式', value: activationLabel },
+                                              { label: '企业名称', value: selectedItemForDetails.enterpriseName || '-' },
+                                              { label: '企业ID', value: selectedItemForDetails.enterpriseId || '-' },
+                                              { label: '供货组织信息', value: selectedItemForDetails.supplyOrgInfo || '-' },
+                                              { label: '升级保障期限', value: selectedItemForDetails.upgradeWarrantyPeriod || '-' },
+                                          ];
+                                          return (
+                                              <div className="grid grid-cols-2 gap-x-6">
+                                                  {fields.map((f, idx) => (
+                                                      <div key={idx} className={`flex items-start gap-4 py-2.5 ${idx < fields.length - 2 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}>
+                                                          <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-24 shrink-0">{f.label}</span>
+                                                          <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{f.value}</span>
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          );
+                                      })()}
                                   </div>
                               </div>
+
+                              {/* 商品授权信息 */}
+                              <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
+                                  <div className="p-5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                      <ShieldCheck className="w-5 h-5 text-purple-500" />
+                                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">商品授权信息</h4>
+                                  </div>
+                                  <div className="p-5">
+                                      {(() => {
+                                          const fields = [
+                                              { label: '被授权方', value: selectedItemForDetails.licensee || '-' },
+                                              { label: '授权期限', value: selectedItemForDetails.licenseTerms || '-' },
+                                              { label: '授权开始计算', value: selectedItemForDetails.licenseStartMethod || '-' },
+                                              { label: '授权截止日期', value: selectedItemForDetails.licenseEndDate || '-' },
+                                              { label: '是否下级单位提供授权', value: selectedItemForDetails.subUnitLicenseAllowed == null ? '-' : selectedItemForDetails.subUnitLicenseAllowed ? '是' : '否' },
+                                          ];
+                                          return (
+                                              <div className="grid grid-cols-2 gap-x-6">
+                                                  {fields.map((f, idx) => (
+                                                      <div key={idx} className={`flex items-start gap-4 py-2.5 ${idx < fields.length - 2 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}>
+                                                          <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-32 shrink-0">{f.label}</span>
+                                                          <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{f.value}</span>
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          );
+                                      })()}
+                                  </div>
+                              </div>
+
                           </div>
 
-                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                              {/* Left Column: License & Delivery */}
-                              <div className="lg:col-span-2 space-y-8">
-                                  {/* License Details */}
-                                  <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
-                                      <div className="p-6 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
-                                          <Key className="w-5 h-5 text-indigo-500" />
-                                          <h4 className="text-sm font-bold text-gray-900 dark:text-white">授权与交付信息</h4>
-                                      </div>
-                                      <div className="p-8 grid grid-cols-2 gap-8">
-                                          <div className="space-y-4">
-                                              <div>
-                                                  <div className="text-[10px] text-gray-400 uppercase font-bold mb-1.5">激活方式</div>
-                                                  <div className="flex items-center gap-2">
-                                                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                                      <span className="text-sm font-bold text-gray-900 dark:text-white">
-                                                          {selectedItemForDetails.activationMethod === 'LicenseKey' ? '授权码激活' : 
-                                                           selectedItemForDetails.activationMethod === 'Online' ? '在线激活' : '加密狗'}
-                                                      </span>
+                          {/* 右侧小列 (1/3)：商品价格参考 + 安装包 纵向排列 */}
+                          <div className="space-y-6">
+
+                              {/* 商品价格参考 */}
+                              <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
+                                  <div className="p-5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                      <CreditCard className="w-5 h-5 text-green-500" />
+                                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">商品价格参考</h4>
+                                  </div>
+                                  <div className="p-5">
+                                      {(() => {
+                                          const fields = [
+                                              { label: '渠道等级', value: selectedItemForDetails.channelLevel || '-', isAmount: false },
+                                              { label: '协议编号', value: selectedItemForDetails.agreementNo || '-', isAmount: false },
+                                              { label: '匹配价格类型', value: selectedItemForDetails.matchedPriceType || '-', isAmount: false },
+                                              { label: '匹配价格', value: selectedItemForDetails.matchedPrice != null ? `¥${selectedItemForDetails.matchedPrice.toLocaleString()}` : '-', isAmount: true },
+                                              { label: '匹配价格ID', value: selectedItemForDetails.matchedPriceId || '-', isAmount: false },
+                                              { label: '建议销售价', value: selectedItemForDetails.suggestedRetailPrice != null ? `¥${selectedItemForDetails.suggestedRetailPrice.toLocaleString()}` : '-', isAmount: true },
+                                          ];
+                                          return (
+                                              <div className="divide-y divide-gray-50 dark:divide-white/5">
+                                                  {fields.map((f, idx) => (
+                                                      <div key={idx} className="flex items-start gap-3 py-2.5">
+                                                          <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-24 shrink-0">{f.label}</span>
+                                                          <span className={`text-sm font-medium flex-1 ${f.isAmount ? 'text-orange-600 dark:text-orange-400' : 'text-gray-900 dark:text-white'}`}>{f.value}</span>
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          );
+                                      })()}
+                                  </div>
+                              </div>
+
+                              {/* 安装包 */}
+                              <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
+                                  <div className="p-5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                      <Disc className="w-5 h-5 text-blue-500" />
+                                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">安装包</h4>
+                                  </div>
+                                  <div className="p-5">
+                                      {(() => {
+                                          const product = products.find(p => p.id === selectedItemForDetails.productId);
+                                          const pkgs = product?.installPackages;
+                                          if (!pkgs || pkgs.length === 0) {
+                                              return (
+                                                  <div className="flex flex-col items-center justify-center py-10 text-center space-y-3">
+                                                      <div className="w-12 h-12 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center">
+                                                          <AlertCircle className="w-6 h-6 text-gray-300" />
+                                                      </div>
+                                                      <div className="text-sm text-gray-400 italic leading-relaxed">
+                                                          暂无安装包数据
+                                                      </div>
                                                   </div>
-                                              </div>
-                                              <div>
-                                                  <div className="text-[10px] text-gray-400 uppercase font-bold mb-1.5">授权范围</div>
-                                                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">{selectedItemForDetails.quantity} 个并发授权 / 节点</div>
-                                              </div>
-                                              <div>
-                                                  <div className="text-[10px] text-gray-400 uppercase font-bold mb-1.5">企业ID</div>
-                                                  <div className="text-sm font-bold text-gray-900 dark:text-white font-mono">
-                                                      {selectedItemForDetails.enterpriseId || '-'}
-                                                  </div>
-                                              </div>
-                                          </div>
-                                          <div className="space-y-4">
-                                              <div>
-                                                  <div className="text-[10px] text-gray-400 uppercase font-bold mb-1.5">交付状态</div>
-                                                  <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase ${
-                                                      selectedItemForDetails.deliveredContent && selectedItemForDetails.deliveredContent.length > 0
-                                                      ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'
-                                                      : 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400'
-                                                  }`}>
-                                                      {selectedItemForDetails.deliveredContent && selectedItemForDetails.deliveredContent.length > 0 ? '已交付' : '待交付'}
-                                                  </span>
-                                              </div>
-                                              <div>
-                                                  <div className="text-[10px] text-gray-400 uppercase font-bold mb-1.5">授权周期</div>
-                                                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                      {selectedItemForDetails.pricingOptionName?.includes('永久') || selectedItemForDetails.pricingOptionName?.includes('Perpetual') ? '永久有效' : '年度订阅'}
-                                                  </div>
-                                              </div>
-                                          </div>
-                                      </div>
-                                      
-                                      {selectedItemForDetails.deliveredContent && selectedItemForDetails.deliveredContent.length > 0 && (
-                                          <div className="px-8 pb-8">
-                                              <div className="text-[10px] text-gray-400 uppercase font-bold mb-3">已发放授权码清单</div>
-                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                  {selectedItemForDetails.deliveredContent.map((code, idx) => (
-                                                      <div key={idx} className="group relative">
-                                                          <div className="text-xs font-mono bg-gray-50 dark:bg-white/5 px-4 py-3 rounded-xl border border-gray-100 dark:border-white/5 text-gray-700 dark:text-gray-300 flex justify-between items-center">
-                                                              {code}
-                                                              <button className="opacity-0 group-hover:opacity-100 text-blue-500 hover:text-blue-600 transition-opacity">
-                                                                  <ClipboardCheck className="w-4 h-4"/>
-                                                              </button>
+                                              );
+                                          }
+                                          return (
+                                              <div className="space-y-4">
+                                                  {pkgs.map((pkg, pkgIdx) => (
+                                                      <div key={pkgIdx} className="rounded-2xl border border-gray-100 dark:border-white/10 overflow-hidden">
+                                                          <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800/30">
+                                                              <Package className="w-4 h-4 text-blue-500 shrink-0" />
+                                                              <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">{pkg.name}</span>
+                                                              <span className="ml-auto text-xs font-bold font-mono text-blue-600 dark:text-blue-400 shrink-0">{pkg.id}</span>
+                                                          </div>
+                                                          <div className="divide-y divide-gray-50 dark:divide-white/5 px-4">
+                                                              {[
+                                                                  { label: '安装包编号', value: pkg.id, mono: true },
+                                                                  { label: '安装包名称', value: pkg.name },
+                                                                  { label: 'CPU', value: pkg.cpu || '-' },
+                                                                  { label: '操作系统', value: pkg.os || '-' },
+                                                                  { label: '架构', value: pkg.arch || '-' },
+                                                                  { label: '安装包链接', value: pkg.url, isLink: true },
+                                                                  { label: '安装包备注', value: pkg.remarks || '-' },
+                                                              ].map((row, i) => (
+                                                                  <div key={i} className="flex items-center gap-3 py-2.5">
+                                                                      <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-20 shrink-0">{row.label}</span>
+                                                                      {row.isLink ? (
+                                                                          row.value && row.value !== '-' ? (
+                                                                              <a href={row.value} target="_blank" rel="noreferrer" className="text-sm font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline flex-1 truncate">{row.value}</a>
+                                                                          ) : (
+                                                                              <span className="text-sm font-medium text-gray-400 flex-1">-</span>
+                                                                          )
+                                                                      ) : (
+                                                                          <span className={`text-sm font-medium flex-1 ${row.mono ? 'font-mono text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>{row.value}</span>
+                                                                      )}
+                                                                  </div>
+                                                              ))}
                                                           </div>
                                                       </div>
                                                   ))}
                                               </div>
-                                          </div>
-                                      )}
-                                  </div>
-
-                                  {/* Pricing Breakdown */}
-                                  <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
-                                      <div className="p-6 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
-                                          <CreditCard className="w-5 h-5 text-orange-500" />
-                                          <h4 className="text-sm font-bold text-gray-900 dark:text-white">价格明细</h4>
-                                      </div>
-                                      <div className="p-8 space-y-6">
-                                          <div className="flex justify-between items-center">
-                                              <div className="text-sm text-gray-500">基准目录单价</div>
-                                              <div className="text-sm font-mono text-gray-900 dark:text-white">¥{(selectedItemForDetails.priceAtPurchase * 1.2).toLocaleString()}</div>
-                                          </div>
-                                          <div className="flex justify-between items-center">
-                                              <div className="text-sm text-gray-500">成交议价单价</div>
-                                              <div className="text-sm font-mono text-gray-900 dark:text-white font-bold">¥{selectedItemForDetails.priceAtPurchase.toLocaleString()}</div>
-                                          </div>
-                                          <div className="flex justify-between items-center">
-                                              <div className="text-sm text-gray-500">折扣率</div>
-                                              <div className="text-xs font-bold text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded">83.3%</div>
-                                          </div>
-                                          <div className="pt-6 border-t border-gray-100 dark:border-white/10 flex justify-between items-end">
-                                              <div className="text-sm font-bold text-gray-900 dark:text-white">结算小计</div>
-                                              <div className="text-3xl font-bold text-[#0071E3] dark:text-[#0A84FF] font-mono">¥{(selectedItemForDetails.priceAtPurchase * selectedItemForDetails.quantity).toLocaleString()}</div>
-                                          </div>
-                                      </div>
+                                          );
+                                      })()}
                                   </div>
                               </div>
 
-                              {/* Right Column: Technical & Support */}
-                              <div className="space-y-8">
-                                  {/* Technical Specs / Install Package */}
-                                  <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
-                                      <div className="p-6 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
-                                          <Disc className="w-5 h-5 text-blue-500" />
-                                          <h4 className="text-sm font-bold text-gray-900 dark:text-white">技术规格与安装包</h4>
-                                      </div>
-                                      <div className="p-8 space-y-6">
-                                          {selectedItemForDetails.installPackageName ? (
-                                              <div className="space-y-6">
-                                                  <div className="flex items-center gap-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/30">
-                                                      <div className="w-12 h-12 bg-white dark:bg-black rounded-xl flex items-center justify-center shadow-sm">
-                                                          <Package className="w-6 h-6 text-blue-500" />
-                                                      </div>
-                                                      <div>
-                                                          <div className="text-sm font-bold text-gray-900 dark:text-white">{selectedItemForDetails.installPackageName}</div>
-                                                          <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase mt-0.5 tracking-wider">标准分发安装包</div>
-                                                      </div>
-                                                  </div>
-                                                  
-                                                  <div className="space-y-4">
-                                                      {(() => {
-                                                          const product = products.find(p => p.id === selectedItemForDetails.productId);
-                                                          const pkg = product?.installPackages?.find(p => p.name === selectedItemForDetails.installPackageName);
-                                                          if (!pkg) return <div className="text-xs text-gray-400 italic">未找到详细技术参数</div>;
-                                                          
-                                                          return (
-                                                              <div className="grid grid-cols-1 gap-4">
-                                                                  <div className="flex justify-between items-center py-2 border-b border-gray-50 dark:border-white/5">
-                                                                      <span className="text-xs text-gray-400 uppercase font-bold">CPU 限制</span>
-                                                                      <span className="text-sm font-bold text-gray-900 dark:text-white">{pkg.cpu || '全兼容'}</span>
-                                                                  </div>
-                                                                  <div className="flex justify-between items-center py-2 border-b border-gray-50 dark:border-white/5">
-                                                                      <span className="text-xs text-gray-400 uppercase font-bold">操作系统</span>
-                                                                      <span className="text-sm font-bold text-gray-900 dark:text-white">{pkg.os || '全兼容'}</span>
-                                                                  </div>
-                                                                  <div className="flex justify-between items-center py-2 border-b border-gray-50 dark:border-white/5">
-                                                                      <span className="text-xs text-gray-400 uppercase font-bold">架构体系</span>
-                                                                      <span className="text-sm font-bold text-gray-900 dark:text-white">{pkg.arch || 'x86/arm'}</span>
-                                                                  </div>
-                                                                  <div className="flex justify-between items-center py-2">
-                                                                      <span className="text-xs text-gray-400 uppercase font-bold">版本号</span>
-                                                                      <span className="text-sm font-mono text-gray-900 dark:text-white">{pkg.version}</span>
-                                                                  </div>
-                                                              </div>
-                                                          );
-                                                      })()}
-                                                  </div>
-                                              </div>
-                                          ) : (
-                                              <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
-                                                  <div className="w-16 h-16 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center">
-                                                      <AlertCircle className="w-8 h-8 text-gray-300" />
-                                                  </div>
-                                                  <div className="text-sm text-gray-400 italic leading-relaxed">
-                                                      该商品无需特定安装包<br/>或尚未关联分发资源
-                                                  </div>
-                                              </div>
-                                          )}
-                                      </div>
-                                  </div>
-
-                                  {/* Lifecycle & Support */}
-                                  <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
-                                      <div className="p-6 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
-                                          <RefreshCcw className="w-5 h-5 text-purple-500" />
-                                          <h4 className="text-sm font-bold text-gray-900 dark:text-white">生命周期与续费</h4>
-                                      </div>
-                                      <div className="p-8">
-                                          <div className="flex items-start gap-4">
-                                              <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center shrink-0">
-                                                  <Clock className="w-5 h-5 text-purple-500" />
-                                              </div>
-                                              <div>
-                                                  <div className="text-sm font-bold text-gray-900 dark:text-white mb-1">
-                                                      {selectedItemForDetails.pricingOptionName?.includes('永久') || selectedItemForDetails.pricingOptionName?.includes('Perpetual') 
-                                                          ? '永久授权模式' 
-                                                          : '订阅授权模式'}
-                                                  </div>
-                                                  <p className="text-xs text-gray-500 leading-relaxed">
-                                                      {selectedItemForDetails.pricingOptionName?.includes('永久') || selectedItemForDetails.pricingOptionName?.includes('Perpetual')
-                                                          ? '该资产属于永久性授权，一次性购买后可终身使用，建议定期关注版本升级策略。'
-                                                          : '该资产属于年度订阅制，系统将在到期前 90 天自动发起续费提醒并生成续费商机。'}
-                                                  </p>
-                                              </div>
-                                          </div>
-                                      </div>
-                                  </div>
-                              </div>
                           </div>
                       </div>
                   </div>

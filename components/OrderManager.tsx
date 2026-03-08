@@ -95,6 +95,8 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
     return firstAllowed ? firstAllowed.id : 'All';
   });
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchField, setSearchField] = useState<'id' | 'customerName' | 'buyerName'>('id');
+  const [isSearchFieldOpen, setIsSearchFieldOpen] = useState(false);
   
   // Advanced Filter State
   const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
@@ -159,7 +161,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   // User Details Drawer State
   const [detailsUser, setDetailsUser] = useState<User | null>(null);
@@ -205,6 +207,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   const [selectedChannelId, setSelectedChannelId] = useState('');
   const [businessManagerId, setBusinessManagerId] = useState('');
   const [salesRepId, setSalesRepId] = useState('');
+  const [creatorId, setCreatorId] = useState(currentUser.id);
   const [orderEnterpriseId, setOrderEnterpriseId] = useState('');
   
   // Step 3: Merchandise Selection (New Cascading Logic)
@@ -371,32 +374,27 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   };
 
   const getPaymentStatusBadge = (isPaid: boolean) => {
-    return isPaid ? (
-        <span className="unified-tag-green"><CheckCircle className="w-3 h-3" />已支付</span>
-    ) : (
-        <span className="unified-tag-gray"><Clock className="w-3 h-3" />待支付</span>
-    );
+    return isPaid
+        ? <span className="unified-tag-green">已支付</span>
+        : <span className="unified-tag-gray">待支付</span>;
   };
 
   const getStockStatusBadge = (order: Order) => {
-    if (order.status === OrderStatus.DELIVERED)
-        return <span className="unified-tag-green"><CheckCircle className="w-3 h-3" />已完成</span>;
-    if (order.status === OrderStatus.SHIPPED)
-        return <span className="unified-tag-indigo"><Truck className="w-3 h-3" />已发货</span>;
-    if (order.isShippingConfirmed)
-        return <span className="unified-tag-blue"><Package className="w-3 h-3" />待发货</span>;
+    if (order.status === OrderStatus.DELIVERED)         return <span className="unified-tag-green">已完成</span>;
+    if (order.status === OrderStatus.SHIPPED)           return <span className="unified-tag-indigo">已发货</span>;
+    if (order.isShippingConfirmed)                      return <span className="unified-tag-blue">待发货</span>;
     if (order.isAuthConfirmed || order.isPackageConfirmed || order.status === OrderStatus.PROCESSING_PROD)
-        return <span className="unified-tag-orange"><Box className="w-3 h-3" />备货中</span>;
-    return <span className="unified-tag-gray"><Clock className="w-3 h-3" />待处理</span>;
+                                                        return <span className="unified-tag-orange">备货中</span>;
+    return <span className="unified-tag-gray">待处理</span>;
   };
 
   const getSourceBadge = (source: OrderSource) => {
       switch(source) {
-          case 'Sales':        return <span className="unified-tag-blue"><UserIcon className="w-3 h-3" />商务代下单</span>;
-          case 'ChannelPortal':return <span className="unified-tag-indigo"><Network className="w-3 h-3" />渠道下单</span>;
-          case 'OnlineStore':  return <span className="unified-tag-orange"><Globe className="w-3 h-3" />官网下单</span>;
-          case 'APISync':      return <span className="unified-tag-gray"><Zap className="w-3 h-3" />第三方下单</span>;
-          case 'Renewal':      return <span className="unified-tag-green"><RefreshCcw className="w-3 h-3" />客户续费</span>;
+          case 'Sales':        return <span className="unified-tag-blue">后台下单</span>;
+          case 'ChannelPortal':return <span className="unified-tag-indigo">渠道下单</span>;
+          case 'OnlineStore':  return <span className="unified-tag-orange">官网下单</span>;
+          case 'APISync':      return <span className="unified-tag-gray">第三方下单</span>;
+          case 'Renewal':      return <span className="unified-tag-green">客户续费</span>;
           default:             return <span className="unified-tag-gray">{source}</span>;
       }
   };
@@ -411,6 +409,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
       setSelectedChannelId('');
       setSalesRepId(currentUser.role === 'Sales' ? currentUser.id : '');
       setBusinessManagerId('');
+      setCreatorId(currentUser.id);
       setNewOrderItems([]);
       setTempProductId('');
       setTempSkuId('');
@@ -516,6 +515,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
     const customer = customers.find(c => c.id === newOrderCustomer);
     const salesUser = users.find(u => u.id === salesRepId);
     const businessUser = users.find(u => u.id === businessManagerId);
+    const creatorUser = users.find(u => u.id === creatorId) || currentUser;
     const linkedOpp = opportunities.find(o => o.id === linkedOpportunityId);
 
     const maxId = orders.reduce((max, o) => {
@@ -559,6 +559,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
         approval: { salesApproved: false, businessApproved: false, financeApproved: false },
         approvalRecords: [], salesRepId: salesRepId, salesRepName: salesUser?.name, 
         businessManagerId: businessManagerId, businessManagerName: businessUser?.name,
+        creatorId: creatorUser.id, creatorName: creatorUser.name.replace(/\s*\(.*?\)/g, ''), creatorPhone: creatorUser.phone,
         buyerType, 
         buyerId: buyerType === 'Channel' ? selectedChannelId : (buyerType === 'Customer' ? newOrderCustomer : undefined),
         buyerName: buyerType === 'Channel' ? channels.find(c => c.id === selectedChannelId)?.name : customer?.companyName,
@@ -581,7 +582,12 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
     if (filterStatus === 'STOCK_SHIP') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && order.isPackageConfirmed && !order.isShippingConfirmed;
     if (filterStatus === 'STOCK_CD') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && order.isShippingConfirmed && !order.isCDBurned;
 
-    const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase()) || order.customerName.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || (
+        searchField === 'id'           ? order.id.toLowerCase().includes(searchLower) :
+        searchField === 'customerName' ? order.customerName.toLowerCase().includes(searchLower) :
+        (order.buyerName || order.customerName).toLowerCase().includes(searchLower)
+    );
     const matchesSource = filterSource === 'All' || order.source === filterSource;
     const matchesDate = (!filterDateStart || new Date(order.date) >= new Date(filterDateStart)) &&
                         (!filterDateEnd || new Date(order.date) <= new Date(new Date(filterDateEnd).setHours(23, 59, 59, 999)));
@@ -613,9 +619,10 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
     return matchesStatus && matchesSearch && matchesSource && matchesDate && matchesAmount && matchesAdvanced;
   });
 
-  const indexOfLastItem = currentPage * itemsPerPage;
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage) || 1;
+  const safePage = Math.min(currentPage, totalPages);
+  const indexOfLastItem = safePage * itemsPerPage;
   const currentOrders = filteredOrders.slice(indexOfLastItem - itemsPerPage, indexOfLastItem);
-  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
 
   const toggleSelectOrder = (id: string) => {
       const newSet = new Set(selectedOrderIds);
@@ -713,11 +720,10 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   };
 
   const getAction = (order: Order) => {
-      if (order.status === OrderStatus.CANCELLED || order.status === OrderStatus.REFUNDED) return null;
       const navigateToStep = (step: string) => navigate(`/orders/${order.id}`, { state: { openAction: step } });
       if (order.status === OrderStatus.PENDING_APPROVAL) return <button onClick={(e) => { e.stopPropagation(); navigateToStep('APPROVAL'); }} className="px-2 py-1 bg-yellow-50 hover:bg-yellow-100 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400 rounded-lg text-[10px] font-bold whitespace-nowrap transition border border-yellow-100 dark:border-yellow-800/30">去审批</button>;
       if (order.status === OrderStatus.PENDING_CONFIRM) return <button onClick={(e) => { e.stopPropagation(); navigateToStep('CONFIRM'); }} className="px-2 py-1 bg-orange-50 hover:bg-orange-100 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400 rounded-lg text-[10px] font-bold whitespace-nowrap transition border border-orange-100 dark:border-orange-800/30">去确认</button>;
-      return <span className="text-gray-400 text-[10px] whitespace-nowrap">详情</span>;
+      return null;
   };
 
   const clearAdvancedFilters = () => {
@@ -737,24 +743,67 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
       );
   };
 
+  const searchFieldOptions: { value: 'id' | 'customerName' | 'buyerName'; label: string; placeholder: string }[] = [
+    { value: 'id',           label: '订单编号', placeholder: '搜索订单编号…' },
+    { value: 'customerName', label: '客户名称', placeholder: '搜索客户名称…' },
+    { value: 'buyerName',    label: '买方名称', placeholder: '搜索买方名称…' },
+  ];
+  const currentSearchOption = searchFieldOptions.find(o => o.value === searchField)!;
+
   return (
     <div className="p-4 lg:p-8 max-w-[1600px] mx-auto space-y-6 animate-fade-in pb-24">
-      <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
-        <div className="w-full lg:w-auto">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">订单中心</h1>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
-            <div className="relative w-full sm:w-64">
-                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                <input 
-                    type="text" 
-                    placeholder="搜索单号或客户..." 
-                    className="w-full pl-9 pr-4 py-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white transition shadow-sm" 
-                    value={searchTerm} 
-                    onChange={(e) => setSearchTerm(e.target.value)} 
-                />
+      <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
+        {/* Left: title + search */}
+        <div className="flex items-center gap-4 w-full lg:w-auto">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">订单中心</h1>
+            {/* Search bar */}
+            <div className="flex items-stretch h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] shadow-sm w-full sm:w-[380px] transition-all focus-within:border-blue-400 dark:focus-within:border-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]">
+                {/* Field selector */}
+                <div className="relative flex-shrink-0">
+                    <button
+                        onClick={() => setIsSearchFieldOpen(v => !v)}
+                        className="h-full flex items-center gap-1.5 pl-3 pr-2.5 text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-white/5 rounded-l-lg border-r border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none whitespace-nowrap"
+                    >
+                        {currentSearchOption.label}
+                        <ChevronDown className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform duration-150 ${isSearchFieldOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {isSearchFieldOpen && (
+                        <>
+                            <div className="fixed inset-0 z-40" onClick={() => setIsSearchFieldOpen(false)} />
+                            <div className="absolute left-0 top-full mt-1.5 w-28 bg-white dark:bg-[#2C2C2E] border border-gray-100 dark:border-white/10 rounded-xl shadow-xl z-50 py-1 animate-fade-in">
+                                {searchFieldOptions.map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => { setSearchField(opt.value); setSearchTerm(''); setIsSearchFieldOpen(false); }}
+                                        className={`w-full text-left px-3 py-2 text-sm font-medium transition-colors ${searchField === opt.value ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
+                {/* Input */}
+                <div className="relative flex-1 flex items-center min-w-0">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 pointer-events-none shrink-0" />
+                    <input
+                        type="text"
+                        placeholder={currentSearchOption.placeholder}
+                        className="w-full h-full pl-8 pr-8 bg-transparent text-sm outline-none text-gray-900 dark:text-white placeholder:text-gray-400"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    {searchTerm && (
+                        <button onClick={() => setSearchTerm('')} className="absolute right-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-0.5 rounded">
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    )}
+                </div>
             </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
             
             <div className="relative">
                 <button 
@@ -917,9 +966,9 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
         <div className="unified-card overflow-hidden">
             <div className="overflow-x-auto max-h-[calc(100vh-320px)] overflow-y-auto custom-scrollbar">
           <table className="w-full text-left border-separate border-spacing-0">
-            <thead className="sticky top-0 z-10 unified-table-header backdrop-blur-md shadow-sm">
+            <thead className="sticky top-0 z-30 unified-table-header backdrop-blur-md shadow-sm">
               <tr>
-                <th className="p-5 w-12 pl-8 border-b border-gray-200/50 dark:border-white/10">
+                <th className="px-4 py-3 sticky left-0 z-30 bg-gray-50/95 dark:bg-[#1C1C1E] border-b border-gray-200/50 dark:border-white/10 w-[52px] min-w-[52px]">
                     <input 
                         type="checkbox" 
                         className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -928,27 +977,45 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                     />
                 </th>
                 {allColumns.map(col => visibleColumns.includes(col.id) && (
-                    <th key={col.id} className="p-5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">{col.label}</th>
+                    <th key={col.id} className={`px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 ${
+                        col.id === 'id'
+                            ? 'sticky left-[52px] z-30 bg-gray-50/95 dark:bg-[#1C1C1E] shadow-[2px_0_6px_-2px_rgba(0,0,0,0.08)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.3)]'
+                            : col.id === 'action'
+                            ? 'sticky right-[52px] z-30 bg-gray-50/95 dark:bg-[#1C1C1E] shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.08)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.3)] text-center'
+                            : ''
+                    }`}>{col.label}</th>
                 ))}
-                <th className="p-5 pr-8 border-b border-gray-200/50 dark:border-white/10"></th>
+                <th className="px-4 py-3 sticky right-0 z-30 bg-gray-50/95 dark:bg-[#1C1C1E] border-b border-gray-200/50 dark:border-white/10 w-[52px] min-w-[52px]"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-white/5 text-sm">
-              {currentOrders.map(order => (
-                <tr key={order.id} className={`group cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b border-gray-100/50 dark:border-white/5 last:border-0 ${selectedOrderIds.has(order.id) ? '!bg-blue-50/50 dark:!bg-blue-900/10' : ''}`} onClick={() => navigate(`/orders/${order.id}`)}>
-                  <td className="p-5 pl-8" onClick={(e) => e.stopPropagation()}>
+              {currentOrders.map(order => {
+                const isSelected = selectedOrderIds.has(order.id);
+                const stickyBg = isSelected
+                    ? 'bg-blue-50/80 dark:bg-blue-900/10'
+                    : 'bg-white dark:bg-[#1C1C1E] group-hover:bg-gray-50 dark:group-hover:bg-white/[0.03]';
+                return (
+                <tr key={order.id} className={`group hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors border-b border-gray-100/50 dark:border-white/5 last:border-0 ${isSelected ? '!bg-blue-50/50 dark:!bg-blue-900/10' : ''}`}>
+                  <td className={`px-4 py-3 sticky left-0 z-20 ${stickyBg} transition-colors`}>
                       <input 
                           type="checkbox" 
                           className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          checked={selectedOrderIds.has(order.id)}
+                          checked={isSelected}
                           onChange={() => toggleSelectOrder(order.id)}
                       />
                   </td>
-                  {visibleColumns.includes('id') && <td className="p-5 font-mono text-[#0071E3] dark:text-[#FF2D55] whitespace-nowrap">{order.id}</td>}
+                  {visibleColumns.includes('id') && (
+                      <td
+                          className={`px-4 py-3 font-mono text-[#0071E3] dark:text-[#FF2D55] whitespace-nowrap sticky left-[52px] z-20 ${stickyBg} shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors cursor-pointer hover:underline`}
+                          onClick={() => navigate(`/orders/${order.id}`)}
+                      >
+                          {order.id}
+                      </td>
+                  )}
                   {visibleColumns.includes('customer') && (
-                      <td className="p-5 max-w-[200px]">
+                      <td className="px-4 py-3 max-w-[180px]">
                         <div 
-                            className="font-bold text-gray-900 dark:text-white hover:text-[#0071E3] dark:hover:text-[#0A84FF] transition-colors truncate"
+                            className="font-semibold text-gray-900 dark:text-white hover:text-[#0071E3] dark:hover:text-[#0A84FF] transition-colors truncate"
                             title={order.customerName}
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -960,10 +1027,10 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                       </td>
                   )}
                   {visibleColumns.includes('buyer') && (
-                      <td className="p-5 max-w-[200px]">
+                      <td className="px-4 py-3 max-w-[180px]">
                         {order.buyerType === 'Channel' ? (
                             <div 
-                                className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer truncate"
+                                className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer truncate"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     const channelId = order.buyerId || channels.find(c => c.name === order.buyerName)?.id;
@@ -974,78 +1041,48 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                 {order.buyerName}
                             </div>
                         ) : (
-                            <div className="text-sm text-gray-500 dark:text-gray-400 truncate" title={order.customerName}>
+                            <div className="text-gray-500 dark:text-gray-400 truncate" title={order.customerName}>
                                 {order.customerName}
                             </div>
                         )}
                       </td>
                   )}
                   {visibleColumns.includes('products') && (
-                      <td className="p-5">
-                          <div className="flex flex-col gap-2 max-w-[240px]">
+                      <td className="px-4 py-3">
+                          <div className="flex flex-col gap-1.5 max-w-[220px]">
                               {order.items.slice(0, 2).map((item, idx) => (
-                                  <div key={idx} className="flex flex-col text-xs">
-                                      <div className="flex items-center justify-between">
-                                          <div className="truncate font-medium text-gray-700 dark:text-gray-300 max-w-[150px]" title={item.productName}>
-                                              {item.productName}
-                                          </div>
-                                          <span className="text-gray-400 shrink-0 ml-2">x{item.quantity}</span>
+                                  <div key={idx} className="flex flex-col">
+                                      <div className="flex items-center justify-between gap-2">
+                                          <div className="truncate font-medium text-gray-700 dark:text-gray-300" title={item.productName}>{item.productName}</div>
+                                          <span className="text-gray-400 shrink-0">×{item.quantity}</span>
                                       </div>
-                                      {item.skuName && (
-                                          <div className="text-[10px] text-gray-400 truncate mt-0.5">
-                                              规格: {item.skuName}
-                                          </div>
-                                      )}
+                                      {item.skuName && <span className="inline-flex w-fit mt-1 px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-full">{item.skuName}</span>}
                                   </div>
                               ))}
                               {order.items.length > 2 && (
-                                  <div className="text-[10px] text-gray-400 bg-gray-50 dark:bg-white/5 w-fit px-1.5 py-0.5 rounded">
-                                      + {order.items.length - 2} 更多
-                                  </div>
+                                  <div className="text-[10px] text-gray-400 bg-gray-50 dark:bg-white/5 w-fit px-1.5 py-0.5 rounded">+ {order.items.length - 2} 更多</div>
                               )}
                           </div>
                       </td>
                   )}
                   {visibleColumns.includes('sales') && (
-                      <td className="p-5 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                           {(() => {
                               const user = users.find(u => u.id === order.salesRepId);
                               const rawName = order.salesRepName || '未分配';
                               const displayName = rawName.replace(/\s*\(.*\)\s*$/, '');
                               const initials = displayName.slice(0, 1);
                               return (
-                                  <div 
-                                      className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 rounded-lg transition-all group/user"
-                                      onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (user) {
-                                              setDetailsUser(user);
-                                              setIsDrawerOpen(true);
-                                          }
-                                      }}
-                                  >
+                                  <div className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 rounded-lg transition-all group/user" onClick={(e) => { e.stopPropagation(); if (user) { setDetailsUser(user); setIsDrawerOpen(true); } }}>
                                       <div className="relative shrink-0">
-                                          <img 
-                                              src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${rawName}`} 
-                                              className="w-8 h-8 rounded-full object-cover bg-gray-100 border border-gray-200 dark:border-white/10 transition-transform group-hover/user:scale-110" 
-                                              alt={displayName}
-                                              onError={(e) => {
-                                                  const target = e.currentTarget;
-                                                  target.style.display = 'none';
-                                                  const fallback = target.nextElementSibling as HTMLElement;
-                                                  if (fallback) fallback.style.display = 'flex';
-                                              }}
-                                          />
-                                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 items-center justify-center text-white text-xs font-bold" style={{ display: 'none' }}>
-                                              {initials}
-                                          </div>
-                                          {user?.status === 'Active' && (
-                                              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-[#1C1C1E] rounded-full"></div>
-                                          )}
+                                          <img src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${rawName}`} className="w-7 h-7 rounded-full object-cover bg-gray-100 border border-gray-200 dark:border-white/10 transition-transform group-hover/user:scale-110" alt={displayName}
+                                              onError={(e) => { const t = e.currentTarget; t.style.display='none'; const f = t.nextElementSibling as HTMLElement; if(f) f.style.display='flex'; }} />
+                                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 items-center justify-center text-white text-[10px] font-bold" style={{display:'none'}}>{initials}</div>
+                                          {user?.status === 'Active' && <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 border-2 border-white dark:border-[#1C1C1E] rounded-full"></div>}
                                       </div>
                                       <div className="flex flex-col min-w-0">
-                                          <span className="font-bold text-gray-900 dark:text-white text-xs group-hover/user:text-blue-600 transition-colors truncate">{displayName}</span>
-                                          {user?.email && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[120px]">{user.email}</span>}
+                                          <span className="font-semibold text-gray-900 dark:text-white group-hover/user:text-blue-600 transition-colors truncate">{displayName}</span>
+                                          {user?.email && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[110px]">{user.email}</span>}
                                       </div>
                                   </div>
                               );
@@ -1053,45 +1090,23 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                       </td>
                   )}
                   {visibleColumns.includes('businessManager') && (
-                      <td className="p-5 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                           {(() => {
                               const user = users.find(u => u.id === order.businessManagerId);
                               const rawName = order.businessManagerName || '未分配';
                               const displayName = rawName.replace(/\s*\(.*\)\s*$/, '');
                               const initials = displayName.slice(0, 1);
                               return (
-                                  <div 
-                                      className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 rounded-lg transition-all group/user"
-                                      onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (user) {
-                                              setDetailsUser(user);
-                                              setIsDrawerOpen(true);
-                                          }
-                                      }}
-                                  >
+                                  <div className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 rounded-lg transition-all group/user" onClick={(e) => { e.stopPropagation(); if (user) { setDetailsUser(user); setIsDrawerOpen(true); } }}>
                                       <div className="relative shrink-0">
-                                          <img 
-                                              src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${rawName}`} 
-                                              className="w-8 h-8 rounded-full object-cover bg-gray-100 border border-gray-200 dark:border-white/10 transition-transform group-hover/user:scale-110" 
-                                              alt={displayName}
-                                              onError={(e) => {
-                                                  const target = e.currentTarget;
-                                                  target.style.display = 'none';
-                                                  const fallback = target.nextElementSibling as HTMLElement;
-                                                  if (fallback) fallback.style.display = 'flex';
-                                              }}
-                                          />
-                                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 items-center justify-center text-white text-xs font-bold" style={{ display: 'none' }}>
-                                              {initials}
-                                          </div>
-                                          {user?.status === 'Active' && (
-                                              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-[#1C1C1E] rounded-full"></div>
-                                          )}
+                                          <img src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${rawName}`} className="w-7 h-7 rounded-full object-cover bg-gray-100 border border-gray-200 dark:border-white/10 transition-transform group-hover/user:scale-110" alt={displayName}
+                                              onError={(e) => { const t = e.currentTarget; t.style.display='none'; const f = t.nextElementSibling as HTMLElement; if(f) f.style.display='flex'; }} />
+                                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 items-center justify-center text-white text-[10px] font-bold" style={{display:'none'}}>{initials}</div>
+                                          {user?.status === 'Active' && <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 border-2 border-white dark:border-[#1C1C1E] rounded-full"></div>}
                                       </div>
                                       <div className="flex flex-col min-w-0">
-                                          <span className="font-bold text-gray-900 dark:text-white text-xs group-hover/user:text-blue-600 transition-colors truncate">{displayName}</span>
-                                          {user?.email && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[120px]">{user.email}</span>}
+                                          <span className="font-semibold text-gray-900 dark:text-white group-hover/user:text-blue-600 transition-colors truncate">{displayName}</span>
+                                          {user?.email && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[110px]">{user.email}</span>}
                                       </div>
                                   </div>
                               );
@@ -1099,94 +1114,104 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                       </td>
                   )}
                   {visibleColumns.includes('department') && (
-                      <td className="p-5 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                           {(() => {
                               const user = users.find(u => u.id === order.salesRepId);
                               const fullPath = getDepartmentPath(user?.departmentId);
-                              if (fullPath === '-') return <span className="text-xs text-gray-400">-</span>;
+                              if (fullPath === '-') return <span className="text-gray-400">-</span>;
                               const leaf = fullPath.split(' / ').pop() || fullPath;
                               const parent = fullPath.split(' / ').slice(-2, -1)[0];
                               return (
                                   <div className="flex flex-col gap-0.5" title={fullPath}>
-                                      <span className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate max-w-[140px]">{leaf}</span>
-                                      {parent && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[140px]">{parent}</span>}
+                                      <span className="font-medium text-gray-800 dark:text-gray-200 truncate max-w-[130px]">{leaf}</span>
+                                      {parent && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[130px]">{parent}</span>}
                                   </div>
                               );
                           })()}
                       </td>
                   )}
-                  {visibleColumns.includes('source') && <td className="p-5 whitespace-nowrap">{getSourceBadge(order.source)}</td>}
+                  {visibleColumns.includes('source') && <td className="px-4 py-3 whitespace-nowrap">{getSourceBadge(order.source)}</td>}
                   {visibleColumns.includes('buyerType') && (
-                      <td className="p-5 whitespace-nowrap">
-                          {order.buyerType === 'Channel'   && <span className="unified-tag-indigo"><Network className="w-3 h-3" />{buyerTypeMap['Channel']}</span>}
-                          {order.buyerType === 'SelfDeal'  && <span className="unified-tag-orange"><Target className="w-3 h-3" />{buyerTypeMap['SelfDeal']}</span>}
-                          {order.buyerType === 'Customer'  && <span className="unified-tag-blue"><UserIcon className="w-3 h-3" />{buyerTypeMap['Customer']}</span>}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                          {order.buyerType === 'Channel'   && <span className="unified-tag-indigo">{buyerTypeMap['Channel']}</span>}
+                          {order.buyerType === 'SelfDeal'  && <span className="unified-tag-orange">{buyerTypeMap['SelfDeal']}</span>}
+                          {order.buyerType === 'Customer'  && <span className="unified-tag-blue">{buyerTypeMap['Customer']}</span>}
                           {!order.buyerType                && <span className="unified-tag-gray">{buyerTypeMap['Customer']}</span>}
                       </td>
                   )}
-                  {visibleColumns.includes('date') && <td className="p-5 text-gray-400 dark:text-gray-500 font-mono text-[11px] whitespace-nowrap">{new Date(order.date).toLocaleString('zh-CN', { hour12: false })}</td>}
-                  {visibleColumns.includes('status') && <td className="p-5 whitespace-nowrap">{getStatusBadge(order.status)}</td>}
-                  {visibleColumns.includes('paymentStatus') && <td className="p-5 whitespace-nowrap">{getPaymentStatusBadge(order.isPaid)}</td>}
-                  {visibleColumns.includes('stockStatus') && <td className="p-5 whitespace-nowrap">{getStockStatusBadge(order)}</td>}
-                  {visibleColumns.includes('total') && <td className="p-5 text-right font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap font-mono">¥{order.total.toLocaleString()}</td>}
-                  
+                  {visibleColumns.includes('date') && <td className="px-4 py-3 text-gray-400 dark:text-gray-500 font-mono text-[11px] whitespace-nowrap">{new Date(order.date).toLocaleString('zh-CN', { hour12: false })}</td>}
+                  {visibleColumns.includes('status') && <td className="px-4 py-3 whitespace-nowrap">{getStatusBadge(order.status)}</td>}
+                  {visibleColumns.includes('paymentStatus') && <td className="px-4 py-3 whitespace-nowrap">{getPaymentStatusBadge(order.isPaid)}</td>}
+                  {visibleColumns.includes('stockStatus') && <td className="px-4 py-3 whitespace-nowrap">{getStockStatusBadge(order)}</td>}
+                  {visibleColumns.includes('total') && <td className="px-4 py-3 text-right font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap font-mono">¥{order.total.toLocaleString()}</td>}
                   {visibleColumns.includes('payment') && (
-                      <td className="p-5 text-gray-600 dark:text-gray-300 text-xs">
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                           {order.paymentMethod ? paymentMethodMap[order.paymentMethod] : '-'}
                       </td>
                   )}
                   {visibleColumns.includes('delivery') && (
-                      <td className="p-5">
+                      <td className="px-4 py-3">
                           {order.deliveryMethod ? (
-                              <span className={`px-2.5 py-1 rounded-[8px] text-[10px] font-bold uppercase tracking-wider border h-6 flex items-center w-fit ${
-                                  order.deliveryMethod === 'Online' 
-                                  ? 'bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/30' 
-                                  : order.deliveryMethod === 'Offline'
-                                  ? 'bg-orange-50 text-orange-600 border-orange-100 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800/30'
-                                  : 'bg-purple-50 text-purple-600 border-purple-100 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800/30'
-                              }`}>
-                                  {deliveryMethodMap[order.deliveryMethod]}
-                              </span>
-                          ) : '-'}
+                              <span className={`unified-tag ${
+                                  order.deliveryMethod === 'Online'  ? 'unified-tag-blue' :
+                                  order.deliveryMethod === 'Offline' ? 'unified-tag-orange' : 'unified-tag-indigo'
+                              }`}>{deliveryMethodMap[order.deliveryMethod]}</span>
+                          ) : <span className="text-gray-400">-</span>}
                       </td>
                   )}
                   {visibleColumns.includes('address') && (
-                      <td className="p-5 text-gray-600 dark:text-gray-300 text-xs max-w-[200px] truncate" title={order.shippingAddress}>
+                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 max-w-[180px] truncate" title={order.shippingAddress}>
                           {order.shippingAddress || '-'}
                       </td>
                   )}
                   {visibleColumns.includes('invoice') && (
-                      <td className="p-5 text-gray-600 dark:text-gray-300 text-xs max-w-[150px] truncate" title={order.invoiceInfo?.title}>
+                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 max-w-[150px] truncate" title={order.invoiceInfo?.title}>
                           {order.invoiceInfo?.title || '-'}
                       </td>
                   )}
                   {visibleColumns.includes('opportunity') && (
-                      <td className="p-5 text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer text-xs max-w-[150px] truncate" title={order.opportunityName} onClick={(e) => { e.stopPropagation(); if (order.opportunityId) navigate(`/opportunities/${order.opportunityId}`); }}>
+                      <td className="px-4 py-3 text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer max-w-[150px] truncate" title={order.opportunityName} onClick={(e) => { e.stopPropagation(); if (order.opportunityId) navigate(`/opportunities/${order.opportunityId}`); }}>
                           {order.opportunityName || '-'}
                       </td>
                   )}
-
-                  {visibleColumns.includes('action') && <td className="p-5 text-center whitespace-nowrap">{getAction(order)}</td>}
-                  <td className="p-5 pr-8 text-right"><ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-blue-500 transition-colors" /></td>
+                  {visibleColumns.includes('action') && (
+                      <td className={`px-4 py-3 text-center whitespace-nowrap sticky right-[52px] z-20 ${stickyBg} shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors`}>
+                          {getAction(order)}
+                      </td>
+                  )}
+                  <td className={`px-4 py-3 sticky right-0 z-20 w-[52px] min-w-[52px] ${stickyBg} transition-colors`} />
                 </tr>
-              ))}
+                );
+              })}
               {currentOrders.length === 0 && <tr><td colSpan={visibleColumns.length + 2} className="p-12 text-center text-gray-400">暂无订单数据</td></tr>}
             </tbody>
           </table>
         </div>
         
-        {totalPages > 1 && (
-            <div className="flex justify-between items-center p-5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5">
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                    共 {filteredOrders.length} 条数据
-                </div>
-                <div className="flex items-center gap-4">
-                    <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1} className="px-4 py-2 rounded-lg bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium shadow-sm transition">上一页</button>
-                    <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400">第 {currentPage} 页 / 共 {totalPages} 页</div>
-                    <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages} className="px-4 py-2 rounded-lg bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium shadow-sm transition">下一页</button>
+        <div className="flex justify-between items-center px-5 py-3.5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5">
+            <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-500 dark:text-gray-400">共 <span className="font-semibold text-gray-700 dark:text-gray-300">{filteredOrders.length}</span> 条</span>
+                <div className="flex items-center gap-1 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-lg p-0.5 shadow-sm">
+                    {[20, 50, 100].map(n => (
+                        <button
+                            key={n}
+                            onClick={() => { setItemsPerPage(n); setCurrentPage(1); }}
+                            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${itemsPerPage === n ? 'bg-blue-600 dark:bg-blue-500 text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+                        >
+                            {n}
+                        </button>
+                    ))}
+                    <span className="text-[10px] text-gray-400 pl-1 pr-1.5">条/页</span>
                 </div>
             </div>
-        )}
+            <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-400 dark:text-gray-500">第 {currentPage} / {totalPages} 页</span>
+                <div className="flex items-center gap-1.5">
+                    <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1} className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium shadow-sm transition disabled:cursor-not-allowed">上一页</button>
+                    <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages} className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium shadow-sm transition disabled:cursor-not-allowed">下一页</button>
+                </div>
+            </div>
+        </div>
       </div>
     </div>
 
@@ -1432,7 +1457,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                     { id: 'OnlineStore', label: '官网下单', icon: Globe, color: 'text-orange-500 bg-orange-50 dark:bg-orange-900/20' },
                                     { id: 'ChannelPortal', label: '渠道下单', icon: Network, color: 'text-purple-500 bg-purple-50 dark:bg-purple-900/20' },
                                     { id: 'APISync', label: '第三方系统', icon: Radio, color: 'text-teal-500 bg-teal-50 dark:bg-teal-900/20' },
-                                    { id: 'Sales', label: '商务代下单', icon: UserIcon, color: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' }
+                                    { id: 'Sales', label: '后台下单', icon: UserIcon, color: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' }
                                 ].map(src => (
                                     <button 
                                         key={src.id}
@@ -1478,6 +1503,53 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                         <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed relative z-10">{type.desc}</p>
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+
+                        {/* 制单人选择 */}
+                        <div>
+                            <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                                <UserIcon className="w-5 h-5 text-blue-500"/> 制单人
+                            </h4>
+                            <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-white/5 p-5 flex items-center gap-4 max-w-sm">
+                                {(() => {
+                                    const sel = users.find(u => u.id === creatorId) || currentUser;
+                                    return (
+                                        <>
+                                            <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-100 dark:border-white/10 shrink-0">
+                                                <img
+                                                    src={sel.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${sel.name}`}
+                                                    alt=""
+                                                    className="w-full h-full object-cover"
+                                                    onError={e => {
+                                                        const t = e.currentTarget;
+                                                        t.style.display = 'none';
+                                                        const p = t.parentElement;
+                                                        if (p && !p.querySelector('span')) {
+                                                            const s = document.createElement('span');
+                                                            s.className = 'w-full h-full flex items-center justify-center text-white text-xs font-bold bg-gradient-to-br from-blue-400 to-indigo-600';
+                                                            s.textContent = sel.name.replace(/\s*\(.*?\)/g, '').charAt(0);
+                                                            p.appendChild(s);
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{sel.name.replace(/\s*\(.*?\)/g, '')}</div>
+                                                {sel.phone && <div className="text-xs text-gray-400 font-mono mt-0.5">{sel.phone}</div>}
+                                            </div>
+                                            <select
+                                                className="text-sm bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-[#0071E3] transition"
+                                                value={creatorId}
+                                                onChange={e => setCreatorId(e.target.value)}
+                                            >
+                                                {users.filter(u => u.status === 'Active').map(u => (
+                                                    <option key={u.id} value={u.id}>{u.name.replace(/\s*\(.*?\)/g, '')}</option>
+                                                ))}
+                                            </select>
+                                        </>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>

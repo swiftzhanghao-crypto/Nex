@@ -107,8 +107,8 @@ function App() {
         ] 
       }],
       installPackages: [
-        { id: 'AZ0006022', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#', cpu: '麒麟', os: 'UOS', arch: '-' },
-        { id: 'pkg1-2', name: 'WPS 365 Mac端', version: 'v6.0.1', url: '#', cpu: 'Intel/M1', os: 'macOS', arch: 'x64/arm64' }
+        { id: 'AZ0006022', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#', platform: 'Windows', cpu: '麒麟', os: 'UOS', arch: '-' },
+        { id: 'pkg1-2', name: 'WPS 365 Mac端', version: 'v6.0.1', url: '#', platform: 'macOS', cpu: 'Intel/M1', os: 'macOS', arch: 'x64/arm64' }
       ]
     },
     { 
@@ -120,7 +120,7 @@ function App() {
           {id:'o1-2-2', title:'月度订阅 (基础版)', price:19, license:{type:'Subscription', period:1, periodUnit:'Month', scope:'1 User'}}
         ] 
       }],
-      installPackages: [{ id: 'pkg1-2-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#' }]
+      installPackages: [{ id: 'pkg1-2-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 10/11' }]
     },
     { 
       id: 'PROD-PUB-002', name: 'WPS 365 高级版', category: 'WPS365公有云', subCategory: 'WPS365高级版', status: 'OnShelf', tags: ['AI', '生态'],
@@ -132,8 +132,8 @@ function App() {
         ] 
       }],
       installPackages: [
-        { id: 'pkg2-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#' },
-        { id: 'pkg2-2', name: 'WPS 365 移动端', version: 'v11.5.0', url: '#' }
+        { id: 'pkg2-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 10/11' },
+        { id: 'pkg2-2', name: 'WPS 365 移动端', version: 'v11.5.0', url: '#', platform: 'Android/iOS', cpu: '通用', os: 'Android 8+ / iOS 14+' }
       ]
     },
     { 
@@ -145,7 +145,7 @@ function App() {
           {id:'o2-2-2', title:'永久授权 (教育版)', price:999, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 User'}}
         ] 
       }],
-      installPackages: [{ id: 'pkg2-2-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#' }]
+      installPackages: [{ id: 'pkg2-2-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 10/11' }]
     },
 
     // WPS365私有云
@@ -158,7 +158,7 @@ function App() {
           {id:'o5-2', title:'年度订阅 (私有云)', price:15000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
         ] 
       }],
-      installPackages: [{ id: 'pkg5-1', name: '私有云部署包', version: 'v7.0.0', url: '#' }]
+      installPackages: [{ id: 'pkg5-1', name: '私有云部署包', version: 'v7.0.0', url: '#', platform: 'Linux', cpu: 'x86_64/ARM', os: 'CentOS 7+ / UOS' }]
     },
     { 
       id: 'PROD-PVT-001-2', name: 'WPS 365 基础版 (私有云)', category: 'WPS365私有云', subCategory: 'WPS365高级版（私有云）', status: 'OnShelf', tags: ['IM'],
@@ -169,7 +169,7 @@ function App() {
           {id:'o5-2-2', title:'年度订阅 (私有云基础)', price:8000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
         ] 
       }],
-      installPackages: [{ id: 'pkg5-2-1', name: '私有云部署包', version: 'v7.0.0', url: '#' }]
+      installPackages: [{ id: 'pkg5-2-1', name: '私有云部署包', version: 'v7.0.0', url: '#', platform: 'Linux', cpu: 'x86_64/ARM', os: 'CentOS 7+ / UOS' }]
     },
 
     // 私有云单品
@@ -182,7 +182,7 @@ function App() {
           {id:'o8-2', title:'年度订阅 (WebOffice)', price:6000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
         ] 
       }],
-      installPackages: [{ id: 'pkg8-1', name: 'WebOffice SDK', version: 'v3.2.1', url: '#' }]
+      installPackages: [{ id: 'pkg8-1', name: 'WebOffice SDK', version: 'v3.2.1', url: '#', platform: 'Web', cpu: '通用', os: '全平台' }]
     },
     { 
       id: 'PROD-ITEM-001-2', name: 'Web Office 增强组件', category: '私有云单品', subCategory: 'Web Office', status: 'OnShelf', tags: ['生态', 'AI'],
@@ -193,7 +193,7 @@ function App() {
           {id:'o8-2-2', title:'年度订阅 (WebOffice增强)', price:12000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
         ] 
       }],
-      installPackages: [{ id: 'pkg8-2-1', name: 'WebOffice SDK', version: 'v3.2.1', url: '#' }]
+      installPackages: [{ id: 'pkg8-2-1', name: 'WebOffice SDK', version: 'v3.2.1', url: '#', platform: 'Web', cpu: '通用', os: '全平台' }]
     },
 
     // Win端
@@ -206,7 +206,7 @@ function App() {
           {id:'o12-2', title:'年度订阅 (单机版)', price:158, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
         ] 
       }],
-      installPackages: [{ id: 'pkg12-1', name: 'WPS 2019 安装包', version: 'v11.1.0', url: '#' }]
+      installPackages: [{ id: 'pkg12-1', name: 'WPS 2019 安装包', version: 'v11.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 7/10/11' }]
     },
     { 
       id: 'PROD-WIN-001-2', name: 'WPS Office 2019 增强版', category: 'Win端', subCategory: 'Win2019', status: 'OnShelf', tags: ['生态', 'AI'],
@@ -217,7 +217,7 @@ function App() {
           {id:'o12-2-2', title:'年度订阅', price:218, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
         ] 
       }],
-      installPackages: [{ id: 'pkg12-2-1', name: 'WPS 2019 安装包', version: 'v11.1.0', url: '#' }]
+      installPackages: [{ id: 'pkg12-2-1', name: 'WPS 2019 安装包', version: 'v11.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 7/10/11' }]
     },
 
     // 其他软件
@@ -230,7 +230,7 @@ function App() {
           {id:'o15-2', title:'年度订阅 (Mac版)', price:158, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
         ] 
       }],
-      installPackages: [{ id: 'pkg15-1', name: 'WPS Mac 安装包', version: 'v6.0.1', url: '#' }]
+      installPackages: [{ id: 'pkg15-1', name: 'WPS Mac 安装包', version: 'v6.0.1', url: '#', platform: 'macOS', cpu: 'Intel/M1/M2', os: 'macOS 11+' }]
     },
     { 
       id: 'PROD-OTH-001-2', name: 'WPS for Mac 个人版', category: '其他软件', subCategory: 'WPS for Mac', status: 'OnShelf', tags: ['生态'],
@@ -241,7 +241,7 @@ function App() {
           {id:'o15-2-2', title:'会员订阅 (Mac个人)', price:89, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}}
         ] 
       }],
-      installPackages: [{ id: 'pkg15-2-1', name: 'WPS Mac 安装包', version: 'v6.0.1', url: '#' }]
+      installPackages: [{ id: 'pkg15-2-1', name: 'WPS Mac 安装包', version: 'v6.0.1', url: '#', platform: 'macOS', cpu: 'Intel/M1/M2', os: 'macOS 11+' }]
     },
 
     // 退市商品
@@ -254,7 +254,7 @@ function App() {
           {id:'o20-2', title:'年度订阅', price:128, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
         ] 
       }],
-      installPackages: [{ id: 'pkg20-1', name: 'WPS 2016 安装包', version: 'v10.1.0', url: '#' }]
+      installPackages: [{ id: 'pkg20-1', name: 'WPS 2016 安装包', version: 'v10.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 7/10' }]
     }
   ]);
 

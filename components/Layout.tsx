@@ -26,6 +26,8 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
     return false;
   });
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const toggleSection = (id: string) => setCollapsedSections(prev => ({ ...prev, [id]: !prev[id] }));
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -71,6 +73,24 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
   const currentUserRole = roles.find(r => r.id === currentUser.role);
   const permissions = currentUserRole?.permissions || [];
   const hasPermission = (perm: string) => permissions.includes('all') || permissions.includes(perm);
+
+  const renderSectionGroup = (id: string, label: string, children: React.ReactNode) => {
+    const isOpen = !collapsedSections[id];
+    return (
+      <div key={id} className="mb-1">
+        {!isCollapsed && (
+          <button
+            onClick={() => toggleSection(id)}
+            className="flex items-center justify-between w-full px-4 py-1.5 mt-3 mb-0.5 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+          >
+            <span className="text-sm font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">{label}</span>
+            <ChevronDown className={`w-3 h-3 text-gray-300 dark:text-gray-600 transition-transform duration-200 ${isOpen ? '' : '-rotate-90'}`} />
+          </button>
+        )}
+        {(isOpen || isCollapsed) && <div className="space-y-0.5">{children}</div>}
+      </div>
+    );
+  };
 
   const topNavItems = [
       { id: 'DASHBOARD', label: '数据看板', path: '/', permissions: ['dashboard_view'] },
@@ -249,72 +269,100 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
                       </button>
                   </div>
 
-                  <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto no-scrollbar">
+                  <nav className="flex-1 px-3 py-4 overflow-y-auto no-scrollbar">
+
                     {activeTopNav === 'DASHBOARD' && (
-                        <>
-                            <div className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2 mt-6 transition-all duration-300 ${isCollapsed ? 'lg:opacity-0 lg:h-0 lg:mb-0 lg:mt-0 lg:overflow-hidden' : ''}`}>业务概览</div>
-                            <NavItem to="/" icon={LayoutDashboard} label="数据看板" />
-                        </>
+                      <>
+                        {renderSectionGroup('dash_main', '数据看板',
+                          <NavItem to="/" icon={LayoutDashboard} label="数据看板" />
+                        )}
+                      </>
                     )}
 
                     {activeTopNav === 'ORDER_CENTER' && (
-                        <>
-                            <div className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2 mt-6 transition-all duration-300 ${isCollapsed ? 'lg:opacity-0 lg:h-0 lg:mb-0 lg:mt-0 lg:overflow-hidden' : ''}`}>订单中心</div>
-                            <NavItem to="/orders" icon={ShoppingCart} label="订单中心" />
-                            
-                            <div className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2 mt-6 transition-all duration-300 ${isCollapsed ? 'lg:opacity-0 lg:h-0 lg:mb-0 lg:mt-0 lg:overflow-hidden' : ''}`}>资源管理</div>
-                            <NavItem to="/opportunities" icon={Target} label="商机信息" />
+                      <>
+                        {renderSectionGroup('order_main', '订单中心',
+                          <NavItem to="/orders" icon={ShoppingCart} label="订单列表" />
+                        )}
+                        {renderSectionGroup('order_resources', '资源信息',
+                          <>
                             <NavItem to="/customers" icon={Users} label="客户信息" />
+                            <NavItem to="/opportunities" icon={Target} label="商机信息" />
                             <NavItem to="/channels" icon={Network} label="渠道管理" />
-                        </>
+                          </>
+                        )}
+                      </>
                     )}
 
                     {activeTopNav === 'LEADS_CENTER' && (
-                        <>
-                            <div className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2 mt-1 transition-all duration-300 ${isCollapsed ? 'lg:opacity-0 lg:h-0 lg:mb-0 lg:mt-0 lg:overflow-hidden' : ''}`}>线索管理</div>
-                            <NavItem to="/leads" icon={Target} label="线索列表" />
-                        </>
+                      <>
+                        {renderSectionGroup('leads_main', '线索管理',
+                          <NavItem to="/leads" icon={Target} label="线索列表" />
+                        )}
+                      </>
                     )}
 
                     {activeTopNav === 'PRODUCT_CENTER' && (
-                        <>
-                            <div className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2 mt-1 transition-all duration-300 ${isCollapsed ? 'lg:opacity-0 lg:h-0 lg:mb-0 lg:mt-0 lg:overflow-hidden' : ''}`}>商品管理</div>
+                      <>
+                        {renderSectionGroup('product_main', '商品中心',
+                          <>
                             <NavItem to="/product-center" icon={Layers} label="商品展示" />
                             <NavItem to="/products" icon={Package} label="商品列表" />
-                        </>
+                          </>
+                        )}
+                      </>
                     )}
 
                     {activeTopNav === 'OPERATIONS_CENTER' && (
-                        <>
-                            <div className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2 mt-1 transition-all duration-300 ${isCollapsed ? 'lg:opacity-0 lg:h-0 lg:mb-0 lg:mt-0 lg:overflow-hidden' : ''}`}>运营中心</div>
+                      <>
+                        {renderSectionGroup('ops_core', '核心业务',
+                          <>
                             <NavItem to="/ops/dashboard" icon={BarChart3} label="指标看板" />
                             <NavItem to="/ops/enterprise" icon={Building2} label="企业管理" />
                             <NavItem to="/ops/crm" icon={Users} label="CRM" />
                             <NavItem to="/ops/orders" icon={ShoppingCart} label="订单管理" />
+                          </>
+                        )}
+                        {renderSectionGroup('ops_manage', '运营管理',
+                          <>
                             <NavItem to="/ops/ops-mgmt" icon={Activity} label="运营管理" />
                             <NavItem to="/ops/strategy" icon={Target} label="策略管理" />
-                            <NavItem to="/ops/menu-mgmt" icon={LayoutList} label="企业后台菜单管理" />
-                            <NavItem to="/ops/client" icon={Monitor} label="企业专属客户端" />
+                            <NavItem to="/ops/menu-mgmt" icon={LayoutList} label="菜单管理" />
+                            <NavItem to="/ops/client" icon={Monitor} label="专属客户端" />
+                          </>
+                        )}
+                        {renderSectionGroup('ops_data', '数据与分析',
+                          <>
                             <NavItem to="/ops/stats" icon={PieChart} label="数据统计" />
                             <NavItem to="/ops/portrait" icon={Contact2} label="企业画像" />
                             <NavItem to="/ops/efficiency" icon={Zap} label="效率平台" />
+                          </>
+                        )}
+                        {renderSectionGroup('ops_system', '系统工具',
+                          <>
                             <NavItem to="/ops/logs" icon={FileText} label="日志管理" />
                             <NavItem to="/ops/isolation" icon={ArrowUpCircle} label="升级隔离" />
                             <NavItem to="/ops/settings" icon={Settings} label="系统设置" />
                             <NavItem to="/ops/migration" icon={Database} label="数据迁移" />
                             <NavItem to="/ops/connector" icon={LinkIcon} label="连接器" />
-                            <NavItem to="/ops/connector-admin" icon={Settings2} label="连接器-管理后台" />
-                        </>
+                            <NavItem to="/ops/connector-admin" icon={Settings2} label="连接器管理" />
+                          </>
+                        )}
+                      </>
                     )}
 
                     {activeTopNav === 'SYSTEM_CONFIG' && currentUser.role === 'Admin' && (
-                        <>
-                            <div className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 mb-2 mt-1 transition-all duration-300 ${isCollapsed ? 'lg:opacity-0 lg:h-0 lg:mb-0 lg:mt-0 lg:overflow-hidden' : ''}`}>系统配置</div>
+                      <>
+                        {renderSectionGroup('system_main', '系统配置',
+                          <>
                             <NavItem to="/organization" icon={Building2} label="组织架构" />
                             <NavItem to="/users" icon={Users} label="用户管理" />
                             <NavItem to="/roles" icon={Shield} label="角色管理" />
-                        </>
+                          </>
+                        )}
+                      </>
                     )}
+
                   </nav>
 
                   {/* Sidebar Footer - Collapse Button */}

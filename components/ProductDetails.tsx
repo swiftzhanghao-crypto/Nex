@@ -291,19 +291,25 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ products, setProducts, 
                           {productForm.installPackages && productForm.installPackages.length > 0 ? (
                               <div className="space-y-3">
                                   {productForm.installPackages.map((pkg) => (
-                                      <div key={pkg.id} className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg border border-gray-100 dark:border-white/5 group">
-                                          <div className="flex justify-between items-start mb-1">
-                                              <div className="font-bold text-sm text-gray-800 dark:text-gray-200">{pkg.name}</div>
+                                      <div key={pkg.id} className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
+                                          <div className="flex justify-between items-center px-4 py-3 bg-gray-50 dark:bg-white/5 border-b border-gray-100 dark:border-white/5">
+                                              <div className="font-semibold text-sm text-gray-900 dark:text-white">{pkg.name}</div>
                                               <a href={pkg.url} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 p-1 bg-blue-50 dark:bg-blue-900/20 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/40 transition">
                                                   <Download className="w-3.5 h-3.5" />
                                               </a>
                                           </div>
-                                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-gray-500 dark:text-gray-400 mt-2">
-                                              <div className="flex justify-between"><span>版本:</span><span className="dark:text-gray-300">{pkg.version}</span></div>
-                                              <div className="flex justify-between"><span>编号:</span><span className="font-mono dark:text-gray-300">{pkg.id}</span></div>
-                                              <div className="flex justify-between"><span>CPU:</span><span className="dark:text-gray-300">{pkg.cpu || '-'}</span></div>
-                                              <div className="flex justify-between"><span>OS:</span><span className="dark:text-gray-300">{pkg.os || '-'}</span></div>
-                                              <div className="flex justify-between"><span>架构:</span><span className="dark:text-gray-300">{pkg.arch || '-'}</span></div>
+                                          <div className="divide-y divide-gray-50 dark:divide-white/5 px-4">
+                                              {[
+                                                  { label: '编号', value: pkg.id, mono: true },
+                                                  { label: '发布平台', value: pkg.platform || '-' },
+                                                  { label: '操作系统', value: pkg.os || '-' },
+                                                  { label: 'CPU', value: pkg.cpu || '-' },
+                                              ].map((row, i) => (
+                                                  <div key={i} className="flex items-center gap-3 py-2">
+                                                      <span className="text-xs text-gray-400 dark:text-gray-500 text-right w-16 shrink-0">{row.label}</span>
+                                                      <span className={`text-xs font-medium text-gray-900 dark:text-white flex-1 ${row.mono ? 'font-mono text-blue-600 dark:text-blue-400' : ''}`}>{row.value}</span>
+                                                  </div>
+                                              ))}
                                           </div>
                                       </div>
                                   ))}
