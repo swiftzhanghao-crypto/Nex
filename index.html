@@ -73,37 +73,52 @@
       /* Animations */
       @keyframes fadeIn {
         from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
+        to { opacity: 1; transform: none; }
       }
       @keyframes fadeOut {
-        from { opacity: 1; transform: translateY(0); }
+        from { opacity: 1; }
         to { opacity: 0; transform: translateY(10px); }
       }
       .animate-fade-in {
         animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
       }
+      @keyframes fadeInOpacity {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      .animate-page-enter {
+        animation: fadeInOpacity 0.2s ease-out forwards;
+      }
       
       @keyframes modalPop {
         0% { opacity: 0; transform: scale(0.95) translateY(10px); }
-        100% { opacity: 1; transform: scale(1) translateY(0); }
+        100% { opacity: 1; transform: none; }
       }
       .animate-modal-enter {
         animation: modalPop 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
       }
 
       @keyframes slideInRight {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
+        from { transform: translateX(105%); }
+        to   { transform: translateX(0); }
       }
       @keyframes slideOutRight {
-        from { transform: translateX(0); opacity: 1; }
-        to { transform: translateX(100%); opacity: 0; }
+        from { transform: translateX(0); }
+        to   { transform: translateX(105%); }
       }
-      .animate-drawer-enter { animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-      .animate-drawer-exit { animation: slideOutRight 0.3s ease-in forwards; }
+      .animate-drawer-enter { animation: slideInRight 0.38s cubic-bezier(0.22, 1, 0.36, 1) both; }
+      .animate-drawer-exit  { animation: slideOutRight 0.26s cubic-bezier(0.4, 0, 1, 1) both; }
 
-      .animate-backdrop-enter { animation: fadeIn 0.3s ease-out forwards; }
-      .animate-backdrop-exit { animation: fadeOut 0.3s ease-in forwards; }
+      @keyframes backdropIn {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+      @keyframes backdropOut {
+        from { opacity: 1; }
+        to   { opacity: 0; }
+      }
+      .animate-backdrop-enter { animation: backdropIn  0.28s ease-out both; }
+      .animate-backdrop-exit  { animation: backdropOut 0.22s ease-in  both; }
 
       /* Certificate Watermark Pattern */
       .mask-stamp {
@@ -117,7 +132,7 @@
           @apply bg-white dark:bg-[#1C1C1E] rounded-[24px] shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden transition-all duration-300;
         }
         .unified-table-header {
-          @apply bg-gray-50/80 dark:bg-white/5 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold tracking-wider border-b border-gray-100 dark:border-white/10;
+          @apply bg-gray-50/80 dark:bg-white/5 text-gray-500 dark:text-gray-400 text-sm uppercase font-bold tracking-wider border-b border-gray-100 dark:border-white/10;
         }
         .unified-button {
           @apply px-4 py-2 rounded-lg font-bold text-sm transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2;
@@ -132,7 +147,7 @@
           @apply unified-button bg-transparent text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10;
         }
         .unified-tag {
-          @apply px-2.5 py-1 rounded-[8px] text-[10px] font-bold uppercase tracking-wider transition-all duration-200 inline-flex items-center gap-1.5;
+          @apply px-2.5 py-1 rounded-[8px] text-xs font-bold uppercase tracking-wider transition-all duration-200 inline-flex items-center gap-1.5;
         }
         .unified-tag-blue {
           @apply unified-tag bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-100 dark:border-blue-800/30;

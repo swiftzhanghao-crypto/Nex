@@ -106,6 +106,14 @@ function App() {
           {id:'o1-3', title:'五年订阅 (长期授权)', price:1299, license:{type:'Subscription', period:5, periodUnit:'Year', scope:'1 User'}}
         ] 
       }],
+      composition: [
+        { id: 'c1-1', name: 'WPS Office 专业版', type: 'Component' },
+        { id: 'c1-2', name: 'WPS云文档', type: 'Service' },
+        { id: 'c1-3', name: 'WPS会议', type: 'Service' },
+        { id: 'c1-4', name: 'WPS表单', type: 'Service' },
+        { id: 'c1-5', name: 'WPS IM 消息', type: 'Feature' },
+        { id: 'c1-6', name: 'AI助手', type: 'Feature' },
+      ],
       installPackages: [
         { id: 'AZ0006022', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#', platform: 'Windows', cpu: '麒麟', os: 'UOS', arch: '-' },
         { id: 'pkg1-2', name: 'WPS 365 Mac端', version: 'v6.0.1', url: '#', platform: 'macOS', cpu: 'Intel/M1', os: 'macOS', arch: 'x64/arm64' }
@@ -120,6 +128,11 @@ function App() {
           {id:'o1-2-2', title:'月度订阅 (基础版)', price:19, license:{type:'Subscription', period:1, periodUnit:'Month', scope:'1 User'}}
         ] 
       }],
+      composition: [
+        { id: 'c12-1', name: 'WPS Office 基础版', type: 'Component' },
+        { id: 'c12-2', name: 'WPS云文档', type: 'Service' },
+        { id: 'c12-3', name: 'WPS IM 消息', type: 'Feature' },
+      ],
       installPackages: [{ id: 'pkg1-2-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 10/11' }]
     },
     { 
@@ -131,6 +144,16 @@ function App() {
           {id:'o2-2', title:'三年订阅 (企业包)', price:1299, license:{type:'Subscription', period:3, periodUnit:'Year', scope:'1 User'}}
         ] 
       }],
+      composition: [
+        { id: 'c2-1', name: 'WPS Office 专业版', type: 'Component' },
+        { id: 'c2-2', name: 'WPS云文档', type: 'Service' },
+        { id: 'c2-3', name: 'WPS会议', type: 'Service' },
+        { id: 'c2-4', name: 'WPS表单', type: 'Service' },
+        { id: 'c2-5', name: 'WPS轻文档', type: 'Service' },
+        { id: 'c2-6', name: 'WPS稻壳模板', type: 'Service' },
+        { id: 'c2-7', name: 'AI智能写作', type: 'Feature' },
+        { id: 'c2-8', name: 'AI图像识别', type: 'Feature' },
+      ],
       installPackages: [
         { id: 'pkg2-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 10/11' },
         { id: 'pkg2-2', name: 'WPS 365 移动端', version: 'v11.5.0', url: '#', platform: 'Android/iOS', cpu: '通用', os: 'Android 8+ / iOS 14+' }
@@ -145,6 +168,13 @@ function App() {
           {id:'o2-2-2', title:'永久授权 (教育版)', price:999, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 User'}}
         ] 
       }],
+      composition: [
+        { id: 'c22-1', name: 'WPS Office 专业版', type: 'Component' },
+        { id: 'c22-2', name: 'WPS云文档', type: 'Service' },
+        { id: 'c22-3', name: 'WPS表单', type: 'Service' },
+        { id: 'c22-4', name: 'AI智能写作', type: 'Feature' },
+        { id: 'c22-5', name: '教育管控平台', type: 'Service' },
+      ],
       installPackages: [{ id: 'pkg2-2-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 10/11' }]
     },
 
@@ -158,6 +188,14 @@ function App() {
           {id:'o5-2', title:'年度订阅 (私有云)', price:15000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
         ] 
       }],
+      composition: [
+        { id: 'c5-1', name: 'WPS Office 服务端', type: 'Component' },
+        { id: 'c5-2', name: '私有云文档协作引擎', type: 'Component' },
+        { id: 'c5-3', name: '私有IM服务', type: 'Service' },
+        { id: 'c5-4', name: '企业会议系统', type: 'Service' },
+        { id: 'c5-5', name: 'AI写作助手 (私有部署)', type: 'Feature' },
+        { id: 'c5-6', name: '管理员控制台', type: 'Feature' },
+      ],
       installPackages: [{ id: 'pkg5-1', name: '私有云部署包', version: 'v7.0.0', url: '#', platform: 'Linux', cpu: 'x86_64/ARM', os: 'CentOS 7+ / UOS' }]
     },
     { 
@@ -169,6 +207,12 @@ function App() {
           {id:'o5-2-2', title:'年度订阅 (私有云基础)', price:8000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
         ] 
       }],
+      composition: [
+        { id: 'c52-1', name: 'WPS Office 服务端', type: 'Component' },
+        { id: 'c52-2', name: '私有云文档存储引擎', type: 'Component' },
+        { id: 'c52-3', name: '私有IM服务', type: 'Service' },
+        { id: 'c52-4', name: '管理员控制台', type: 'Feature' },
+      ],
       installPackages: [{ id: 'pkg5-2-1', name: '私有云部署包', version: 'v7.0.0', url: '#', platform: 'Linux', cpu: 'x86_64/ARM', os: 'CentOS 7+ / UOS' }]
     },
 
@@ -182,6 +226,12 @@ function App() {
           {id:'o8-2', title:'年度订阅 (WebOffice)', price:6000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
         ] 
       }],
+      composition: [
+        { id: 'c8-1', name: 'WebOffice 文字引擎', type: 'Component' },
+        { id: 'c8-2', name: 'WebOffice 表格引擎', type: 'Component' },
+        { id: 'c8-3', name: 'WebOffice 演示引擎', type: 'Component' },
+        { id: 'c8-4', name: '协同编辑服务', type: 'Service' },
+      ],
       installPackages: [{ id: 'pkg8-1', name: 'WebOffice SDK', version: 'v3.2.1', url: '#', platform: 'Web', cpu: '通用', os: '全平台' }]
     },
     { 
@@ -193,6 +243,15 @@ function App() {
           {id:'o8-2-2', title:'年度订阅 (WebOffice增强)', price:12000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}
         ] 
       }],
+      composition: [
+        { id: 'c82-1', name: 'WebOffice 文字引擎', type: 'Component' },
+        { id: 'c82-2', name: 'WebOffice 表格引擎', type: 'Component' },
+        { id: 'c82-3', name: 'WebOffice 演示引擎', type: 'Component' },
+        { id: 'c82-4', name: 'WebOffice PDF引擎', type: 'Component' },
+        { id: 'c82-5', name: '协同编辑服务', type: 'Service' },
+        { id: 'c82-6', name: 'AI文档处理', type: 'Feature' },
+        { id: 'c82-7', name: '插件扩展框架', type: 'Feature' },
+      ],
       installPackages: [{ id: 'pkg8-2-1', name: 'WebOffice SDK', version: 'v3.2.1', url: '#', platform: 'Web', cpu: '通用', os: '全平台' }]
     },
 
@@ -206,6 +265,12 @@ function App() {
           {id:'o12-2', title:'年度订阅 (单机版)', price:158, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
         ] 
       }],
+      composition: [
+        { id: 'c12-1', name: 'WPS 文字', type: 'Component' },
+        { id: 'c12-2', name: 'WPS 表格', type: 'Component' },
+        { id: 'c12-3', name: 'WPS 演示', type: 'Component' },
+        { id: 'c12-4', name: 'WPS PDF', type: 'Component' },
+      ],
       installPackages: [{ id: 'pkg12-1', name: 'WPS 2019 安装包', version: 'v11.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 7/10/11' }]
     },
     { 
@@ -217,6 +282,14 @@ function App() {
           {id:'o12-2-2', title:'年度订阅', price:218, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
         ] 
       }],
+      composition: [
+        { id: 'c122-1', name: 'WPS 文字', type: 'Component' },
+        { id: 'c122-2', name: 'WPS 表格', type: 'Component' },
+        { id: 'c122-3', name: 'WPS 演示', type: 'Component' },
+        { id: 'c122-4', name: 'WPS PDF', type: 'Component' },
+        { id: 'c122-5', name: 'AI写作助手', type: 'Feature' },
+        { id: 'c122-6', name: 'WPS稻壳模板', type: 'Service' },
+      ],
       installPackages: [{ id: 'pkg12-2-1', name: 'WPS 2019 安装包', version: 'v11.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 7/10/11' }]
     },
 
@@ -230,6 +303,12 @@ function App() {
           {id:'o15-2', title:'年度订阅 (Mac版)', price:158, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
         ] 
       }],
+      composition: [
+        { id: 'c15-1', name: 'WPS 文字 (Mac)', type: 'Component' },
+        { id: 'c15-2', name: 'WPS 表格 (Mac)', type: 'Component' },
+        { id: 'c15-3', name: 'WPS 演示 (Mac)', type: 'Component' },
+        { id: 'c15-4', name: 'WPS PDF (Mac)', type: 'Component' },
+      ],
       installPackages: [{ id: 'pkg15-1', name: 'WPS Mac 安装包', version: 'v6.0.1', url: '#', platform: 'macOS', cpu: 'Intel/M1/M2', os: 'macOS 11+' }]
     },
     { 
@@ -241,20 +320,76 @@ function App() {
           {id:'o15-2-2', title:'会员订阅 (Mac个人)', price:89, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}}
         ] 
       }],
+      composition: [
+        { id: 'c152-1', name: 'WPS 文字 (Mac)', type: 'Component' },
+        { id: 'c152-2', name: 'WPS 表格 (Mac)', type: 'Component' },
+        { id: 'c152-3', name: 'WPS 演示 (Mac)', type: 'Component' },
+      ],
       installPackages: [{ id: 'pkg15-2-1', name: 'WPS Mac 安装包', version: 'v6.0.1', url: '#', platform: 'macOS', cpu: 'Intel/M1/M2', os: 'macOS 11+' }]
     },
 
-    // 退市商品
+    // 退市产品
     { 
-      id: 'PROD-OFF-001', name: 'WPS Office 2016 (已退市)', category: 'Win端', subCategory: 'Win2019', status: 'OffShelf', tags: ['生态'],
+      id: 'PROD-OFF-001', name: 'WPS Office 2016 专业版', category: 'Win端', subCategory: 'Win2019', status: 'OffShelf', tags: ['生态'],
       skus: [{ 
-        id: 's20', code: 'S20', name: '标准版', price: 398, status: 'Active', stock: 100,
+        id: 's20', code: 'S20', name: '标准版', price: 398, status: 'Inactive', stock: 0,
         pricingOptions: [
           {id:'o20-1', title:'永久授权', price:398, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},
           {id:'o20-2', title:'年度订阅', price:128, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
         ] 
       }],
+      composition: [
+        { id: 'c20-1', name: 'WPS 文字', type: 'Component' },
+        { id: 'c20-2', name: 'WPS 表格', type: 'Component' },
+        { id: 'c20-3', name: 'WPS 演示', type: 'Component' },
+      ],
       installPackages: [{ id: 'pkg20-1', name: 'WPS 2016 安装包', version: 'v10.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 7/10' }]
+    },
+    {
+      id: 'PROD-OFF-002', name: 'WPS Office 2013 企业版', category: 'Win端', subCategory: 'Win2019', status: 'OffShelf', tags: ['生态'],
+      skus: [{
+        id: 's21', code: 'S21', name: '企业版', price: 298, status: 'Inactive', stock: 0,
+        pricingOptions: [
+          {id:'o21-1', title:'永久授权', price:298, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}}
+        ]
+      }],
+      composition: [
+        { id: 'c21-1', name: 'WPS 文字', type: 'Component' },
+        { id: 'c21-2', name: 'WPS 表格', type: 'Component' },
+        { id: 'c21-3', name: 'WPS 演示', type: 'Component' },
+      ],
+      installPackages: [{ id: 'pkg21-1', name: 'WPS 2013 安装包', version: 'v9.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows XP/7' }]
+    },
+    {
+      id: 'PROD-OFF-003', name: 'WPS 365 基础版 (旧版)', category: '云服务产品', subCategory: 'WPS365公有云', status: 'OffShelf', tags: ['生态'],
+      skus: [{
+        id: 's22', code: 'S22', name: '基础版', price: 99, status: 'Inactive', stock: 0,
+        pricingOptions: [
+          {id:'o22-1', title:'年度订阅', price:99, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}}
+        ]
+      }],
+      installPackages: []
+    },
+    {
+      id: 'PROD-OFF-004', name: 'WPS Mac 2019 标准版', category: 'Mac端', subCategory: 'Mac2019', status: 'OffShelf', tags: ['生态'],
+      skus: [{
+        id: 's23', code: 'S23', name: '标准版', price: 338, status: 'Inactive', stock: 0,
+        pricingOptions: [
+          {id:'o23-1', title:'永久授权', price:338, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},
+          {id:'o23-2', title:'年度订阅', price:108, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}
+        ]
+      }],
+      installPackages: [{ id: 'pkg23-1', name: 'WPS Mac 2019 安装包', version: 'v2.1.0', url: '#', platform: 'Mac', cpu: '通用', os: 'macOS 10.13+' }]
+    },
+    {
+      id: 'PROD-OFF-005', name: 'WPS 文字处理单品 (旧版)', category: '单品授权', subCategory: '私有云单品', status: 'OffShelf', tags: ['生态'],
+      skus: [{
+        id: 's24', code: 'S24', name: '标准版', price: 188, status: 'Inactive', stock: 0,
+        pricingOptions: [
+          {id:'o24-1', title:'永久授权', price:188, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}}
+        ]
+      }],
+      installPackages: []
     }
   ]);
 
@@ -693,7 +828,7 @@ function App() {
                 buyerName: '北京小优易教科技有限公司',
                 directChannel: '-',
                 terminalChannel: '-',
-                orderType: '订单',
+                orderType: ['新购订单', '续费订单', '增购订单', '降配订单', '退款订单'][i % 5],
                 creatorId: 'u10',
                 creatorName: '苏雪松',
                 creatorPhone: '17610166961',
@@ -705,7 +840,15 @@ function App() {
                 sellerName: ['珠海金山办公软件有限公司', '武汉金山办公软件有限公司', '北京金山办公软件有限公司'][i % 3],
                 sellerContact: '李海瑞 (00019829)',
                 customerStatus: '已覆盖',
-                channelService: '否'
+                channelService: '否',
+                // 折算抵扣金额：约30条数据（i % 3 === 0，且 i ≤ 90）
+                conversionDeductionAmount: (i % 3 === 0 && i <= 90)
+                    ? Math.floor(total * 0.04 / 100) * 100 || 100
+                    : undefined,
+                // 折算金额：比实付金额小，约取 total 的 70%
+                conversionAmount: (i % 3 === 0 && i <= 90)
+                    ? Math.floor(total * 0.70 / 100) * 100 || 500
+                    : undefined,
             });
         }
         return mockOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

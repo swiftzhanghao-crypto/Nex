@@ -175,7 +175,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('确定要删除这个商品吗？')) {
+    if (confirm('确定要删除这个产品吗？')) {
       setProducts(prev => prev.filter(p => p.id !== id));
     }
   };
@@ -214,7 +214,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
   const handleDeleteAtom = (id: string) => {
       const usedIn = products.filter(p => p.composition?.some(c => c.id === id));
       if (usedIn.length > 0) {
-          alert(`无法删除：该能力已被 ${usedIn.length} 个商品使用 (如: ${usedIn[0].name})`);
+          alert(`无法删除：该能力已被 ${usedIn.length} 个产品使用 (如: ${usedIn[0].name})`);
           return;
       }
       if (confirm('确定要删除此原子能力吗？')) {
@@ -259,7 +259,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
   };
 
   const handleAIGenerate = async () => {
-    if (!formData.name) return alert("请先输入商品名称。");
+    if (!formData.name) return alert("请先输入产品名称。");
     setGeneratingAI(true);
     
     const atomNames = atomicCapabilities.filter(a => selectedAtomIds.includes(a.id)).map(a => a.name).join(', ');
@@ -333,7 +333,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                     onClick={() => setActiveTab(tab as typeof activeTab)}
                     className={`px-4 py-2 rounded-sm text-sm font-medium transition whitespace-nowrap ${activeTab === tab ? 'bg-white dark:bg-[#1C1C1E] shadow text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'}`}
                 >
-                    {tab === 'SPU' ? '商品列表' : 
+                    {tab === 'SPU' ? '产品列表' : 
                      tab === 'SKU' ? '规格列表' : 
                      tab === 'LicenseTypes' ? '授权类型' : 
                      tab === 'Rights' ? '权益定义' : 
@@ -353,7 +353,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
             <button 
                 className="px-4 py-1.5 text-sm font-medium rounded-md bg-white dark:bg-[#1C1C1E] text-[#2B5EEA] dark:text-white shadow-sm transition-colors"
             >
-                商品管理视图
+                产品管理视图
             </button>
         </div>
       </div>
@@ -366,7 +366,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                     <Search className="w-5 h-5 text-gray-400" />
                     <input 
                         type="text" 
-                        placeholder={`搜索 ${activeTab === 'SPU' ? '商品' : '规格'}...`} 
+                        placeholder={`搜索 ${activeTab === 'SPU' ? '产品' : '规格'}...`} 
                         className="bg-transparent border-none outline-none flex-1 text-gray-700 dark:text-gray-200 placeholder-gray-400 text-sm"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -377,7 +377,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                         onClick={handleOpenModal}
                         className="unified-button-primary"
                         >
-                        <Plus className="w-4 h-4" /> 新增商品
+                        <Plus className="w-4 h-4" /> 新增产品
                       </button>
                   )}
               </div>
@@ -389,7 +389,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                 <table className="w-full text-left">
                     <thead className="unified-table-header">
                     <tr>
-                        <th className="p-4 pl-6">商品名称 / ID</th>
+                        <th className="p-4 pl-6">产品名称 / ID</th>
                         <th className="p-4">标签</th>
                         <th className="p-4">状态</th>
                         <th className="p-4">权益/套餐</th>
@@ -459,7 +459,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                             </button>
                             <button 
                                 onClick={() => handleToggleStatus(product)}
-                                title={product.status === 'OnShelf' ? "下架商品" : "上架商品"}
+                                title={product.status === 'OnShelf' ? "下架产品" : "上架产品"}
                                 className={`p-2 rounded-full transition ${
                                     product.status === 'OnShelf' 
                                     ? 'text-orange-400 hover:text-orange-600 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30' 
@@ -514,7 +514,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                           <tr>
                               <th className="p-4 pl-6">规格编码</th>
                               <th className="p-4">规格名称</th>
-                              <th className="p-4">所属商品</th>
+                              <th className="p-4">所属产品</th>
                               <th className="p-4">授权类型数</th>
                               <th className="p-4">基准价格</th>
                               <th className="p-4">库存</th>
@@ -572,7 +572,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                   <div className="flex justify-between items-center">
                       <div>
                           <h3 className="text-lg font-bold text-gray-900 dark:text-white">授权类型定义</h3>
-                          <p className="text-sm text-gray-500">配置商品规格可引用的标准化授权模式。</p>
+                          <p className="text-sm text-gray-500">配置产品规格可引用的标准化授权模式。</p>
                       </div>
                       <button 
                         onClick={() => setIsLicenseModalOpen(true)}
@@ -611,7 +611,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                   <div className="flex justify-between items-center">
                       <div>
                           <h3 className="text-lg font-bold text-gray-900 dark:text-white">权益定义 (Rights Definition)</h3>
-                          <p className="text-sm text-gray-500">定义商品中可控的权益项，如存储空间、并发数等。</p>
+                          <p className="text-sm text-gray-500">定义产品中可控的权益项，如存储空间、并发数等。</p>
                       </div>
                       <button 
                         onClick={() => setIsRightsModalOpen(true)}
@@ -644,7 +644,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                   <div className="flex justify-between items-center">
                       <div>
                           <h3 className="text-lg font-bold text-gray-900 dark:text-white">权益套餐 (Rights Packages)</h3>
-                          <p className="text-sm text-gray-500">组合多个权益项，形成标准化的商品权益配置。</p>
+                          <p className="text-sm text-gray-500">组合多个权益项，形成标准化的产品权益配置。</p>
                       </div>
                       <button 
                         onClick={handleOpenPkgModal}
@@ -689,7 +689,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                   <div className="flex justify-between items-center">
                       <div>
                           <h3 className="text-lg font-bold text-gray-900 dark:text-white">原子能力列表</h3>
-                          <p className="text-sm text-gray-500">这些是构成商品的最小功能单元。</p>
+                          <p className="text-sm text-gray-500">这些是构成产品的最小功能单元。</p>
                       </div>
                       <button 
                         onClick={() => setIsAtomModalOpen(true)}
@@ -726,7 +726,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in p-4">
           <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-2xl w-full max-w-3xl m-4 overflow-hidden flex flex-col max-h-[90vh] animate-modal-enter border border-white/10">
             <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5">
-              <h3 className="text-xl font-bold text-gray-800 dark:text-white">新增商品</h3>
+              <h3 className="text-xl font-bold text-gray-800 dark:text-white">新增产品</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">&times;</button>
             </div>
             
@@ -734,7 +734,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">商品名称</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">产品名称</label>
                     <input 
                         type="text" 
                         value={formData.name} 
@@ -757,7 +757,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
 
               {/* Tags Input */}
               <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">商品标签</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">产品标签</label>
                   <div className="flex flex-wrap gap-2 mb-2">
                       {formData.tags?.map(tag => (
                           <span key={tag} className="text-xs bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded-sm flex items-center gap-1">
@@ -873,7 +873,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({
 
               <div>
                 <div className="flex justify-between items-end mb-1">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">商品描述</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">产品描述</label>
                     <button 
                         type="button"
                         onClick={handleAIGenerate}
@@ -889,14 +889,14 @@ const ProductManager: React.FC<ProductManagerProps> = ({
                     value={formData.description} 
                     onChange={(e) => setFormData({...formData, description: e.target.value})}
                     className="w-full border border-gray-300 dark:border-white/10 rounded-sm p-3 bg-white dark:bg-black text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none text-sm"
-                    placeholder="输入商品描述..."
+                    placeholder="输入产品描述..."
                 ></textarea>
               </div>
             </div>
 
             <div className="p-6 bg-gray-50 dark:bg-white/5 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
               <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 rounded-md transition font-medium">取消</button>
-              <button onClick={handleSave} className="px-4 py-2 bg-[#0071E3] dark:bg-[#FF2D55] text-white rounded-md hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 transition font-medium shadow-md">创建商品</button>
+              <button onClick={handleSave} className="px-4 py-2 bg-[#0071E3] dark:bg-[#FF2D55] text-white rounded-md hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 transition font-medium shadow-md">创建产品</button>
             </div>
           </div>
         </div>

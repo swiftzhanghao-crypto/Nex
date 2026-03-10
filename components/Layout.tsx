@@ -31,7 +31,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
 
   const location = useLocation();
   const navigate = useNavigate();
-  const hideSidebar = location.pathname.includes('/preview');
+  const hideSidebar = false;
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -95,7 +95,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
   const topNavItems = [
       { id: 'DASHBOARD', label: '数据看板', path: '/', permissions: ['dashboard_view'] },
       { id: 'ORDER_CENTER', label: '订单中心', path: '/orders', permissions: ['order_view_all', 'order_view_pending_approval', 'order_view_pending_confirm', 'order_view_auth_confirm', 'order_view_stock_prep', 'customer_view', 'opportunity_manage', 'channel_view'] },
-      { id: 'PRODUCT_CENTER', label: '商品中心', path: '/product-center', permissions: ['product_view', 'merchandise_view'] },
+      { id: 'PRODUCT_CENTER', label: '产品中心', path: '/product-center', permissions: ['product_view', 'merchandise_view'] },
       { id: 'LEADS_CENTER', label: '线索中心', path: '/leads', permissions: ['leads_view'] },
       { id: 'OPERATIONS_CENTER', label: '运营中心', path: '/wps-ops', permissions: ['wps_ops_view'] },
       { id: 'SYSTEM_CONFIG', label: '系统配置', path: '/organization', permissions: ['admin_view', 'user_manage', 'role_manage', 'org_manage'] }
@@ -113,8 +113,10 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
     }
   };
 
-  const NavItem = ({ to, icon: Icon, label }: { to: string; icon: React.ElementType; label: string }) => {
-    const isActive = location.pathname === to || (to !== '/' && location.pathname.startsWith(to));
+  const NavItem = ({ to, icon: Icon, label, alsoMatch }: { to: string; icon: React.ElementType; label: string; alsoMatch?: string[] }) => {
+    const isActive = location.pathname === to
+      || (to !== '/' && location.pathname.startsWith(to))
+      || (alsoMatch?.some(p => location.pathname.startsWith(p)) ?? false);
     return (
       <Link 
         to={to} 
@@ -320,10 +322,10 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
 
                     {activeTopNav === 'PRODUCT_CENTER' && (
                       <>
-                        {renderSectionGroup('product_main', '商品中心',
+                        {renderSectionGroup('product_main', '产品中心',
                           <>
-                            <NavItem to="/product-center" icon={Layers} label="商品展示" />
-                            <NavItem to="/products" icon={Package} label="商品列表" />
+                            <NavItem to="/product-center" icon={Layers} label="产品展示" alsoMatch={['/catalog']} />
+                            <NavItem to="/products" icon={Package} label="产品列表" />
                           </>
                         )}
                       </>

@@ -485,6 +485,9 @@ export interface Order {
     
     refundReason?: string;
     refundAmount?: number;
+
+    conversionDeductionAmount?: number; // 折算抵扣金额
+    conversionAmount?: number;          // 折算金额（低于实付金额）
 }
 
 export type ProjectStatus = 'Planning' | 'Ongoing' | 'OnHold' | 'Completed' | 'Cancelled';

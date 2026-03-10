@@ -60,6 +60,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
   const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'SNAPSHOT' | 'FULFILLMENT' | 'EMAIL'>('MANAGEMENT');
   const [isContractPreviewOpen, setIsContractPreviewOpen] = useState(false);
   const [contractZoom, setContractZoom] = useState(100);
+  const [selectedDeliveryNo, setSelectedDeliveryNo] = useState<string | null>(null);
 
   // Step specific forms
   const [shippingCarrier, setShippingCarrier] = useState('');
@@ -445,8 +446,8 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                    <button onClick={() => navigate('/orders')} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition text-gray-500 dark:text-gray-400 shrink-0"><ArrowLeft className="w-5 h-5" /></button>
                    <div className="flex items-center gap-2 flex-wrap">
                        <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white tracking-tight">订单 {selectedOrder.id}</h1>
-                       <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">下单时间：<span className="font-mono">{new Date(selectedOrder.date).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</span></span>
-                       <span className={`shrink-0 ${
+                       <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">提单时间：<span className="font-mono">{new Date(selectedOrder.date).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</span></span>
+                       <span className={`shrink-0 !rounded-full ${
                            selectedOrder.status === OrderStatus.DELIVERED ? 'unified-tag-green' :
                            selectedOrder.status === OrderStatus.SHIPPED ? 'unified-tag-indigo' :
                            selectedOrder.status === OrderStatus.PROCESSING_PROD ? 'unified-tag-blue' :
@@ -459,18 +460,18 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                            'unified-tag-gray'
                        }`}>{statusMap[selectedOrder.status] || selectedOrder.status}</span>
                        {selectedOrder.isPaid
-                           ? <span className="unified-tag-green shrink-0">已支付</span>
-                           : <span className="unified-tag-blue shrink-0">待支付</span>
+                           ? <span className="unified-tag-green !rounded-full shrink-0">已支付</span>
+                           : <span className="unified-tag-blue !rounded-full shrink-0">待支付</span>
                        }
                        {selectedOrder.status === OrderStatus.DELIVERED
-                           ? <span className="unified-tag-green shrink-0">已完成</span>
+                           ? <span className="unified-tag-green !rounded-full shrink-0">已完成</span>
                            : selectedOrder.status === OrderStatus.SHIPPED
-                               ? <span className="unified-tag-indigo shrink-0">已发货</span>
+                               ? <span className="unified-tag-indigo !rounded-full shrink-0">已发货</span>
                                : selectedOrder.isShippingConfirmed
-                                   ? <span className="unified-tag-blue shrink-0">待发货</span>
+                                   ? <span className="unified-tag-blue !rounded-full shrink-0">待发货</span>
                                    : (selectedOrder.isAuthConfirmed || selectedOrder.isPackageConfirmed || selectedOrder.status === OrderStatus.PROCESSING_PROD)
-                                       ? <span className="unified-tag-orange shrink-0">备货中</span>
-                                       : <span className="unified-tag-blue shrink-0">待处理</span>
+                                       ? <span className="unified-tag-orange !rounded-full shrink-0">备货中</span>
+                                       : <span className="unified-tag-blue !rounded-full shrink-0">待处理</span>
                        }
                    </div>
                </div>
@@ -532,32 +533,29 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
           </div>
 
           {/* Tabs Navigation */}
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pt-2.5 pb-0 items-end">
+          <div className="flex gap-1 overflow-x-auto no-scrollbar pt-2 border-b border-gray-200 dark:border-white/10">
               {[
                   { id: 'MANAGEMENT', label: '订单管理' },
                   { id: 'SNAPSHOT', label: '订单快照' },
                   { id: 'FULFILLMENT', label: '订单交付' },
-                  { id: 'EMAIL', label: '发货邮件' },
+                  { id: 'EMAIL', label: '发货信息' },
               ].map(tab => (
                   <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id as 'MANAGEMENT' | 'SNAPSHOT' | 'FULFILLMENT' | 'EMAIL')}
-                      className={`relative px-5 py-1.5 rounded-t-lg text-sm font-semibold transition-all whitespace-nowrap ${
+                      className={`relative px-5 py-2 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 -mb-px ${
                           activeTab === tab.id
-                          ? 'bg-white dark:bg-[#2C2C2E] text-[#0071E3] dark:text-[#0A84FF] border border-gray-200 dark:border-white/10 border-b-white dark:border-b-[#2C2C2E] -mb-px'
-                          : 'bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-gray-200 mb-0 rounded-t-lg'
+                          ? 'text-[#0071E3] dark:text-[#0A84FF] border-[#0071E3] dark:border-[#0A84FF]'
+                          : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-200'
                       }`}
                   >
                       {tab.label}
-                      {activeTab === tab.id && (
-                          <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0071E3] dark:bg-[#0A84FF] rounded-full" />
-                      )}
                   </button>
               ))}
           </div>
       </div>
 
-      <div className="p-4 lg:p-6 max-w-[2400px] mx-auto w-full space-y-4 animate-fade-in pb-20">
+      <div className="p-4 lg:p-6 max-w-[2400px] mx-auto w-full space-y-4 animate-page-enter pb-20">
           {activeTab === 'MANAGEMENT' && (
             <>
               {/* Stepper */}
@@ -601,7 +599,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
           <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden">
               <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                   <Package className="w-5 h-5 text-orange-500" />
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">订单商品明细</h3>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">订单产品明细</h3>
               </div>
               <div className="flex items-stretch">
                   {/* Left: items table (fills remaining) */}
@@ -610,11 +608,11 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                           <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 text-sm uppercase font-bold tracking-wider">
                               <tr>
                                   <th className="px-5 py-4 pl-6 text-center w-16 whitespace-nowrap">明细编号</th>
-                                  <th className="px-5 py-4">商品信息</th>
+                                  <th className="px-5 py-4">产品信息</th>
                                   <th className="px-5 py-4 text-center">数量</th>
                                   <th className="px-5 py-4 text-right">单价</th>
-                                  <th className="px-5 py-4 text-right">商品金额</th>
-                                  <th className="px-5 py-4 text-right">商品需付金额</th>
+                                  <th className="px-5 py-4 text-right">产品金额</th>
+                                  <th className="px-5 py-4 text-right">产品需付金额</th>
                                   <th className="px-5 py-4">电子授权</th>
                               </tr>
                           </thead>
@@ -683,25 +681,34 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                               const lineTotal = item.priceAtPurchase * item.quantity;
                               return sum + (item.priceAtPurchase > 5000 ? Math.floor(lineTotal * 0.02 / 10) * 10 : 0);
                           }, 0);
-                          const totalDiscount = discountAmt + rebateAmt;
+                          const convDeductAmt = selectedOrder.conversionDeductionAmount ?? 0;
+                          const totalDiscount = discountAmt + rebateAmt + convDeductAmt;
                           const fmt = (n: number) => `¥${n.toLocaleString()}`;
                           return (
                       <div className="space-y-3 text-sm">
                           <div className="flex justify-between items-center">
-                              <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500">商品总金额</span>
-                              <span className="font-mono text-gray-900 dark:text-white">{fmt(productTotal)}</span>
+                              <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500">产品总金额</span>
+                              <span className="font-bold text-xl font-mono text-gray-900 dark:text-white">{fmt(productTotal)}</span>
                           </div>
-                          <div className="flex justify-between items-center">
-                              <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500">优惠折扣</span>
-                              <span className="font-mono text-red-600 dark:text-red-400">- {fmt(discountAmt)}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                              <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500">返利折扣</span>
-                              <span className="font-mono text-red-600 dark:text-red-400">- {fmt(rebateAmt)}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                              <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500">优惠金额</span>
-                              <span className="font-mono text-red-600 dark:text-red-400">- {fmt(totalDiscount)}</span>
+                          <div className="border-t border-gray-200 dark:border-white/10 pt-3 space-y-3">
+                              <div className="flex justify-between items-center">
+                                  <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500">优惠折扣金额</span>
+                                  <span className="font-bold text-sm font-mono text-red-600 dark:text-red-400">- {fmt(discountAmt)}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                  <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500">返利折扣金额</span>
+                                  <span className="font-bold text-sm font-mono text-red-600 dark:text-red-400">- {fmt(rebateAmt)}</span>
+                              </div>
+                              {convDeductAmt > 0 && (
+                                  <div className="flex justify-between items-center">
+                                      <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500">折算抵扣金额</span>
+                                      <span className="font-bold text-sm font-mono text-red-600 dark:text-red-400">- {fmt(convDeductAmt)}</span>
+                                  </div>
+                              )}
+                              <div className="flex justify-between items-center">
+                                  <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500">优惠金额</span>
+                                  <span className="font-bold text-sm font-mono text-red-600 dark:text-red-400">- {fmt(totalDiscount)}</span>
+                              </div>
                           </div>
                       </div>
                           );
@@ -716,7 +723,8 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                               const lineTotal = item.priceAtPurchase * item.quantity;
                               return sum + (item.priceAtPurchase > 5000 ? Math.floor(lineTotal * 0.02 / 10) * 10 : 0);
                           }, 0);
-                          const amountDue = productTotal - discountAmt - rebateAmt;
+                          const convDeductAmt2 = selectedOrder.conversionDeductionAmount ?? 0;
+                          const amountDue = productTotal - discountAmt - rebateAmt - convDeductAmt2;
                           const fmt = (n: number) => `¥${n.toLocaleString()}`;
                           return (
                               <div className="mt-4 pt-4 border-t border-gray-200 dark:border-white/10 space-y-2">
@@ -728,6 +736,12 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                       <div className="flex justify-between items-center">
                                           <span className="font-bold text-gray-900 dark:text-white text-sm">订单实付金额</span>
                                           <span className="font-bold text-xl text-green-600 dark:text-green-400 font-mono">{fmt(amountDue)}</span>
+                                      </div>
+                                  )}
+                                  {selectedOrder.conversionAmount != null && (
+                                      <div className="flex justify-between items-center pt-1">
+                                          <span className="font-bold text-gray-900 dark:text-white text-sm">折算金额</span>
+                                          <span className="font-bold text-xl text-blue-600 dark:text-blue-400 font-mono">{fmt(selectedOrder.conversionAmount)}</span>
                                       </div>
                                   )}
                               </div>
@@ -821,13 +835,16 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                           <div className="divide-y divide-gray-50 dark:divide-white/5">
                               {[
                                   { label: '商机名称', value: opp.name },
-                                  { label: 'CRM ID', value: opp.crmId || opp.id },
+                                  { label: '商机编号', value: opp.crmId || opp.id },
+                                  { label: '商机客户名称', value: selectedOrder.customerName },
+                                  { label: '商机产品名称', value: selectedOrder.items?.[0]?.productName },
+                                  { label: '商机授权类型', value: selectedOrder.items?.[0]?.licenseType },
                                   { label: '商机阶段', value: opp.stage === 'Negotiation' ? '商务洽谈' : opp.stage === 'Qualification' ? '资格确定' : opp.stage === 'Proposal' ? '方案建议' : opp.stage === 'Closed Won' ? '已赢单' : opp.stage === 'Closed Lost' ? '已输单' : opp.stage },
                                   { label: '商机金额', value: `¥${(opp.amount || opp.expectedRevenue).toLocaleString()}` },
                                   { label: '结单日期', value: opp.closeDate },
                               ].map((item, idx) => (
                                   <div key={idx} className="flex items-center gap-8 py-3">
-                                      <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap whitespace-nowrap">{item.label}</span>
+                                      <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap">{item.label}</span>
                                       <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{item.value || '-'}</span>
                                   </div>
                               ))}
@@ -910,6 +927,46 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                   )}
               </div>
             </div>
+
+            {/* Acceptance Information Table */}
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden">
+                    <div className="p-6 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                        <ClipboardCheck className="w-5 h-5 text-green-500" />
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">验收信息</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 text-sm font-bold tracking-wider">
+                                <tr>
+                                    <th className="p-4 pl-8">明细编号</th>
+                                    <th className="p-4">产品名称</th>
+                                    <th className="p-4">验收方式</th>
+                                    <th className="p-4">验收条件</th>
+                                    <th className="p-4">预计验收时间</th>
+                                    <th className="p-4">验收比例</th>
+                                    <th className="p-4 text-right pr-8">验收金额</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                                {selectedOrder.items.map((item, idx) => (
+                                    <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                        <td className="p-4 pl-8 font-mono text-gray-500">{idx + 1}</td>
+                                        <td className="p-4 font-bold text-gray-900 dark:text-white">{item.productName}</td>
+                                        <td className="p-4 text-gray-600 dark:text-gray-300">
+                                            {selectedOrder.acceptanceConfig?.type === 'Phased' ? '分期验收' : '一次性验收'}
+                                        </td>
+                                        <td className="p-4 text-gray-600 dark:text-gray-300">视同验收</td>
+                                        <td className="p-4 text-gray-600 dark:text-gray-300">发货后2日</td>
+                                        <td className="p-4 text-gray-600 dark:text-gray-300">100%</td>
+                                        <td className="p-4 text-right pr-8 font-bold text-gray-900 dark:text-white">
+                                            ¥{(item.priceAtPurchase * item.quantity).toLocaleString()}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
           </>
         )}
 
@@ -986,13 +1043,13 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                 <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden">
                     <div className="p-8 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                         <Package className="w-5 h-5 text-gray-400" />
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">商品明细快照</h3>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">产品明细快照</h3>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left min-w-[800px]">
                             <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 text-[10px] uppercase font-bold tracking-wider">
                                 <tr>
-                                    <th className="p-8 pl-10">商品名称</th>
+                                    <th className="p-8 pl-10">产品名称</th>
                                     <th className="p-8">规格/SKU</th>
                                     <th className="p-8 text-center">数量</th>
                                     <th className="p-8 text-right">成交单价</th>
@@ -1062,92 +1119,262 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                  </div>
              </div>
 
-             {/* Acceptance Information Table (Large - 3/3) */}
-             <div className="md:col-span-3 bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden">
-                     <div className="p-6 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
-                         <ClipboardCheck className="w-5 h-5 text-green-500" />
-                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">验收信息</h3>
-                     </div>
-                     <div className="overflow-x-auto">
-                         <table className="w-full text-left text-sm">
-                             <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 text-[10px] uppercase font-bold tracking-wider">
-                                 <tr>
-                                     <th className="p-4 pl-8">明细编号</th>
-                                     <th className="p-4">产品名称</th>
-                                     <th className="p-4">验收方式</th>
-                                     <th className="p-4">验收条件</th>
-                                     <th className="p-4">预计验收时间</th>
-                                     <th className="p-4">验收比例</th>
-                                     <th className="p-4 text-right pr-8">验收金额</th>
-                                 </tr>
-                             </thead>
-                             <tbody className="divide-y divide-gray-50 dark:divide-white/5">
-                                 {selectedOrder.items.map((item, idx) => (
-                                     <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                         <td className="p-4 pl-8 font-mono text-gray-500">{idx + 1}</td>
-                                         <td className="p-4 font-bold text-gray-900 dark:text-white">{item.productName}</td>
-                                         <td className="p-4 text-gray-600 dark:text-gray-300">
-                                             {selectedOrder.acceptanceConfig?.type === 'Phased' ? '分期验收' : '一次性验收'}
-                                         </td>
-                                         <td className="p-4 text-gray-600 dark:text-gray-300">视同验收</td>
-                                         <td className="p-4 text-gray-600 dark:text-gray-300">发货后2日</td>
-                                         <td className="p-4 text-gray-600 dark:text-gray-300">100%</td>
-                                         <td className="p-4 text-right pr-8 font-bold text-gray-900 dark:text-white">
-                                             ¥{(item.priceAtPurchase * item.quantity).toLocaleString()}
-                                         </td>
-                                     </tr>
-                                 ))}
-                             </tbody>
-                         </table>
-                     </div>
-                 </div>
           </div>
         )}
 
         {activeTab === 'EMAIL' && (
-          <div className="bg-white dark:bg-white/5 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden min-h-[800px] p-4 md:p-12">
-              <div className="max-w-4xl mx-auto bg-white dark:bg-[#1C1C1E] shadow-2xl rounded-xl overflow-hidden border border-gray-100 dark:border-white/10">
-                  {/* Email Header */}
-                  <div className="bg-[#F8F9FA] dark:bg-white/5 p-6 border-b dark:border-white/10 flex justify-between items-center">
-                      <div className="flex items-center gap-4">
-                          <div className="w-1.5 h-6 bg-blue-600 rounded-full"></div>
-                          <h2 className="text-lg font-bold text-gray-900 dark:text-white">【金山办公】订购服务开通通知</h2>
-                          <span className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded text-[10px] font-bold">最终用户</span>
-                      </div>
-                      <div className="text-xs text-gray-400 font-mono">{new Date(selectedOrder.date).toLocaleString()}</div>
+          <div className="flex min-h-[600px]">
+            {(() => {
+              // ── Shared delivery record data ──────────────────────────────────
+              const expressList = ['顺丰速运', '中通快递', '圆通速递', 'EMS邮政'];
+              const senderNames = ['王明', '李静', '张伟', '赵敏'];
+              const senderPhones = ['0756-8888001', '021-6666002', '010-5555003', '027-4444004'];
+              const receiverPhones = [
+                '138' + selectedOrder.id.slice(-8),
+                '139' + selectedOrder.id.slice(-8),
+                '136' + selectedOrder.id.slice(-8),
+              ];
+              const deliveryRecords = [
+                {
+                  no: '001',
+                  type: '线下发货',
+                  receiver: '买方',
+                  unitName: selectedOrder.buyerName || selectedOrder.customerName,
+                  item: selectedOrder.items[0],
+                  method: '快递',
+                  email: undefined as string | undefined,
+                  address: selectedOrder.shippingAddress || '上海市浦东新区张江高科技园区',
+                  senderName: '陈晓',
+                  senderUnit: '珠海金山办公软件有限公司',
+                  senderAddress: '广东省珠海市香洲区金山软件园8号楼',
+                  senderPhone: '0756-8888099',
+                  receiverName: selectedOrder.customerName.slice(0, 3) + '采购部',
+                  receiverUnit: selectedOrder.buyerName || selectedOrder.customerName,
+                  receiverAddress: selectedOrder.shippingAddress || '上海市浦东新区张江高科技园区',
+                  receiverPhone: '021-8888' + selectedOrder.id.slice(-4),
+                  expressCompany: '顺丰速运',
+                  expressNo: `SF${selectedOrder.id.replace(/[^0-9]/g, '').slice(0, 6)}9999`,
+                },
+                ...selectedOrder.items.map((item, idx) => {
+                  const receiver = idx % 3 === 0 ? '最终用户' : '买方';
+                  const unitName = receiver === '最终用户'
+                    ? selectedOrder.customerName
+                    : (selectedOrder.buyerName || selectedOrder.customerName);
+                  return {
+                    no: String(idx + 2).padStart(3, '0'),
+                    type: '线上发货',
+                    receiver, unitName, item,
+                    method: '账号分发',
+                    email: `service@${selectedOrder.customerName.slice(0, 4).replace(/\s/g, '')}.com` as string | undefined,
+                    address: undefined as string | undefined,
+                    senderName: senderNames[idx % senderNames.length],
+                    senderUnit: '珠海金山办公软件有限公司',
+                    senderAddress: '广东省珠海市香洲区金山软件园8号楼',
+                    senderPhone: senderPhones[idx % senderPhones.length],
+                    receiverName: selectedOrder.customerName.slice(0, 3) + '负责人',
+                    receiverUnit: unitName,
+                    receiverAddress: selectedOrder.shippingAddress || '北京市海淀区中关村大街1号',
+                    receiverPhone: receiverPhones[idx % receiverPhones.length],
+                    expressCompany: expressList[idx % expressList.length],
+                    expressNo: `SF${selectedOrder.id.replace(/[^0-9]/g, '').slice(0, 6)}${String(idx + 2).padStart(4, '0')}`,
+                  };
+                }),
+              ];
+
+              const active = deliveryRecords.find(r => r.no === (selectedDeliveryNo ?? deliveryRecords[0]?.no)) ?? deliveryRecords[0] ?? null;
+
+              return (
+                <>
+                  {/* ── Left: Delivery Cards ─────────────────────────────── */}
+                  <div className="w-[460px] shrink-0 space-y-3 pr-6 overflow-y-auto">
+                    <div className="flex items-center gap-2 px-1 mb-4">
+                      <Truck className="w-5 h-5 text-blue-500" />
+                      <span className="text-base font-semibold text-gray-900 dark:text-white">发货信息</span>
+                      <span className="ml-auto text-xs font-mono"><span className="text-[#0071E3] dark:text-[#0A84FF]">{deliveryRecords.length}</span><span className="text-gray-400 dark:text-gray-500"> 条</span></span>
+                    </div>
+                    {deliveryRecords.map((rec) => {
+                      const isOnline = rec.type === '线上发货';
+                      const isSelected = (selectedDeliveryNo ?? deliveryRecords[0]?.no) === rec.no;
+                      return (
+                        <div
+                          key={rec.no}
+                          onClick={() => setSelectedDeliveryNo(isSelected ? null : rec.no)}
+                          className={`rounded-2xl shadow-apple border p-4 space-y-3 transition-all cursor-pointer ${
+                            isSelected
+                              ? isOnline
+                                ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-300 dark:border-blue-700 ring-2 ring-blue-200 dark:ring-blue-800'
+                                : 'bg-orange-50 dark:bg-orange-900/10 border-orange-300 dark:border-orange-700 ring-2 ring-orange-200 dark:ring-orange-800'
+                              : 'bg-white dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 hover:border-gray-200 dark:hover:border-white/20'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className={`inline-flex items-center justify-center w-9 h-9 rounded-xl border text-xs font-bold font-mono transition-colors ${
+                              isSelected
+                                ? isOnline
+                                  ? 'bg-[#0071E3] border-blue-500 text-white'
+                                  : 'bg-orange-500 border-orange-500 text-white'
+                                : 'bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800/40 text-[#0071E3] dark:text-[#0A84FF]'
+                            }`}>{rec.no}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">
+                                {new Date(new Date(selectedOrder.date).getTime() + (rec.no.charCodeAt(2) - 48 + 1) * 86400000).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}
+                              </span>
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                isOnline
+                                  ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-100 dark:border-blue-800'
+                                  : 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400 border border-orange-100 dark:border-orange-800'
+                              }`}>
+                                {isOnline ? <Box className="w-3 h-3" /> : <Package className="w-3 h-3" />}
+                                {rec.type}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="divide-y divide-gray-50 dark:divide-white/5 text-sm">
+                            {[
+                              { label: '收货方', value: rec.receiver },
+                              { label: '收货单位名称', value: rec.unitName },
+                              { label: '收货方式', value: rec.method },
+                              ...(isOnline
+                                ? [{ label: '收货邮箱', value: rec.email }]
+                                : [{ label: '收货地址', value: rec.address }]
+                              ),
+                            ].map((field, fi) => (
+                              <div key={fi} className="flex items-center gap-8 py-3">
+                                <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-28 shrink-0 whitespace-nowrap">{field.label}</span>
+                                <span className="text-sm font-medium text-gray-900 dark:text-white break-all flex-1">{field.value || '-'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
 
-                  {/* Email Content */}
-                  <div className="p-6 md:p-10 space-y-8 text-gray-700 dark:text-gray-300 leading-relaxed text-sm">
-                      <div className="space-y-4">
-                          <h3 className="text-lg font-bold text-gray-900 dark:text-white">发货邮件信息</h3>
-                          <p>尊敬的用户： 您好！</p>
-                          <p>请查阅贵组织订购信息并按照本邮件中指引操作后开始使用所订购产品/服务</p>
-                      </div>
+                  {/* ── Divider ──────────────────────────────────────────── */}
+                  <div className="w-px bg-gray-200 dark:bg-white/10 mx-6 self-stretch" />
 
-                      <div className="space-y-3 bg-gray-50 dark:bg-white/5 p-6 rounded-2xl border border-gray-100 dark:border-white/5">
-                          <div className="flex gap-4"><span className="text-gray-400 min-w-[100px]">单位/企业:</span><span className="font-bold text-blue-600 dark:text-blue-400">{selectedOrder.customerName}</span></div>
-                          <div className="flex gap-4"><span className="text-gray-400 min-w-[100px]">产品:</span><span className="font-bold text-blue-600 dark:text-blue-400">{selectedOrder.items[0]?.productName}</span></div>
-                          <div className="flex gap-4"><span className="text-gray-400 min-w-[100px]">购买套数/用户数:</span><span className="font-bold text-blue-600 dark:text-blue-400">{selectedOrder.items.reduce((sum, i) => sum + i.quantity, 0)}</span></div>
-                          <div className="flex gap-4"><span className="text-gray-400 min-w-[100px]">授权类型:</span><span className="font-bold text-blue-600 dark:text-blue-400">用户订阅许可</span></div>
-                          <div className="flex gap-4"><span className="text-gray-400 min-w-[100px]">授权时长:</span><span className="font-bold text-blue-600 dark:text-blue-400">{new Date(selectedOrder.date).toLocaleDateString()} 至 {new Date(new Date(selectedOrder.date).setFullYear(new Date(selectedOrder.date).getFullYear() + 1)).toLocaleDateString()}</span></div>
+                  {/* ── Right: Detail Card ────────────────────────────────── */}
+                  <div className="flex-1 bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col">
+                    {!active ? (
+                      <div className="flex flex-col items-center justify-center flex-1 min-h-[400px] gap-4 text-gray-400 dark:text-gray-600">
+                        <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/10 flex items-center justify-center">
+                          <Truck className="w-8 h-8 text-blue-300 dark:text-blue-700" />
+                        </div>
+                        <p className="text-sm font-medium">请点击左侧发货卡片查看详情</p>
                       </div>
-
-                      <div className="space-y-4">
-                          <p className="text-red-600 font-bold">【重要-获取授权信息说明】 欢迎您使用金山办公产品/服务的电子交付，享WPS Office 正版权益。请您按照以下账号、密码或兑换码链接方式获取电子授权信息：</p>
-                          <p>您的初始组织名称是：<span className="text-blue-600 dark:text-blue-400 underline cursor-pointer">{selectedOrder.customerName}(企业ID: {selectedOrder.items[0]?.enterpriseId || '658057387'})</span>，登录信息是：<span className="text-blue-600 dark:text-blue-400 underline cursor-pointer">该组织为用户自创建，请用该组织的企业管理员账号登录查看，https://365.wps.cn/home（请您首次登录后尽快修改初始始密码）</span>，请您按照如下操作指引获取贵组织本次所订购产品/服务电子授权信息和安装序列号（如有）、软件安装包（如有）。如前述账号密码信息显示为“无”，请将该链接复制到浏览器中打开 <span className="text-blue-600 dark:text-blue-400 underline cursor-pointer">无</span>，该链接将引导您获取所订购产品/服务电子授权信息和安装序列号（如有）、软件安装包（如有）。【升级、增减购、续费订单金山办公会按照订单信息直接在您管理后台增加权益，不再发送兑换码】</p>
+                    ) : active.type === '线上发货' ? (
+                      /* Online: email preview */
+                      <div key={active.no} className="animate-page-enter flex flex-col flex-1 overflow-hidden">
+                        <div className="bg-gray-50 dark:bg-white/5 px-6 py-4 border-b border-gray-100 dark:border-white/10 flex justify-between items-center shrink-0">
+                          <div className="flex items-center gap-3">
+                            <div className="w-1.5 h-6 bg-blue-600 rounded-full"></div>
+                            <h2 className="text-base font-bold text-gray-900 dark:text-white">【金山办公】订购服务开通通知</h2>
+                            <span className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded text-[10px] font-bold">{active.receiver}</span>
+                            <span className="font-mono text-xs text-gray-400 bg-gray-100 dark:bg-white/10 px-2 py-0.5 rounded">#{active.no}</span>
+                          </div>
+                          <div className="text-xs text-gray-400 font-mono">{new Date(selectedOrder.date).toLocaleString()}</div>
+                        </div>
+                        <div className="p-6 md:p-8 overflow-y-auto flex-1 space-y-8 text-gray-700 dark:text-gray-300 leading-relaxed text-sm">
+                          <div className="space-y-2">
+                            <p>尊敬的用户： 您好！</p>
+                            <p>请查阅贵组织订购信息并按照本邮件中指引操作后开始使用所订购产品/服务</p>
+                          </div>
+                          <div className="space-y-3 bg-gray-50 dark:bg-white/5 p-6 rounded-2xl border border-gray-100 dark:border-white/5">
+                            <div className="flex gap-4"><span className="text-gray-400 min-w-[120px]">收货方:</span><span className="font-bold text-blue-600 dark:text-blue-400">{active.receiver}</span></div>
+                            <div className="flex gap-4"><span className="text-gray-400 min-w-[120px]">单位/企业:</span><span className="font-bold text-blue-600 dark:text-blue-400">{active.unitName}</span></div>
+                            <div className="flex gap-4"><span className="text-gray-400 min-w-[120px]">收货邮箱:</span><span className="font-bold text-blue-600 dark:text-blue-400">{active.email || '-'}</span></div>
+                            <div className="flex gap-4"><span className="text-gray-400 min-w-[120px]">产品:</span><span className="font-bold text-blue-600 dark:text-blue-400">{active.item?.productName}</span></div>
+                            <div className="flex gap-4"><span className="text-gray-400 min-w-[120px]">购买套数/用户数:</span><span className="font-bold text-blue-600 dark:text-blue-400">{active.item?.quantity}</span></div>
+                            <div className="flex gap-4"><span className="text-gray-400 min-w-[120px]">授权类型:</span><span className="font-bold text-blue-600 dark:text-blue-400">{active.item?.licenseType || '用户订阅许可'}</span></div>
+                            <div className="flex gap-4"><span className="text-gray-400 min-w-[120px]">授权时长:</span><span className="font-bold text-blue-600 dark:text-blue-400">{new Date(selectedOrder.date).toLocaleDateString()} 至 {new Date(new Date(selectedOrder.date).setFullYear(new Date(selectedOrder.date).getFullYear() + 1)).toLocaleDateString()}</span></div>
+                          </div>
+                          <div className="space-y-4">
+                            <p className="text-red-600 font-bold">【重要-获取授权信息说明】 欢迎您使用金山办公产品/服务的电子交付，享WPS Office 正版权益。请您按照以下账号、密码或兑换码链接方式获取电子授权信息：</p>
+                            <p>您的初始组织名称是：<span className="text-blue-600 dark:text-blue-400 underline cursor-pointer">{active.unitName}(企业ID: {active.item?.enterpriseId || '658057387'})</span>，登录信息是：<span className="text-blue-600 dark:text-blue-400 underline cursor-pointer">该组织为用户自创建，请用该组织的企业管理员账号登录查看，https://365.wps.cn/home（请您首次登录后尽快修改初始密码）</span>，请您按照如下操作指引获取贵组织本次所订购产品/服务电子授权信息。【升级、增减购、续费订单金山办公会按照订单信息直接在您管理后台增加权益，不再发送兑换码】</p>
+                          </div>
+                          <div>
+                            <p className="font-bold">获取电子授权的操作步骤指引，详情请阅 <a href="https://365.kdocs.cn/l/cstq9xkV34VW" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline">https://365.kdocs.cn/l/cstq9xkV34VW</a></p>
+                          </div>
+                          <div className="pt-6 border-t border-gray-100 dark:border-white/10 text-[10px] text-gray-400 space-y-3 italic">
+                            <p>*本邮件仅为确认订购信息、交付电子授权的通知函，贵组织具有向本次订购的销售方支付全部款项的义务。</p>
+                            <p>为便捷用户授权管理，【授权与保障】信息页面会持续升级，您可随时进入金山办公官网 <a href="https://365.wps.cn/authentication/list" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline">https://365.wps.cn/authentication/list</a> 查看授权信息。</p>
+                          </div>
+                        </div>
                       </div>
-
-                      <div className="space-y-4">
-                          <p className="font-bold">获取电子授权的操作步骤指引，详情请阅 <a href="https://365.kdocs.cn/l/cstq9xkV34VW" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline">https://365.kdocs.cn/l/cstq9xkV34VW</a></p>
+                    ) : (
+                      /* Offline: courier info */
+                      <div key={active.no} className="animate-page-enter overflow-y-auto flex-1">
+                        <div className="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-3 bg-gray-50 dark:bg-white/5 shrink-0">
+                          <div className="w-8 h-8 rounded-xl bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center">
+                            <Package className="w-4 h-4 text-orange-500" />
+                          </div>
+                          <div className="flex items-center gap-2 flex-1">
+                            <h3 className="text-base font-bold text-gray-900 dark:text-white">线下发货快递信息</h3>
+                            <span className="font-mono text-xs text-gray-400 bg-gray-100 dark:bg-white/10 px-2 py-0.5 rounded">#{active.no}</span>
+                          </div>
+                          <div className="text-xs text-gray-400 font-mono">{new Date(selectedOrder.date).toLocaleString()}</div>
+                        </div>
+                        <div className="p-6 space-y-5">
+                          <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-800/30 rounded-2xl p-5 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <Truck className="w-6 h-6 text-orange-500 shrink-0" />
+                              <div>
+                                <div className="text-xs text-orange-400 font-bold mb-1">快递公司</div>
+                                <div className="text-base font-bold text-gray-900 dark:text-white">{active.expressCompany}</div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xs text-gray-400 font-bold mb-1">快递单号</div>
+                              <div className="text-base font-bold font-mono text-orange-600 dark:text-orange-400 tracking-widest">{active.expressNo}</div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="rounded-2xl border border-gray-100 dark:border-white/10 overflow-hidden">
+                              <div className="px-5 py-3.5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 bg-gray-50 dark:bg-white/5">
+                                <MapPin className="w-4 h-4 text-blue-500" />
+                                <span className="text-sm font-bold text-gray-900 dark:text-white">寄件信息</span>
+                              </div>
+                              <div className="divide-y divide-gray-50 dark:divide-white/5 px-5 text-sm">
+                                {[
+                                  { label: '寄件人姓名', value: active.senderName },
+                                  { label: '寄件单位', value: active.senderUnit },
+                                  { label: '寄件地址', value: active.senderAddress },
+                                  { label: '寄件人电话', value: active.senderPhone },
+                                ].map((f, fi) => (
+                                  <div key={fi} className="flex items-center gap-8 py-3">
+                                    <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-24 shrink-0 whitespace-nowrap">{f.label}</span>
+                                    <span className="text-sm font-medium text-gray-900 dark:text-white flex-1 break-all">{f.value || '-'}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="rounded-2xl border border-gray-100 dark:border-white/10 overflow-hidden">
+                              <div className="px-5 py-3.5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 bg-gray-50 dark:bg-white/5">
+                                <MapPin className="w-4 h-4 text-green-500" />
+                                <span className="text-sm font-bold text-gray-900 dark:text-white">收件信息</span>
+                              </div>
+                              <div className="divide-y divide-gray-50 dark:divide-white/5 px-5 text-sm">
+                                {[
+                                  { label: '收件人姓名', value: active.receiverName },
+                                  { label: '收件单位', value: active.receiverUnit },
+                                  { label: '收件地址', value: active.receiverAddress },
+                                  { label: '收件人电话', value: active.receiverPhone },
+                                ].map((f, fi) => (
+                                  <div key={fi} className="flex items-center gap-8 py-3">
+                                    <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-24 shrink-0 whitespace-nowrap">{f.label}</span>
+                                    <span className="text-sm font-medium text-gray-900 dark:text-white flex-1 break-all">{f.value || '-'}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-
-                      <div className="pt-8 border-t dark:border-white/10 text-[10px] text-gray-400 space-y-4 italic">
-                          <p>*本邮件仅为确认订购信息、交付电子授权的通知函，贵组织具有向本次订购的销售方支付全部款项的义务。本次订购记录以及贵组织对订购产品的全部权益以电子授权页面中显示的信息为准。</p>
-                          <p>为便捷用户授权管理，【授权与保障】信息页面会持续升级，您可随时进入金山办公官网 <a href="https://365.wps.cn/authentication/list" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline">https://365.wps.cn/authentication/list</a> 查看授权信息，并可在有因第三方检查、备案、资产登记等工作需要归档授权信息时，将电子授权信息连同金山办公官网网址一并截图提供。</p>
-                      </div>
+                    )}
                   </div>
-              </div>
+                </>
+              );
+            })()}
           </div>
         )}
 
@@ -1157,7 +1384,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
       {/* --- Log Drawer --- */}
       {isLogDrawerOpen && (
           <div className="fixed inset-0 z-50 flex justify-end">
-              <div className={`absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity ${isLogDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={handleCloseLogDrawer}></div>
+              <div className={`absolute inset-0 bg-black/30 backdrop-blur-sm ${isLogDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={handleCloseLogDrawer}></div>
               <div className={`relative w-full max-w-md h-full bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col ${isLogDrawerClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
                   <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center shrink-0">
                       <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -1194,7 +1421,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
       {/* --- Action Drawer --- */}
       {activeStepModal && (
           <div className="fixed inset-0 z-50 flex justify-end">
-              <div className={`absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity ${isDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={handleCloseDrawer}></div>
+              <div className={`absolute inset-0 bg-black/30 backdrop-blur-sm ${isDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={handleCloseDrawer}></div>
               <div className={`relative w-full max-w-3xl h-full bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col ${isDrawerClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
                   <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center shrink-0">
                       <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -1508,7 +1735,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
       {/* License Cert Drawer */}
       {selectedCertificateItem && (
           <div className="fixed inset-0 z-50 flex justify-end">
-              <div className={`absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity ${isCertDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={handleCloseCertDrawer}></div>
+              <div className={`absolute inset-0 bg-black/30 backdrop-blur-sm ${isCertDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={handleCloseCertDrawer}></div>
               <div className={`relative w-full max-w-4xl h-full bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col ${isCertDrawerClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
                    {/* Cert Header */}
                    <div className="p-4 border-b border-gray-100 dark:border-white/10 flex justify-between items-center print:hidden bg-white dark:bg-white/5">
@@ -1557,7 +1784,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                      </div>
                                      
                                      <div className="space-y-2">
-                                        <h2 className="text-5xl font-serif text-gray-900 font-medium tracking-wide">软件商品授权证书</h2>
+                                        <h2 className="text-5xl font-serif text-gray-900 font-medium tracking-wide">软件产品授权证书</h2>
                                         <div className="text-xs text-gray-400 uppercase tracking-[0.3em]">Certificate of Software License</div>
                                      </div>
 
@@ -1569,7 +1796,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                          
                                          <div className="grid grid-cols-2 gap-y-8 gap-x-12 text-left bg-gray-50 p-8 rounded-3xl border border-gray-100">
                                              <div>
-                                                 <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">商品名称 (Product)</div>
+                                                 <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">产品名称 (Product)</div>
                                                  <div className="text-xl font-bold text-gray-900">{selectedCertificateItem.productName}</div>
                                              </div>
                                              <div>
@@ -1768,7 +1995,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
       {selectedItemForDetails && (
           <div className="fixed inset-y-0 right-0 left-[240px] z-[70] flex justify-end">
               <div 
-                  className={`absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity duration-300 ${isItemDetailsClosing ? 'opacity-0' : 'opacity-100'}`}
+                  className={`absolute inset-0 bg-black/20 backdrop-blur-sm ${isItemDetailsClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`}
                   onClick={() => {
                       setIsItemDetailsClosing(true);
                       setTimeout(() => {
@@ -1777,7 +2004,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                       }, 300);
                   }}
               />
-              <div className={`w-full bg-white dark:bg-[#1C1C1E] h-full shadow-2xl flex flex-col transform transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${isItemDetailsClosing ? 'translate-x-full' : 'translate-x-0'} relative z-10`}>
+              <div className={`w-full bg-white dark:bg-[#1C1C1E] h-full shadow-2xl flex flex-col relative z-10 ${isItemDetailsClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
                   <div className="p-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-white dark:bg-[#1C1C1E] shrink-0">
                       <div className="flex items-center gap-4">
                           <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
@@ -1785,7 +2012,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                           </div>
                           <div>
                               <div className="flex items-center gap-3">
-                                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">订单商品明细详情</h3>
+                                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">订单产品明细详情</h3>
                                   <span className="text-xl font-bold text-gray-500 dark:text-gray-400 font-mono">
                                       {selectedOrder.id}-{String(selectedItemIndex + 1).padStart(3, '0')}
                                   </span>
@@ -1809,14 +2036,14 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                   <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-gray-50/30 dark:bg-black/20">
                       <div className="grid grid-cols-3 gap-4">
 
-                          {/* 左侧大列 (2/3)：商品交易信息、商品交付信息、商品授权信息 纵向排列 */}
+                          {/* 左侧大列 (2/3)：产品交易信息、产品交付信息、产品授权信息 纵向排列 */}
                           <div className="col-span-2 space-y-4">
 
-                              {/* 商品交易信息 */}
+                              {/* 产品交易信息 */}
                               <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
                                   <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                                       <Box className="w-5 h-5 text-blue-500" />
-                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">商品交易信息</h4>
+                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">产品交易信息</h4>
                                   </div>
                                   <div className="p-5">
                                       {(() => {
@@ -1827,17 +2054,17 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                           const amountDue = itemAmount - discountAmount;
                                           const fmt = (n: number) => `¥${n.toLocaleString()}`;
                                           const fields = [
-                                              { label: '商品名称', value: selectedItemForDetails.productName || '-', isAmount: false },
-                                              { label: '商品规格', value: [selectedItemForDetails.skuName, selectedItemForDetails.skuCode].filter(Boolean).join('  ·  ') || '-', isAmount: false },
+                                              { label: '产品名称', value: selectedItemForDetails.productName || '-', isAmount: false },
+                                              { label: '产品规格', value: [selectedItemForDetails.skuName, selectedItemForDetails.skuCode].filter(Boolean).join('  ·  ') || '-', isAmount: false },
                                               { label: '授权类型', value: selectedItemForDetails.pricingOptionName || selectedItemForDetails.licenseType || '-', isAmount: false },
-                                              { label: '商品类型', value: selectedItemForDetails.productType || '-', isAmount: false },
+                                              { label: '产品类型', value: selectedItemForDetails.productType || '-', isAmount: false },
                                               { label: '数量', value: String(selectedItemForDetails.quantity), isAmount: false },
                                               { label: '单价', value: fmt(selectedItemForDetails.priceAtPurchase), isAmount: true },
                                               { label: '计价数量', value: String(selectedItemForDetails.quantity), isAmount: false },
                                               { label: '计价单价', value: selectedItemForDetails.pricingUnitPrice != null ? fmt(selectedItemForDetails.pricingUnitPrice) : '-', isAmount: true },
-                                              { label: '商品金额', value: fmt(itemAmount), isAmount: true },
-                                              { label: '商品优惠金额', value: fmt(discountAmount), isAmount: true },
-                                              { label: '商品需付金额', value: fmt(amountDue), isAmount: true },
+                                              { label: '产品金额', value: fmt(itemAmount), isAmount: true },
+                                              { label: '产品优惠金额', value: fmt(discountAmount), isAmount: true },
+                                              { label: '产品需付金额', value: fmt(amountDue), isAmount: true },
                                           ];
                                           return (
                                               <div className="grid grid-cols-2 gap-x-6">
@@ -1853,11 +2080,11 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                   </div>
                               </div>
 
-                              {/* 商品授权信息 */}
+                              {/* 产品授权信息 */}
                               <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
                                   <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                                       <ShieldCheck className="w-5 h-5 text-purple-500" />
-                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">商品授权信息</h4>
+                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">产品授权信息</h4>
                                   </div>
                                   <div className="p-5">
                                       {(() => {
@@ -1885,11 +2112,11 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                   </div>
                               </div>
 
-                              {/* 商品价格参考 */}
+                              {/* 产品价格参考 */}
                               <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
                                   <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                                       <CreditCard className="w-5 h-5 text-green-500" />
-                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">商品价格参考</h4>
+                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">产品价格参考</h4>
                                   </div>
                                   <div className="p-5">
                                       {(() => {
@@ -1917,14 +2144,14 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
 
                           </div>
 
-                          {/* 右侧小列 (1/3)：商品交付信息 + 安装包 纵向排列 */}
+                          {/* 右侧小列 (1/3)：产品交付信息 + 安装包 纵向排列 */}
                           <div className="space-y-4">
 
-                              {/* 商品交付信息 */}
+                              {/* 产品交付信息 */}
                               <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
                                   <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                                       <Truck className="w-5 h-5 text-indigo-500" />
-                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">商品交付信息</h4>
+                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">产品交付信息</h4>
                                   </div>
                                   <div className="p-5">
                                       {(() => {

@@ -249,7 +249,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ products, setProducts, 
         )}
       </div>
 
-      <div className="p-4 lg:p-10 max-w-7xl mx-auto w-full space-y-8 animate-fade-in">
+      <div className="p-4 lg:p-10 max-w-7xl mx-auto w-full space-y-8 animate-page-enter">
           {currentView === 'PRODUCT_DETAIL' && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   {/* Left: Product Info */}

@@ -439,7 +439,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, departments,
   const handlePageChange = (page: number) => setCurrentPage(page);
 
   return (
-    <div className="p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 animate-fade-in relative h-[calc(100vh-64px)] flex flex-col">
+    <div className="p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 animate-page-enter relative h-[calc(100vh-64px)] flex flex-col">
       {/* Header */}
       <div className="flex justify-between items-center shrink-0">
         <div>
