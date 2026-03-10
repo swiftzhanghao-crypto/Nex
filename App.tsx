@@ -304,15 +304,16 @@ function App() {
   ]);
 
   const [users, setUsers] = useState<User[]>([
-    { id: 'u1', accountId: '10000001', name: '张伟 (Admin)', email: 'zhangwei@wps.cn', role: 'Admin', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhangWei', departmentId: 'root' },
-    { id: 'u2', accountId: '10000002', name: '李娜 (Sales)', email: 'lina@wps.cn', role: 'Sales', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=LiNa', departmentId: 'c2-d1-r1-t1' },
-    { id: 'u3', accountId: '10000003', name: '王强 (Business)', email: 'wangqiang@wps.cn', role: 'Business', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=WangQiang', departmentId: 'c3-d1' },
-    { id: 'u4', accountId: '10000004', name: '赵敏 (Technical)', email: 'zhaomin@wps.cn', role: 'Technical', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhaoMin', departmentId: 'root' },
-    { id: 'u5', accountId: '10000005', name: '孙涛 (Logistics)', email: 'suntao@wps.cn', role: 'Logistics', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=SunTao', departmentId: 'c3-d2' },
-    { id: 'u6', accountId: '10000006', name: '周杰 (Sales)', email: 'zhoujie@wps.cn', role: 'Sales', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Felix', departmentId: 'c2-d1' },
-    { id: 'u7', accountId: '10000007', name: '吴刚 (Sales)', email: 'wugang@wps.cn', role: 'Sales', userType: 'Internal', status: 'Inactive', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Aneka', departmentId: 'c2-d1' },
-    { id: 'u8', accountId: '10000008', name: '郑华 (Finance)', email: 'zhenghua@wps.cn', role: 'Business', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhengHua', departmentId: 'c3-d1' },
-    { id: 'u9', accountId: '20000001', name: '陈总 (Partner)', email: 'chen@wps.cn', role: 'Sales', userType: 'External', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ChenPartner', departmentId: '' },
+    { id: 'u1', accountId: '10000001', name: '张伟 (Admin)', email: 'zhangwei@wps.cn', phone: '13800000001', role: 'Admin', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhangWei', departmentId: 'root' },
+    { id: 'u2', accountId: '10000002', name: '李娜 (Sales)', email: 'lina@wps.cn', phone: '13800000002', role: 'Sales', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=LiNa', departmentId: 'c2-d1-r1-t1' },
+    { id: 'u3', accountId: '10000003', name: '王强 (Business)', email: 'wangqiang@wps.cn', phone: '13800000003', role: 'Business', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=WangQiang', departmentId: 'c3-d1' },
+    { id: 'u4', accountId: '10000004', name: '赵敏 (Technical)', email: 'zhaomin@wps.cn', phone: '13800000004', role: 'Technical', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhaoMin', departmentId: 'root' },
+    { id: 'u5', accountId: '10000005', name: '孙涛 (Logistics)', email: 'suntao@wps.cn', phone: '13800000005', role: 'Logistics', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=SunTao', departmentId: 'c3-d2' },
+    { id: 'u6', accountId: '10000006', name: '周杰 (Sales)', email: 'zhoujie@wps.cn', phone: '13800000006', role: 'Sales', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Felix', departmentId: 'c2-d1' },
+    { id: 'u7', accountId: '10000007', name: '吴刚 (Sales)', email: 'wugang@wps.cn', phone: '13800000007', role: 'Sales', userType: 'Internal', status: 'Inactive', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Aneka', departmentId: 'c2-d1' },
+    { id: 'u8', accountId: '10000008', name: '郑华 (Finance)', email: 'zhenghua@wps.cn', phone: '13800000008', role: 'Business', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ZhengHua', departmentId: 'c3-d1' },
+    { id: 'u9', accountId: '20000001', name: '陈总 (Partner)', email: 'chen@wps.cn', phone: '13800000009', role: 'Sales', userType: 'External', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=ChenPartner', departmentId: '' },
+    { id: 'u10', accountId: '10000010', name: '苏雪松', email: 'suxuesong@wps.cn', phone: '17610166961', role: 'Business', userType: 'Internal', status: 'Active', avatar: 'https://api.dicebear.com/9.x/avataaars/svg?seed=SuXueSong', departmentId: 'c2-d1' },
   ]);
   const [currentUser, setCurrentUser] = useState<User>(users[0]);
 
@@ -481,7 +482,8 @@ function App() {
             const source = sources[i % sources.length];
             
             const date = new Date();
-            date.setDate(date.getDate() - Math.floor(Math.random() * 180));
+            // Top 5 orders get very recent dates (0-4 days ago) to appear at the top of the list
+            date.setDate(date.getDate() - (i <= 5 ? (i - 1) : Math.floor(Math.random() * 180)));
             const dateStr = date.toISOString();
 
             let status = statuses[i % statuses.length];
@@ -540,13 +542,22 @@ function App() {
                 approvalRecords.push({ id: `ar-${i}-1`, operatorId: 'u2', operatorName: '李娜 (Sales)', operatorRole: 'Sales', actionType: 'Sales Approval', result: 'Approved', timestamp: dateStr, comment: '符合销售政策' });
             }
 
-            const orderItems: OrderItem[] = (merchandise?.items || []).map(mItem => {
+            const licenseTypes = ['数量授权', '服务器授权', '用户订阅许可', '年场地授权', '年授权'];
+
+            // Extra product pool for multi-item orders
+            const extraProductPool = [
+                { productId: 'PROD-PUB-002', productName: 'WPS 365 高级版', skuId: 's2', skuName: '标准版', price: 499 },
+                { productId: 'PROD-PUB-001-2', productName: 'WPS 365 基础版 (政府)', skuId: 's1-2', skuName: '基础版', price: 199 },
+                { productId: 'PROD-PVT-001', productName: 'WPS 365 高级版 (私有云)', skuId: 's5', skuName: '标准版', price: 50000 },
+                { productId: 'PROD-ITEM-001', productName: 'Web Office 核心组件', skuId: 's8', skuName: '标准版', price: 20000 },
+                { productId: 'PROD-PUB-001', productName: 'WPS 365 标准版 (政府)', skuId: 's1', skuName: '标准版', price: 299 },
+            ];
+
+            const makeItem = (mItem: { productId: string; productName: string; skuId: string; skuName: string; quantity?: number }, unitPrice: number, idxOffset: number): OrderItem => {
                 const product = products.find(p => p.id === mItem.productId);
                 const capabilitiesSnapshot = product?.composition?.map(c => c.name) || [];
                 const sku = product?.skus.find(s => s.id === mItem.skuId);
-                // Use the first pricing option as default mock value
-                const defaultOption = sku?.pricingOptions?.[0]; 
-
+                const defaultOption = sku?.pricingOptions?.[0];
                 return {
                     merchandiseId: merchandise?.id,
                     merchandiseName: merchandise?.name,
@@ -554,15 +565,39 @@ function App() {
                     productName: mItem.productName,
                     skuId: mItem.skuId,
                     skuName: mItem.skuName,
-                    quantity: quantity * mItem.quantity, 
-                    priceAtPurchase: (merchandise?.price || 500) / (merchandise?.items.length || 1), 
+                    licenseType: licenseTypes[(i + idxOffset) % licenseTypes.length],
+                    quantity: quantity * (mItem.quantity ?? 1),
+                    priceAtPurchase: unitPrice,
                     capabilitiesSnapshot,
                     deliveredContent: (status === OrderStatus.DELIVERED || status === OrderStatus.SHIPPED) ? [generateLicenseKey()] : [],
                     activationMethod: 'LicenseKey',
                     pricingOptionId: defaultOption?.id,
                     pricingOptionName: defaultOption?.title
                 };
+            };
+
+            const baseItems = (merchandise?.items || []).map((mItem, idx) =>
+                makeItem(mItem, (merchandise?.price || 500) / (merchandise?.items.length || 1), idx)
+            );
+
+            // Determine how many extra items to add based on order index
+            // Top 5 orders get 4 extra items (5 total), next 30 get 1 extra (2 total)
+            const extraCount = i <= 5 ? 4 : i <= 35 ? 1 : 0;
+            const extraItems: OrderItem[] = Array.from({ length: extraCount }).map((_, idx) => {
+                const poolItem = extraProductPool[(i + idx) % extraProductPool.length];
+                // Avoid duplicating the same product as base or already-added extras
+                const usedIds = [...baseItems.map(b => b.productId)];
+                let safePoolItem = poolItem;
+                let attempts = 0;
+                while (usedIds.includes(safePoolItem.productId) && attempts < extraProductPool.length) {
+                    safePoolItem = extraProductPool[(i + idx + attempts + 1) % extraProductPool.length];
+                    attempts++;
+                }
+                usedIds.push(safePoolItem.productId);
+                return makeItem(safePoolItem, safePoolItem.price, idx + 10);
             });
+
+            const orderItems: OrderItem[] = [...baseItems, ...extraItems];
 
             const salesRep = users.find(u => u.id === customer.ownerId);
             const invoiceInfo: InvoiceInfo | undefined = isPaid ? {
@@ -659,6 +694,7 @@ function App() {
                 directChannel: '-',
                 terminalChannel: '-',
                 orderType: '订单',
+                creatorId: 'u10',
                 creatorName: '苏雪松',
                 creatorPhone: '17610166961',
                 industryLine: '大客央国企',
@@ -666,7 +702,7 @@ function App() {
                 city: '嘉兴市',
                 district: '桐乡市',
                 reportTag: 'EA',
-                sellerName: '珠海金山办公软件有限公司',
+                sellerName: ['珠海金山办公软件有限公司', '武汉金山办公软件有限公司', '北京金山办公软件有限公司'][i % 3],
                 sellerContact: '李海瑞 (00019829)',
                 customerStatus: '已覆盖',
                 channelService: '否'

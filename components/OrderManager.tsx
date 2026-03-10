@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Order, OrderStatus, Product, Customer, OrderItem, ActivationMethod, User, Department, ApprovalRecord, Opportunity, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, Channel, RoleDefinition, DeliveryMethod } from '../types';
 import { Search, User as UserIcon, Plus, Trash2, Disc, ChevronRight, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, Wallet, FileCheck, CheckSquare, Package, Zap, Box, Settings, Filter, MapPin, MessageSquare, ChevronDown, Calendar, Shield } from 'lucide-react';
@@ -130,7 +130,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   // Column Configuration State
   const [isColumnConfigOpen, setIsColumnConfigOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([
-      'id', 'customer', 'buyer', 'products', 'sales', 'businessManager', 'department', 'source', 'buyerType', 'date', 'status', 'paymentStatus', 'stockStatus', 'total', 'delivery', 'action'
+      'id', 'customer', 'buyer', 'products', 'sales', 'businessManager', 'department', 'source', 'buyerType', 'date', 'status', 'paymentStatus', 'stockStatus', 'total', 'action'
   ]);
 
   const allColumns = [
@@ -138,8 +138,8 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
       { id: 'customer', label: '客户名称' },
       { id: 'buyer', label: '买方名称' },
       { id: 'products', label: '商品信息' },
-      { id: 'sales', label: '销售人员' },
-      { id: 'businessManager', label: '商务人员' },
+      { id: 'sales', label: '销售' },
+      { id: 'businessManager', label: '商务' },
       { id: 'department', label: '所属部门' },
       { id: 'source', label: '订单来源' },
       { id: 'buyerType', label: '订单类型' },
@@ -195,6 +195,21 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
 
   // --- Create Order Wizard State ---
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [productPopoverId, setProductPopoverId] = useState<string | null>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+  const productPopoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!productPopoverId) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (productPopoverRef.current && !productPopoverRef.current.contains(e.target as Node)) {
+        setProductPopoverId(null);
+        setPopoverPos(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [productPopoverId]);
   const [currentStep, setCurrentStep] = useState(1); // 1: Type, 2: Info, 3: Products, 4: Delivery
 
   // Step 1: Order Type & Source
@@ -357,26 +372,25 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   const getStatusBadge = (status: OrderStatus) => {
     const text = statusMap[status] || status;
     let className = '';
-    let dotColor = '';
     switch (status) {
-      case OrderStatus.PENDING_PAYMENT:   className = 'unified-tag-gray';   dotColor = 'bg-gray-400'; break;
-      case OrderStatus.PENDING_APPROVAL:  className = 'unified-tag-orange';  dotColor = 'bg-orange-500'; break;
-      case OrderStatus.PENDING_CONFIRM:   className = 'unified-tag-orange';  dotColor = 'bg-orange-500'; break;
-      case OrderStatus.PROCESSING_PROD:   className = 'unified-tag-blue';    dotColor = 'bg-blue-500'; break;
-      case OrderStatus.SHIPPED:           className = 'unified-tag-indigo';  dotColor = 'bg-indigo-500'; break;
-      case OrderStatus.DELIVERED:         className = 'unified-tag-green';   dotColor = 'bg-green-500'; break;
-      case OrderStatus.CANCELLED:         className = 'unified-tag-red';     dotColor = 'bg-red-500'; break;
-      case OrderStatus.REFUND_PENDING:    className = 'unified-tag-orange';  dotColor = 'bg-orange-500'; break;
-      case OrderStatus.REFUNDED:          className = 'unified-tag-red';     dotColor = 'bg-red-400'; break;
-      default: className = 'unified-tag-gray'; dotColor = 'bg-gray-400';
+      case OrderStatus.PENDING_PAYMENT:   className = 'unified-tag-blue';   break;
+      case OrderStatus.PENDING_APPROVAL:  className = 'unified-tag-blue';   break;
+      case OrderStatus.PENDING_CONFIRM:   className = 'unified-tag-blue';   break;
+      case OrderStatus.PROCESSING_PROD:   className = 'unified-tag-blue';   break;
+      case OrderStatus.SHIPPED:           className = 'unified-tag-indigo'; break;
+      case OrderStatus.DELIVERED:         className = 'unified-tag-green';  break;
+      case OrderStatus.CANCELLED:         className = 'unified-tag-gray';   break;
+      case OrderStatus.REFUND_PENDING:    className = 'unified-tag-blue';   break;
+      case OrderStatus.REFUNDED:          className = 'unified-tag-red';    break;
+      default: className = 'unified-tag-gray';
     }
-    return <span className={className}><span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />{text}</span>;
+    return <span className={className}>{text}</span>;
   };
 
   const getPaymentStatusBadge = (isPaid: boolean) => {
     return isPaid
         ? <span className="unified-tag-green">已支付</span>
-        : <span className="unified-tag-gray">待支付</span>;
+        : <span className="unified-tag-blue">待支付</span>;
   };
 
   const getStockStatusBadge = (order: Order) => {
@@ -385,7 +399,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
     if (order.isShippingConfirmed)                      return <span className="unified-tag-blue">待发货</span>;
     if (order.isAuthConfirmed || order.isPackageConfirmed || order.status === OrderStatus.PROCESSING_PROD)
                                                         return <span className="unified-tag-orange">备货中</span>;
-    return <span className="unified-tag-gray">待处理</span>;
+    return <span className="unified-tag-blue">待处理</span>;
   };
 
   const getSourceBadge = (source: OrderSource) => {
@@ -751,13 +765,16 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   const currentSearchOption = searchFieldOptions.find(o => o.value === searchField)!;
 
   return (
-    <div className="p-4 lg:p-8 max-w-[1600px] mx-auto space-y-6 animate-fade-in pb-24">
+    <div className="p-4 lg:p-6 max-w-[2400px] mx-auto space-y-4 animate-fade-in pb-24">
       <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
-        {/* Left: title + search */}
+        {/* Left: title */}
         <div className="flex items-center gap-4 w-full lg:w-auto">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">订单中心</h1>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
             {/* Search bar */}
-            <div className="flex items-stretch h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] shadow-sm w-full sm:w-[380px] transition-all focus-within:border-blue-400 dark:focus-within:border-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]">
+            <div className="flex items-stretch h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] shadow-sm w-full sm:w-[320px] transition-all focus-within:border-blue-400 dark:focus-within:border-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]">
                 {/* Field selector */}
                 <div className="relative flex-shrink-0">
                     <button
@@ -801,41 +818,11 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                     )}
                 </div>
             </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
-            
-            <div className="relative">
-                <button 
-                    onClick={() => setIsColumnConfigOpen(!isColumnConfigOpen)}
-                    className={`p-2 rounded-lg border transition shadow-sm ${isColumnConfigOpen ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
-                    title="配置列"
-                >
-                    <Settings className="w-4 h-4" />
-                </button>
-                {isColumnConfigOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#2C2C2E] shadow-xl z-50 p-2 rounded-xl border border-gray-100 dark:border-white/10 animate-fade-in max-h-80 overflow-y-auto custom-scrollbar">
-                        <div className="text-xs font-bold text-gray-400 uppercase px-2 py-1 mb-1">显示列配置</div>
-                        {allColumns.map(col => (
-                            <label key={col.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg cursor-pointer transition">
-                                <input 
-                                    type="checkbox" 
-                                    checked={visibleColumns.includes(col.id)} 
-                                    onChange={() => toggleColumn(col.id)}
-                                    disabled={col.id === 'id' || col.id === 'action'} 
-                                    className="w-4 h-4 rounded-sm border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <span className="text-sm text-gray-700 dark:text-gray-300">{col.label}</span>
-                            </label>
-                        ))}
-                    </div>
-                )}
-            </div>
-
+            {/* 筛选按钮（原设置字段位置） */}
             <button 
                 onClick={() => {
                     if (!isAdvancedFilterOpen && advancedFilters.length === 0) {
-                        // Add some default filters from the image
                         const defaults = [
                             { id: '1', fieldId: 'renewalType', mode: '多选' as FilterMode, value: '不限' },
                             { id: '2', fieldId: 'orderNature', mode: '多选' as FilterMode, value: '全部' },
@@ -850,11 +837,39 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                     }
                     setIsAdvancedFilterOpen(!isAdvancedFilterOpen);
                 }}
-                className={`p-2 rounded-lg border transition shadow-sm ${isAdvancedFilterOpen ? 'bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
+                className={`p-2 rounded-lg border transition shadow-sm ${isAdvancedFilterOpen ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
                 title="高级筛选"
             >
                 <Filter className="w-4 h-4" />
             </button>
+
+            {/* 设置字段按钮（原筛选位置） */}
+            <div className="relative">
+                <button 
+                    onClick={() => setIsColumnConfigOpen(!isColumnConfigOpen)}
+                    className={`p-2 rounded-lg border transition shadow-sm ${isColumnConfigOpen ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
+                    title="配置列"
+                >
+                    <Settings className="w-4 h-4" />
+                </button>
+                {isColumnConfigOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#2C2C2E] shadow-xl z-50 p-2 rounded-xl border border-gray-100 dark:border-white/10 animate-fade-in max-h-80 overflow-y-auto custom-scrollbar">
+                        <div className="text-xs font-bold text-gray-400 uppercase px-2 py-1 mb-1">显示列配置</div>
+                        {allColumns.map(col => (
+                            <label key={col.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg cursor-pointer transition">
+                                <input 
+                                    type="checkbox" 
+                                    checked={visibleColumns.includes(col.id)} 
+                                    onChange={() => toggleColumn(col.id)}
+                                    disabled={col.id === 'id' || col.id === 'action'} 
+                                    className="w-4 h-4 rounded-sm border-gray-300 text-[#0071E3] focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-700 dark:text-gray-300">{col.label}</span>
+                            </label>
+                        ))}
+                    </div>
+                )}
+            </div>
 
             <div className="w-px h-6 bg-gray-200 dark:bg-white/10 mx-1 hidden sm:block"></div>
 
@@ -875,15 +890,15 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                     onClick={() => setFilterStatus('All')}
                     className={`relative p-2 rounded-xl border transition-all duration-300 text-left group min-w-[100px] flex-shrink-0 snap-start
                         ${filterStatus === 'All' 
-                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20' 
-                            : 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-blue-300 dark:hover:border-blue-900'}
+                            ? 'bg-[#0071E3] border-[#0071E3] text-white shadow-lg shadow-blue-500/20' 
+                            : 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-[#0071E3]/40 dark:hover:border-blue-900'}
                     `}
                 >
                     <div className="flex items-center justify-between mb-1.5">
-                        <div className={`p-1 rounded-lg ${filterStatus === 'All' ? 'bg-white/20' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600'}`}>
+                        <div className={`p-1 rounded-lg ${filterStatus === 'All' ? 'bg-white/20' : 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3]'}`}>
                             <Layers className="w-3.5 h-3.5" />
                         </div>
-                        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${filterStatus === 'All' ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400'}`}>
+                        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${filterStatus === 'All' ? 'bg-white text-[#0071E3]' : 'bg-blue-100 text-[#0071E3] dark:bg-blue-900/40 dark:text-blue-400'}`}>
                             {orders.length}
                         </span>
                     </div>
@@ -909,16 +924,16 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                         onClick={() => setFilterStatus(step.id)}
                         className={`relative p-2 rounded-xl border transition-all duration-300 text-left group min-w-[100px] flex-shrink-0 snap-start
                             ${isActive 
-                                ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20' 
-                                : 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-blue-300 dark:hover:border-blue-900'}
+                                ? 'bg-[#0071E3] border-[#0071E3] text-white shadow-lg shadow-blue-500/20' 
+                                : 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-[#0071E3]/40 dark:hover:border-blue-900'}
                         `}
                     >
                         <div className="flex items-center justify-between mb-1.5">
-                            <div className={`p-1 rounded-lg ${isActive ? 'bg-white/20' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600'}`}>
+                            <div className={`p-1 rounded-lg ${isActive ? 'bg-white/20' : 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3]'}`}>
                                 <step.icon className="w-3.5 h-3.5" />
                             </div>
                             {count > 0 && (
-                                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isActive ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400'}`}>
+                                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isActive ? 'bg-white text-[#0071E3]' : 'bg-blue-100 text-[#0071E3] dark:bg-blue-900/40 dark:text-blue-400'}`}>
                                     {count}
                                 </span>
                             )}
@@ -934,29 +949,36 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
             {exceptionStatuses.filter(step => hasPermission(step.permission)).map((step) => {
                 const isActive = filterStatus === step.id;
                 const count = orders.filter(o => o.status === step.id).length;
+                const isCancelled = step.id === OrderStatus.CANCELLED;
                 return (
                     <button
                         key={step.id}
                         onClick={() => setFilterStatus(step.id)}
                         className={`relative p-2 rounded-xl border transition-all duration-300 text-left group min-w-[100px] flex-shrink-0 snap-start
                             ${isActive 
-                                ? 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-500/20' 
-                                : 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-red-300 dark:hover:border-red-900'}
+                                ? isCancelled
+                                    ? 'bg-gray-500 border-gray-500 text-white shadow-lg shadow-gray-400/20'
+                                    : 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-500/20'
+                                : isCancelled
+                                    ? 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-gray-400 dark:hover:border-gray-600'
+                                    : 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-red-300 dark:hover:border-red-900'}
                         `}
                     >
                         <div className="flex items-center justify-between mb-1.5">
-                            <div className={`p-1 rounded-lg ${isActive ? 'bg-white/20' : 'bg-red-50 dark:bg-red-900/20 text-red-600'}`}>
+                            <div className={`p-1 rounded-lg ${isActive ? 'bg-white/20' : isCancelled ? 'bg-gray-100 dark:bg-white/10 text-gray-500' : 'bg-red-50 dark:bg-red-900/20 text-red-600'}`}>
                                 <step.icon className="w-3.5 h-3.5" />
                             </div>
                             {count > 0 && (
-                                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isActive ? 'bg-white text-red-600' : 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'}`}>
+                                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isActive
+                                    ? isCancelled ? 'bg-white text-gray-600' : 'bg-white text-red-600'
+                                    : isCancelled ? 'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400' : 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'}`}>
                                     {count}
                                 </span>
                             )}
                         </div>
                         <div className={`text-[11px] font-bold ${isActive ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{step.label}</div>
                         {isActive && (
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-1 bg-white rounded-full"></div>
+                            <div className={`absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-1 ${isCancelled ? 'bg-white' : 'bg-white'} rounded-full`}></div>
                         )}
                     </button>
                 );
@@ -983,7 +1005,10 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                             : col.id === 'action'
                             ? 'sticky right-[52px] z-30 bg-gray-50/95 dark:bg-[#1C1C1E] shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.08)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.3)] text-center'
                             : ''
-                    }`}>{col.label}</th>
+                    }`} style={
+                        col.id === 'sales' || col.id === 'businessManager' ? { minWidth: '120px' } :
+                        col.id === 'department' ? { minWidth: '240px' } : undefined
+                    }>{col.label}</th>
                 ))}
                 <th className="px-4 py-3 sticky right-0 z-30 bg-gray-50/95 dark:bg-[#1C1C1E] border-b border-gray-200/50 dark:border-white/10 w-[52px] min-w-[52px]"></th>
               </tr>
@@ -1006,7 +1031,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                   </td>
                   {visibleColumns.includes('id') && (
                       <td
-                          className={`px-4 py-3 font-mono text-[#0071E3] dark:text-[#FF2D55] whitespace-nowrap sticky left-[52px] z-20 ${stickyBg} shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors cursor-pointer hover:underline`}
+                          className={`px-4 py-3 font-mono font-bold text-[#0071E3] dark:text-[#FF2D55] whitespace-nowrap sticky left-[52px] z-20 ${stickyBg} shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors cursor-pointer hover:underline`}
                           onClick={() => navigate(`/orders/${order.id}`)}
                       >
                           {order.id}
@@ -1015,7 +1040,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                   {visibleColumns.includes('customer') && (
                       <td className="px-4 py-3 max-w-[180px]">
                         <div 
-                            className="font-semibold text-gray-900 dark:text-white hover:text-[#0071E3] dark:hover:text-[#0A84FF] transition-colors truncate"
+                            className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline transition-colors truncate cursor-pointer"
                             title={order.customerName}
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -1049,24 +1074,50 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                   )}
                   {visibleColumns.includes('products') && (
                       <td className="px-4 py-3">
-                          <div className="flex flex-col gap-1.5 max-w-[220px]">
-                              {order.items.slice(0, 2).map((item, idx) => (
+                          <div className="flex flex-col gap-1 max-w-[220px]">
+                              {/* 只展示第一个商品 */}
+                              {order.items.slice(0, 1).map((item, idx) => (
                                   <div key={idx} className="flex flex-col">
                                       <div className="flex items-center justify-between gap-2">
                                           <div className="truncate font-medium text-gray-700 dark:text-gray-300" title={item.productName}>{item.productName}</div>
                                           <span className="text-gray-400 shrink-0">×{item.quantity}</span>
                                       </div>
-                                      {item.skuName && <span className="inline-flex w-fit mt-1 px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-full">{item.skuName}</span>}
+                                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                          {item.skuName && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-full">{item.skuName}</span>}
+                                          {item.licenseType && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-full">{item.licenseType}</span>}
+                                      </div>
                                   </div>
                               ))}
-                              {order.items.length > 2 && (
-                                  <div className="text-[10px] text-gray-400 bg-gray-50 dark:bg-white/5 w-fit px-1.5 py-0.5 rounded">+ {order.items.length - 2} 更多</div>
+                              {/* 更多按钮 + 气泡弹窗 */}
+                              {order.items.length > 1 && (
+                                  <div className="mt-1 self-end" ref={productPopoverId === order.id ? productPopoverRef : undefined}>
+                                      <button
+                                          onClick={(e) => {
+                                              e.stopPropagation();
+                                              if (productPopoverId === order.id) {
+                                                  setProductPopoverId(null);
+                                                  setPopoverPos(null);
+                                              } else {
+                                                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                  const popoverWidth = 288;
+                                                  // Always expand to the left; clamp so it doesn't go off-screen
+                                                  const left = Math.max(4, rect.left - popoverWidth - 6);
+                                                  const top = rect.top - 8;
+                                                  setPopoverPos({ top, left });
+                                                  setProductPopoverId(order.id);
+                                              }
+                                          }}
+                                          className="text-[10px] font-semibold text-[#0071E3] dark:text-[#0A84FF] bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-100 dark:border-blue-800 px-1.5 py-px rounded-full transition"
+                                      >
+                                          +{order.items.length - 1} 更多
+                                      </button>
+                                  </div>
                               )}
                           </div>
                       </td>
                   )}
                   {visibleColumns.includes('sales') && (
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap" style={{ minWidth: '120px' }}>
                           {(() => {
                               const user = users.find(u => u.id === order.salesRepId);
                               const rawName = order.salesRepName || '未分配';
@@ -1080,17 +1131,14 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 items-center justify-center text-white text-[10px] font-bold" style={{display:'none'}}>{initials}</div>
                                           {user?.status === 'Active' && <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 border-2 border-white dark:border-[#1C1C1E] rounded-full"></div>}
                                       </div>
-                                      <div className="flex flex-col min-w-0">
-                                          <span className="font-semibold text-gray-900 dark:text-white group-hover/user:text-blue-600 transition-colors truncate">{displayName}</span>
-                                          {user?.email && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[110px]">{user.email}</span>}
-                                      </div>
+                                      <span className="font-semibold text-gray-900 dark:text-white group-hover/user:text-blue-600 transition-colors whitespace-nowrap">{displayName}</span>
                                   </div>
                               );
                           })()}
                       </td>
                   )}
                   {visibleColumns.includes('businessManager') && (
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap" style={{ minWidth: '120px' }}>
                           {(() => {
                               const user = users.find(u => u.id === order.businessManagerId);
                               const rawName = order.businessManagerName || '未分配';
@@ -1104,27 +1152,27 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 items-center justify-center text-white text-[10px] font-bold" style={{display:'none'}}>{initials}</div>
                                           {user?.status === 'Active' && <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 border-2 border-white dark:border-[#1C1C1E] rounded-full"></div>}
                                       </div>
-                                      <div className="flex flex-col min-w-0">
-                                          <span className="font-semibold text-gray-900 dark:text-white group-hover/user:text-blue-600 transition-colors truncate">{displayName}</span>
-                                          {user?.email && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[110px]">{user.email}</span>}
-                                      </div>
+                                      <span className="font-semibold text-gray-900 dark:text-white group-hover/user:text-blue-600 transition-colors whitespace-nowrap">{displayName}</span>
                                   </div>
                               );
                           })()}
                       </td>
                   )}
                   {visibleColumns.includes('department') && (
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-4 py-3" style={{ minWidth: '240px', maxWidth: '300px' }}>
                           {(() => {
                               const user = users.find(u => u.id === order.salesRepId);
                               const fullPath = getDepartmentPath(user?.departmentId);
                               if (fullPath === '-') return <span className="text-gray-400">-</span>;
-                              const leaf = fullPath.split(' / ').pop() || fullPath;
-                              const parent = fullPath.split(' / ').slice(-2, -1)[0];
+                              const parts = fullPath.split(' / ');
                               return (
-                                  <div className="flex flex-col gap-0.5" title={fullPath}>
-                                      <span className="font-medium text-gray-800 dark:text-gray-200 truncate max-w-[130px]">{leaf}</span>
-                                      {parent && <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[130px]">{parent}</span>}
+                                  <div className="flex items-start gap-1 flex-wrap leading-snug">
+                                      {parts.map((part, idx) => (
+                                          <span key={idx} className="flex items-center gap-1">
+                                              {idx > 0 && <span className="text-gray-300 dark:text-gray-600 text-[10px]">/</span>}
+                                              <span className={`text-xs font-medium ${idx === parts.length - 1 ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>{part}</span>
+                                          </span>
+                                      ))}
                                   </div>
                               );
                           })()}
@@ -1143,7 +1191,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                   {visibleColumns.includes('status') && <td className="px-4 py-3 whitespace-nowrap">{getStatusBadge(order.status)}</td>}
                   {visibleColumns.includes('paymentStatus') && <td className="px-4 py-3 whitespace-nowrap">{getPaymentStatusBadge(order.isPaid)}</td>}
                   {visibleColumns.includes('stockStatus') && <td className="px-4 py-3 whitespace-nowrap">{getStockStatusBadge(order)}</td>}
-                  {visibleColumns.includes('total') && <td className="px-4 py-3 text-right font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap font-mono">¥{order.total.toLocaleString()}</td>}
+                  {visibleColumns.includes('total') && <td className="px-4 py-3 text-right font-bold text-red-600 dark:text-red-400 whitespace-nowrap font-mono">¥{order.total.toLocaleString()}</td>}
                   {visibleColumns.includes('payment') && (
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                           {order.paymentMethod ? paymentMethodMap[order.paymentMethod] : '-'}
@@ -1189,22 +1237,21 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
         </div>
         
         <div className="flex justify-between items-center px-5 py-3.5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5">
+            <span className="text-xs text-gray-500 dark:text-gray-400">共 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF]">{filteredOrders.length}</span> 条</span>
             <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-500 dark:text-gray-400">共 <span className="font-semibold text-gray-700 dark:text-gray-300">{filteredOrders.length}</span> 条</span>
-                <div className="flex items-center gap-1 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-lg p-0.5 shadow-sm">
-                    {[20, 50, 100].map(n => (
-                        <button
-                            key={n}
-                            onClick={() => { setItemsPerPage(n); setCurrentPage(1); }}
-                            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${itemsPerPage === n ? 'bg-blue-600 dark:bg-blue-500 text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
-                        >
-                            {n}
-                        </button>
-                    ))}
-                    <span className="text-[10px] text-gray-400 pl-1 pr-1.5">条/页</span>
+                {/* 每页条数下拉 */}
+                <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">每页</span>
+                    <select
+                        value={itemsPerPage}
+                        onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                        className="h-7 pl-2 pr-6 text-xs font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-lg shadow-sm outline-none appearance-none cursor-pointer hover:border-[#0071E3]/50 transition"
+                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
+                    >
+                        {[20, 50, 100].map(n => <option key={n} value={n}>{n} 条</option>)}
+                    </select>
                 </div>
-            </div>
-            <div className="flex items-center gap-3">
+                {/* 页码信息 + 翻页 */}
                 <span className="text-xs text-gray-400 dark:text-gray-500">第 {currentPage} / {totalPages} 页</span>
                 <div className="flex items-center gap-1.5">
                     <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1} className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium shadow-sm transition disabled:cursor-not-allowed">上一页</button>
@@ -1214,6 +1261,41 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
         </div>
       </div>
     </div>
+
+      {/* Product Popover — fixed to viewport, avoids table clipping */}
+      {productPopoverId && popoverPos && (() => {
+          const order = orders.find(o => o.id === productPopoverId);
+          if (!order) return null;
+          return (
+              <div
+                  ref={productPopoverRef}
+                  style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left, zIndex: 9999, width: 288 }}
+                  className="bg-white dark:bg-[#2C2C2E] rounded-2xl shadow-2xl border border-gray-100 dark:border-white/10 overflow-hidden animate-fade-in"
+                  onClick={e => e.stopPropagation()}
+              >
+                  <div className="px-4 py-2.5 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">全部商品（{order.items.length}）</span>
+                      <button onClick={() => { setProductPopoverId(null); setPopoverPos(null); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition">
+                          <X className="w-3.5 h-3.5" />
+                      </button>
+                  </div>
+                  <div className="p-3 space-y-2.5 max-h-96 overflow-y-auto custom-scrollbar">
+                      {order.items.map((item, idx) => (
+                          <div key={idx} className="flex flex-col gap-1 pb-2.5 border-b border-gray-50 dark:border-white/5 last:border-0 last:pb-0">
+                              <div className="flex items-center justify-between gap-2">
+                                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200 leading-snug">{item.productName}</span>
+                                  <span className="text-xs text-gray-400 shrink-0">×{item.quantity}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                  {item.skuName && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-full">{item.skuName}</span>}
+                                  {item.licenseType && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-full">{item.licenseType}</span>}
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          );
+      })()}
 
       {/* Advanced Filters Modal */}
       {isAdvancedFilterOpen && (
@@ -1718,13 +1800,13 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                                 <td className="p-5"><span className="text-xs bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md text-gray-600 dark:text-gray-300 font-medium">{item.pricingOptionName || '默认'}</span></td>
                                                 <td className="p-5 text-center dark:text-white font-medium">{item.quantity}</td>
                                                 <td className="p-5 text-right dark:text-white">¥{item.priceAtPurchase.toLocaleString()}</td>
-                                                <td className="p-5 text-right font-bold text-orange-600 dark:text-orange-400">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
+                                                <td className="p-5 text-right font-bold text-red-600 dark:text-red-400">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
                                                 <td className="p-5 text-center"><button onClick={() => handleRemoveItem(idx)} className="text-gray-400 hover:text-red-500 p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition"><Trash2 className="w-4 h-4"/></button></td>
                                             </tr>
                                         ))}
                                         <tr className="bg-gray-50/50 dark:bg-white/5">
                                             <td colSpan={4} className="p-5 text-right font-bold text-gray-500">总计金额:</td>
-                                            <td className="p-5 text-right text-xl font-bold text-orange-600 dark:text-orange-400">¥{calculateNewOrderTotal().toLocaleString()}</td>
+                                            <td className="p-5 text-right text-xl font-bold text-red-600 dark:text-red-400">¥{calculateNewOrderTotal().toLocaleString()}</td>
                                             <td></td>
                                         </tr>
                                     </tbody>

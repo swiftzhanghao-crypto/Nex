@@ -253,7 +253,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
 
           {/* Sidebar */}
           {!hideSidebar && (
-            <aside className={`absolute inset-y-0 left-4 top-4 bottom-4 z-40 transform transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] lg:relative lg:translate-x-0 lg:top-0 lg:bottom-0 lg:left-0 lg:py-6 lg:pl-6
+            <aside className={`absolute inset-y-0 left-4 top-4 bottom-4 z-40 transform transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] lg:relative lg:translate-x-0 lg:top-0 lg:bottom-0 lg:left-0 lg:pt-2 lg:pb-2 lg:pl-2 lg:pr-3
               ${isSidebarOpen ? 'translate-x-0 w-[240px]' : '-translate-x-[110%] lg:translate-x-0'}
               ${isCollapsed ? 'lg:w-[88px]' : 'lg:w-[240px]'}
               flex flex-col gap-1
@@ -266,6 +266,22 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
                       <span className="font-bold text-gray-900 dark:text-white">菜单</span>
                       <button onClick={() => setIsSidebarOpen(false)} className="p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full">
                           <X className="w-5 h-5" />
+                      </button>
+                  </div>
+
+                  {/* Desktop Sidebar Header - Top */}
+                  <div className={`px-3 py-3 border-b border-gray-100 dark:border-white/5 shrink-0 hidden lg:flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+                      {!isCollapsed && (
+                          <span className="text-base font-bold text-gray-800 dark:text-gray-100 pl-3 truncate">
+                              {topNavItems.find(item => item.id === activeTopNav)?.label ?? '菜单'}
+                          </span>
+                      )}
+                      <button 
+                          onClick={() => setIsCollapsed(!isCollapsed)} 
+                          className="flex items-center justify-center text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl p-2 transition-all duration-300 shrink-0"
+                          title={isCollapsed ? '展开菜单' : '收起菜单'}
+                      >
+                          {isCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
                       </button>
                   </div>
 
@@ -365,17 +381,6 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
 
                   </nav>
 
-                  {/* Sidebar Footer - Collapse Button */}
-                  <div className="p-3 border-t border-gray-100 dark:border-white/5 shrink-0 hidden lg:flex">
-                      <button 
-                          onClick={() => setIsCollapsed(!isCollapsed)} 
-                          className={`flex items-center text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl p-2.5 transition-all duration-300 w-full ${isCollapsed ? 'justify-center' : 'gap-3'}`}
-                          title={isCollapsed ? '展开菜单' : '收起菜单'}
-                      >
-                          {isCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
-                          {!isCollapsed && <span className="text-sm font-medium">收起菜单</span>}
-                      </button>
-                  </div>
               </div>
             </aside>
           )}

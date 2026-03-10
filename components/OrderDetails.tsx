@@ -6,7 +6,7 @@ import {
     ArrowLeft, Box, Printer, Award, X, Lock, CheckCircle, Truck, ClipboardCheck, 
     UploadCloud, AlertOctagon, RefreshCcw, Key, Package, Disc, Receipt, FileText, 
     Briefcase, History, Eye, CheckSquare, CreditCard, ShieldCheck, User as UserIcon, Building,
-    ChevronRight, AlertCircle, Clock, MapPin, Target, Users
+    ChevronRight, AlertCircle, Clock, MapPin, Target, Users, Paperclip, Scroll, ZoomIn, ZoomOut, Download
 } from 'lucide-react';
 
 interface OrderDetailsProps {
@@ -58,6 +58,8 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
   const [fulfillmentItemIndex, setFulfillmentItemIndex] = useState<number | null>(null);
   const [fulfillmentContent, setFulfillmentContent] = useState('');
   const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'SNAPSHOT' | 'FULFILLMENT' | 'EMAIL'>('MANAGEMENT');
+  const [isContractPreviewOpen, setIsContractPreviewOpen] = useState(false);
+  const [contractZoom, setContractZoom] = useState(100);
 
   // Step specific forms
   const [shippingCarrier, setShippingCarrier] = useState('');
@@ -437,18 +439,28 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
     <>
       <div className="flex flex-col min-h-screen bg-[#F5F5F7] dark:bg-black">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white/80 dark:bg-[#1C1C1E]/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-white/10 px-4 md:px-6 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-           <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
-               <button onClick={() => navigate('/orders')} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition text-gray-500 dark:text-gray-400 shrink-0"><ArrowLeft className="w-5 h-5" /></button>
-               <div className="flex flex-col min-w-0">
+      <div className="sticky top-0 z-20 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-white/10 px-4 md:px-6 pt-4 flex flex-col">
+          <div className="flex flex-row justify-between items-center gap-4 pb-3">
+               <div className="flex items-center gap-4 md:gap-5">
+                   <button onClick={() => navigate('/orders')} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition text-gray-500 dark:text-gray-400 shrink-0"><ArrowLeft className="w-5 h-5" /></button>
                    <div className="flex items-center gap-2 flex-wrap">
-                       <h1 className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white tracking-tight truncate">订单 {selectedOrder.id}</h1>
-                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 ${
-                           selectedOrder.status === OrderStatus.REFUND_PENDING ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                       <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white tracking-tight">订单 {selectedOrder.id}</h1>
+                       <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">下单时间：<span className="font-mono">{new Date(selectedOrder.date).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</span></span>
+                       <span className={`shrink-0 ${
+                           selectedOrder.status === OrderStatus.DELIVERED ? 'unified-tag-green' :
+                           selectedOrder.status === OrderStatus.SHIPPED ? 'unified-tag-indigo' :
+                           selectedOrder.status === OrderStatus.PROCESSING_PROD ? 'unified-tag-blue' :
+                           selectedOrder.status === OrderStatus.PENDING_APPROVAL ? 'unified-tag-blue' :
+                           selectedOrder.status === OrderStatus.PENDING_CONFIRM ? 'unified-tag-blue' :
+                           selectedOrder.status === OrderStatus.REFUND_PENDING ? 'unified-tag-blue' :
+                           selectedOrder.status === OrderStatus.CANCELLED ? 'unified-tag-gray' :
+                           selectedOrder.status === OrderStatus.REFUNDED ? 'unified-tag-red' :
+                           selectedOrder.status === OrderStatus.PENDING_PAYMENT ? 'unified-tag-blue' :
+                           'unified-tag-gray'
                        }`}>{statusMap[selectedOrder.status] || selectedOrder.status}</span>
                        {selectedOrder.isPaid
                            ? <span className="unified-tag-green shrink-0">已支付</span>
-                           : <span className="unified-tag-gray shrink-0">待支付</span>
+                           : <span className="unified-tag-blue shrink-0">待支付</span>
                        }
                        {selectedOrder.status === OrderStatus.DELIVERED
                            ? <span className="unified-tag-green shrink-0">已完成</span>
@@ -458,62 +470,48 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                    ? <span className="unified-tag-blue shrink-0">待发货</span>
                                    : (selectedOrder.isAuthConfirmed || selectedOrder.isPackageConfirmed || selectedOrder.status === OrderStatus.PROCESSING_PROD)
                                        ? <span className="unified-tag-orange shrink-0">备货中</span>
-                                       : <span className="unified-tag-gray shrink-0">待处理</span>
+                                       : <span className="unified-tag-blue shrink-0">待处理</span>
                        }
                    </div>
-                   <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-[200px] md:max-w-none flex items-center gap-2">
-                       <span>{selectedOrder.customerName}</span>
-                       <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                       <span className="font-mono">{new Date(selectedOrder.date).toLocaleDateString()}</span>
-                   </div>
                </div>
-               
-               <div className="hidden lg:flex items-center gap-6 ml-4 border-l border-gray-200 dark:border-white/10 pl-6">
-                   <div className="flex items-center gap-2">
-                       <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-100 dark:border-white/10">
-                           <img src={users.find(u => u.id === selectedOrder.salesRepId)?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${selectedOrder.salesRepName || 'Sales'}`} alt="" className="w-full h-full object-cover" />
-                       </div>
-                       <div>
-                           <div className="text-[10px] text-gray-400 uppercase font-bold">销售负责人</div>
-                           <div className="text-xs font-bold text-gray-900 dark:text-white">{selectedOrder.salesRepName || '未分配'}</div>
-                       </div>
-                   </div>
-                   <div className="flex items-center gap-2">
-                       <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-100 dark:border-white/10">
-                           <img src={users.find(u => u.id === selectedOrder.businessManagerId)?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${selectedOrder.businessManagerName || 'Business'}`} alt="" className="w-full h-full object-cover" />
-                       </div>
-                       <div>
-                           <div className="text-[10px] text-gray-400 uppercase font-bold">商务经理</div>
-                           <div className="text-xs font-bold text-gray-900 dark:text-white">{selectedOrder.businessManagerName || '未分配'}</div>
-                       </div>
-                   </div>
-                   {selectedOrder.creatorName && (
-                       <div className="flex items-center gap-2 border-l border-gray-200 dark:border-white/10 pl-6">
-                           <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-100 dark:border-white/10 shrink-0">
-                               <img
-                                   src={users.find(u => u.id === selectedOrder.creatorId)?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${selectedOrder.creatorName || 'Creator'}`}
-                                   alt=""
-                                   className="w-full h-full object-cover"
-                               />
+
+               <div className="flex items-center gap-3 shrink-0">
+                   {/* 销售 / 商务 / 制单人 */}
+                   <div className="hidden lg:flex items-center gap-4 border-r border-gray-200 dark:border-white/10 pr-4">
+                       <div className="flex items-center gap-2.5">
+                           <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 shrink-0">
+                               <img src={users.find(u => u.id === selectedOrder.salesRepId)?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${selectedOrder.salesRepName || 'Sales'}`} alt="" className="w-full h-full object-cover" />
                            </div>
                            <div>
-                               <div className="text-[10px] text-gray-400 uppercase font-bold">制单人</div>
-                               <div className="text-xs font-bold text-gray-900 dark:text-white">{selectedOrder.creatorName}</div>
-                               {selectedOrder.creatorPhone && (
-                                   <div className="text-[10px] text-gray-400 font-mono mt-0.5">{selectedOrder.creatorPhone}</div>
-                               )}
+                               <div className="text-[10px] text-gray-400 uppercase font-bold leading-none mb-1">销售</div>
+                               <div className="text-xs font-semibold text-gray-900 dark:text-white leading-none">{(selectedOrder.salesRepName || '未分配').replace(/\s*[\((（].*?[\))）]\s*/g, '').trim()}</div>
                            </div>
                        </div>
-                   )}
-               </div>
-           </div>
-           <div className="flex gap-4 items-center w-full md:w-auto justify-between md:justify-end shrink-0">
-               {selectedOrder.isPaid && (
-                   <div className="text-right block bg-gray-50 dark:bg-white/5 px-4 py-2 rounded-xl">
-                       <div className="text-[10px] text-gray-400 uppercase font-bold mb-0.5">订单实付金额</div>
-                       <div className="text-xl font-bold text-orange-600 dark:text-orange-400 font-mono tracking-tight">¥{selectedOrder.total.toLocaleString()}</div>
+                       <div className="flex items-center gap-2.5">
+                           <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 shrink-0">
+                               <img src={users.find(u => u.id === selectedOrder.businessManagerId)?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${selectedOrder.businessManagerName || 'Business'}`} alt="" className="w-full h-full object-cover" />
+                           </div>
+                           <div>
+                               <div className="text-[10px] text-gray-400 uppercase font-bold leading-none mb-1">商务</div>
+                               <div className="text-xs font-semibold text-gray-900 dark:text-white leading-none">{(selectedOrder.businessManagerName || '未分配').replace(/\s*[\((（].*?[\))）]\s*/g, '').trim()}</div>
+                           </div>
+                       </div>
+                       {selectedOrder.creatorName && (
+                           <div className="flex items-center gap-2.5">
+                               <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 shrink-0">
+                                   <img src={users.find(u => u.id === selectedOrder.creatorId)?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${selectedOrder.creatorName || 'Creator'}`} alt="" className="w-full h-full object-cover" />
+                               </div>
+                               <div>
+                                   <div className="text-[10px] text-gray-400 uppercase font-bold leading-none mb-1">制单人</div>
+                                   <div className="text-xs font-semibold text-gray-900 dark:text-white leading-none">{selectedOrder.creatorName.replace(/\s*[\((（].*?[\))）]\s*/g, '').trim()}</div>
+                                   {(selectedOrder.creatorPhone || users.find(u => u.id === selectedOrder.creatorId)?.phone) && (
+                                       <div className="text-[10px] text-gray-400 leading-none mt-0.5">{selectedOrder.creatorPhone || users.find(u => u.id === selectedOrder.creatorId)?.phone}</div>
+                                   )}
+                               </div>
+                           </div>
+                       )}
                    </div>
-               )}
+
                <div className="flex gap-2 shrink-0">
                    <button 
                        onClick={handleOpenLogDrawer}
@@ -529,13 +527,11 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                            <AlertOctagon className="w-3.5 h-3.5"/> 退单
                        </button>
                    )}
-                   
                </div>
-           </div>
-      </div>
+               </div>
+          </div>
 
-      {/* Tabs Navigation */}
-      <div className="bg-white dark:bg-[#1C1C1E] border-b border-gray-200 dark:border-white/10 px-4 md:px-10 shrink-0 sticky top-[73px] md:top-[81px] z-10">
+          {/* Tabs Navigation */}
           <div className="flex gap-2 overflow-x-auto no-scrollbar pt-2.5 pb-0 items-end">
               {[
                   { id: 'MANAGEMENT', label: '订单管理' },
@@ -554,7 +550,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                   >
                       {tab.label}
                       {activeTab === tab.id && (
-                          <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0071E3] dark:bg-[#0A84FF]" />
+                          <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0071E3] dark:bg-[#0A84FF] rounded-full" />
                       )}
                   </button>
               ))}
@@ -601,99 +597,143 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
              </div>
           </div>
 
-          {/* Order Items Table (Full Width) */}
+          {/* Order Items Table + Summary Side-by-Side */}
           <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden">
-              <div className="p-5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+              <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                   <Package className="w-5 h-5 text-orange-500" />
-                  <h3 className="text-[18px] font-semibold text-gray-900 dark:text-white">订单商品明细</h3>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">订单商品明细</h3>
               </div>
-              <div className="overflow-x-auto">
-                  <table className="w-full text-left min-w-[600px]">
-                      <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 text-sm uppercase font-bold tracking-wider">
-                          <tr>
-                              <th className="p-8 pl-10 text-center w-20 whitespace-nowrap">明细编号</th>
-                              <th className="p-8">商品与规格</th>
-                              <th className="p-8">授权类型</th>
-                              <th className="p-8 text-center">数量</th>
-                              <th className="p-8 text-right">单价/小计</th>
-                              <th className="p-8">电子授权</th>
-                          </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50 dark:divide-white/5">
-                          {selectedOrder.items.map((item, idx) => {
-                              const lineNo = String(idx + 1).padStart(3, '0');
-                              return (
-                              <tr 
-                                key={idx} 
-                                className="group text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
-                              >
-                                  <td className="p-8 pl-10 text-center">
-                                      <button
-                                          onClick={() => { setSelectedItemForDetails(item); setSelectedItemIndex(idx); }}
-                                          className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-xs font-bold font-mono text-[#0071E3] dark:text-[#0A84FF] transition-all"
-                                      >
-                                          {lineNo}
-                                      </button>
-                                  </td>
-                                  <td className="p-8">
-                                      <button 
-                                        onClick={() => navigate(`/products/${item.productId}`)}
-                                        className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline text-left text-base"
-                                      >
-                                          {item.productName}
-                                      </button>
-                                      <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
-                                          <span className="bg-gray-100 dark:bg-white/10 px-2 py-0.5 rounded text-gray-600 dark:text-gray-300 font-mono">{item.skuCode}</span>
-                                          <span>{item.skuName}</span>
-                                      </div>
-                                  </td>
-                                  <td className="p-8">
-                                      <span className="text-gray-600 dark:text-gray-400 font-medium">{item.pricingOptionName || item.licenseType || '正式授权'}</span>
-                                  </td>
-                                  <td className="p-8 text-center dark:text-white font-medium text-lg">x {item.quantity}</td>
-                                  <td className="p-8 text-right">
-                                      <div className="text-xs text-orange-400 dark:text-orange-300 font-mono">¥{item.priceAtPurchase.toLocaleString()}</div>
-                                      <div className="font-bold text-lg text-orange-600 dark:text-orange-400 font-mono">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</div>
-                                  </td>
-                                  <td className="p-8">
-                                      {selectedOrder.isPaid && selectedOrder.confirmedDate && (
-                                          <button 
-                                            onClick={() => { setSelectedCertificateItem(item); setIsCertPreviewMode(true); }} 
-                                            className="text-xs font-bold text-[#0071E3] hover:text-blue-700 dark:text-[#0A84FF] hover:underline flex items-center gap-1"
-                                          >
-                                              <Award className="w-3.5 h-3.5"/> 电子授权
-                                          </button>
-                                      )}
-                                  </td>
+              <div className="flex items-stretch">
+                  {/* Left: items table (fills remaining) */}
+                  <div className="flex-1 min-w-0 overflow-x-auto border-r border-gray-100 dark:border-white/10">
+                      <table className="w-full text-left min-w-[520px]">
+                          <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 text-sm uppercase font-bold tracking-wider">
+                              <tr>
+                                  <th className="px-5 py-4 pl-6 text-center w-16 whitespace-nowrap">明细编号</th>
+                                  <th className="px-5 py-4">商品信息</th>
+                                  <th className="px-5 py-4 text-center">数量</th>
+                                  <th className="px-5 py-4 text-right">单价</th>
+                                  <th className="px-5 py-4 text-right">商品金额</th>
+                                  <th className="px-5 py-4 text-right">商品需付金额</th>
+                                  <th className="px-5 py-4">电子授权</th>
                               </tr>
-                              );
-                          })}
-                      </tbody>
-                  </table>
-              </div>
-              <div className="p-6 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex justify-end">
-                      <div className="w-full max-w-sm space-y-3 text-sm">
-                          <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
-                              <span>产品总金额</span>
-                              <span className="font-mono text-orange-600 dark:text-orange-400">¥{selectedOrder.items.reduce((sum, item) => sum + (item.priceAtPurchase * item.quantity), 0).toLocaleString()}</span>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                              {selectedOrder.items.map((item, idx) => {
+                                  const lineNo = String(idx + 1).padStart(3, '0');
+                                  const itemAmount = item.priceAtPurchase * item.quantity;
+                                  const discountAmt = item.priceAtPurchase > 1000 ? Math.floor(itemAmount * 0.05 / 10) * 10 : 0;
+                                  const rebateAmt = item.priceAtPurchase > 5000 ? Math.floor(itemAmount * 0.02 / 10) * 10 : 0;
+                                  const amountDue = itemAmount - discountAmt - rebateAmt;
+                                  return (
+                                  <tr
+                                    key={idx}
+                                    className="group text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                                  >
+                                      <td className="px-5 py-5 pl-6 text-center">
+                                          <button
+                                              onClick={() => { setSelectedItemForDetails(item); setSelectedItemIndex(idx); }}
+                                              className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-xs font-bold font-mono text-[#0071E3] dark:text-[#0A84FF] transition-all"
+                                          >
+                                              {lineNo}
+                                          </button>
+                                      </td>
+                                      <td className="px-5 py-5">
+                                          <button
+                                            onClick={() => navigate(`/products/${item.productId}`)}
+                                            className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline text-left text-sm"
+                                          >
+                                              {item.productName}
+                                          </button>
+                                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                                              {item.skuName && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-full">{item.skuName}</span>}
+                                              {item.licenseType && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-full">{item.licenseType}</span>}
+                                          </div>
+                                      </td>
+                                      <td className="px-5 py-5 text-center dark:text-white font-medium">x {item.quantity}</td>
+                                      <td className="px-5 py-5 text-right font-mono text-sm text-gray-700 dark:text-gray-300">¥{item.priceAtPurchase.toLocaleString()}</td>
+                                      <td className="px-5 py-5 text-right font-bold font-mono text-gray-900 dark:text-white">¥{itemAmount.toLocaleString()}</td>
+                                      <td className="px-5 py-5 text-right font-bold font-mono text-red-600 dark:text-red-400">¥{amountDue.toLocaleString()}</td>
+                                      <td className="px-5 py-5">
+                                          {selectedOrder.isPaid && selectedOrder.confirmedDate && (
+                                              <button
+                                                onClick={() => { setSelectedCertificateItem(item); setIsCertPreviewMode(true); }}
+                                                className="text-xs font-bold text-[#0071E3] hover:text-blue-700 dark:text-[#0A84FF] hover:underline flex items-center gap-1"
+                                              >
+                                                  <Award className="w-3.5 h-3.5"/> 电子授权
+                                              </button>
+                                          )}
+                                      </td>
+                                  </tr>
+                                  );
+                              })}
+                          </tbody>
+                      </table>
+                  </div>
+
+                  {/* Right: price summary */}
+                  <div className="w-[27%] shrink-0 flex flex-col justify-between p-6 bg-gray-50/50 dark:bg-white/5">
+                      {(() => {
+                          const productTotal = selectedOrder.items.reduce((sum, item) => sum + item.priceAtPurchase * item.quantity, 0);
+                          const discountAmt = selectedOrder.items.reduce((sum, item) => {
+                              const lineTotal = item.priceAtPurchase * item.quantity;
+                              return sum + (item.priceAtPurchase > 1000 ? Math.floor(lineTotal * 0.05 / 10) * 10 : 0);
+                          }, 0);
+                          const rebateAmt = selectedOrder.items.reduce((sum, item) => {
+                              const lineTotal = item.priceAtPurchase * item.quantity;
+                              return sum + (item.priceAtPurchase > 5000 ? Math.floor(lineTotal * 0.02 / 10) * 10 : 0);
+                          }, 0);
+                          const totalDiscount = discountAmt + rebateAmt;
+                          const fmt = (n: number) => `¥${n.toLocaleString()}`;
+                          return (
+                      <div className="space-y-3 text-sm">
+                          <div className="flex justify-between items-center">
+                              <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500">商品总金额</span>
+                              <span className="font-mono text-gray-900 dark:text-white">{fmt(productTotal)}</span>
                           </div>
-                          <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
-                              <span>优惠折扣</span>
-                              <span className="font-mono">100%</span>
+                          <div className="flex justify-between items-center">
+                              <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500">优惠折扣</span>
+                              <span className="font-mono text-red-600 dark:text-red-400">- {fmt(discountAmt)}</span>
                           </div>
-                          <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
-                              <span>返利折扣</span>
-                              <span className="font-mono">0%</span>
+                          <div className="flex justify-between items-center">
+                              <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500">返利折扣</span>
+                              <span className="font-mono text-red-600 dark:text-red-400">- {fmt(rebateAmt)}</span>
                           </div>
-                          <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
-                              <span>优惠金额</span>
-                              <span className="font-mono text-orange-600 dark:text-orange-400">- ¥0</span>
-                          </div>
-                          <div className="pt-3 border-t border-gray-200 dark:border-white/10 flex justify-between items-center">
-                              <span className="font-bold text-gray-900 dark:text-white">订单需付金额</span>
-                              <span className="font-bold text-xl text-orange-600 dark:text-orange-400 font-mono">¥{selectedOrder.total.toLocaleString()}</span>
+                          <div className="flex justify-between items-center">
+                              <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500">优惠金额</span>
+                              <span className="font-mono text-red-600 dark:text-red-400">- {fmt(totalDiscount)}</span>
                           </div>
                       </div>
+                          );
+                      })()}
+                      {(() => {
+                          const productTotal = selectedOrder.items.reduce((sum, item) => sum + item.priceAtPurchase * item.quantity, 0);
+                          const discountAmt = selectedOrder.items.reduce((sum, item) => {
+                              const lineTotal = item.priceAtPurchase * item.quantity;
+                              return sum + (item.priceAtPurchase > 1000 ? Math.floor(lineTotal * 0.05 / 10) * 10 : 0);
+                          }, 0);
+                          const rebateAmt = selectedOrder.items.reduce((sum, item) => {
+                              const lineTotal = item.priceAtPurchase * item.quantity;
+                              return sum + (item.priceAtPurchase > 5000 ? Math.floor(lineTotal * 0.02 / 10) * 10 : 0);
+                          }, 0);
+                          const amountDue = productTotal - discountAmt - rebateAmt;
+                          const fmt = (n: number) => `¥${n.toLocaleString()}`;
+                          return (
+                              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-white/10 space-y-2">
+                                  <div className="flex justify-between items-center">
+                                      <span className="font-bold text-gray-900 dark:text-white text-sm">订单需付金额</span>
+                                      <span className="font-bold text-xl text-red-600 dark:text-red-400 font-mono">{fmt(amountDue)}</span>
+                                  </div>
+                                  {selectedOrder.isPaid && (
+                                      <div className="flex justify-between items-center">
+                                          <span className="font-bold text-gray-900 dark:text-white text-sm">订单实付金额</span>
+                                          <span className="font-bold text-xl text-green-600 dark:text-green-400 font-mono">{fmt(amountDue)}</span>
+                                      </div>
+                                  )}
+                              </div>
+                          );
+                      })()}
+                  </div>
               </div>
           </div>
 
@@ -702,8 +742,8 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
               <div className="md:col-span-2 space-y-4">
                   {/* 客户信息卡片 */}
                   <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-4">
-                      <div className="border-b border-gray-100 dark:border-white/10 pb-3">
-                          <h4 className="text-[18px] font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <div className="border-b border-gray-100 dark:border-white/10 pb-2.5">
+                          <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                               <Building className="w-5 h-5 text-[#0071E3]" /> 客户信息
                           </h4>
                       </div>
@@ -720,7 +760,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                               <div className="grid grid-cols-2 gap-x-6">
                                   {fields.map((item, idx) => (
                                       <div key={idx} className={`flex items-center gap-8 py-2 ${idx < fields.length - 2 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}>
-                                          <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-28 shrink-0">{item.label}</span>
+                                          <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap whitespace-nowrap">{item.label}</span>
                                           {item.isLink ? (
                                               <button onClick={() => navigate(item.linkTo!)} className="text-sm font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline text-left flex-1">
                                                   {item.value || '-'}
@@ -737,14 +777,15 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
 
                   {/* 交易方信息卡片 */}
                   <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-4">
-                      <div className="border-b border-gray-100 dark:border-white/10 pb-3">
-                          <h4 className="text-[18px] font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <div className="border-b border-gray-100 dark:border-white/10 pb-2.5">
+                          <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                               <Users className="w-5 h-5 text-indigo-500" /> 交易方信息
                           </h4>
                       </div>
                       {(() => {
                           const fields = [
                               { label: '买方名称', value: selectedOrder.buyerName },
+                              { label: '卖方名称', value: selectedOrder.sellerName },
                               { label: '直接下单渠道', value: selectedOrder.directChannel },
                               { label: '终端渠道', value: selectedOrder.terminalChannel },
                               { label: '渠道是否提供服务', value: selectedOrder.channelService },
@@ -753,7 +794,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                               <div className="grid grid-cols-2 gap-x-6">
                                   {fields.map((item, idx) => (
                                       <div key={idx} className={`flex items-center gap-8 py-2 ${idx < fields.length - 2 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}>
-                                          <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-28 shrink-0">{item.label}</span>
+                                          <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap whitespace-nowrap">{item.label}</span>
                                           <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{item.value || '-'}</span>
                                       </div>
                                   ))}
@@ -764,38 +805,89 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
               </div>
 
               {/* Opportunity Information (Small - 1/3) */}
-              {selectedOrder.opportunityId && (
-                  <div className="md:col-span-1 bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-3">
-                      <div className="border-b border-gray-100 dark:border-white/10 pb-3">
-                          <h4 className="text-[18px] font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Target className="w-5 h-5 text-orange-500"/> 商机信息</h4>
-                      </div>
-                      {(() => {
-                          const opp = opportunities.find(o => o.id === selectedOrder.opportunityId);
-                          if (!opp) return null;
-                          return (
-                              <div className="divide-y divide-gray-50 dark:divide-white/5">
-                                  {[
-                                      { label: '商机名称', value: opp.name },
-                                      { label: 'CRM ID', value: opp.crmId || opp.id },
-                                      { label: '商机阶段', value: opp.stage === 'Negotiation' ? '商务洽谈' : opp.stage === 'Qualification' ? '资格确定' : opp.stage === 'Proposal' ? '方案建议' : opp.stage === 'Closed Won' ? '已赢单' : opp.stage === 'Closed Lost' ? '已输单' : opp.stage },
-                                      { label: '商机金额', value: `¥${(opp.amount || opp.expectedRevenue).toLocaleString()}` },
-                                      { label: '结单日期', value: opp.closeDate },
-                                  ].map((item, idx) => (
-                                      <div key={idx} className="flex items-center gap-8 py-2">
-                                          <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-28 shrink-0">{item.label}</span>
-                                          <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{item.value || '-'}</span>
-                                      </div>
-                                  ))}
-                              </div>
-                          );
-                      })()}
-                  </div>
-              )}
-
-              {/* Invoice Details (Small - 1/3) */}
               <div className="md:col-span-1 bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-3">
-                  <div className="border-b border-gray-100 dark:border-white/10 pb-3">
-                      <h4 className="text-[18px] font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Receipt className="w-5 h-5 text-green-500"/> 开票明细</h4>
+                  <div className="border-b border-gray-100 dark:border-white/10 pb-2.5">
+                      <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Target className="w-5 h-5 text-orange-500"/> 商机信息</h4>
+                  </div>
+                  {(() => {
+                      const opp = selectedOrder.opportunityId ? opportunities.find(o => o.id === selectedOrder.opportunityId) : null;
+                      if (!opp) return (
+                          <div className="flex flex-col items-center justify-center py-8 text-gray-400 dark:text-gray-600">
+                              <Target className="w-8 h-8 mb-2 opacity-20" />
+                              <span className="text-xs">暂无关联商机信息</span>
+                          </div>
+                      );
+                      return (
+                          <div className="divide-y divide-gray-50 dark:divide-white/5">
+                              {[
+                                  { label: '商机名称', value: opp.name },
+                                  { label: 'CRM ID', value: opp.crmId || opp.id },
+                                  { label: '商机阶段', value: opp.stage === 'Negotiation' ? '商务洽谈' : opp.stage === 'Qualification' ? '资格确定' : opp.stage === 'Proposal' ? '方案建议' : opp.stage === 'Closed Won' ? '已赢单' : opp.stage === 'Closed Lost' ? '已输单' : opp.stage },
+                                  { label: '商机金额', value: `¥${(opp.amount || opp.expectedRevenue).toLocaleString()}` },
+                                  { label: '结单日期', value: opp.closeDate },
+                              ].map((item, idx) => (
+                                  <div key={idx} className="flex items-center gap-8 py-3">
+                                      <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap whitespace-nowrap">{item.label}</span>
+                                      <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{item.value || '-'}</span>
+                                  </div>
+                              ))}
+                          </div>
+                      );
+                  })()}
+              </div>
+
+              {/* Contract Info (Small - 1/3) */}
+              <div className="md:col-span-1 bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-3">
+                  <div className="border-b border-gray-100 dark:border-white/10 pb-2.5 flex items-center justify-between">
+                      <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                          <Scroll className="w-5 h-5 text-blue-500"/> 合同信息
+                      </h4>
+                      <button
+                          onClick={() => setIsContractPreviewOpen(true)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-[#0A84FF] hover:bg-blue-100 dark:hover:bg-blue-900/40 transition border border-blue-100 dark:border-blue-800/40"
+                      >
+                          <Paperclip className="w-3.5 h-3.5" /> 合同预览
+                      </button>
+                  </div>
+                  <div className="divide-y divide-gray-50 dark:divide-white/5">
+                      {[
+                          { label: '合同名称', value: `${selectedOrder.customerName}软件产品采购合同` },
+                          { label: '合同编号', value: `HT-${new Date(selectedOrder.date).getFullYear()}-${selectedOrder.id.slice(-6).toUpperCase()}` },
+                          { label: '签约金额', value: `¥${selectedOrder.total.toLocaleString()}`, highlight: true },
+                      ].map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-8 py-3">
+                              <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap whitespace-nowrap">{item.label}</span>
+                              {item.highlight
+                                  ? <span className="text-sm font-bold text-red-600 dark:text-red-400 font-mono flex-1">{item.value}</span>
+                                  : <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{item.value || '-'}</span>
+                              }
+                          </div>
+                      ))}
+                  </div>
+              </div>
+
+              {/* Original Order Numbers (Small - 1/3) */}
+              <div className="md:col-span-1 bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-3">
+                  <div className="border-b border-gray-100 dark:border-white/10 pb-2.5">
+                      <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2"><History className="w-5 h-5 text-purple-500"/> 原订单编号</h4>
+                  </div>
+                  <div className="divide-y divide-gray-50 dark:divide-white/5">
+                      {[
+                          { label: 'SMS订单编号', value: selectedOrder.smsOriginalOrderId || 'S00713162' },
+                          { label: 'SaaS订单编号', value: selectedOrder.saasOriginalOrderId || 'P20260303195755000001' },
+                      ].map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-8 py-3">
+                              <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap whitespace-nowrap">{item.label}</span>
+                              <span className="text-sm font-medium font-mono text-gray-900 dark:text-white flex-1 break-all">{item.value}</span>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+
+              {/* Invoice Details (Small - 1/3) — rightmost */}
+              <div className="md:col-span-1 bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-3">
+                  <div className="border-b border-gray-100 dark:border-white/10 pb-2.5">
+                      <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Receipt className="w-5 h-5 text-green-500"/> 开票明细</h4>
                   </div>
                   {selectedOrder.invoiceInfo ? (
                       <div className="divide-y divide-gray-50 dark:divide-white/5">
@@ -805,7 +897,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                               { label: '发票类型', value: '增值税专用发票' },
                           ].map((item, idx) => (
                               <div key={idx} className="flex items-center gap-8 py-3">
-                                  <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-28 shrink-0">{item.label}</span>
+                                  <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap whitespace-nowrap">{item.label}</span>
                                   <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{item.value || '-'}</span>
                               </div>
                           ))}
@@ -816,24 +908,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                           暂无开票信息
                       </div>
                   )}
-              </div>
-
-              {/* Original Order Numbers (Small - 1/3) */}
-              <div className="md:col-span-1 bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-3">
-                  <div className="border-b border-gray-100 dark:border-white/10 pb-3">
-                      <h4 className="text-[18px] font-semibold text-gray-900 dark:text-white flex items-center gap-2"><History className="w-5 h-5 text-purple-500"/> 关联原始订单</h4>
-                  </div>
-                  <div className="divide-y divide-gray-50 dark:divide-white/5">
-                      {[
-                          { label: 'SMS原订单编号', value: selectedOrder.smsOriginalOrderId || 'S00713162' },
-                          { label: 'SaaS原订单编号', value: selectedOrder.saasOriginalOrderId || 'P20260303195755000001' },
-                      ].map((item, idx) => (
-                          <div key={idx} className="flex items-start gap-8 py-3">
-                              <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-28 shrink-0">{item.label}</span>
-                              <span className="text-base font-medium font-mono text-gray-900 dark:text-white flex-1 break-all">{item.value}</span>
-                          </div>
-                      ))}
-                  </div>
               </div>
             </div>
           </>
@@ -856,7 +930,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                             </div>
                             <div>
                                 <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">订单总额</div>
-                                <div className="text-sm font-bold text-orange-600 dark:text-orange-400 font-mono">¥{selectedOrder.total.toLocaleString()}</div>
+                                <div className="text-sm font-bold text-red-600 dark:text-red-400 font-mono">¥{selectedOrder.total.toLocaleString()}</div>
                             </div>
                             <div>
                                 <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">当前状态</div>
@@ -942,7 +1016,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                             <tfoot className="bg-gray-50/30 dark:bg-white/5">
                                 <tr>
                                     <td colSpan={4} className="p-8 text-right text-sm font-bold text-gray-500">合计应收金额</td>
-                                    <td className="p-8 text-right pr-10 text-2xl font-bold text-orange-600 dark:text-orange-400 font-mono">¥{selectedOrder.total.toLocaleString()}</td>
+                                    <td className="p-8 text-right pr-10 text-2xl font-bold text-red-600 dark:text-red-400 font-mono">¥{selectedOrder.total.toLocaleString()}</td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -1704,7 +1778,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                   }}
               />
               <div className={`w-full bg-white dark:bg-[#1C1C1E] h-full shadow-2xl flex flex-col transform transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${isItemDetailsClosing ? 'translate-x-full' : 'translate-x-0'} relative z-10`}>
-                  <div className="p-8 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-white dark:bg-[#1C1C1E] shrink-0">
+                  <div className="p-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-white dark:bg-[#1C1C1E] shrink-0">
                       <div className="flex items-center gap-4">
                           <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
                               <Package className="w-6 h-6 text-blue-500" />
@@ -1712,11 +1786,10 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                           <div>
                               <div className="flex items-center gap-3">
                                   <h3 className="text-xl font-bold text-gray-900 dark:text-white">订单商品明细详情</h3>
-                                  <span className="px-2.5 py-0.5 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 text-[10px] font-bold font-mono border border-orange-100 dark:border-orange-800/30">
+                                  <span className="text-xl font-bold text-gray-500 dark:text-gray-400 font-mono">
                                       {selectedOrder.id}-{String(selectedItemIndex + 1).padStart(3, '0')}
                                   </span>
                               </div>
-                              <p className="text-xs text-gray-500 mt-0.5">查看商品规格、授权及交付状态</p>
                           </div>
                       </div>
                       <button 
@@ -1733,70 +1806,45 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                       </button>
                   </div>
                   
-                  <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-gray-50/30 dark:bg-black/20">
-                      <div className="grid grid-cols-3 gap-6">
+                  <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-gray-50/30 dark:bg-black/20">
+                      <div className="grid grid-cols-3 gap-4">
 
                           {/* 左侧大列 (2/3)：商品交易信息、商品交付信息、商品授权信息 纵向排列 */}
-                          <div className="col-span-2 space-y-6">
+                          <div className="col-span-2 space-y-4">
 
                               {/* 商品交易信息 */}
                               <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
-                                  <div className="p-5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                                       <Box className="w-5 h-5 text-blue-500" />
-                                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">商品交易信息</h4>
+                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">商品交易信息</h4>
                                   </div>
                                   <div className="p-5">
                                       {(() => {
+                                          const itemAmount = selectedItemForDetails.priceAtPurchase * selectedItemForDetails.quantity;
+                                          const discountAmount = selectedItemForDetails.priceAtPurchase > 1000
+                                              ? Math.floor(itemAmount * 0.05 / 10) * 10
+                                              : 0;
+                                          const amountDue = itemAmount - discountAmount;
+                                          const fmt = (n: number) => `¥${n.toLocaleString()}`;
                                           const fields = [
                                               { label: '商品名称', value: selectedItemForDetails.productName || '-', isAmount: false },
                                               { label: '商品规格', value: [selectedItemForDetails.skuName, selectedItemForDetails.skuCode].filter(Boolean).join('  ·  ') || '-', isAmount: false },
                                               { label: '授权类型', value: selectedItemForDetails.pricingOptionName || selectedItemForDetails.licenseType || '-', isAmount: false },
                                               { label: '商品类型', value: selectedItemForDetails.productType || '-', isAmount: false },
                                               { label: '数量', value: String(selectedItemForDetails.quantity), isAmount: false },
-                                              { label: '单价', value: `¥${selectedItemForDetails.priceAtPurchase.toLocaleString()}`, isAmount: true },
-                                              { label: '最终用户成交单价', value: selectedItemForDetails.finalUserUnitPrice != null ? `¥${selectedItemForDetails.finalUserUnitPrice.toLocaleString()}` : '-', isAmount: true },
-                                              { label: '计价单价', value: selectedItemForDetails.pricingUnitPrice != null ? `¥${selectedItemForDetails.pricingUnitPrice.toLocaleString()}` : '-', isAmount: true },
-                                              { label: '最终用户成交计价单价', value: selectedItemForDetails.finalUserPricingUnitPrice != null ? `¥${selectedItemForDetails.finalUserPricingUnitPrice.toLocaleString()}` : '-', isAmount: true },
-                                              { label: '订单明细备注', value: selectedItemForDetails.lineRemarks || '-', isAmount: false },
+                                              { label: '单价', value: fmt(selectedItemForDetails.priceAtPurchase), isAmount: true },
+                                              { label: '计价数量', value: String(selectedItemForDetails.quantity), isAmount: false },
+                                              { label: '计价单价', value: selectedItemForDetails.pricingUnitPrice != null ? fmt(selectedItemForDetails.pricingUnitPrice) : '-', isAmount: true },
+                                              { label: '商品金额', value: fmt(itemAmount), isAmount: true },
+                                              { label: '商品优惠金额', value: fmt(discountAmount), isAmount: true },
+                                              { label: '商品需付金额', value: fmt(amountDue), isAmount: true },
                                           ];
                                           return (
                                               <div className="grid grid-cols-2 gap-x-6">
                                                   {fields.map((f, idx) => (
                                                       <div key={idx} className={`flex items-start gap-4 py-2.5 ${idx < fields.length - 2 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}>
-                                                          <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-36 shrink-0">{f.label}</span>
-                                                          <span className={`text-sm font-medium flex-1 ${f.isAmount ? 'text-orange-600 dark:text-orange-400' : 'text-gray-900 dark:text-white'}`}>{f.value}</span>
-                                                      </div>
-                                                  ))}
-                                              </div>
-                                          );
-                                      })()}
-                                  </div>
-                              </div>
-
-                              {/* 商品交付信息 */}
-                              <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
-                                  <div className="p-5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
-                                      <Truck className="w-5 h-5 text-indigo-500" />
-                                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">商品交付信息</h4>
-                                  </div>
-                                  <div className="p-5">
-                                      {(() => {
-                                          const activationLabel = selectedItemForDetails.activationMethod === 'LicenseKey' ? '授权码激活'
-                                              : selectedItemForDetails.activationMethod === 'Online' ? '在线激活' : '加密狗';
-                                          const fields = [
-                                              { label: '分发模式', value: selectedItemForDetails.distributionMode || '-' },
-                                              { label: '激活方式', value: activationLabel },
-                                              { label: '企业名称', value: selectedItemForDetails.enterpriseName || '-' },
-                                              { label: '企业ID', value: selectedItemForDetails.enterpriseId || '-' },
-                                              { label: '供货组织信息', value: selectedItemForDetails.supplyOrgInfo || '-' },
-                                              { label: '升级保障期限', value: selectedItemForDetails.upgradeWarrantyPeriod || '-' },
-                                          ];
-                                          return (
-                                              <div className="grid grid-cols-2 gap-x-6">
-                                                  {fields.map((f, idx) => (
-                                                      <div key={idx} className={`flex items-start gap-4 py-2.5 ${idx < fields.length - 2 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}>
-                                                          <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-24 shrink-0">{f.label}</span>
-                                                          <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{f.value}</span>
+                                                          <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap">{f.label}</span>
+                                                          <span className={`text-sm font-medium flex-1 ${f.isAmount ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>{f.value}</span>
                                                       </div>
                                                   ))}
                                               </div>
@@ -1807,24 +1855,27 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
 
                               {/* 商品授权信息 */}
                               <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
-                                  <div className="p-5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                                       <ShieldCheck className="w-5 h-5 text-purple-500" />
-                                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">商品授权信息</h4>
+                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">商品授权信息</h4>
                                   </div>
                                   <div className="p-5">
                                       {(() => {
                                           const fields = [
                                               { label: '被授权方', value: selectedItemForDetails.licensee || '-' },
+                                              { label: '授权范围', value: selectedItemForDetails.licenseScope || '企业内部使用' },
                                               { label: '授权期限', value: selectedItemForDetails.licenseTerms || '-' },
                                               { label: '授权开始计算', value: selectedItemForDetails.licenseStartMethod || '-' },
                                               { label: '授权截止日期', value: selectedItemForDetails.licenseEndDate || '-' },
                                               { label: '是否下级单位提供授权', value: selectedItemForDetails.subUnitLicenseAllowed == null ? '-' : selectedItemForDetails.subUnitLicenseAllowed ? '是' : '否' },
+                                              { label: '升级保障期限', value: selectedItemForDetails.upgradeWarrantyPeriod || '-' },
+                                              { label: '售后保障期限', value: selectedItemForDetails.afterSaleWarrantyPeriod || '1年' },
                                           ];
                                           return (
                                               <div className="grid grid-cols-2 gap-x-6">
                                                   {fields.map((f, idx) => (
                                                       <div key={idx} className={`flex items-start gap-4 py-2.5 ${idx < fields.length - 2 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}>
-                                                          <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-32 shrink-0">{f.label}</span>
+                                                          <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap">{f.label}</span>
                                                           <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{f.value}</span>
                                                       </div>
                                                   ))}
@@ -1834,16 +1885,11 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                   </div>
                               </div>
 
-                          </div>
-
-                          {/* 右侧小列 (1/3)：商品价格参考 + 安装包 纵向排列 */}
-                          <div className="space-y-6">
-
                               {/* 商品价格参考 */}
                               <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
-                                  <div className="p-5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                                       <CreditCard className="w-5 h-5 text-green-500" />
-                                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">商品价格参考</h4>
+                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">商品价格参考</h4>
                                   </div>
                                   <div className="p-5">
                                       {(() => {
@@ -1856,11 +1902,52 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                               { label: '建议销售价', value: selectedItemForDetails.suggestedRetailPrice != null ? `¥${selectedItemForDetails.suggestedRetailPrice.toLocaleString()}` : '-', isAmount: true },
                                           ];
                                           return (
+                                              <div className="grid grid-cols-2 gap-x-6">
+                                                  {fields.map((f, idx) => (
+                                                      <div key={idx} className={`flex items-start gap-4 py-2.5 ${idx < fields.length - 2 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}>
+                                                          <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap">{f.label}</span>
+                                                          <span className={`text-sm font-medium flex-1 ${f.isAmount ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>{f.value}</span>
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          );
+                                      })()}
+                                  </div>
+                              </div>
+
+                          </div>
+
+                          {/* 右侧小列 (1/3)：商品交付信息 + 安装包 纵向排列 */}
+                          <div className="space-y-4">
+
+                              {/* 商品交付信息 */}
+                              <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
+                                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                      <Truck className="w-5 h-5 text-indigo-500" />
+                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">商品交付信息</h4>
+                                  </div>
+                                  <div className="p-5">
+                                      {(() => {
+                                          const activationLabel = selectedItemForDetails.activationMethod === 'LicenseKey' ? '授权码激活'
+                                              : selectedItemForDetails.activationMethod === 'Online' ? '在线激活' : '加密狗';
+                                          const distMode = selectedItemForDetails.distributionMode
+                                              || (selectedItemIndex % 2 === 0 ? '账号分发' : '兑换码分发');
+                                          const enterpriseName = selectedItemForDetails.enterpriseName || selectedOrder.customerName;
+                                          const enterpriseId = selectedItemForDetails.enterpriseId
+                                              || String(parseInt(selectedOrder.id.replace(/\D/g, '').slice(-6) || '100000', 10) + 500000000).slice(0, 9);
+                                          const fields = [
+                                              { label: '分发模式', value: distMode },
+                                              { label: '激活方式', value: activationLabel },
+                                              { label: '企业名称', value: enterpriseName },
+                                              { label: '企业ID', value: enterpriseId },
+                                              { label: '供货组织信息', value: selectedItemForDetails.supplyOrgInfo || '-' },
+                                          ];
+                                          return (
                                               <div className="divide-y divide-gray-50 dark:divide-white/5">
                                                   {fields.map((f, idx) => (
-                                                      <div key={idx} className="flex items-start gap-3 py-2.5">
-                                                          <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-24 shrink-0">{f.label}</span>
-                                                          <span className={`text-sm font-medium flex-1 ${f.isAmount ? 'text-orange-600 dark:text-orange-400' : 'text-gray-900 dark:text-white'}`}>{f.value}</span>
+                                                      <div key={idx} className="flex items-center gap-8 py-3">
+                                                          <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap">{f.label}</span>
+                                                          <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{f.value}</span>
                                                       </div>
                                                   ))}
                                               </div>
@@ -1871,59 +1958,43 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
 
                               {/* 安装包 */}
                               <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
-                                  <div className="p-5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                                       <Disc className="w-5 h-5 text-blue-500" />
-                                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">安装包</h4>
+                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">安装包</h4>
                                   </div>
                                   <div className="p-5">
                                       {(() => {
                                           const product = products.find(p => p.id === selectedItemForDetails.productId);
-                                          const pkgs = product?.installPackages;
-                                          if (!pkgs || pkgs.length === 0) {
+                                          const pkg = product?.installPackages?.[0];
+                                          if (!pkg) {
                                               return (
                                                   <div className="flex flex-col items-center justify-center py-10 text-center space-y-3">
                                                       <div className="w-12 h-12 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center">
                                                           <AlertCircle className="w-6 h-6 text-gray-300" />
                                                       </div>
-                                                      <div className="text-sm text-gray-400 italic leading-relaxed">
-                                                          暂无安装包数据
-                                                      </div>
+                                                      <div className="text-sm text-gray-400 italic">暂无安装包数据</div>
                                                   </div>
                                               );
                                           }
+                                          const rows: { label: string; value: string; isLink?: boolean }[] = [
+                                              { label: '安装包编号', value: pkg.id },
+                                              { label: '安装包名称', value: pkg.name },
+                                              { label: 'CPU', value: pkg.cpu || '-' },
+                                              { label: '操作系统', value: pkg.os || '-' },
+                                              { label: '架构', value: pkg.arch || '-' },
+                                              { label: '安装包链接', value: pkg.url || '-', isLink: true },
+                                              { label: '安装包备注', value: pkg.remarks || '-' },
+                                          ];
                                           return (
-                                              <div className="space-y-4">
-                                                  {pkgs.map((pkg, pkgIdx) => (
-                                                      <div key={pkgIdx} className="rounded-2xl border border-gray-100 dark:border-white/10 overflow-hidden">
-                                                          <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800/30">
-                                                              <Package className="w-4 h-4 text-blue-500 shrink-0" />
-                                                              <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">{pkg.name}</span>
-                                                              <span className="ml-auto text-xs font-bold font-mono text-blue-600 dark:text-blue-400 shrink-0">{pkg.id}</span>
-                                                          </div>
-                                                          <div className="divide-y divide-gray-50 dark:divide-white/5 px-4">
-                                                              {[
-                                                                  { label: '安装包编号', value: pkg.id, mono: true },
-                                                                  { label: '安装包名称', value: pkg.name },
-                                                                  { label: 'CPU', value: pkg.cpu || '-' },
-                                                                  { label: '操作系统', value: pkg.os || '-' },
-                                                                  { label: '架构', value: pkg.arch || '-' },
-                                                                  { label: '安装包链接', value: pkg.url, isLink: true },
-                                                                  { label: '安装包备注', value: pkg.remarks || '-' },
-                                                              ].map((row, i) => (
-                                                                  <div key={i} className="flex items-center gap-3 py-2.5">
-                                                                      <span className="text-sm text-gray-400 dark:text-gray-500 text-right w-20 shrink-0">{row.label}</span>
-                                                                      {row.isLink ? (
-                                                                          row.value && row.value !== '-' ? (
-                                                                              <a href={row.value} target="_blank" rel="noreferrer" className="text-sm font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline flex-1 truncate">{row.value}</a>
-                                                                          ) : (
-                                                                              <span className="text-sm font-medium text-gray-400 flex-1">-</span>
-                                                                          )
-                                                                      ) : (
-                                                                          <span className={`text-sm font-medium flex-1 ${row.mono ? 'font-mono text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>{row.value}</span>
-                                                                      )}
-                                                                  </div>
-                                                              ))}
-                                                          </div>
+                                              <div className="divide-y divide-gray-50 dark:divide-white/5">
+                                                  {rows.map((row, i) => (
+                                                      <div key={i} className="flex items-center gap-8 py-3">
+                                                          <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap">{row.label}</span>
+                                                          {row.isLink && row.value !== '-' ? (
+                                                              <a href={row.value} target="_blank" rel="noreferrer" className="text-sm font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline flex-1 truncate">{row.value}</a>
+                                                          ) : (
+                                                              <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{row.value}</span>
+                                                          )}
                                                       </div>
                                                   ))}
                                               </div>
@@ -1938,6 +2009,186 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
               </div>
           </div>
       )}
+      {/* Contract Preview Modal */}
+      {isContractPreviewOpen && selectedOrder && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in p-4">
+              <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col border border-gray-200/50 dark:border-white/10 overflow-hidden">
+                  {/* Modal Header */}
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/10 shrink-0">
+                      <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+                              <Scroll className="w-5 h-5 text-[#0071E3]" />
+                          </div>
+                          <div>
+                              <div className="text-base font-bold text-gray-900 dark:text-white">{selectedOrder.customerName}软件产品采购合同</div>
+                              <div className="text-xs text-gray-400 font-mono">HT-{new Date(selectedOrder.date).getFullYear()}-{selectedOrder.id.slice(-6).toUpperCase()}</div>
+                          </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                          <button onClick={() => setContractZoom(z => Math.max(60, z - 10))} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 transition"><ZoomOut className="w-4 h-4" /></button>
+                          <span className="text-xs text-gray-500 w-10 text-center">{contractZoom}%</span>
+                          <button onClick={() => setContractZoom(z => Math.min(150, z + 10))} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 transition"><ZoomIn className="w-4 h-4" /></button>
+                          <button className="ml-2 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 transition" title="下载合同"><Download className="w-4 h-4" /></button>
+                          <button onClick={() => setIsContractPreviewOpen(false)} className="ml-1 p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition"><X className="w-4 h-4" /></button>
+                      </div>
+                  </div>
+
+                  {/* Contract Document */}
+                  <div className="flex-1 overflow-y-auto custom-scrollbar bg-gray-100 dark:bg-black/30 p-6">
+                      <div
+                          className="bg-white dark:bg-[#2C2C2E] mx-auto shadow-xl rounded-sm border border-gray-200 dark:border-white/10 transition-all duration-200"
+                          style={{ width: `${contractZoom}%`, minWidth: '480px', padding: '60px 72px' }}
+                      >
+                          {/* Contract Title */}
+                          <div className="text-center mb-8">
+                              <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-widest mb-1">软件产品采购合同</h1>
+                              <div className="text-sm text-gray-400 font-mono">合同编号：HT-{new Date(selectedOrder.date).getFullYear()}-{selectedOrder.id.slice(-6).toUpperCase()}</div>
+                          </div>
+
+                          {/* Parties */}
+                          <div className="mb-6 text-sm leading-8 text-gray-700 dark:text-gray-300">
+                              <p>甲方（买方）：<strong className="text-gray-900 dark:text-white">{selectedOrder.customerName}</strong></p>
+                              <p>乙方（卖方）：<strong className="text-gray-900 dark:text-white">北京金山办公软件股份有限公司</strong></p>
+                              <p className="mt-2 text-gray-500 dark:text-gray-400 text-xs leading-6">
+                                  根据《中华人民共和国合同法》及相关法律法规的规定，甲乙双方在平等、自愿、公平、诚实信用的基础上，经友好协商，就甲方购买乙方软件产品事宜，达成如下协议：
+                              </p>
+                          </div>
+
+                          <div className="w-full h-px bg-gray-200 dark:bg-white/10 my-5" />
+
+                          {/* Article 1 */}
+                          <div className="mb-5">
+                              <h2 className="text-sm font-bold text-gray-900 dark:text-white mb-2">第一条　产品信息</h2>
+                              <div className="overflow-x-auto">
+                                  <table className="w-full text-xs border border-gray-200 dark:border-white/10 border-collapse">
+                                      <thead>
+                                          <tr className="bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400">
+                                              <th className="border border-gray-200 dark:border-white/10 px-3 py-2 text-left font-bold">序号</th>
+                                              <th className="border border-gray-200 dark:border-white/10 px-3 py-2 text-left font-bold">产品名称</th>
+                                              <th className="border border-gray-200 dark:border-white/10 px-3 py-2 text-left font-bold">规格/版本</th>
+                                              <th className="border border-gray-200 dark:border-white/10 px-3 py-2 text-center font-bold">数量</th>
+                                              <th className="border border-gray-200 dark:border-white/10 px-3 py-2 text-right font-bold">单价（元）</th>
+                                              <th className="border border-gray-200 dark:border-white/10 px-3 py-2 text-right font-bold">小计（元）</th>
+                                          </tr>
+                                      </thead>
+                                      <tbody>
+                                          {selectedOrder.items.map((item, idx) => (
+                                              <tr key={idx} className="text-gray-700 dark:text-gray-300">
+                                                  <td className="border border-gray-200 dark:border-white/10 px-3 py-2 text-center">{idx + 1}</td>
+                                                  <td className="border border-gray-200 dark:border-white/10 px-3 py-2">{item.productName}</td>
+                                                  <td className="border border-gray-200 dark:border-white/10 px-3 py-2">{item.skuName || item.skuCode}</td>
+                                                  <td className="border border-gray-200 dark:border-white/10 px-3 py-2 text-center">{item.quantity}</td>
+                                                  <td className="border border-gray-200 dark:border-white/10 px-3 py-2 text-right font-mono">¥{item.priceAtPurchase.toLocaleString()}</td>
+                                                  <td className="border border-gray-200 dark:border-white/10 px-3 py-2 text-right font-mono">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
+                                              </tr>
+                                          ))}
+                                          <tr className="bg-orange-50/60 dark:bg-orange-900/10 font-bold text-gray-900 dark:text-white">
+                                              <td colSpan={5} className="border border-gray-200 dark:border-white/10 px-3 py-2 text-right">合计金额</td>
+                                              <td className="border border-gray-200 dark:border-white/10 px-3 py-2 text-right font-mono text-red-600 dark:text-red-400">¥{selectedOrder.total.toLocaleString()}</td>
+                                          </tr>
+                                      </tbody>
+                                  </table>
+                              </div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 leading-6">
+                                  合同总金额（大写）：<strong className="text-gray-700 dark:text-gray-300">{(() => {
+                                      const units = ['', '拾', '佰', '仟'];
+                                      const bigUnits = ['', '万', '亿'];
+                                      const nums = '零壹贰叁肆伍陆柒捌玖';
+                                      const n = Math.round(selectedOrder.total);
+                                      if (n === 0) return '零元整';
+                                      let result = '';
+                                      const str = String(n);
+                                      const len = str.length;
+                                      for (let i = 0; i < len; i++) {
+                                          const d = parseInt(str[i]);
+                                          const pos = len - i - 1;
+                                          result += nums[d];
+                                          if (d !== 0) result += units[pos % 4];
+                                          if (pos % 4 === 0 && pos !== 0) result += bigUnits[Math.floor(pos / 4)];
+                                      }
+                                      return result + '元整';
+                                  })()}</strong>
+                              </p>
+                          </div>
+
+                          {/* Article 2 */}
+                          <div className="mb-5">
+                              <h2 className="text-sm font-bold text-gray-900 dark:text-white mb-2">第二条　付款方式</h2>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 leading-7">
+                                  甲方应于合同签订后 <strong className="text-gray-900 dark:text-white">30</strong> 个工作日内，将合同款项全额汇入乙方指定账户。付款方式为银行转账。乙方收到全部款项后，向甲方开具增值税专用发票。
+                              </p>
+                              <div className="mt-3 bg-gray-50 dark:bg-white/5 rounded-lg p-3 text-xs space-y-1 text-gray-600 dark:text-gray-400">
+                                  <p>开户行：<span className="text-gray-800 dark:text-gray-200">中国工商银行北京海淀支行</span></p>
+                                  <p>账户名称：<span className="text-gray-800 dark:text-gray-200">北京金山办公软件股份有限公司</span></p>
+                                  <p>银行账号：<span className="text-gray-800 dark:text-gray-200 font-mono">0200 0048 0920 0135 958</span></p>
+                              </div>
+                          </div>
+
+                          {/* Article 3 */}
+                          <div className="mb-5">
+                              <h2 className="text-sm font-bold text-gray-900 dark:text-white mb-2">第三条　交付方式</h2>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 leading-7">
+                                  乙方在收到甲方全额货款后，通过电子邮件或在线系统向甲方交付产品授权码（License Key）及相关安装介质。交付完成后，甲方应在 <strong className="text-gray-900 dark:text-white">5</strong> 个工作日内签署验收确认书。
+                              </p>
+                          </div>
+
+                          {/* Article 4 */}
+                          <div className="mb-5">
+                              <h2 className="text-sm font-bold text-gray-900 dark:text-white mb-2">第四条　保密条款</h2>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 leading-7">
+                                  双方对在合同履行过程中知悉的对方商业秘密及技术秘密，负有保密义务，未经书面同意不得向第三方披露，该义务在合同终止后仍持续有效，期限为 <strong className="text-gray-900 dark:text-white">3</strong> 年。
+                              </p>
+                          </div>
+
+                          {/* Article 5 */}
+                          <div className="mb-5">
+                              <h2 className="text-sm font-bold text-gray-900 dark:text-white mb-2">第五条　违约责任</h2>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 leading-7">
+                                  任何一方违反本合同规定，应向守约方支付合同总金额 <strong className="text-gray-900 dark:text-white">10%</strong> 的违约金，并赔偿由此造成的全部损失。
+                              </p>
+                          </div>
+
+                          {/* Article 6 */}
+                          <div className="mb-8">
+                              <h2 className="text-sm font-bold text-gray-900 dark:text-white mb-2">第六条　争议解决</h2>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 leading-7">
+                                  本合同在履行过程中发生的争议，双方应友好协商解决；协商不成的，提交 <strong className="text-gray-900 dark:text-white">北京仲裁委员会</strong> 按其仲裁规则进行仲裁，仲裁裁决为终局裁决。
+                              </p>
+                          </div>
+
+                          <div className="w-full h-px bg-gray-200 dark:bg-white/10 my-6" />
+
+                          {/* Signatures */}
+                          <div className="grid grid-cols-2 gap-8 text-xs text-gray-600 dark:text-gray-400">
+                              <div className="space-y-3">
+                                  <p className="font-bold text-gray-800 dark:text-gray-200">甲方（盖章）</p>
+                                  <p>{selectedOrder.customerName}</p>
+                                  <div className="w-28 h-28 rounded-full border-2 border-red-300 dark:border-red-800/50 flex items-center justify-center mt-2 opacity-60">
+                                      <div className="text-center">
+                                          <div className="text-[9px] text-red-400 font-bold tracking-widest">合同专用章</div>
+                                          <div className="text-[8px] text-red-400 mt-1">{selectedOrder.customerName.slice(0, 6)}</div>
+                                      </div>
+                                  </div>
+                                  <p className="mt-2">签约日期：{new Date(selectedOrder.date).toLocaleDateString('zh-CN')}</p>
+                              </div>
+                              <div className="space-y-3">
+                                  <p className="font-bold text-gray-800 dark:text-gray-200">乙方（盖章）</p>
+                                  <p>北京金山办公软件股份有限公司</p>
+                                  <div className="w-28 h-28 rounded-full border-2 border-red-300 dark:border-red-800/50 flex items-center justify-center mt-2 opacity-60">
+                                      <div className="text-center">
+                                          <div className="text-[9px] text-red-400 font-bold tracking-widest">合同专用章</div>
+                                          <div className="text-[8px] text-red-400 mt-1">金山办公</div>
+                                      </div>
+                                  </div>
+                                  <p className="mt-2">签约日期：{new Date(selectedOrder.date).toLocaleDateString('zh-CN')}</p>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
     </>
   );
 };

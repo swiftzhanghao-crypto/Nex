@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, UserRole, Department, RoleDefinition, UserType, Channel, PermissionDimension, RowPermissionRule, ColumnPermissionRule, PermissionResource } from '../types';
-import { Search, Plus, Shield, User as UserIcon, Briefcase, Truck, Monitor, Edit, Building2, X, Mail, CheckCircle, Calendar, Hash, Lock, CheckSquare, Settings, Save, Trash2, LayoutList, Filter, Database, Check, ChevronDown, ChevronRight, Columns } from 'lucide-react';
+import { Search, Plus, Shield, User as UserIcon, Briefcase, Truck, Monitor, Edit, Building2, X, Mail, Phone, CheckCircle, Calendar, Hash, Lock, CheckSquare, Settings, Save, Trash2, LayoutList, Filter, Database, Check, ChevronDown, ChevronRight, Columns } from 'lucide-react';
 
 interface UserManagerProps {
   users: User[];
@@ -877,6 +877,10 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, departments,
                           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">邮箱</label>
                           <input value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} className="w-full p-3 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white" />
                       </div>
+                      <div>
+                          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">手机号</label>
+                          <input value={userForm.phone || ''} onChange={e => setUserForm({...userForm, phone: e.target.value})} placeholder="请输入手机号" className="w-full p-3 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white placeholder-gray-300 dark:placeholder-gray-600" />
+                      </div>
                       <div className="grid grid-cols-2 gap-4">
                           <div>
                               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">角色</label>
@@ -941,6 +945,11 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, departments,
                             <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
                                 <Mail className="w-3.5 h-3.5" /> {detailsUser.email}
                             </div>
+                            {detailsUser.phone && (
+                                <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-1">
+                                    <Phone className="w-3.5 h-3.5" /> {detailsUser.phone}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -959,6 +968,13 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, departments,
                                 <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5">
                                     <div className="text-[10px] text-gray-400 uppercase mb-1">人员类型</div>
                                     <div className="text-sm font-bold text-gray-700 dark:text-gray-200">{detailsUser.userType === 'Internal' ? '内部员工' : '外部协作'}</div>
+                                </div>
+                                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5 col-span-2">
+                                    <div className="text-[10px] text-gray-400 uppercase mb-1">手机号</div>
+                                    <div className="text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center gap-1.5">
+                                        <Phone className="w-3.5 h-3.5 text-green-500" />
+                                        {detailsUser.phone || <span className="text-gray-400 font-normal italic">未填写</span>}
+                                    </div>
                                 </div>
                                 <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5 col-span-2">
                                     <div className="text-[10px] text-gray-400 uppercase mb-1">所属部门</div>
