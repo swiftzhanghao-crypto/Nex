@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Order, OrderStatus, Product, Customer, OrderItem, ActivationMethod, User, Department, ApprovalRecord, Opportunity, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, Channel, RoleDefinition, DeliveryMethod } from '../types';
 import { Search, User as UserIcon, Plus, Trash2, Disc, ChevronRight, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, Wallet, FileCheck, CheckSquare, Package, Zap, Box, Settings, Filter, MapPin, MessageSquare, ChevronDown, Calendar, Shield, RotateCcw } from 'lucide-react';
+import ModalPortal from './ModalPortal';
 
 type FilterMode = '单选' | '多选' | '时间段' | '时间点' | '金额范围';
 
@@ -945,7 +946,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
 
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
             {/* Search bar */}
-            <div className="flex items-stretch h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] shadow-sm w-full sm:w-[320px] transition-all focus-within:border-blue-400 dark:focus-within:border-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]">
+            <div className="flex items-stretch h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] w-full sm:w-[320px] focus-within:border-blue-400 dark:focus-within:border-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)] transition shadow-apple">
                 {/* Field selector */}
                 <div className="relative flex-shrink-0">
                     <button
@@ -1004,7 +1005,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                     }
                     setIsAdvancedFilterOpen(!isAdvancedFilterOpen);
                 }}
-                className={`p-2 rounded-lg border transition shadow-sm ${isAdvancedFilterOpen ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
+                className={`p-2 rounded-lg border transition shadow-apple ${isAdvancedFilterOpen ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
                 title="高级筛选"
             >
                 <Filter className="w-4 h-4" />
@@ -1022,7 +1023,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                     setFilterSource('All');
                     setAdvancedFilters([]);
                 }}
-                className="p-2 rounded-lg border transition shadow-sm bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:border-red-800 dark:hover:text-red-400"
+                className="p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-500 dark:text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:border-red-800 dark:hover:text-red-400 transition shadow-apple"
                 title="重置所有筛选"
             >
                 <RotateCcw className="w-4 h-4" />
@@ -1032,7 +1033,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
             <div className="relative">
                 <button 
                     onClick={() => setIsColumnConfigOpen(!isColumnConfigOpen)}
-                    className={`p-2 rounded-lg border transition shadow-sm ${isColumnConfigOpen ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
+                    className={`p-2 rounded-lg border transition shadow-apple ${isColumnConfigOpen ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
                     title="配置列"
                 >
                     <Settings className="w-4 h-4" />
@@ -1047,7 +1048,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                     checked={visibleColumns.includes(col.id)} 
                                     onChange={() => toggleColumn(col.id)}
                                     disabled={col.id === 'id' || col.id === 'action'} 
-                                    className="w-4 h-4 rounded-sm border-gray-300 text-[#0071E3] focus:ring-blue-500"
+                                    className="w-4 h-4 rounded-lg border-gray-300 text-[#0071E3] focus:ring-blue-500"
                                 />
                                 <span className="text-sm text-gray-700 dark:text-gray-300">{col.label}</span>
                             </label>
@@ -1173,7 +1174,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
         <div className="unified-card overflow-hidden">
             <div className="overflow-x-auto max-h-[calc(100vh-320px)] overflow-y-auto custom-scrollbar">
           <table className="w-full text-left border-separate border-spacing-0">
-            <thead className="sticky top-0 z-30 unified-table-header backdrop-blur-md shadow-sm">
+            <thead className="sticky top-0 z-30 unified-table-header backdrop-blur-md shadow-apple">
               <tr>
                 <th className="pl-6 pr-2 py-3 sticky left-0 z-30 bg-gray-50/95 dark:bg-[#1C1C1E] border-b border-gray-200/50 dark:border-white/10 w-[52px] min-w-[52px] align-middle">
                     <input 
@@ -1268,8 +1269,8 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                           <span className="text-gray-400 shrink-0">×{item.quantity}</span>
                                       </div>
                                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                          {item.skuName && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-md">{item.skuName}</span>}
-                                          {item.licenseType && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-md">{item.licenseType}</span>}
+                                          {item.skuName && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">{item.skuName}</span>}
+                                          {item.licenseType && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg">{item.licenseType}</span>}
                                       </div>
                                   </div>
                               ))}
@@ -1430,7 +1431,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                     <select
                         value={itemsPerPage}
                         onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                        className="h-7 pl-2 pr-6 text-xs font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-lg shadow-sm outline-none appearance-none cursor-pointer hover:border-[#0071E3]/50 transition"
+                        className="unified-card h-7 pl-2 pr-6 text-xs font-medium text-gray-700 dark:text-gray-200 dark:bg-[#1C1C1E] -gray-200 dark:-white/10 outline-none appearance-none cursor-pointer hover:-[#0071E3]/50 transition"
                         style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
                     >
                         {[20, 50, 100].map(n => <option key={n} value={n}>{n} 条</option>)}
@@ -1439,8 +1440,8 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                 {/* 页码信息 + 翻页 */}
                 <span className="text-xs text-gray-400 dark:text-gray-500">第 {currentPage} / {totalPages} 页</span>
                 <div className="flex items-center gap-1.5">
-                    <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1} className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium shadow-sm transition disabled:cursor-not-allowed">上一页</button>
-                    <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages} className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium shadow-sm transition disabled:cursor-not-allowed">下一页</button>
+                    <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1} className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] -gray-200 dark:-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:/10 text-xs font-medium transition disabled:cursor-not-allowed">上一页</button>
+                    <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages} className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] -gray-200 dark:-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:/10 text-xs font-medium transition disabled:cursor-not-allowed">下一页</button>
                 </div>
             </div>
         </div>
@@ -1472,8 +1473,8 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                   <span className="text-xs text-gray-400 shrink-0">×{item.quantity}</span>
                               </div>
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                  {item.skuName && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-md">{item.skuName}</span>}
-                                  {item.licenseType && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-md">{item.licenseType}</span>}
+                                  {item.skuName && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">{item.skuName}</span>}
+                                  {item.licenseType && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg">{item.licenseType}</span>}
                               </div>
                           </div>
                       ))}
@@ -1484,14 +1485,15 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
 
       {/* Advanced Filters Drawer */}
       {isAdvancedFilterOpen && (
-        <div className="fixed inset-0 z-[60] pointer-events-none">
-          {/* Backdrop — starts below the top nav bar */}
+        <ModalPortal>
+        <div className="fixed inset-0 z-[500]">
+          {/* Full-screen backdrop */}
           <div
-            className={`absolute top-16 inset-x-0 bottom-0 pointer-events-auto ${isFilterClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'} bg-black/30 backdrop-blur-sm`}
+            className={`absolute inset-0 pointer-events-auto ${isFilterClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'} bg-black/40 backdrop-blur-sm`}
             onClick={closeFilterDrawer}
           />
-          {/* Drawer panel — flush with top nav bar bottom (top-16 = 64px) */}
-          <div className={`absolute right-0 top-16 bottom-0 w-full max-w-[480px] pointer-events-auto bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col border-l border-gray-200/50 dark:border-white/10 ${isFilterClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
+          {/* Drawer panel */}
+          <div className={`absolute right-0 inset-y-0 w-full max-w-[480px] pointer-events-auto bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col border-l border-gray-200/50 dark:border-white/10 ${isFilterClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
             <div className="p-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center shrink-0">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">设置筛选条件</h3>
                 <button onClick={closeFilterDrawer} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full text-gray-400 transition">
@@ -1589,7 +1591,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                         )}
                                         <span className="flex items-center gap-1 shrink-0 ml-2">
                                             {isMultiCheckbox && selectedArr.length > 0 && (
-                                                <span className="text-[10px] font-bold text-white bg-[#0071E3] rounded-full w-5 h-5 flex items-center justify-center">{selectedArr.length}</span>
+                                                <span className="unified-button-primary text-[10px] bg-[#0071E3] w-5 h-5">{selectedArr.length}</span>
                                             )}
                                             <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isValueOpen ? 'rotate-180' : ''}`} />
                                         </span>
@@ -1628,11 +1630,12 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                 </div>
                 <div className="flex items-center gap-2">
                     <button onClick={closeFilterDrawer} className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">取消</button>
-                    <button onClick={applyFilters} className="px-6 py-2 text-sm font-bold text-white bg-[#0071E3] rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/25">查询</button>
+                    <button onClick={applyFilters} className="unified-button-primary bg-[#0071E3] shadow-blue-500/25">查询</button>
                 </div>
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* Unified filter dropdown — rendered via portal to escape any ancestor transform/overflow */}
@@ -1755,7 +1758,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
       {/* Batch Action Floating Bar */}
       {selectedOrderIds.size > 0 && (
           <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 animate-fade-in w-full px-4 md:w-auto md:px-0">
-              <div className="bg-white/80 dark:bg-[#1C1C1E]/80 backdrop-blur-xl shadow-2xl border border-gray-200 dark:border-white/10 rounded-full px-6 py-3 flex flex-wrap justify-center items-center gap-4 ring-1 ring-black/5 max-w-full">
+              <div className="unified-card /80 dark:bg-[#1C1C1E]/80 backdrop-blur-xl shadow-2xl -gray-200 dark:-white/10 rounded-full px-6 py-3 flex flex-wrap justify-center items-center gap-4 ring-1 ring-black/5 max-w-full">
                   <div className="flex items-center gap-2 text-sm font-bold text-gray-800 dark:text-white mr-2">
                       <div className="w-5 h-5 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center text-xs">
                           {selectedOrderIds.size}
@@ -1800,8 +1803,9 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
 
       {/* --- Full Create Order Wizard Modal --- */}
       {isCreateOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-0 md:p-6 animate-fade-in overflow-hidden">
-          <div className="bg-white dark:bg-[#1C1C1E] md:rounded-3xl shadow-2xl w-full h-full md:h-auto md:max-h-[90vh] md:max-w-5xl overflow-hidden flex flex-col border border-white/10 animate-modal-enter relative">
+        <ModalPortal>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[500] p-0 md:p-6 animate-fade-in overflow-hidden">
+          <div className="unified-card dark:bg-[#1C1C1E] md: shadow-2xl w-full h-full md:h-auto md:max-h-[90vh] md:max-w-5xl flex flex-col -white/10 animate-modal-enter relative">
             
             {/* Wizard Header */}
             <div className="px-8 py-6 border-b border-gray-100 dark:border-white/10 bg-white/50 dark:bg-white/5 backdrop-blur flex justify-between items-center shrink-0">
@@ -1809,7 +1813,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
                         创建销售订单
                         {orderSource === 'Renewal' && (
-                            <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-md flex items-center gap-1">
+                            <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg flex items-center gap-1">
                                 <RefreshCcw className="w-3.5 h-3.5"/> 续费模式
                             </span>
                         )}
@@ -1901,7 +1905,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${type.color}`}>
                                                 <type.icon className="w-7 h-7" />
                                             </div>
-                                            {buyerType === type.id && <div className="bg-[#0071E3] dark:bg-[#FF2D55] text-white p-1 rounded-full"><CheckCircle className="w-5 h-5" /></div>}
+                                            {buyerType === type.id && <div className="unified-button-primary bg-[#0071E3] dark:bg-[#FF2D55] p-1"><CheckCircle className="w-5 h-5" /></div>}
                                         </div>
                                         <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-2 relative z-10">{type.title}</h4>
                                         <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed relative z-10">{type.desc}</p>
@@ -1962,7 +1966,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                 {/* Step 2: Basic Info */}
                 {currentStep === 2 && (
                     <div className="space-y-8 animate-fade-in max-w-4xl mx-auto">
-                        <div className="bg-white dark:bg-[#2C2C2E] p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm space-y-6">
+                        <div className="bg-white dark:bg-[#2C2C2E] p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-6">
                             <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-4">
                                 <UserIcon className="w-5 h-5 text-indigo-500"/> 客户与商机信息
                             </h4>
@@ -2029,7 +2033,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                             </div>
                         )}
                         
-                        <div className="bg-white dark:bg-[#2C2C2E] p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
+                        <div className="bg-white dark:bg-[#2C2C2E] p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple">
                             <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-4 mb-6">
                                 <ShoppingBag className="w-5 h-5 text-blue-500"/> 添加产品
                             </h4>
@@ -2101,7 +2105,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                     <button 
                                         onClick={handleAddItem} 
                                         disabled={!tempProductId || !tempSkuId || (selectedSku?.pricingOptions?.length > 0 && !tempPricingOptionId)} 
-                                        className="w-full bg-black dark:bg-white text-white dark:text-black py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:opacity-80 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                                        className="w-full bg-black dark:bg-white text-white dark:text-black py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:opacity-80 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-apple"
                                     >
                                         <Plus className="w-4 h-4"/> 加入清单
                                     </button>
@@ -2110,16 +2114,16 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                         </div>
 
                         {newOrderItems.length > 0 && (
-                            <div className="bg-white dark:bg-[#2C2C2E] rounded-3xl border border-gray-100 dark:border-white/5 overflow-hidden shadow-sm">
+                            <div className="bg-white dark:bg-[#2C2C2E] rounded-3xl border border-gray-100 dark:border-white/5 overflow-hidden shadow-apple">
                                 <table className="w-full text-left text-sm min-w-[600px]">
-                                    <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 font-bold text-xs uppercase">
+                                    <thead className="unified-table-header">
                                         <tr><th className="p-5 pl-6">产品/规格</th><th className="p-5">授权类型</th><th className="p-5 text-center">数量</th><th className="p-5 text-right">单价</th><th className="p-5 text-right">小计</th><th className="p-5 text-center">操作</th></tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                                         {newOrderItems.map((item, idx) => (
                                             <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                                 <td className="p-5 pl-6"><div className="font-bold text-gray-900 dark:text-white">{item.productName}</div><div className="text-xs text-gray-500 mt-0.5">{item.skuName}</div></td>
-                                                <td className="p-5"><span className="text-xs bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-md text-gray-600 dark:text-gray-300 font-medium">{item.pricingOptionName || '默认'}</span></td>
+                                                <td className="p-5"><span className="text-xs bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-lg text-gray-600 dark:text-gray-300 font-medium">{item.pricingOptionName || '默认'}</span></td>
                                                 <td className="p-5 text-center dark:text-white font-medium">{item.quantity}</td>
                                                 <td className="p-5 text-right dark:text-white">¥{item.priceAtPurchase.toLocaleString()}</td>
                                                 <td className="p-5 text-right font-bold text-red-600 dark:text-red-400">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
@@ -2142,7 +2146,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                 {currentStep === 4 && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-in max-w-5xl mx-auto">
                         <div className="space-y-8">
-                            <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm space-y-6">
+                            <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-6">
                                 <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><FileText className="w-5 h-5 text-blue-500"/> 开票配置</h4>
                                 <div className="space-y-4">
                                     <div><label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">发票抬头</label><input className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20" value={invoiceForm.title} onChange={e=>setInvoiceForm({...invoiceForm, title:e.target.value})} /></div>
@@ -2150,7 +2154,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                 </div>
                             </div>
 
-                            <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm space-y-6">
+                            <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-6">
                                 <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><CreditCard className="w-5 h-5 text-indigo-500"/> 支付方式</h4>
                                 <div className="grid grid-cols-3 gap-4">
                                     {[
@@ -2192,7 +2196,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                         </div>
 
                         <div className="space-y-8">
-                            <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm space-y-6">
+                            <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-6">
                                 <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><Truck className="w-5 h-5 text-green-500"/> 发货方式</h4>
                                 <div className="grid grid-cols-3 gap-4">
                                     {[
@@ -2221,7 +2225,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                 </div>
                             </div>
 
-                            <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm space-y-6">
+                            <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-6">
                                 <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><MapPin className="w-5 h-5 text-red-500"/> 收货信息</h4>
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
@@ -2272,7 +2276,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                 </div>
                             </div>
 
-                            <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm space-y-6">
+                            <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-6">
                                 <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><ClipboardCheck className="w-5 h-5 text-green-500"/> 验收计划</h4>
                                 <div className="flex bg-gray-100 dark:bg-white/10 p-1.5 rounded-xl">
                                     <button onClick={()=>setAcceptanceType('OneTime')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${acceptanceType === 'OneTime' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}>整体验收</button>
@@ -2304,7 +2308,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
             </div>
 
             {/* Footer Actions */}
-            <div className="p-6 bg-white dark:bg-[#1C1C1E] border-t border-gray-100 dark:border-white/10 flex justify-end gap-4 shrink-0 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20">
+            <div className="unified-card p-6 dark:bg-[#1C1C1E] -t -gray-100 dark:-white/10 flex justify-end gap-4 shrink-0 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20">
                 <button onClick={() => currentStep > 1 ? setCurrentStep(currentStep - 1) : setIsCreateOpen(false)} className="px-8 py-3 text-gray-500 dark:text-gray-400 font-bold hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition text-sm">
                     {currentStep === 1 ? '取消' : '上一步'}
                 </button>
@@ -2318,7 +2322,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                             下一步
                         </button>
                     ) : (
-                        <button onClick={handleCreateOrder} className="bg-[#0071E3] dark:bg-[#FF2D55] text-white px-10 py-3 rounded-xl font-bold shadow-xl hover:bg-blue-600 dark:hover:bg-[#FF2D55]/90 hover:scale-105 hover:shadow-blue-500/30 transition text-sm">
+                        <button onClick={handleCreateOrder} className="unified-button-primary bg-[#0071E3] dark:bg-[#FF2D55] shadow-xl hover: dark:hover:bg-[#FF2D55]/90 hover:scale-105 hover:shadow-blue-500/30">
                             提交订单
                         </button>
                     )}
@@ -2326,10 +2330,12 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
       {/* User Details Drawer */}
       {isDrawerOpen && detailsUser && (
-        <div className="fixed inset-0 z-[100] flex justify-end">
+        <ModalPortal>
+        <div className="fixed inset-0 z-[500] flex justify-end">
           <div className={`absolute inset-0 bg-black/40 backdrop-blur-sm ${isDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={closeDrawer}></div>
           <div className={`relative w-full max-w-md bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col h-full border-l border-white/10 ${isDrawerClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
             <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5">
@@ -2408,6 +2414,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

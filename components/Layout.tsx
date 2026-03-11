@@ -142,19 +142,15 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
     <div className="h-screen flex flex-col font-sans overflow-hidden bg-[#F5F5F7] dark:bg-black transition-colors duration-300 selection:bg-blue-500/30">
       
       {/* Top Header */}
-      <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 z-30 sticky top-0
-          bg-white/70 backdrop-blur-xl border-b border-gray-200/50
-          dark:bg-[#1C1C1E]/70 dark:border-white/10 transition-all
-      ">
+      <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 z-30 sticky top-0 bg-white/70 backdrop-blur-xl border-b border-gray-200/50 dark:bg-[#1C1C1E]/70 dark:border-white/10 transition-all">
           <div className="flex items-center gap-6">
               {/* Logo Area */}
               <div className="flex items-center gap-3">
                 <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full p-2 transition">
                     <Menu className="w-5 h-5" />
                 </button>
-                <div className="flex items-center gap-1.5 group cursor-pointer" onClick={() => navigate('/')}>
-                    <WPSLogo className="h-7 w-auto group-hover:scale-105 transition-transform duration-300" />
-                    <div className="h-5 w-px bg-gray-200 dark:bg-white/10 mx-0.5 hidden sm:block"></div>
+                <div className="flex items-center gap-2 group cursor-pointer" onClick={() => navigate('/')}>
+                    <WPSLogo className="h-[18px] w-auto group-hover:scale-105 transition-transform duration-300" />
                     <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight hidden sm:block">业务平台</span>
                 </div>
               </div>
@@ -167,7 +163,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
                           onClick={() => navigate(item.path)}
                           className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
                               activeTopNav === item.id 
-                              ? 'bg-[#0071E3] text-white shadow-md shadow-blue-500/20' 
+                              ? 'bg-[#0071E3] text-white shadow-apple shadow-blue-500/20' 
                               : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/10'
                           }`}
                       >
@@ -206,13 +202,13 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
                     <img 
                         src={currentUser.avatar} 
                         alt={currentUser.name} 
-                        className="w-8 h-8 rounded-full object-cover shadow-sm border border-gray-200 dark:border-white/10"
+                        className="w-8 h-8 rounded-full object-cover shadow-apple border border-gray-200 dark:border-white/10"
                     />
                     <ChevronDown className="w-3 h-3 text-gray-400" />
                 </button>
 
                 {isUserMenuOpen && (
-                    <div className="absolute right-0 top-full mt-3 w-64 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-2xl rounded-2xl shadow-apple border border-gray-200/50 dark:border-white/10 p-2 z-50 animate-modal-enter origin-top-right">
+                    <div className="unified-card absolute right-0 top-full mt-3 w-64 /90 dark:bg-[#1C1C1E]/90 backdrop-blur-2xl -gray-200/50 dark:-white/10 p-2 z-50 animate-modal-enter origin-top-right">
                         <div className="px-3 py-2 border-b border-gray-100 dark:border-white/10 mb-1">
                             <p className="text-sm font-bold text-gray-900 dark:text-white">{currentUser.name}</p>
                         </div>
@@ -261,7 +257,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, users, setCurren
               flex flex-col gap-1
             `}>
               {/* Sidebar visual container */}
-              <div className="w-full h-full bg-white/60 dark:bg-[#1C1C1E]/60 backdrop-blur-xl border border-gray-200/50 dark:border-white/10 rounded-3xl shadow-apple flex flex-col overflow-hidden">
+              <div className="unified-card w-full h-full /60 dark:bg-[#1C1C1E]/60 backdrop-blur-xl -gray-200/50 dark:-white/10 flex flex-col">
                   
                   {/* Mobile Sidebar Header */}
                   <div className="lg:hidden h-14 flex items-center justify-between px-5 border-b border-gray-100 dark:border-white/5 shrink-0">
