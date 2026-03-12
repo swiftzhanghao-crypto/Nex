@@ -8,6 +8,7 @@ import {
     Briefcase, History, Eye, CheckSquare, CreditCard, ShieldCheck, User as UserIcon, Building,
     ChevronRight, AlertCircle, Clock, MapPin, Target, Users, Paperclip, Scroll, ZoomIn, ZoomOut, Download
 } from 'lucide-react';
+import ModalPortal from './ModalPortal';
 
 interface OrderDetailsProps {
   orders: Order[];
@@ -419,7 +420,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
               <div className="flex items-center gap-2.5">
                   <img 
                       src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${record.operatorName}`} 
-                      className="w-8 h-8 rounded-full border-2 border-white dark:border-[#1C1C1E] shadow-sm bg-gray-100" 
+                      className="w-8 h-8 rounded-full border-2 border-white dark:border-[#1C1C1E] shadow-apple bg-gray-100" 
                       alt="" 
                   />
                   <div>
@@ -447,32 +448,62 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                    <div className="flex items-center gap-2 flex-wrap">
                        <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white tracking-tight">订单 {selectedOrder.id}</h1>
                        <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">提单时间：<span className="font-mono">{new Date(selectedOrder.date).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</span></span>
-                       <span className={`shrink-0 !rounded-full ${
-                           selectedOrder.status === OrderStatus.DELIVERED ? 'unified-tag-green' :
-                           selectedOrder.status === OrderStatus.SHIPPED ? 'unified-tag-indigo' :
-                           selectedOrder.status === OrderStatus.PROCESSING_PROD ? 'unified-tag-blue' :
-                           selectedOrder.status === OrderStatus.PENDING_APPROVAL ? 'unified-tag-blue' :
-                           selectedOrder.status === OrderStatus.PENDING_CONFIRM ? 'unified-tag-blue' :
-                           selectedOrder.status === OrderStatus.REFUND_PENDING ? 'unified-tag-blue' :
-                           selectedOrder.status === OrderStatus.CANCELLED ? 'unified-tag-gray' :
-                           selectedOrder.status === OrderStatus.REFUNDED ? 'unified-tag-red' :
-                           selectedOrder.status === OrderStatus.PENDING_PAYMENT ? 'unified-tag-blue' :
-                           'unified-tag-gray'
-                       }`}>{statusMap[selectedOrder.status] || selectedOrder.status}</span>
-                       {selectedOrder.isPaid
-                           ? <span className="unified-tag-green !rounded-full shrink-0">已支付</span>
-                           : <span className="unified-tag-blue !rounded-full shrink-0">待支付</span>
-                       }
-                       {selectedOrder.status === OrderStatus.DELIVERED
-                           ? <span className="unified-tag-green !rounded-full shrink-0">已完成</span>
-                           : selectedOrder.status === OrderStatus.SHIPPED
-                               ? <span className="unified-tag-indigo !rounded-full shrink-0">已发货</span>
-                               : selectedOrder.isShippingConfirmed
-                                   ? <span className="unified-tag-blue !rounded-full shrink-0">待发货</span>
-                                   : (selectedOrder.isAuthConfirmed || selectedOrder.isPackageConfirmed || selectedOrder.status === OrderStatus.PROCESSING_PROD)
-                                       ? <span className="unified-tag-orange !rounded-full shrink-0">备货中</span>
-                                       : <span className="unified-tag-blue !rounded-full shrink-0">待处理</span>
-                       }
+                       {/* 订单状态 */}
+                       <div className="relative group/status inline-flex shrink-0">
+                           <span className={`!rounded-full ${
+                               selectedOrder.status === OrderStatus.DELIVERED ? 'unified-tag-green' :
+                               selectedOrder.status === OrderStatus.SHIPPED ? 'unified-tag-indigo' :
+                               selectedOrder.status === OrderStatus.PROCESSING_PROD ? 'unified-tag-blue' :
+                               selectedOrder.status === OrderStatus.PENDING_APPROVAL ? 'unified-tag-blue' :
+                               selectedOrder.status === OrderStatus.PENDING_CONFIRM ? 'unified-tag-blue' :
+                               selectedOrder.status === OrderStatus.REFUND_PENDING ? 'unified-tag-blue' :
+                               selectedOrder.status === OrderStatus.CANCELLED ? 'unified-tag-gray' :
+                               selectedOrder.status === OrderStatus.REFUNDED ? 'unified-tag-red' :
+                               selectedOrder.status === OrderStatus.PENDING_PAYMENT ? 'unified-tag-blue' :
+                               'unified-tag-gray'
+                           }`}>{statusMap[selectedOrder.status] || selectedOrder.status}</span>
+                           <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1.5 bg-white text-gray-900 rounded-xl text-xs whitespace-nowrap opacity-0 group-hover/status:opacity-100 transition-opacity duration-150 pointer-events-none z-50 shadow-xl border border-gray-100">
+                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-white"></div>
+                               <div className="text-gray-400 text-[10px] font-medium leading-none mb-1">订单状态</div>
+                               <div className="font-semibold leading-none">{statusMap[selectedOrder.status] || selectedOrder.status}</div>
+                           </div>
+                       </div>
+                       {/* 付款状态 */}
+                       <div className="relative group/payment inline-flex shrink-0">
+                           {selectedOrder.isPaid
+                               ? <span className="unified-tag-green !rounded-full">已支付</span>
+                               : <span className="unified-tag-blue !rounded-full">待支付</span>
+                           }
+                           <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1.5 bg-white text-gray-900 rounded-xl text-xs whitespace-nowrap opacity-0 group-hover/payment:opacity-100 transition-opacity duration-150 pointer-events-none z-50 shadow-xl border border-gray-100">
+                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-white"></div>
+                               <div className="text-gray-400 text-[10px] font-medium leading-none mb-1">付款状态</div>
+                               <div className="font-semibold leading-none">{selectedOrder.isPaid ? '已支付' : '待支付'}</div>
+                           </div>
+                       </div>
+                       {/* 发货状态 */}
+                       <div className="relative group/shipping inline-flex shrink-0">
+                           {selectedOrder.status === OrderStatus.DELIVERED
+                               ? <span className="unified-tag-green !rounded-full">已完成</span>
+                               : selectedOrder.status === OrderStatus.SHIPPED
+                                   ? <span className="unified-tag-indigo !rounded-full">已发货</span>
+                                   : selectedOrder.isShippingConfirmed
+                                       ? <span className="unified-tag-blue !rounded-full">待发货</span>
+                                       : (selectedOrder.isAuthConfirmed || selectedOrder.isPackageConfirmed || selectedOrder.status === OrderStatus.PROCESSING_PROD)
+                                           ? <span className="unified-tag-orange !rounded-full">备货中</span>
+                                           : <span className="unified-tag-blue !rounded-full">待处理</span>
+                           }
+                           <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1.5 bg-white text-gray-900 rounded-xl text-xs whitespace-nowrap opacity-0 group-hover/shipping:opacity-100 transition-opacity duration-150 pointer-events-none z-50 shadow-xl border border-gray-100">
+                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-white"></div>
+                               <div className="text-gray-400 text-[10px] font-medium leading-none mb-1">发货状态</div>
+                               <div className="font-semibold leading-none">{
+                                   selectedOrder.status === OrderStatus.DELIVERED ? '已完成' :
+                                   selectedOrder.status === OrderStatus.SHIPPED ? '已发货' :
+                                   selectedOrder.isShippingConfirmed ? '待发货' :
+                                   (selectedOrder.isAuthConfirmed || selectedOrder.isPackageConfirmed || selectedOrder.status === OrderStatus.PROCESSING_PROD) ? '备货中' :
+                                   '待处理'
+                               }</div>
+                           </div>
+                       </div>
                    </div>
                </div>
 
@@ -559,7 +590,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
           {activeTab === 'MANAGEMENT' && (
             <>
               {/* Stepper */}
-              <div className="bg-white dark:bg-[#1C1C1E] px-6 py-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-x-auto">
+              <div className="unified-card dark:bg-[#1C1C1E] px-6 py-4 -gray-100/50 dark:-white/10 overflow-x-auto">
              <div className="flex justify-between items-start relative min-w-[700px]">
                  <div className="absolute top-6 left-0 w-full h-1 bg-gray-100 dark:bg-white/10 -z-0 rounded-full overflow-hidden">
                  </div>
@@ -573,9 +604,9 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                             : 'cursor-pointer hover:scale-105'
                         }`}
                     >
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-md ${
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-apple ${
                             step.status === 'Completed' ? 'bg-green-500 text-white ring-4 ring-green-100 dark:ring-green-900/20' : 
-                            step.status === 'Current' ? 'bg-[#0071E3] dark:bg-[#0A84FF] text-white ring-8 ring-blue-100 dark:ring-blue-900/30 shadow-xl scale-110' : 
+                            step.status === 'Current' ? 'bg-[#0071E3] dark:bg-[#0A84FF] text-white ring-4 ring-blue-100 dark:ring-blue-900/30 shadow-xl scale-110' : 
                             'bg-white dark:bg-[#2C2C2E] border-2 border-gray-200 dark:border-gray-600 text-gray-400'
                         }`}>
                             {step.status === 'Locked' ? <Lock className="w-5 h-5" /> : <step.icon className="w-6 h-6" />}
@@ -587,7 +618,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                     {new Date(step.completedAt).toLocaleDateString()} {new Date(step.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </div>
                             )}
-                            {step.status === 'Current' && <div className="text-[10px] text-white bg-[#0071E3] dark:bg-[#0A84FF] px-2 py-0.5 rounded-full font-bold shadow-md mt-0.5 animate-bounce">点击处理</div>}
+                            {step.status === 'Current' && <div className="text-[9px] font-bold text-white bg-[#0071E3] dark:bg-[#0A84FF] px-2 py-0.5 rounded-full mt-1 animate-pulse">点击处理</div>}
                             {step.status === 'Completed' && <div className="text-[9px] text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full font-bold mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">查看信息</div>}
                         </div>
                     </div>
@@ -596,7 +627,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
           </div>
 
           {/* Order Items Table + Summary Side-by-Side */}
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden">
+          <div className="unified-card dark:bg-[#1C1C1E] -gray-100/50 dark:-white/10">
               <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                   <Package className="w-5 h-5 text-orange-500" />
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white">订单产品明细</h3>
@@ -605,14 +636,13 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                   {/* Left: items table (fills remaining) */}
                   <div className="flex-1 min-w-0 overflow-x-auto border-r border-gray-100 dark:border-white/10">
                       <table className="w-full text-left min-w-[520px]">
-                          <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 text-sm uppercase font-bold tracking-wider">
+                          <thead className="unified-table-header">
                               <tr>
                                   <th className="px-5 py-4 pl-6 text-center w-16 whitespace-nowrap">明细编号</th>
                                   <th className="px-5 py-4">产品信息</th>
                                   <th className="px-5 py-4 text-center">数量</th>
                                   <th className="px-5 py-4 text-right">单价</th>
                                   <th className="px-5 py-4 text-right">产品金额</th>
-                                  <th className="px-5 py-4 text-right">产品需付金额</th>
                                   <th className="px-5 py-4">电子授权</th>
                               </tr>
                           </thead>
@@ -620,9 +650,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                               {selectedOrder.items.map((item, idx) => {
                                   const lineNo = String(idx + 1).padStart(3, '0');
                                   const itemAmount = item.priceAtPurchase * item.quantity;
-                                  const discountAmt = item.priceAtPurchase > 1000 ? Math.floor(itemAmount * 0.05 / 10) * 10 : 0;
-                                  const rebateAmt = item.priceAtPurchase > 5000 ? Math.floor(itemAmount * 0.02 / 10) * 10 : 0;
-                                  const amountDue = itemAmount - discountAmt - rebateAmt;
                                   return (
                                   <tr
                                     key={idx}
@@ -638,20 +665,19 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                       </td>
                                       <td className="px-5 py-5">
                                           <button
-                                            onClick={() => navigate(`/products/${item.productId}`)}
+                                            onClick={() => navigate(`/catalog/${item.productId}/preview`)}
                                             className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline text-left text-sm"
                                           >
                                               {item.productName}
                                           </button>
                                           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                                              {item.skuName && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-full">{item.skuName}</span>}
-                                              {item.licenseType && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-full">{item.licenseType}</span>}
+                                              {item.skuName && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">{item.skuName}</span>}
+                                              {item.licenseType && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg">{item.licenseType}</span>}
                                           </div>
                                       </td>
                                       <td className="px-5 py-5 text-center dark:text-white font-medium">x {item.quantity}</td>
                                       <td className="px-5 py-5 text-right font-mono text-sm text-gray-700 dark:text-gray-300">¥{item.priceAtPurchase.toLocaleString()}</td>
                                       <td className="px-5 py-5 text-right font-bold font-mono text-gray-900 dark:text-white">¥{itemAmount.toLocaleString()}</td>
-                                      <td className="px-5 py-5 text-right font-bold font-mono text-red-600 dark:text-red-400">¥{amountDue.toLocaleString()}</td>
                                       <td className="px-5 py-5">
                                           {selectedOrder.isPaid && selectedOrder.confirmedDate && (
                                               <button
@@ -755,7 +781,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
               {/* Customer Info */}
               <div className="md:col-span-2 space-y-4">
                   {/* 客户信息卡片 */}
-                  <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-4">
+                  <div className="unified-card dark:bg-[#1C1C1E] p-5 -gray-100/50 dark:-white/10 space-y-4">
                       <div className="border-b border-gray-100 dark:border-white/10 pb-2.5">
                           <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                               <Building className="w-5 h-5 text-[#0071E3]" /> 客户信息
@@ -790,7 +816,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                   </div>
 
                   {/* 交易方信息卡片 */}
-                  <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-4">
+                  <div className="unified-card dark:bg-[#1C1C1E] p-5 -gray-100/50 dark:-white/10 space-y-4">
                       <div className="border-b border-gray-100 dark:border-white/10 pb-2.5">
                           <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                               <Users className="w-5 h-5 text-indigo-500" /> 交易方信息
@@ -800,7 +826,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                           const fields = [
                               { label: '买方名称', value: selectedOrder.buyerName },
                               { label: '卖方名称', value: selectedOrder.sellerName },
-                              { label: '直接下单渠道', value: selectedOrder.directChannel },
+                              { label: '直接下级渠道', value: selectedOrder.directChannel },
                               { label: '终端渠道', value: selectedOrder.terminalChannel },
                               { label: '渠道是否提供服务', value: selectedOrder.channelService },
                           ];
@@ -819,7 +845,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
               </div>
 
               {/* Opportunity Information (Small - 1/3) */}
-              <div className="md:col-span-1 bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-3">
+              <div className="unified-card md:col-span-1 dark:bg-[#1C1C1E] p-4 -gray-100/50 dark:-white/10 space-y-3">
                   <div className="border-b border-gray-100 dark:border-white/10 pb-2.5">
                       <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Target className="w-5 h-5 text-orange-500"/> 商机信息</h4>
                   </div>
@@ -854,7 +880,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
               </div>
 
               {/* Contract Info (Small - 1/3) */}
-              <div className="md:col-span-1 bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-3">
+              <div className="unified-card md:col-span-1 dark:bg-[#1C1C1E] p-4 -gray-100/50 dark:-white/10 space-y-3">
                   <div className="border-b border-gray-100 dark:border-white/10 pb-2.5 flex items-center justify-between">
                       <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                           <Scroll className="w-5 h-5 text-blue-500"/> 合同信息
@@ -884,7 +910,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
               </div>
 
               {/* Original Order Numbers (Small - 1/3) */}
-              <div className="md:col-span-1 bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-3">
+              <div className="unified-card md:col-span-1 dark:bg-[#1C1C1E] p-4 -gray-100/50 dark:-white/10 space-y-3">
                   <div className="border-b border-gray-100 dark:border-white/10 pb-2.5">
                       <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2"><History className="w-5 h-5 text-purple-500"/> 原订单编号</h4>
                   </div>
@@ -902,7 +928,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
               </div>
 
               {/* Invoice Details (Small - 1/3) — rightmost */}
-              <div className="md:col-span-1 bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-3">
+              <div className="unified-card md:col-span-1 dark:bg-[#1C1C1E] p-4 -gray-100/50 dark:-white/10 space-y-3">
                   <div className="border-b border-gray-100 dark:border-white/10 pb-2.5">
                       <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Receipt className="w-5 h-5 text-green-500"/> 开票明细</h4>
                   </div>
@@ -929,14 +955,14 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
             </div>
 
             {/* Acceptance Information Table */}
-            <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden">
+            <div className="unified-card dark:bg-[#1C1C1E] -gray-100/50 dark:-white/10">
                     <div className="p-6 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                         <ClipboardCheck className="w-5 h-5 text-green-500" />
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">验收信息</h3>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
-                            <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 text-sm font-bold tracking-wider">
+                            <thead className="unified-table-header">
                                 <tr>
                                     <th className="p-4 pl-8">明细编号</th>
                                     <th className="p-4">产品名称</th>
@@ -974,7 +1000,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
             <div className="space-y-8">
                 {/* Basic Info Snapshot */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 bg-white dark:bg-[#1C1C1E] p-8 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10">
+                    <div className="unified-card lg:col-span-2 dark:bg-[#1C1C1E] p-8 -gray-100/50 dark:-white/10">
                         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2 mb-6"><FileText className="w-4 h-4"/> 订单基础信息快照</h4>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                             <div>
@@ -1016,7 +1042,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-[#1C1C1E] p-8 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10">
+                    <div className="unified-card dark:bg-[#1C1C1E] p-8 -gray-100/50 dark:-white/10">
                         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2 mb-6"><Building className="w-4 h-4"/> 客户信息快照</h4>
                         <div className="space-y-6">
                             <div>
@@ -1040,14 +1066,14 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                 </div>
 
                 {/* Product Snapshot Table */}
-                <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden">
+                <div className="unified-card dark:bg-[#1C1C1E] -gray-100/50 dark:-white/10">
                     <div className="p-8 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                         <Package className="w-5 h-5 text-gray-400" />
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">产品明细快照</h3>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left min-w-[800px]">
-                            <thead className="bg-gray-50/50 dark:bg-white/5 text-gray-400 text-[10px] uppercase font-bold tracking-wider">
+                            <thead className="unified-table-header text-[10px]">
                                 <tr>
                                     <th className="p-8 pl-10">产品名称</th>
                                     <th className="p-8">规格/SKU</th>
@@ -1093,7 +1119,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
           {activeTab === 'FULFILLMENT' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
              {/* Delivery Info (Medium - 2/3) */}
-             <div className="md:col-span-2 bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 space-y-3">
+             <div className="unified-card md:col-span-2 dark:bg-[#1C1C1E] p-4 -gray-100/50 dark:-white/10 space-y-3">
                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2"><Truck className="w-4 h-4"/> 交付信息</h4>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                      <div className="p-4 bg-gray-50 dark:bg-black/20 rounded-2xl border border-gray-100 dark:border-white/5 space-y-3">
@@ -1254,7 +1280,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                   <div className="w-px bg-gray-200 dark:bg-white/10 mx-6 self-stretch" />
 
                   {/* ── Right: Detail Card ────────────────────────────────── */}
-                  <div className="flex-1 bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col">
+                  <div className="unified-card flex-1 dark:bg-[#1C1C1E] -gray-100/50 dark:-white/10 flex flex-col">
                     {!active ? (
                       <div className="flex flex-col items-center justify-center flex-1 min-h-[400px] gap-4 text-gray-400 dark:text-gray-600">
                         <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/10 flex items-center justify-center">
@@ -1383,7 +1409,9 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
 
       {/* --- Log Drawer --- */}
       {isLogDrawerOpen && (
-          <div className="fixed inset-0 z-50 flex justify-end">
+
+          <ModalPortal>
+          <div className="fixed inset-0 z-[500] flex justify-end">
               <div className={`absolute inset-0 bg-black/30 backdrop-blur-sm ${isLogDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={handleCloseLogDrawer}></div>
               <div className={`relative w-full max-w-md h-full bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col ${isLogDrawerClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
                   <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center shrink-0">
@@ -1416,11 +1444,15 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                   </div>
               </div>
           </div>
+          </ModalPortal>
+
       )}
 
       {/* --- Action Drawer --- */}
       {activeStepModal && (
-          <div className="fixed inset-0 z-50 flex justify-end">
+
+          <ModalPortal>
+          <div className="fixed inset-0 z-[500] flex justify-end">
               <div className={`absolute inset-0 bg-black/30 backdrop-blur-sm ${isDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={handleCloseDrawer}></div>
               <div className={`relative w-full max-w-3xl h-full bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col ${isDrawerClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
                   <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center shrink-0">
@@ -1454,7 +1486,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                            <textarea value={approvalComment} onChange={e => setApprovalComment(e.target.value)} placeholder="审批意见..." className="w-full p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-transparent dark:border-white/10 text-sm outline-none resize-none h-20 dark:text-white" />
                                            <div className="flex gap-2">
                                                <button onClick={() => handleApproveAction('sales', 'Reject')} className="flex-1 py-2 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 text-xs transition">拒绝</button>
-                                               <button onClick={() => handleApproveAction('sales', 'Approve')} className="flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 text-xs transition">同意</button>
+                                               <button onClick={() => handleApproveAction('sales', 'Approve')} className="unified-button-primary -1">同意</button>
                                            </div>
                                        </div>
                                    )}
@@ -1472,7 +1504,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                            <textarea value={approvalComment} onChange={e => setApprovalComment(e.target.value)} placeholder="审批意见..." className="w-full p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-transparent dark:border-white/10 text-sm outline-none resize-none h-20 dark:text-white" />
                                            <div className="flex gap-2">
                                                <button onClick={() => handleApproveAction('business', 'Reject')} className="flex-1 py-2 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 text-xs transition">拒绝</button>
-                                               <button onClick={() => handleApproveAction('business', 'Approve')} className="flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 text-xs transition">同意</button>
+                                               <button onClick={() => handleApproveAction('business', 'Approve')} className="unified-button-primary -1">同意</button>
                                            </div>
                                        </div>
                                    )}
@@ -1489,7 +1521,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                            <textarea value={approvalComment} onChange={e => setApprovalComment(e.target.value)} placeholder="审批意见..." className="w-full p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-transparent dark:border-white/10 text-sm outline-none resize-none h-20 dark:text-white" />
                                            <div className="flex gap-2">
                                                <button onClick={() => handleApproveAction('finance', 'Reject')} className="flex-1 py-2 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 text-xs transition">拒绝</button>
-                                               <button onClick={() => handleApproveAction('finance', 'Approve')} className="flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 text-xs transition">同意</button>
+                                               <button onClick={() => handleApproveAction('finance', 'Approve')} className="unified-button-primary -1">同意</button>
                                            </div>
                                        </div>
                                    )}
@@ -1536,7 +1568,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                    
                                    <div className="mb-4 overflow-x-auto border border-gray-100 dark:border-white/10 rounded-xl">
                                        <table className="w-full text-left text-xs">
-                                           <thead className="bg-gray-50 dark:bg-white/5 text-gray-400 uppercase font-bold">
+                                           <thead className="unified-table-header">
                                                <tr>
                                                    <th className="p-3">编号</th>
                                                    <th className="p-3">安装包名称</th>
@@ -1608,7 +1640,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                {selectedOrder.isAuthConfirmed && selectedOrder.isPackageConfirmed && selectedOrder.isCDBurned && selectedOrder.isShippingConfirmed && (
                                    <button 
                                       onClick={handleStockComplete} 
-                                      className="w-full py-4 bg-[#0071E3] dark:bg-[#0A84FF] text-white rounded-2xl font-bold shadow-lg animate-pulse hover:opacity-80 transition mt-4"
+                                      className="unified-button-primary w-full bg-[#0071E3] dark:bg-[#0A84FF] rounded-2xl animate-pulse hover:opacity-80 mt-4"
                                    >
                                        备货状态更新为：已备货完成
                                    </button>
@@ -1730,11 +1762,15 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                   </div>
               </div>
           </div>
+          </ModalPortal>
+
       )}
 
       {/* License Cert Drawer */}
       {selectedCertificateItem && (
-          <div className="fixed inset-0 z-50 flex justify-end">
+
+          <ModalPortal>
+          <div className="fixed inset-0 z-[500] flex justify-end">
               <div className={`absolute inset-0 bg-black/30 backdrop-blur-sm ${isCertDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={handleCloseCertDrawer}></div>
               <div className={`relative w-full max-w-4xl h-full bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col ${isCertDrawerClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
                    {/* Cert Header */}
@@ -1747,13 +1783,13 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                            <div className="flex bg-gray-100 dark:bg-white/10 p-1 rounded-xl border border-gray-200 dark:border-white/5">
                                <button 
                                    onClick={() => setCertView('paper')}
-                                   className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${certView === 'paper' ? 'bg-white dark:bg-white/20 shadow-sm text-[#0071E3] dark:text-[#0A84FF]' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                                   className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${certView === 'paper' ? 'bg-white dark:bg-white/20 shadow-apple text-[#0071E3] dark:text-[#0A84FF]' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
                                >
                                    纸质排版
                                </button>
                                <button 
                                    onClick={() => setCertView('structured')}
-                                   className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${certView === 'structured' ? 'bg-white dark:bg-white/20 shadow-sm text-[#0071E3] dark:text-[#0A84FF]' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                                   className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${certView === 'structured' ? 'bg-white dark:bg-white/20 shadow-apple text-[#0071E3] dark:text-[#0A84FF]' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
                                >
                                    结构化展示
                                </button>
@@ -1779,7 +1815,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                 
                                 <div className="relative z-10 text-center space-y-12 mt-8">
                                      <div className="flex flex-col items-center gap-4">
-                                         <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center text-white text-3xl font-black italic shadow-xl">W</div>
+                                         <div className="unified-button-primary w-20 h-20 rounded-3xl text-3xl font-black italic shadow-xl">W</div>
                                          <div className="text-sm font-bold tracking-[0.4em] text-blue-600 uppercase">WPS Enterprise Systems</div>
                                      </div>
                                      
@@ -1813,7 +1849,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                              </div>
                                              <div className="col-span-2 pt-4 border-t border-gray-200/50">
                                                  <div className="text-[10px] text-gray-400 uppercase font-bold mb-2">授权许可码 (License Key)</div>
-                                                 <div className="font-mono text-base text-blue-700 bg-blue-50 p-4 rounded-xl border border-blue-100 break-all shadow-sm">
+                                                 <div className="font-mono text-base text-blue-700 bg-blue-50 p-4 rounded-xl border border-blue-100 break-all shadow-apple">
                                                      {selectedCertificateItem.deliveredContent?.[0] || 'PREVIEW-LICENSE-KEY-GENERATED-001'}
                                                  </div>
                                              </div>
@@ -1840,18 +1876,18 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                             </div>
                         ) : (
                             /* Structured Layout */
-                            <div className="bg-white dark:bg-[#1C1C1E] w-full max-w-5xl rounded-3xl shadow-xl overflow-hidden flex flex-col">
+                            <div className="unified-card dark:bg-[#1C1C1E] w-full max-w-5xl flex flex-col">
                                 <div className="p-8 border-b border-gray-100 dark:border-white/10 flex justify-between items-center">
                                     <div className="flex items-center gap-4">
                                         <h2 className="text-xl font-bold text-gray-900 dark:text-white">{selectedCertificateItem.productName}授权信息</h2>
                                         <div className="flex items-center gap-2">
                                             <div className="w-10 h-5 bg-gray-200 dark:bg-white/10 rounded-full relative cursor-pointer">
-                                                <div className="absolute left-1 top-1 w-3 h-3 bg-white rounded-full shadow-sm"></div>
+                                                <div className="absolute left-1 top-1 w-3 h-3 bg-white rounded-full shadow-apple"></div>
                                             </div>
                                             <span className="text-xs font-bold text-orange-500 bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded">未生效</span>
                                         </div>
                                     </div>
-                                    <button className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition">编辑</button>
+                                    <button className="unified-button-primary">编辑</button>
                                 </div>
                                 
                                 <div className="p-10 space-y-12">
@@ -1968,19 +2004,23 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
 
                    {/* Footer Actions for Preview Mode */}
                    {isCertPreviewMode && (
-                        <div className="p-6 bg-white dark:bg-[#1C1C1E] border-t border-gray-100 dark:border-white/10 flex justify-end gap-3 shrink-0 shadow-[-5px_0_30px_rgba(0,0,0,0.1)] z-20">
+                        <div className="unified-card p-6 dark:bg-[#1C1C1E] -t -gray-100 dark:-white/10 flex justify-end gap-3 shrink-0 shadow-[-5px_0_30px_rgba(0,0,0,0.1)] z-20">
                             <button onClick={handleCloseCertDrawer} className="px-6 py-3 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition font-bold text-sm">取消</button>
-                            <button onClick={() => handleStockAction('auth')} className="px-8 py-3 bg-[#0071E3] dark:bg-[#0A84FF] text-white rounded-xl hover:bg-blue-600 dark:hover:bg-[#0A84FF]/80 transition shadow-lg font-bold text-sm">确认授权无误</button>
+                            <button onClick={() => handleStockAction('auth')} className="unified-button-primary bg-[#0071E3] dark:bg-[#0A84FF] hover: dark:hover:bg-[#0A84FF]/80">确认授权无误</button>
                         </div>
                    )}
               </div>
           </div>
+          </ModalPortal>
+
       )}
 
       {/* Fulfillment Modal */}
       {fulfillmentItemIndex !== null && (
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-modal-enter border border-white/10">
+
+          <ModalPortal>
+          <div className="fixed inset-0 z-[500] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-md animate-modal-enter -white/10">
                   <div className="p-6 border-b dark:border-white/10 flex justify-between items-center"><h3 className="font-bold dark:text-white">配置交付内容</h3><button onClick={() => setFulfillmentItemIndex(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5"/></button></div>
                   <div className="p-6 space-y-4">
                       <label className="text-xs font-bold text-gray-400 uppercase block">授权码 / 链接 (每行一个)</label>
@@ -1989,6 +2029,8 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                   </div>
               </div>
           </div>
+          </ModalPortal>
+
       )}
 
       {/* Order Item Details Drawer */}
@@ -2005,7 +2047,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                   }}
               />
               <div className={`w-full bg-white dark:bg-[#1C1C1E] h-full shadow-2xl flex flex-col relative z-10 ${isItemDetailsClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
-                  <div className="p-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-white dark:bg-[#1C1C1E] shrink-0">
+                  <div className="unified-card p-5 -b -gray-100 dark:-white/10 flex justify-between items-center dark:bg-[#1C1C1E] shrink-0">
                       <div className="flex items-center gap-4">
                           <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
                               <Package className="w-6 h-6 text-blue-500" />
@@ -2040,7 +2082,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                           <div className="col-span-2 space-y-4">
 
                               {/* 产品交易信息 */}
-                              <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
+                              <div className="unified-card dark:bg-[#1C1C1E] -gray-100 dark:-white/10">
                                   <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                                       <Box className="w-5 h-5 text-blue-500" />
                                       <h4 className="text-base font-semibold text-gray-900 dark:text-white">产品交易信息</h4>
@@ -2048,10 +2090,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                   <div className="p-5">
                                       {(() => {
                                           const itemAmount = selectedItemForDetails.priceAtPurchase * selectedItemForDetails.quantity;
-                                          const discountAmount = selectedItemForDetails.priceAtPurchase > 1000
-                                              ? Math.floor(itemAmount * 0.05 / 10) * 10
-                                              : 0;
-                                          const amountDue = itemAmount - discountAmount;
                                           const fmt = (n: number) => `¥${n.toLocaleString()}`;
                                           const fields = [
                                               { label: '产品名称', value: selectedItemForDetails.productName || '-', isAmount: false },
@@ -2063,8 +2101,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                               { label: '计价数量', value: String(selectedItemForDetails.quantity), isAmount: false },
                                               { label: '计价单价', value: selectedItemForDetails.pricingUnitPrice != null ? fmt(selectedItemForDetails.pricingUnitPrice) : '-', isAmount: true },
                                               { label: '产品金额', value: fmt(itemAmount), isAmount: true },
-                                              { label: '产品优惠金额', value: fmt(discountAmount), isAmount: true },
-                                              { label: '产品需付金额', value: fmt(amountDue), isAmount: true },
                                           ];
                                           return (
                                               <div className="grid grid-cols-2 gap-x-6">
@@ -2081,7 +2117,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                               </div>
 
                               {/* 产品授权信息 */}
-                              <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
+                              <div className="unified-card dark:bg-[#1C1C1E] -gray-100 dark:-white/10">
                                   <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                                       <ShieldCheck className="w-5 h-5 text-purple-500" />
                                       <h4 className="text-base font-semibold text-gray-900 dark:text-white">产品授权信息</h4>
@@ -2113,7 +2149,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                               </div>
 
                               {/* 产品价格参考 */}
-                              <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
+                              <div className="unified-card dark:bg-[#1C1C1E] -gray-100 dark:-white/10">
                                   <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                                       <CreditCard className="w-5 h-5 text-green-500" />
                                       <h4 className="text-base font-semibold text-gray-900 dark:text-white">产品价格参考</h4>
@@ -2148,7 +2184,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                           <div className="space-y-4">
 
                               {/* 产品交付信息 */}
-                              <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
+                              <div className="unified-card dark:bg-[#1C1C1E] -gray-100 dark:-white/10">
                                   <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                                       <Truck className="w-5 h-5 text-indigo-500" />
                                       <h4 className="text-base font-semibold text-gray-900 dark:text-white">产品交付信息</h4>
@@ -2184,7 +2220,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                               </div>
 
                               {/* 安装包 */}
-                              <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden">
+                              <div className="unified-card dark:bg-[#1C1C1E] -gray-100 dark:-white/10">
                                   <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                                       <Disc className="w-5 h-5 text-blue-500" />
                                       <h4 className="text-base font-semibold text-gray-900 dark:text-white">安装包</h4>
@@ -2238,8 +2274,8 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
       )}
       {/* Contract Preview Modal */}
       {isContractPreviewOpen && selectedOrder && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in p-4">
-              <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col border border-gray-200/50 dark:border-white/10 overflow-hidden">
+          <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in p-4">
+              <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col -gray-200/50 dark:-white/10">
                   {/* Modal Header */}
                   <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/10 shrink-0">
                       <div className="flex items-center gap-3">
@@ -2263,7 +2299,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                   {/* Contract Document */}
                   <div className="flex-1 overflow-y-auto custom-scrollbar bg-gray-100 dark:bg-black/30 p-6">
                       <div
-                          className="bg-white dark:bg-[#2C2C2E] mx-auto shadow-xl rounded-sm border border-gray-200 dark:border-white/10 transition-all duration-200"
+                          className="bg-white dark:bg-[#2C2C2E] mx-auto shadow-xl rounded-lg border border-gray-200 dark:border-white/10 transition-all duration-200"
                           style={{ width: `${contractZoom}%`, minWidth: '480px', padding: '60px 72px' }}
                       >
                           {/* Contract Title */}

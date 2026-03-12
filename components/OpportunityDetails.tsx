@@ -448,32 +448,62 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                    <div className="flex items-center gap-2 flex-wrap">
                        <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white tracking-tight">订单 {selectedOrder.id}</h1>
                        <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">提单时间：<span className="font-mono">{new Date(selectedOrder.date).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</span></span>
-                       <span className={`shrink-0 !rounded-full ${
-                           selectedOrder.status === OrderStatus.DELIVERED ? 'unified-tag-green' :
-                           selectedOrder.status === OrderStatus.SHIPPED ? 'unified-tag-indigo' :
-                           selectedOrder.status === OrderStatus.PROCESSING_PROD ? 'unified-tag-blue' :
-                           selectedOrder.status === OrderStatus.PENDING_APPROVAL ? 'unified-tag-blue' :
-                           selectedOrder.status === OrderStatus.PENDING_CONFIRM ? 'unified-tag-blue' :
-                           selectedOrder.status === OrderStatus.REFUND_PENDING ? 'unified-tag-blue' :
-                           selectedOrder.status === OrderStatus.CANCELLED ? 'unified-tag-gray' :
-                           selectedOrder.status === OrderStatus.REFUNDED ? 'unified-tag-red' :
-                           selectedOrder.status === OrderStatus.PENDING_PAYMENT ? 'unified-tag-blue' :
-                           'unified-tag-gray'
-                       }`}>{statusMap[selectedOrder.status] || selectedOrder.status}</span>
-                       {selectedOrder.isPaid
-                           ? <span className="unified-tag-green !rounded-full shrink-0">已支付</span>
-                           : <span className="unified-tag-blue !rounded-full shrink-0">待支付</span>
-                       }
-                       {selectedOrder.status === OrderStatus.DELIVERED
-                           ? <span className="unified-tag-green !rounded-full shrink-0">已完成</span>
-                           : selectedOrder.status === OrderStatus.SHIPPED
-                               ? <span className="unified-tag-indigo !rounded-full shrink-0">已发货</span>
-                               : selectedOrder.isShippingConfirmed
-                                   ? <span className="unified-tag-blue !rounded-full shrink-0">待发货</span>
-                                   : (selectedOrder.isAuthConfirmed || selectedOrder.isPackageConfirmed || selectedOrder.status === OrderStatus.PROCESSING_PROD)
-                                       ? <span className="unified-tag-orange !rounded-full shrink-0">备货中</span>
-                                       : <span className="unified-tag-blue !rounded-full shrink-0">待处理</span>
-                       }
+                       {/* 订单状态 */}
+                       <div className="relative group/status inline-flex shrink-0">
+                           <span className={`!rounded-full ${
+                               selectedOrder.status === OrderStatus.DELIVERED ? 'unified-tag-green' :
+                               selectedOrder.status === OrderStatus.SHIPPED ? 'unified-tag-indigo' :
+                               selectedOrder.status === OrderStatus.PROCESSING_PROD ? 'unified-tag-blue' :
+                               selectedOrder.status === OrderStatus.PENDING_APPROVAL ? 'unified-tag-blue' :
+                               selectedOrder.status === OrderStatus.PENDING_CONFIRM ? 'unified-tag-blue' :
+                               selectedOrder.status === OrderStatus.REFUND_PENDING ? 'unified-tag-blue' :
+                               selectedOrder.status === OrderStatus.CANCELLED ? 'unified-tag-gray' :
+                               selectedOrder.status === OrderStatus.REFUNDED ? 'unified-tag-red' :
+                               selectedOrder.status === OrderStatus.PENDING_PAYMENT ? 'unified-tag-blue' :
+                               'unified-tag-gray'
+                           }`}>{statusMap[selectedOrder.status] || selectedOrder.status}</span>
+                           <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1.5 bg-white text-gray-900 rounded-xl text-xs whitespace-nowrap opacity-0 group-hover/status:opacity-100 transition-opacity duration-150 pointer-events-none z-50 shadow-xl border border-gray-100">
+                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-white"></div>
+                               <div className="text-gray-400 text-[10px] font-medium leading-none mb-1">订单状态</div>
+                               <div className="font-semibold leading-none">{statusMap[selectedOrder.status] || selectedOrder.status}</div>
+                           </div>
+                       </div>
+                       {/* 付款状态 */}
+                       <div className="relative group/payment inline-flex shrink-0">
+                           {selectedOrder.isPaid
+                               ? <span className="unified-tag-green !rounded-full">已支付</span>
+                               : <span className="unified-tag-blue !rounded-full">待支付</span>
+                           }
+                           <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1.5 bg-white text-gray-900 rounded-xl text-xs whitespace-nowrap opacity-0 group-hover/payment:opacity-100 transition-opacity duration-150 pointer-events-none z-50 shadow-xl border border-gray-100">
+                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-white"></div>
+                               <div className="text-gray-400 text-[10px] font-medium leading-none mb-1">付款状态</div>
+                               <div className="font-semibold leading-none">{selectedOrder.isPaid ? '已支付' : '待支付'}</div>
+                           </div>
+                       </div>
+                       {/* 发货状态 */}
+                       <div className="relative group/shipping inline-flex shrink-0">
+                           {selectedOrder.status === OrderStatus.DELIVERED
+                               ? <span className="unified-tag-green !rounded-full">已完成</span>
+                               : selectedOrder.status === OrderStatus.SHIPPED
+                                   ? <span className="unified-tag-indigo !rounded-full">已发货</span>
+                                   : selectedOrder.isShippingConfirmed
+                                       ? <span className="unified-tag-blue !rounded-full">待发货</span>
+                                       : (selectedOrder.isAuthConfirmed || selectedOrder.isPackageConfirmed || selectedOrder.status === OrderStatus.PROCESSING_PROD)
+                                           ? <span className="unified-tag-orange !rounded-full">备货中</span>
+                                           : <span className="unified-tag-blue !rounded-full">待处理</span>
+                           }
+                           <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1.5 bg-white text-gray-900 rounded-xl text-xs whitespace-nowrap opacity-0 group-hover/shipping:opacity-100 transition-opacity duration-150 pointer-events-none z-50 shadow-xl border border-gray-100">
+                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-white"></div>
+                               <div className="text-gray-400 text-[10px] font-medium leading-none mb-1">发货状态</div>
+                               <div className="font-semibold leading-none">{
+                                   selectedOrder.status === OrderStatus.DELIVERED ? '已完成' :
+                                   selectedOrder.status === OrderStatus.SHIPPED ? '已发货' :
+                                   selectedOrder.isShippingConfirmed ? '待发货' :
+                                   (selectedOrder.isAuthConfirmed || selectedOrder.isPackageConfirmed || selectedOrder.status === OrderStatus.PROCESSING_PROD) ? '备货中' :
+                                   '待处理'
+                               }</div>
+                           </div>
+                       </div>
                    </div>
                </div>
 
@@ -576,7 +606,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                     >
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-apple ${
                             step.status === 'Completed' ? 'bg-green-500 text-white ring-4 ring-green-100 dark:ring-green-900/20' : 
-                            step.status === 'Current' ? 'bg-[#0071E3] dark:bg-[#0A84FF] text-white ring-8 ring-blue-100 dark:ring-blue-900/30 shadow-xl scale-110' : 
+                            step.status === 'Current' ? 'bg-[#0071E3] dark:bg-[#0A84FF] text-white ring-4 ring-blue-100 dark:ring-blue-900/30 shadow-xl scale-110' : 
                             'bg-white dark:bg-[#2C2C2E] border-2 border-gray-200 dark:border-gray-600 text-gray-400'
                         }`}>
                             {step.status === 'Locked' ? <Lock className="w-5 h-5" /> : <step.icon className="w-6 h-6" />}
@@ -588,7 +618,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                     {new Date(step.completedAt).toLocaleDateString()} {new Date(step.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </div>
                             )}
-                            {step.status === 'Current' && <div className="unified-button-primary text-[10px] bg-[#0071E3] dark:bg-[#0A84FF] shadow-apple mt-0.5 animate-bounce">点击处理</div>}
+                            {step.status === 'Current' && <div className="text-[9px] font-bold text-white bg-[#0071E3] dark:bg-[#0A84FF] px-2 py-0.5 rounded-full mt-1 animate-pulse">点击处理</div>}
                             {step.status === 'Completed' && <div className="text-[9px] text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full font-bold mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">查看信息</div>}
                         </div>
                     </div>
@@ -613,7 +643,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                   <th className="px-5 py-4 text-center">数量</th>
                                   <th className="px-5 py-4 text-right">单价</th>
                                   <th className="px-5 py-4 text-right">产品金额</th>
-                                  <th className="px-5 py-4 text-right">产品需付金额</th>
                                   <th className="px-5 py-4">电子授权</th>
                               </tr>
                           </thead>
@@ -621,9 +650,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                               {selectedOrder.items.map((item, idx) => {
                                   const lineNo = String(idx + 1).padStart(3, '0');
                                   const itemAmount = item.priceAtPurchase * item.quantity;
-                                  const discountAmt = item.priceAtPurchase > 1000 ? Math.floor(itemAmount * 0.05 / 10) * 10 : 0;
-                                  const rebateAmt = item.priceAtPurchase > 5000 ? Math.floor(itemAmount * 0.02 / 10) * 10 : 0;
-                                  const amountDue = itemAmount - discountAmt - rebateAmt;
                                   return (
                                   <tr
                                     key={idx}
@@ -639,20 +665,19 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                       </td>
                                       <td className="px-5 py-5">
                                           <button
-                                            onClick={() => navigate(`/products/${item.productId}`)}
+                                            onClick={() => navigate(`/catalog/${item.productId}/preview`)}
                                             className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline text-left text-sm"
                                           >
                                               {item.productName}
                                           </button>
                                           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                                              {item.skuName && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-full">{item.skuName}</span>}
-                                              {item.licenseType && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-full">{item.licenseType}</span>}
+                                              {item.skuName && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">{item.skuName}</span>}
+                                              {item.licenseType && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg">{item.licenseType}</span>}
                                           </div>
                                       </td>
                                       <td className="px-5 py-5 text-center dark:text-white font-medium">x {item.quantity}</td>
                                       <td className="px-5 py-5 text-right font-mono text-sm text-gray-700 dark:text-gray-300">¥{item.priceAtPurchase.toLocaleString()}</td>
                                       <td className="px-5 py-5 text-right font-bold font-mono text-gray-900 dark:text-white">¥{itemAmount.toLocaleString()}</td>
-                                      <td className="px-5 py-5 text-right font-bold font-mono text-red-600 dark:text-red-400">¥{amountDue.toLocaleString()}</td>
                                       <td className="px-5 py-5">
                                           {selectedOrder.isPaid && selectedOrder.confirmedDate && (
                                               <button
@@ -801,7 +826,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                           const fields = [
                               { label: '买方名称', value: selectedOrder.buyerName },
                               { label: '卖方名称', value: selectedOrder.sellerName },
-                              { label: '直接下单渠道', value: selectedOrder.directChannel },
+                              { label: '直接下级渠道', value: selectedOrder.directChannel },
                               { label: '终端渠道', value: selectedOrder.terminalChannel },
                               { label: '渠道是否提供服务', value: selectedOrder.channelService },
                           ];
@@ -1384,7 +1409,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
 
       {/* --- Log Drawer --- */}
       {isLogDrawerOpen && (
-                <Portal>
+
           <ModalPortal>
           <div className="fixed inset-0 z-[500] flex justify-end">
               <div className={`absolute inset-0 bg-black/30 backdrop-blur-sm ${isLogDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={handleCloseLogDrawer}></div>
@@ -1420,12 +1445,12 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
               </div>
           </div>
           </ModalPortal>
-                </Portal>
+
       )}
 
       {/* --- Action Drawer --- */}
       {activeStepModal && (
-                <Portal>
+
           <ModalPortal>
           <div className="fixed inset-0 z-[500] flex justify-end">
               <div className={`absolute inset-0 bg-black/30 backdrop-blur-sm ${isDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={handleCloseDrawer}></div>
@@ -1738,12 +1763,12 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
               </div>
           </div>
           </ModalPortal>
-                </Portal>
+
       )}
 
       {/* License Cert Drawer */}
       {selectedCertificateItem && (
-                <Portal>
+
           <ModalPortal>
           <div className="fixed inset-0 z-[500] flex justify-end">
               <div className={`absolute inset-0 bg-black/30 backdrop-blur-sm ${isCertDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={handleCloseCertDrawer}></div>
@@ -1987,12 +2012,12 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
               </div>
           </div>
           </ModalPortal>
-                </Portal>
+
       )}
 
       {/* Fulfillment Modal */}
       {fulfillmentItemIndex !== null && (
-                <Portal>
+
           <ModalPortal>
           <div className="fixed inset-0 z-[500] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-md animate-modal-enter -white/10">
@@ -2005,7 +2030,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
               </div>
           </div>
           </ModalPortal>
-                </Portal>
+
       )}
 
       {/* Order Item Details Drawer */}
@@ -2065,10 +2090,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                   <div className="p-5">
                                       {(() => {
                                           const itemAmount = selectedItemForDetails.priceAtPurchase * selectedItemForDetails.quantity;
-                                          const discountAmount = selectedItemForDetails.priceAtPurchase > 1000
-                                              ? Math.floor(itemAmount * 0.05 / 10) * 10
-                                              : 0;
-                                          const amountDue = itemAmount - discountAmount;
                                           const fmt = (n: number) => `¥${n.toLocaleString()}`;
                                           const fields = [
                                               { label: '产品名称', value: selectedItemForDetails.productName || '-', isAmount: false },
@@ -2080,8 +2101,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                                               { label: '计价数量', value: String(selectedItemForDetails.quantity), isAmount: false },
                                               { label: '计价单价', value: selectedItemForDetails.pricingUnitPrice != null ? fmt(selectedItemForDetails.pricingUnitPrice) : '-', isAmount: true },
                                               { label: '产品金额', value: fmt(itemAmount), isAmount: true },
-                                              { label: '产品优惠金额', value: fmt(discountAmount), isAmount: true },
-                                              { label: '产品需付金额', value: fmt(amountDue), isAmount: true },
                                           ];
                                           return (
                                               <div className="grid grid-cols-2 gap-x-6">

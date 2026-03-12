@@ -72,11 +72,23 @@ const ProductPreview: React.FC<ProductPreviewProps> = ({ products }) => {
     return () => container.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const getOffsetTop = (el: HTMLElement, stopAt: HTMLElement): number => {
+    let top = 0;
+    let node: HTMLElement | null = el;
+    while (node && node !== stopAt) {
+      top += node.offsetTop;
+      node = node.offsetParent as HTMLElement;
+    }
+    return node === stopAt ? top : 0;
+  };
+
   const scrollToSection = (sectionId: string) => {
     const container = contentRef.current;
-    const el = container?.querySelector(`#${sectionId}`) as HTMLElement | null;
+    const el = container?.querySelector(`#${CSS.escape(sectionId)}`) as HTMLElement | null;
     if (!container || !el) return;
-    container.scrollTo({ top: el.offsetTop - 16, behavior: 'smooth' });
+    const headerOffset = 80;
+    const targetTop = getOffsetTop(el, container) - headerOffset;
+    container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
     setActiveSection(sectionId);
   };
 
@@ -95,10 +107,10 @@ const ProductPreview: React.FC<ProductPreviewProps> = ({ products }) => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#F5F5F7] dark:bg-black">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden bg-[#F5F5F7] dark:bg-black">
 
       {/* ── Header + Tabs（整体 sticky 顶栏，与订单详情一致） ── */}
-      <div className="sticky top-0 z-20 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-white/10 px-4 md:px-6 pt-4 flex flex-col shrink-0">
+      <div className="shrink-0 z-20 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-white/10 px-4 md:px-6 pt-4 flex flex-col">
 
         {/* 标题行 */}
         <div className="flex flex-row justify-between items-center gap-4 pb-3">
@@ -161,7 +173,7 @@ const ProductPreview: React.FC<ProductPreviewProps> = ({ products }) => {
             <div className="px-8 py-6 space-y-8">
 
               {/* 组件信息 */}
-              <section id="components-section">
+              <section id="components-section" className="scroll-mt-20">
                 <h2 className="text-base font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <Monitor className="w-4 h-4 text-[#2B5AED]" /> 组件信息
                 </h2>
@@ -191,7 +203,7 @@ const ProductPreview: React.FC<ProductPreviewProps> = ({ products }) => {
               </section>
 
               {/* 授权类型 */}
-              <section id="license-section">
+              <section id="license-section" className="scroll-mt-20">
                 <h2 className="text-base font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <Key className="w-4 h-4 text-[#2B5AED]" /> 授权类型
                 </h2>
@@ -258,7 +270,7 @@ const ProductPreview: React.FC<ProductPreviewProps> = ({ products }) => {
               </section>
 
               {/* 资料 */}
-              <section id="docs-section">
+              <section id="docs-section" className="scroll-mt-20">
                 <h2 className="text-base font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <FileText className="w-4 h-4 text-[#2B5AED]" /> 资料
                 </h2>
@@ -286,7 +298,7 @@ const ProductPreview: React.FC<ProductPreviewProps> = ({ products }) => {
               </section>
 
               {/* 售卖范围 */}
-              <section id="scope-section">
+              <section id="scope-section" className="scroll-mt-20">
                 <h2 className="text-base font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <Globe className="w-4 h-4 text-[#2B5AED]" /> 售卖范围
                 </h2>
@@ -317,7 +329,7 @@ const ProductPreview: React.FC<ProductPreviewProps> = ({ products }) => {
               </section>
 
               {/* 权益管控 */}
-              <section id="rights-section">
+              <section id="rights-section" className="scroll-mt-20">
                 <h2 className="text-base font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <Zap className="w-4 h-4 text-[#2B5AED]" /> 权益管控
                 </h2>
@@ -342,7 +354,7 @@ const ProductPreview: React.FC<ProductPreviewProps> = ({ products }) => {
               </section>
 
               {/* 交付信息 */}
-              <section id="delivery-section" className="pb-8">
+              <section id="delivery-section" className="scroll-mt-20 pb-8">
                 <h2 className="text-base font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <MemoryStick className="w-4 h-4 text-[#2B5AED]" /> 交付信息
                 </h2>

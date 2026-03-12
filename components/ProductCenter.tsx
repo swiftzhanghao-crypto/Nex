@@ -114,7 +114,7 @@ const ProductCenter: React.FC<ProductCenterProps> = ({ products }) => {
         <div className="flex items-center gap-3">
 
           {/* Search */}
-          <div className="flex items-stretch h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] shadow-sm w-[280px] transition-all focus-within:border-blue-400 dark:focus-within:border-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]">
+          <div className="unified-card flex items-stretch h-9 -gray-200 dark:-white/10 dark:bg-[#1C1C1E] w-[280px] focus-within:-blue-400 dark:focus-within:-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]">
             <div className="relative flex-1 flex items-center min-w-0">
               <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 pointer-events-none shrink-0" />
               <input
@@ -136,15 +136,21 @@ const ProductCenter: React.FC<ProductCenterProps> = ({ products }) => {
           </div>
 
           {/* Tab Buttons */}
-          <div className="flex items-center gap-1 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-lg p-0.5 shadow-sm">
+          <div className="relative flex items-center bg-gray-100 dark:bg-white/5 rounded-full p-0.5 border border-gray-200/60 dark:border-white/10">
+            {/* 滑动指示器 */}
+            <div
+              className={`absolute top-0.5 bottom-0.5 left-0.5 w-[calc(50%-2px)] rounded-full bg-[#0071E3] dark:bg-[#0A84FF] shadow-sm transition-transform duration-300 ease-in-out ${
+                activeTab === 'ALL' ? 'translate-x-full' : 'translate-x-0'
+              }`}
+            />
             {(['ON_SHELF', 'ALL'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-3.5 py-1.5 text-sm font-medium rounded-md transition-all ${
+                className={`relative z-10 flex-1 px-4 py-1.5 text-sm font-semibold rounded-full transition-colors duration-300 whitespace-nowrap ${
                   activeTab === tab
-                    ? 'bg-[#0071E3] text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'
+                    ? 'text-white'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                 }`}
               >
                 {tab === 'ON_SHELF' ? '在架产品' : '下架产品'}
@@ -155,10 +161,10 @@ const ProductCenter: React.FC<ProductCenterProps> = ({ products }) => {
       </div>
 
       {/* ── Body ───────────────────────────────────────────────── */}
-      <div className="flex-1 flex overflow-hidden mx-6 mb-6 rounded-2xl border border-gray-200/80 dark:border-white/10 shadow-sm bg-white dark:bg-[#1C1C1E] overflow-hidden">
+      <div className="unified-card flex-1 flex mx-6 mb-6 -gray-200/80 dark:-white/10 dark:bg-[#1C1C1E]">
 
         {/* ── Left: Collapsible Tree Sidebar ─────────────────── */}
-        <div className="w-[312px] shrink-0 border-r border-gray-200/80 dark:border-white/10 overflow-y-auto bg-white dark:bg-[#1C1C1E]">
+        <div className="unified-card w-[312px] shrink-0 -r -gray-200/80 dark:-white/10 overflow-y-auto dark:bg-[#1C1C1E]">
           <div className="px-4 pt-4 pb-1">
             <div className="text-sm font-bold text-gray-300 dark:text-gray-600 px-1 mb-3">产品分类</div>
           </div>
@@ -227,7 +233,7 @@ const ProductCenter: React.FC<ProductCenterProps> = ({ products }) => {
                 {displayProducts.map(product => (
                   <div
                     key={product.id}
-                    className="group bg-white dark:bg-[#1C1C1E] border border-gray-200/80 dark:border-white/10 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800/50 transition-all relative flex flex-col gap-3"
+                    className="unified-card group dark:bg-[#1C1C1E] -gray-200/80 dark:-white/10 p-5 hover: hover:-blue-200 dark:hover:-blue-800/50 relative flex flex-col gap-3"
                   >
                     {/* Card Top: icon + name + status */}
                     <div className="flex items-start gap-3">
@@ -265,7 +271,7 @@ const ProductCenter: React.FC<ProductCenterProps> = ({ products }) => {
                         <span className="text-xs text-gray-400 dark:text-gray-500 font-medium w-14 shrink-0">规格</span>
                         <div className="flex flex-wrap gap-1 min-w-0">
                           {product.skus.slice(0, 3).map(sku => (
-                            <span key={sku.id} className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-[#0A84FF] border border-blue-100 dark:border-blue-800/50">
+                            <span key={sku.id} className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-[#0A84FF] border border-blue-100 dark:border-blue-800/50">
                               {sku.name}
                             </span>
                           ))}
@@ -282,7 +288,7 @@ const ProductCenter: React.FC<ProductCenterProps> = ({ products }) => {
                             {product.composition.slice(0, 6).map(c => (
                               <span
                                 key={c.id}
-                                className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${
+                                className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium border ${
                                   c.type === 'Feature'
                                     ? 'bg-purple-50 text-purple-600 border-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800/50'
                                     : c.type === 'Service'
@@ -309,7 +315,7 @@ const ProductCenter: React.FC<ProductCenterProps> = ({ products }) => {
                                       setCompPopoverId(product.id);
                                     }
                                   }}
-                                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-white/10 hover:bg-gray-200 dark:hover:bg-white/20 transition"
+                                  className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-white/10 hover:bg-gray-200 dark:hover:bg-white/20 transition"
                                 >
                                   +{product.composition.length - 6} 更多
                                 </button>
@@ -326,7 +332,7 @@ const ProductCenter: React.FC<ProductCenterProps> = ({ products }) => {
                     <div className="flex items-center justify-between mt-auto pt-1">
                       <div className="flex flex-wrap gap-1">
                         {product.tags?.map(tag => (
-                          <span key={tag} className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-xs font-bold border ${getTagColor(tag)}`}>
+                          <span key={tag} className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-xs font-bold border ${getTagColor(tag)}`}>
                             <Tag className="w-2.5 h-2.5" />
                             {tag}
                           </span>
@@ -334,7 +340,7 @@ const ProductCenter: React.FC<ProductCenterProps> = ({ products }) => {
                       </div>
                       <button
                         onClick={() => navigate(`/catalog/${product.id}/preview`)}
-                        className="shrink-0 ml-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0071E3] hover:bg-blue-600 active:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-all shadow-sm"
+                        className="unified-button-primary shrink-0 ml-3 inline- .5 bg-[#0071E3] hover: active:bg-blue-700 shadow-apple"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         预览详情
@@ -385,7 +391,7 @@ const ProductCenter: React.FC<ProductCenterProps> = ({ products }) => {
             {p.composition.map(c => (
               <span
                 key={c.id}
-                className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${
+                className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium border ${
                   c.type === 'Feature'
                     ? 'bg-purple-50 text-purple-600 border-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800/50'
                     : c.type === 'Service'

@@ -291,6 +291,8 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   const [productPopoverId, setProductPopoverId] = useState<string | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
   const productPopoverRef = useRef<HTMLDivElement>(null);
+  const headerScrollRef = useRef<HTMLDivElement>(null);
+  const bodyScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!productPopoverId) return;
@@ -936,8 +938,26 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
   ];
   const currentSearchOption = searchFieldOptions.find(o => o.value === searchField)!;
 
+  const colWidthMap: Record<string, number> = {
+      id: 190, customer: 150, buyer: 140, products: 240,
+      sales: 130, businessManager: 130, department: 200,
+      source: 110, buyerType: 110, date: 165, status: 100,
+      paymentStatus: 105, stockStatus: 100, total: 120,
+      payment: 110, delivery: 110, address: 180, invoice: 160,
+      opportunity: 160, action: 90,
+  };
+  const tableColGroup = (
+      <colgroup>
+          <col style={{ width: 52 }} />
+          {allColumns.filter(c => visibleColumns.includes(c.id)).map(col => (
+              <col key={col.id} style={{ width: colWidthMap[col.id] || 120 }} />
+          ))}
+          <col style={{ width: 52 }} />
+      </colgroup>
+  );
+
   return (
-    <div className="p-4 lg:p-6 max-w-[2400px] mx-auto space-y-4 animate-page-enter pb-24">
+    <div className="p-4 lg:p-6 max-w-[2400px] mx-auto space-y-4 animate-page-enter pb-2">
       <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
         {/* Left: title */}
         <div className="flex items-center gap-4 w-full lg:w-auto">
@@ -1172,33 +1192,46 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
         </div>
 
         <div className="unified-card overflow-hidden">
-            <div className="overflow-x-auto max-h-[calc(100vh-320px)] overflow-y-auto custom-scrollbar">
-          <table className="w-full text-left border-separate border-spacing-0">
-            <thead className="sticky top-0 z-30 unified-table-header backdrop-blur-md shadow-apple">
-              <tr>
-                <th className="pl-6 pr-2 py-3 sticky left-0 z-30 bg-gray-50/95 dark:bg-[#1C1C1E] border-b border-gray-200/50 dark:border-white/10 w-[52px] min-w-[52px] align-middle">
-                    <input 
-                        type="checkbox" 
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 align-middle"
-                        onChange={toggleSelectAll}
-                        checked={currentOrders.length > 0 && currentOrders.every(o => selectedOrderIds.has(o.id))}
-                    />
-                </th>
-                {allColumns.map(col => visibleColumns.includes(col.id) && (
-                    <th key={col.id} className={`px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 ${
-                        col.id === 'id'
-                            ? 'sticky left-[52px] z-30 bg-gray-50/95 dark:bg-[#1C1C1E] shadow-[2px_0_6px_-2px_rgba(0,0,0,0.08)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.3)]'
-                            : col.id === 'action'
-                            ? 'sticky right-[52px] z-30 bg-gray-50/95 dark:bg-[#1C1C1E] shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.08)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.3)] text-center'
-                            : ''
-                    }`} style={
-                        col.id === 'sales' || col.id === 'businessManager' ? { minWidth: '120px' } :
-                        col.id === 'department' ? { minWidth: '240px' } : undefined
-                    }>{col.label}</th>
-                ))}
-                <th className="px-4 py-3 sticky right-0 z-30 bg-gray-50/95 dark:bg-[#1C1C1E] border-b border-gray-200/50 dark:border-white/10 w-[52px] min-w-[52px]"></th>
-              </tr>
-            </thead>
+            {/* ── 固定表头（不在滚动容器内，滚动条不延伸至此） ── */}
+            <div
+                ref={headerScrollRef}
+                className="overflow-x-auto no-scrollbar"
+                onScroll={(e) => { if (bodyScrollRef.current) bodyScrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
+            >
+              <table className="w-full text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed' }}>
+                {tableColGroup}
+                <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E]">
+                  <tr>
+                    <th className="pl-6 pr-2 py-3 sticky left-0 z-10 bg-gray-50 dark:bg-[#1C1C1E] border-b border-gray-200/50 dark:border-white/10 w-[52px] min-w-[52px] align-middle">
+                        <input 
+                            type="checkbox" 
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 align-middle"
+                            onChange={toggleSelectAll}
+                            checked={currentOrders.length > 0 && currentOrders.every(o => selectedOrderIds.has(o.id))}
+                        />
+                    </th>
+                    {allColumns.map(col => visibleColumns.includes(col.id) && (
+                        <th key={col.id} className={`px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E] ${
+                            col.id === 'id'
+                                ? 'sticky left-[52px] z-10 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.08)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.3)]'
+                                : col.id === 'action'
+                                ? 'sticky right-[52px] z-10 shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.08)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.3)] text-center'
+                                : ''
+                        }`}>{col.label}</th>
+                    ))}
+                    <th className="px-4 py-3 sticky right-0 z-10 bg-gray-50 dark:bg-[#1C1C1E] border-b border-gray-200/50 dark:border-white/10 w-[52px] min-w-[52px]"></th>
+                  </tr>
+                </thead>
+              </table>
+            </div>
+            {/* ── 可滚动表体（滚动条只在此区域） ── */}
+            <div
+                ref={bodyScrollRef}
+                className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-370px)] custom-scrollbar"
+                onScroll={(e) => { if (headerScrollRef.current) headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
+            >
+          <table className="w-full text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed' }}>
+            {tableColGroup}
             <tbody className="divide-y divide-gray-100 dark:divide-white/5 text-sm">
               {currentOrders.map(order => {
                 const isSelected = selectedOrderIds.has(order.id);
