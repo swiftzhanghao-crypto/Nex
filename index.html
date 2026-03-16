@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WPS365业务平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Text', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+            },
+            colors: {
+              primary: '#0071E3',
+              'primary-dark': '#0A84FF',
+              secondary: '#86868B',
+              dark: '#1D1D1F',
+              canvas: '#F5F5F7',
+              'canvas-dark': '#000000',
+              surface: '#FFFFFF',
+              'surface-dark': '#1C1C1E',
+            },
+            boxShadow: {
+              'apple': '0 4px 24px -1px rgba(0, 0, 0, 0.04), 0 2px 8px -1px rgba(0, 0, 0, 0.02)',
+              'apple-hover': '0 12px 32px -4px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04)',
+              'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+              'glow': '0 0 20px rgba(0, 113, 227, 0.3)',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* Clean Scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 0, 0, 0.2);
+      }
+      .dark ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+      }
+      .dark ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.25);
+      }
+
+      /* Utility: No Scrollbar */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+
+      /* Animations */
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: none; }
+      }
+      @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; transform: translateY(10px); }
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+      @keyframes fadeInOpacity {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      .animate-page-enter {
+        animation: fadeInOpacity 0.2s ease-out forwards;
+      }
+      
+      @keyframes modalPop {
+        0% { opacity: 0; transform: scale(0.95) translateY(10px); }
+        100% { opacity: 1; transform: none; }
+      }
+      .animate-modal-enter {
+        animation: modalPop 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+
+      @keyframes slideInRight {
+        from { transform: translateX(105%); }
+        to   { transform: translateX(0); }
+      }
+      @keyframes slideOutRight {
+        from { transform: translateX(0); }
+        to   { transform: translateX(105%); }
+      }
+      .animate-drawer-enter { animation: slideInRight 0.38s cubic-bezier(0.22, 1, 0.36, 1) both; }
+      .animate-drawer-exit  { animation: slideOutRight 0.26s cubic-bezier(0.4, 0, 1, 1) both; }
+
+      @keyframes backdropIn {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+      @keyframes backdropOut {
+        from { opacity: 1; }
+        to   { opacity: 0; }
+      }
+      .animate-backdrop-enter { animation: backdropIn  0.28s ease-out both; }
+      .animate-backdrop-exit  { animation: backdropOut 0.22s ease-in  both; }
+
+      /* Certificate Watermark Pattern */
+      .mask-stamp {
+        mask-image: radial-gradient(circle, rgba(0,0,0,1) 40%, rgba(0,0,0,0.5) 100%);
+        -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,1) 40%, rgba(0,0,0,0.5) 100%);
+      }
+    </style>
+    <style type="text/tailwindcss">
+      @layer components {
+        .unified-card {
+          @apply bg-white dark:bg-[#1C1C1E] rounded-[24px] shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden transition-all duration-300;
+        }
+        .unified-table-header {
+          @apply bg-gray-50/80 dark:bg-white/5 text-gray-500 dark:text-gray-400 text-sm uppercase font-bold tracking-wider border-b border-gray-100 dark:border-white/10;
+        }
+        .unified-button {
+          @apply px-4 py-2 rounded-lg font-bold text-sm transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2;
+        }
+        .unified-button-primary {
+          @apply unified-button bg-[#0071E3] dark:bg-[#FF2D55] text-white hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 shadow-lg shadow-blue-500/20 dark:shadow-red-500/20;
+        }
+        .unified-button-secondary {
+          @apply unified-button bg-white dark:bg-[#1C1C1E] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 shadow-sm;
+        }
+        .unified-button-ghost {
+          @apply unified-button bg-transparent text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10;
+        }
+        .unified-tag {
+          @apply px-2.5 py-1 rounded-[8px] text-xs font-bold uppercase tracking-wider transition-all duration-200 inline-flex items-center gap-1.5;
+        }
+        .unified-tag-blue {
+          @apply unified-tag bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-100 dark:border-blue-800/30;
+        }
+        .unified-tag-green {
+          @apply unified-tag bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400 border border-green-100 dark:border-green-800/30;
+        }
+        .unified-tag-orange {
+          @apply unified-tag bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400 border border-orange-100 dark:border-orange-800/30;
+        }
+        .unified-tag-gray {
+          @apply unified-tag bg-gray-50 text-gray-600 dark:bg-white/10 dark:text-gray-400 border border-gray-100 dark:border-white/10;
+        }
+        .unified-tag-indigo {
+          @apply unified-tag bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/30;
+        }
+        .unified-tag-red {
+          @apply unified-tag bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 border border-red-100 dark:border-red-800/30;
+        }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
+    "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4"
+  }
+}
+</script>
+</head>
+  <body class="antialiased bg-[#F5F5F7] dark:bg-black text-[#1D1D1F] dark:text-[#F5F5F7]">
+    <div id="root"></div>
+    <div id="modal-root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
