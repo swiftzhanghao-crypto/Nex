@@ -76,7 +76,11 @@ export interface OrderItem extends MerchandiseItem {
     licensePeriod?: string;
     licenseStartMethod?: string;
     licenseEndDate?: string;
+    licenseScope?: string;
     subUnitLicenseAllowed?: boolean;
+
+    // After-sale info
+    afterSaleWarrantyPeriod?: string;
 }
 
 export type CapabilityType = 'Component' | 'Feature' | 'Rights' | 'Service';
@@ -308,7 +312,7 @@ export interface Opportunity {
     customerId: string;
     customerName: string;
     productType?: string; // 产品类型/授权方式
-    stage: OpportunityStage | string;
+    stage: OpportunityStage;
     probability: number;
     amount?: number; // 商机金额
     expectedRevenue: number;
@@ -512,4 +516,104 @@ export interface ContactInfo {
     name: string;
     phone: string;
     email: string;
+}
+
+// --- Contract (migrated from ContractManager.tsx) ---
+export interface Contract {
+    id: string;
+    code: string;
+    name: string;
+    externalCode?: string;
+    contractType: string;
+    partyA?: string;
+    partyB?: string;
+    verifyStatus: 'PENDING_BUSINESS' | 'PENDING' | 'VERIFIED' | 'APPROVED' | 'REJECTED';
+    verifyRemark?: string;
+    amount?: number;
+    signDate?: string;
+    createdAt: string;
+    orderId?: string;
+}
+
+// --- Remittance (migrated from RemittanceManager.tsx) ---
+export interface Remittance {
+    id: string;
+    erpDocNo?: string;
+    bankTransactionNo?: string;
+    type: '渠道' | '客户';
+    remitterName: string;
+    remitterAccount?: string;
+    paymentMethod: string;
+    amount: number;
+    receiverName: string;
+    receiverAccount?: string;
+    paymentTime: string;
+}
+
+// --- Invoice (migrated from InvoiceManager.tsx) ---
+export interface Invoice {
+    id: string;
+    invoiceTitle: string;
+    amount: number;
+    applyTime: string;
+    applyType: '开票' | '红冲' | '换票';
+    status: 'PENDING' | 'PROCESSING' | 'ISSUED' | 'CANCELLED' | 'REJECTED';
+    orderId?: string;
+    taxId?: string;
+    remark?: string;
+}
+
+// --- Performance (migrated from PerformanceManager.tsx) ---
+export interface Performance {
+    id: string;
+    orderId: string;
+    acceptanceDetailId: string;
+    orderStatus: string;
+    detailAmountSubtotal: number;
+    acceptanceRatio: number;
+    deferralRatio: number;
+    postContractStatus: string;
+    discount: string;
+    costAmount: number;
+    salesPerformance: number;
+    weightedSalesPerformance: number;
+    projectWeightCoeff: number;
+    productWeightCoeffSubscription: number;
+    productWeightCoeffAuthorization: number;
+    serviceType: '授权' | '订阅';
+    owner: string;
+}
+
+// --- Authorization (migrated from AuthorizationManager.tsx) ---
+export interface Authorization {
+    id: string;
+    authCode: string;
+    orderId: string;
+    licensee: string;
+    customerName: string;
+    customerId: string;
+    productName: string;
+    productCode: string;
+    authStartDate: string;
+    authEndDate: string;
+    serviceStartDate?: string;
+    serviceEndDate?: string;
+}
+
+// --- DeliveryInfo (migrated from DeliveryInfoManager.tsx) ---
+export interface DeliveryInfo {
+    id: string;
+    deliveryType: string;
+    orderId: string;
+    quantity: number;
+    authType: string;
+    licensee: string;
+    customerName: string;
+    customerId: string;
+    authCode?: string;
+    authDuration?: string;
+    authStartDate?: string;
+    authEndDate?: string;
+    serviceStartDate?: string;
+    serviceEndDate?: string;
 }

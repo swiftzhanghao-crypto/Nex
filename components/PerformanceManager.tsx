@@ -1,26 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Search, Filter, ChevronDown, X, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
-
-export interface Performance {
-  id: string;
-  orderId: string;
-  acceptanceDetailId: string;
-  orderStatus: string;
-  detailAmountSubtotal: number;
-  acceptanceRatio: number;
-  deferralRatio: number;
-  postContractStatus: string;
-  discount: string;
-  costAmount: number;
-  salesPerformance: number;
-  weightedSalesPerformance: number;
-  projectWeightCoeff: number;
-  productWeightCoeffSubscription: number;
-  productWeightCoeffAuthorization: number;
-  serviceType: '授权' | '订阅';
-  owner: string;
-}
+import { Performance } from '../types';
 
 interface PerformanceManagerProps {
   performances: Performance[];

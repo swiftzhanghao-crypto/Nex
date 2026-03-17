@@ -1,22 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Search, FileText, Filter, ChevronDown, X, CheckCircle, Clock, AlertCircle, Circle, RotateCcw } from 'lucide-react';
-
-export interface Contract {
-  id: string;
-  code: string;
-  name: string;
-  externalCode?: string;
-  contractType: string;
-  partyA?: string;
-  partyB?: string;
-  verifyStatus: 'PENDING_BUSINESS' | 'PENDING' | 'VERIFIED' | 'APPROVED' | 'REJECTED';
-  verifyRemark?: string;
-  amount?: number;
-  signDate?: string;
-  createdAt: string;
-  orderId?: string;
-}
+import { Contract } from '../types';
 
 interface ContractManagerProps {
   contracts: Contract[];

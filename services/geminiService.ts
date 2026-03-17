@@ -1,8 +1,18 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Initialize the Google GenAI client exclusively with the API key from environment variables
-const ai = new GoogleGenAI({ apiKey:'AIzaSyBfZCoGWmMJqYs2QCRYw12xiJXYEqWW4Ck'});
+let _ai: GoogleGenAI | null = null;
+
+function getAI(): GoogleGenAI {
+  if (!_ai) {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('VITE_GEMINI_API_KEY is not configured. Please set it in a .env file.');
+    }
+    _ai = new GoogleGenAI({ apiKey });
+  }
+  return _ai;
+}
 
 /**
  * Generates a creative product description based on name and category.
@@ -10,7 +20,7 @@ const ai = new GoogleGenAI({ apiKey:'AIzaSyBfZCoGWmMJqYs2QCRYw12xiJXYEqWW4Ck'});
 export const generateProductDescription = async (name: string, category: string, keywords: string): Promise<string> => {
   try {
     /* Use gemini-3-flash-preview for basic text tasks as per guidelines */
-    const response = await ai.models.generateContent({
+    const response = await getAI().models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `请为名为 "${name}" 的产品（类别："${category}"）撰写一段引人入胜的简短营销描述（最多2句话）。必须包含关键词：${keywords}。请使用简体中文回答。`,
     });
@@ -32,7 +42,7 @@ export const generateBusinessInsight = async (
 ): Promise<string> => {
   try {
     /* Use gemini-3-flash-preview for basic text analysis */
-    const response = await ai.models.generateContent({
+    const response = await getAI().models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `扮演一位资深商业分析师。分析以下数据：总收入：¥${totalRevenue}，总订单数：${totalOrders}，最畅销产品类别：${topProduct}。请提供一份简短的、包含3个要点的执行摘要，并给出一个可行的建议。请使用纯文本格式，并用简体中文回答。`,
     });
@@ -50,7 +60,7 @@ export const generateBusinessInsight = async (
 export const suggestCategory = async (productName: string): Promise<string> => {
     try {
         /* Use gemini-3-flash-preview with a structured JSON response schema */
-        const response = await ai.models.generateContent({
+        const response = await getAI().models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: `为产品 "${productName}" 建议一个单一的类别名称。请使用简体中文回答。`,
             config: {

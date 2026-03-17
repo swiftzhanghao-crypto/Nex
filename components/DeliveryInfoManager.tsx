@@ -1,23 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Search, ChevronDown, X, Filter, ChevronLeft, ChevronRight, PackageCheck } from 'lucide-react';
-
-export interface DeliveryInfo {
-  id: string;
-  deliveryType: string;
-  orderId: string;
-  quantity: number;
-  authType: string;
-  licensee: string;
-  customerName: string;
-  customerId: string;
-  authCode?: string;
-  authDuration?: string;
-  authStartDate?: string;
-  authEndDate?: string;
-  serviceStartDate?: string;
-  serviceEndDate?: string;
-}
+import { DeliveryInfo } from '../types';
 
 interface DeliveryInfoManagerProps {
   deliveryInfos: DeliveryInfo[];

@@ -838,12 +838,14 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                 if (min === null && max === null) return true;
                 return (min === null || order.total >= min) && (max === null || order.total <= max);
             }
-            case 'delayTime':
-                if (filter.mode === '时间段' && filter.value.start && filter.value.end) {
+            case 'delayTime': {
+                const dv = filter.value as { start: string; end: string };
+                if (filter.mode === '时间段' && dv.start && dv.end) {
                     const orderDate = new Date(order.date);
-                    return orderDate >= new Date(filter.value.start) && orderDate <= new Date(filter.value.end);
+                    return orderDate >= new Date(dv.start) && orderDate <= new Date(dv.end);
                 }
                 return true;
+            }
             default:
                 return true;
         }
@@ -2381,7 +2383,7 @@ const OrderManager: React.FC<OrderManagerProps> = ({ orders, setOrders, products
                                     ].map(method => (
                                         <button 
                                             key={method.id}
-                                            onClick={() => setDeliveryMethod(method.id)}
+                                            onClick={() => setDeliveryMethod(method.id as DeliveryMethod)}
                                             className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all gap-2 ${
                                                 deliveryMethod === method.id 
                                                 ? method.color 

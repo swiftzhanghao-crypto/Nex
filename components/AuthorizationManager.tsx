@@ -1,21 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Search, X, ChevronDown, KeyRound, Filter } from 'lucide-react';
-
-export interface Authorization {
-  id: string;
-  authCode: string;
-  orderId: string;
-  licensee: string;
-  customerName: string;
-  customerId: string;
-  productName: string;
-  productCode: string;
-  authStartDate: string;
-  authEndDate: string;
-  serviceStartDate?: string;
-  serviceEndDate?: string;
-}
+import { Authorization } from '../types';
 
 interface AuthorizationManagerProps {
   authorizations: Authorization[];

@@ -1,18 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Search, X, ChevronDown, Receipt, Calendar, SlidersHorizontal } from 'lucide-react';
-
-export interface Invoice {
-  id: string;
-  invoiceTitle: string;
-  amount: number;
-  applyTime: string;
-  applyType: '开票' | '红冲' | '换票';
-  status: 'PENDING' | 'PROCESSING' | 'ISSUED' | 'CANCELLED' | 'REJECTED';
-  orderId?: string;
-  taxId?: string;
-  remark?: string;
-}
+import { Invoice } from '../types';
 
 interface InvoiceManagerProps {
   invoices: Invoice[];

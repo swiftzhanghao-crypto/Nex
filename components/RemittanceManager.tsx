@@ -1,20 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Search, X, ChevronDown, Banknote, Calendar, Filter, SlidersHorizontal } from 'lucide-react';
-
-export interface Remittance {
-  id: string;
-  erpDocNo?: string;
-  bankTransactionNo?: string;
-  type: '渠道' | '客户';
-  remitterName: string;
-  remitterAccount?: string;
-  paymentMethod: string;
-  amount: number;
-  receiverName: string;
-  receiverAccount?: string;
-  paymentTime: string;
-}
+import { Remittance } from '../types';
 
 interface RemittanceManagerProps {
   remittances: Remittance[];

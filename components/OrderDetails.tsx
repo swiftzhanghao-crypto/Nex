@@ -1517,8 +1517,8 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ orders, setOrders, products
                   <div className="space-y-2">
                     {[
                       { label: '客户名称', value: selectedOrder.customerName },
-                      { label: '联系人',   value: fullCustomer?.contactPerson || '-' },
-                      { label: '联系电话', value: fullCustomer?.phone || '-', mono: true },
+                      { label: '联系人',   value: fullCustomer?.contacts?.[0]?.name || '-' },
+                      { label: '联系电话', value: fullCustomer?.contacts?.[0]?.phone || '-', mono: true },
                       { label: '收货地址', value: selectedOrder.shippingAddress || '无地址信息' },
                     ].map(field => (
                       <div key={field.label} className="flex items-start gap-3 py-3.5 border-b border-gray-100 dark:border-white/5 last:border-0">
