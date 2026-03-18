@@ -1,160 +1,111 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Activity } from 'lucide-react';
-import Layout from './components/Layout';
-import ProductManager from './components/ProductManager';
-import OrderManager from './components/OrderManager';
-import CustomerManager from './components/CustomerManager';
-import UserManager from './components/UserManager';
-import OrganizationManager from './components/OrganizationManager';
-import ChannelManager from './components/ChannelManager';
-import OpportunityManager from './components/OpportunityManager';
-import ProductDetails from './components/ProductDetails';
-import OrderDetails from './components/OrderDetails';
-import CustomerDetails from './components/CustomerDetails';
-import MerchandiseDetails from './components/MerchandiseDetails';
-import ChannelDetails from './components/ChannelDetails';
-import OpportunityDetails from './components/OpportunityDetails';
-import LeadsManager from './components/LeadsManager';
-import Dashboard from './components/Dashboard';
-import ProductPreview from './components/ProductPreview';
-import ProductCenter from './components/ProductCenter';
-import ContractManager from './components/ContractManager';
-import RemittanceManager from './components/RemittanceManager';
-import InvoiceManager from './components/InvoiceManager';
-import PerformanceManager from './components/PerformanceManager';
-import AuthorizationManager from './components/AuthorizationManager';
-import DeliveryInfoManager from './components/DeliveryInfoManager';
+import { AppProvider } from './contexts/AppContext';
+import Layout from './components/layout/Layout';
+import ProductManager from './components/product/ProductManager';
+import OrderManager from './components/order/OrderManager';
+import CustomerManager from './components/crm/CustomerManager';
+import UserManager from './components/system/UserManager';
+import OrganizationManager from './components/system/OrganizationManager';
+import ChannelManager from './components/channel/ChannelManager';
+import OpportunityManager from './components/crm/OpportunityManager';
+import ProductDetails from './components/product/ProductDetails';
+import OrderDetails from './components/order/OrderDetails';
+import CustomerDetails from './components/crm/CustomerDetails';
+import MerchandiseDetails from './components/product/MerchandiseDetails';
+import ChannelDetails from './components/channel/ChannelDetails';
+import OpportunityDetails from './components/crm/OpportunityDetails';
+import LeadsManager from './components/crm/LeadsManager';
+import Dashboard from './components/layout/Dashboard';
+import ProductPreview from './components/product/ProductPreview';
+import ProductCenter from './components/product/ProductCenter';
+import ContractManager from './components/order/ContractManager';
+import RemittanceManager from './components/order/RemittanceManager';
+import InvoiceManager from './components/order/InvoiceManager';
+import PerformanceManager from './components/performance/PerformanceManager';
+import AuthorizationManager from './components/order/AuthorizationManager';
+import DeliveryInfoManager from './components/order/DeliveryInfoManager';
+import OperationsManager from './components/operations/OperationsManager';
+import ProjectManager from './components/project/ProjectManager';
+import ProjectDetails from './components/project/ProjectDetails';
+import ProductComponentPoolManager from './components/product/ProductComponentPoolManager';
+import ProductPackageManager from './components/product/ProductPackageManager';
+import ProductLicenseTemplateManager from './components/product/ProductLicenseTemplateManager';
+import ProductAttrConfigManager from './components/product/ProductAttrConfigManager';
+import ProductMsrpManager from './components/product/ProductMsrpManager';
+import ProductChannelPriceManager from './components/product/ProductChannelPriceManager';
 
-import {
-    initialProducts, initialMerchandises, initialAtomicCapabilities,
-    initialProductRights, initialRightPackages, initialLicenseDefs,
-    initialDepartments, initialRoles, initialUsers, initialChannels,
-    initialStandaloneEnterprises,
-} from './data/staticData';
-import {
-    generateCustomers, generateOpportunities, generateOrders,
-    generateContracts, generateRemittances, generateInvoices,
-    generatePerformances, generateAuthorizations, generateDeliveryInfos,
-} from './data/generators';
+function AppRoutes() {
+  return (
+    <Layout>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+
+        <Route path="/product-center" element={<ProductCenter />} />
+        <Route path="/catalog/:id/preview" element={<ProductPreview />} />
+        <Route path="/products" element={<ProductManager />} />
+        <Route path="/products/:id" element={<ProductDetails />} />
+        <Route path="/merchandises/:id" element={<MerchandiseDetails />} />
+
+        <Route path="/orders" element={<OrderManager />} />
+        <Route path="/orders/:id" element={<OrderDetails />} />
+
+        <Route path="/customers" element={<CustomerManager />} />
+        <Route path="/customers/:id" element={<CustomerDetails />} />
+
+        <Route path="/users" element={<UserManager defaultTab="USERS" />} />
+        <Route path="/roles" element={<UserManager defaultTab="ROLES" />} />
+        <Route path="/organization" element={<OrganizationManager />} />
+
+        <Route path="/channels" element={<ChannelManager />} />
+        <Route path="/channels/:id" element={<ChannelDetails />} />
+
+        <Route path="/opportunities" element={<OpportunityManager />} />
+        <Route path="/opportunities/:id" element={<OpportunityDetails />} />
+
+        <Route path="/contracts" element={<ContractManager />} />
+        <Route path="/remittances" element={<RemittanceManager />} />
+        <Route path="/invoices" element={<InvoiceManager />} />
+
+        <Route path="/performance" element={<PerformanceManager />} />
+        <Route path="/authorizations" element={<AuthorizationManager />} />
+        <Route path="/delivery-info" element={<DeliveryInfoManager />} />
+
+        <Route path="/leads" element={<LeadsManager />} />
+
+        {/* 产品管理子路由 */}
+        <Route path="/product-manage/component-pool" element={<ProductComponentPoolManager />} />
+        <Route path="/product-manage/packages" element={<ProductPackageManager />} />
+        <Route path="/product-manage/license-templates" element={<ProductLicenseTemplateManager />} />
+        <Route path="/product-manage/attr-config" element={<ProductAttrConfigManager />} />
+
+        {/* 产品报价子路由 */}
+        <Route path="/product-pricing/msrp" element={<ProductMsrpManager />} />
+        <Route path="/product-pricing/channel" element={<ProductChannelPriceManager />} />
+
+        {/* 项目管理 */}
+        <Route path="/projects" element={<ProjectManager />} />
+        <Route path="/projects/:id" element={<ProjectDetails />} />
+
+        {/* 运营中心 */}
+        <Route path="/wps-ops" element={<OperationsManager />} />
+        <Route path="/ops/*" element={<OperationsManager />} />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Layout>
+  );
+}
 
 function App() {
-  const [atomicCapabilities, setAtomicCapabilities] = useState(initialAtomicCapabilities);
-  const [productRights, setProductRights] = useState(initialProductRights);
-  const [rightPackages, setRightPackages] = useState(initialRightPackages);
-  const [licenseDefs, setLicenseDefs] = useState(initialLicenseDefs);
-  const [products, setProducts] = useState(initialProducts);
-  const [merchandises, setMerchandises] = useState(initialMerchandises);
-  const [departments, setDepartments] = useState(initialDepartments);
-  const [roles, setRoles] = useState(initialRoles);
-  const [users, setUsers] = useState(initialUsers);
-  const [channels, setChannels] = useState(initialChannels);
-  const [standaloneEnterprises] = useState(initialStandaloneEnterprises);
-
-  const [currentUser, setCurrentUser] = useState(users[0]);
-
-  const [customers, setCustomers] = useState(() => generateCustomers(users));
-  const [opportunities, setOpportunities] = useState<ReturnType<typeof generateOpportunities>>([]);
-  const [orders, setOrders] = useState<ReturnType<typeof generateOrders>>([]);
-
-  const [contracts] = useState(() => generateContracts());
-  const [remittances] = useState(() => generateRemittances());
-  const [invoices] = useState(() => generateInvoices());
-  const [performances] = useState(() => generatePerformances());
-  const [authorizations] = useState(() => generateAuthorizations());
-  const [deliveryInfos] = useState(() => generateDeliveryInfos());
-
-  useEffect(() => {
-    if (customers.length > 0) {
-      setOpportunities(generateOpportunities(customers));
-    }
-  }, [customers]);
-
-  useEffect(() => {
-    if (customers.length === 0 || opportunities.length === 0 || products.length === 0 || channels.length === 0) return;
-    setOrders(generateOrders({ customers, products, users, merchandises, opportunities, channels }));
-  }, [customers, products, users, merchandises, opportunities, channels]);
-
   return (
-    <Router>
-      <Layout currentUser={currentUser} users={users} setCurrentUser={setCurrentUser} roles={roles}>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-
-          <Route path="/product-center" element={<ProductCenter products={products} currentUser={currentUser} roles={roles} />} />
-          <Route path="/catalog/:id/preview" element={<ProductPreview products={products} currentUser={currentUser} roles={roles} />} />
-          <Route path="/products" element={
-            <ProductManager
-                products={products} setProducts={setProducts}
-                atomicCapabilities={atomicCapabilities} setAtomicCapabilities={setAtomicCapabilities}
-                productRights={productRights} setProductRights={setProductRights}
-                rightPackages={rightPackages} setRightPackages={setRightPackages}
-                licenseDefs={licenseDefs} setLicenseDefs={setLicenseDefs}
-                currentUser={currentUser} roles={roles}
-            />
-          } />
-          <Route path="/products/:id" element={<ProductDetails products={products} setProducts={setProducts} rightPackages={rightPackages} licenseDefs={licenseDefs} />} />
-          <Route path="/merchandises/:id" element={<MerchandiseDetails merchandises={merchandises} setMerchandises={setMerchandises} products={products} />} />
-
-          <Route path="/orders" element={
-            <OrderManager
-                orders={orders} setOrders={setOrders}
-                products={products}
-                customers={customers}
-                currentUser={currentUser}
-                users={users}
-                departments={departments}
-                opportunities={opportunities}
-                channels={channels}
-                roles={roles}
-                standaloneEnterprises={standaloneEnterprises}
-            />
-          } />
-          <Route path="/orders/:id" element={
-            <OrderDetails
-                orders={orders} setOrders={setOrders} products={products}
-                customers={customers} users={users} departments={departments}
-                currentUser={currentUser} opportunities={opportunities}
-                roles={roles}
-            />
-          } />
-
-          <Route path="/customers" element={<CustomerManager customers={customers} setCustomers={setCustomers} users={users} />} />
-          <Route path="/customers/:id" element={<CustomerDetails customers={customers} setCustomers={setCustomers} orders={orders} users={users} />} />
-
-          <Route path="/users" element={<UserManager users={users} setUsers={setUsers} departments={departments} roles={roles} setRoles={setRoles} channels={channels} defaultTab="USERS" />} />
-          <Route path="/roles" element={<UserManager users={users} setUsers={setUsers} departments={departments} roles={roles} setRoles={setRoles} channels={channels} defaultTab="ROLES" />} />
-          <Route path="/organization" element={<OrganizationManager departments={departments} setDepartments={setDepartments} users={users} />} />
-
-          <Route path="/channels" element={<ChannelManager channels={channels} setChannels={setChannels} />} />
-          <Route path="/channels/:id" element={<ChannelDetails channels={channels} setChannels={setChannels} />} />
-
-          <Route path="/opportunities" element={<OpportunityManager opportunities={opportunities} setOpportunities={setOpportunities} customers={customers} />} />
-          <Route path="/opportunities/:id" element={<OpportunityDetails opportunities={opportunities} setOpportunities={setOpportunities} customers={customers} />} />
-
-          <Route path="/contracts" element={<ContractManager contracts={contracts} />} />
-          <Route path="/remittances" element={<RemittanceManager remittances={remittances} />} />
-          <Route path="/invoices" element={<InvoiceManager invoices={invoices} />} />
-
-          <Route path="/performance" element={<PerformanceManager performances={performances} />} />
-          <Route path="/authorizations" element={<AuthorizationManager authorizations={authorizations} />} />
-          <Route path="/delivery-info" element={<DeliveryInfoManager deliveryInfos={deliveryInfos} />} />
-
-          <Route path="/leads" element={<LeadsManager />} />
-
-          <Route path="/wps-ops" element={
-            <div className="p-12 text-center">
-              <Activity className="w-16 h-16 text-blue-500 mx-auto mb-4 opacity-20" />
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">WPS 运营中心</h2>
-              <p className="text-gray-500 mt-2">该模块正在建设中，敬请期待。</p>
-            </div>
-          } />
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Layout>
-    </Router>
+    <AppProvider>
+      <Router>
+        <AppRoutes />
+      </Router>
+    </AppProvider>
   );
 }
 

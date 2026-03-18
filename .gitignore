@@ -13,6 +13,14 @@ dist-ssr
 *.local
 test-results
 
+# Database
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# Environment
+.env
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

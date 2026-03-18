@@ -1,0 +1,259 @@
+import React from 'react';
+import { OrderItem, Product } from '../../types';
+import { X, Box, CreditCard, Truck, Package, Disc, AlertCircle, ShieldCheck } from 'lucide-react';
+
+interface Props {
+  item: OrderItem | null;
+  itemIndex: number;
+  isClosing: boolean;
+  onClose: () => void;
+  products: Product[];
+  selectedOrder: any;
+}
+
+const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, onClose, products, selectedOrder }) => {
+  if (!item) return null;
+  const selectedItemForDetails = item;
+  const selectedItemIndex = itemIndex;
+  const isItemDetailsClosing = isClosing;
+
+  return (
+    <>
+          <div className="fixed inset-y-0 right-0 left-[240px] z-[70] flex justify-end">
+              <div 
+                  className={`absolute inset-0 bg-black/20 backdrop-blur-sm ${isItemDetailsClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`}
+                  onClick={() => {
+                      setTimeout(() => {
+                          onClose();
+                      }, 300);
+                  }}
+              />
+              <div className={`w-full bg-white dark:bg-[#1C1C1E] h-full shadow-2xl flex flex-col relative z-10 ${isItemDetailsClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
+                  <div className="unified-card p-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center dark:bg-[#1C1C1E] shrink-0">
+                      <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+                              <Package className="w-6 h-6 text-blue-500" />
+                          </div>
+                          <div>
+                              <div className="flex items-center gap-3">
+                                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">订单产品明细详情</h3>
+                                  <span className="text-xl font-bold text-gray-500 dark:text-gray-400 font-mono">
+                                      {selectedOrder.id}-{String(selectedItemIndex + 1).padStart(3, '0')}
+                                  </span>
+                              </div>
+                          </div>
+                      </div>
+                      <button 
+                          onClick={() => {
+                              setTimeout(() => {
+                                  onClose();
+                              }, 300);
+                          }} 
+                          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                      >
+                          <X className="w-6 h-6"/>
+                      </button>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-gray-50/30 dark:bg-black/20">
+                      <div className="grid grid-cols-3 gap-4">
+
+                          {/* 左侧大列 (2/3)：产品交易信息、产品交付信息、产品授权信息 纵向排列 */}
+                          <div className="col-span-2 space-y-4">
+
+                              {/* 产品交易信息 */}
+                              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10">
+                                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                      <Box className="w-5 h-5 text-blue-500" />
+                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">产品交易信息</h4>
+                                  </div>
+                                  <div className="p-5">
+                                      {(() => {
+                                          const itemAmount = selectedItemForDetails.priceAtPurchase * selectedItemForDetails.quantity;
+                                          const fmt = (n: number) => `¥${n.toLocaleString()}`;
+                                          const fields = [
+                                              { label: '产品名称', value: selectedItemForDetails.productName || '-', isAmount: false },
+                                              { label: '产品规格', value: [selectedItemForDetails.skuName, selectedItemForDetails.skuCode].filter(Boolean).join('  ·  ') || '-', isAmount: false },
+                                              { label: '授权类型', value: selectedItemForDetails.pricingOptionName || selectedItemForDetails.licenseType || '-', isAmount: false },
+                                              { label: '产品类型', value: selectedItemForDetails.productType || '-', isAmount: false },
+                                              { label: '数量', value: String(selectedItemForDetails.quantity), isAmount: false },
+                                              { label: '单价', value: fmt(selectedItemForDetails.priceAtPurchase), isAmount: true },
+                                              { label: '计价数量', value: String(selectedItemForDetails.quantity), isAmount: false },
+                                              { label: '计价单价', value: selectedItemForDetails.pricingUnitPrice != null ? fmt(selectedItemForDetails.pricingUnitPrice) : '-', isAmount: true },
+                                              { label: '产品金额', value: fmt(itemAmount), isAmount: true },
+                                          ];
+                                          return (
+                                              <div className="grid grid-cols-2 gap-x-6">
+                                                  {fields.map((f, idx) => (
+                                                      <div key={idx} className={`flex items-start gap-4 py-3.5 ${idx < fields.length - 2 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}>
+                                                          <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap">{f.label}</span>
+                                                          <span className={`text-sm font-medium flex-1 ${f.isAmount ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>{f.value}</span>
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          );
+                                      })()}
+                                  </div>
+                              </div>
+
+                              {/* 产品授权信息 */}
+                              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10">
+                                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                      <ShieldCheck className="w-5 h-5 text-purple-500" />
+                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">产品授权信息</h4>
+                                  </div>
+                                  <div className="p-5">
+                                      {(() => {
+                                          const fields = [
+                                              { label: '被授权方', value: selectedItemForDetails.licensee || '-' },
+                                              { label: '授权范围', value: selectedItemForDetails.licenseScope || '企业内部使用' },
+                                              { label: '授权期限', value: (selectedItemForDetails.licensePeriod && selectedItemForDetails.licensePeriod !== '永久') ? selectedItemForDetails.licensePeriod : '-' },
+                                              { label: '授权开始计算', value: selectedItemForDetails.licenseStartMethod || '-' },
+                                              { label: '授权截止日期', value: selectedItemForDetails.licenseEndDate || '-' },
+                                              { label: '是否下级单位提供授权', value: selectedItemForDetails.subUnitLicenseAllowed == null ? '-' : selectedItemForDetails.subUnitLicenseAllowed ? '是' : '否' },
+                                              { label: '升级保障期限', value: selectedItemForDetails.upgradeWarrantyPeriod || '-' },
+                                              { label: '售后保障期限', value: selectedItemForDetails.afterSaleWarrantyPeriod || '1年' },
+                                          ];
+                                          return (
+                                              <div className="grid grid-cols-2 gap-x-6">
+                                                  {fields.map((f, idx) => (
+                                                      <div key={idx} className={`flex items-start gap-4 py-3.5 ${idx < fields.length - 2 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}>
+                                                          <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap">{f.label}</span>
+                                                          <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{f.value}</span>
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          );
+                                      })()}
+                                  </div>
+                              </div>
+
+                              {/* 产品价格参考 */}
+                              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10">
+                                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                      <CreditCard className="w-5 h-5 text-green-500" />
+                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">产品价格参考</h4>
+                                  </div>
+                                  <div className="p-5">
+                                      {(() => {
+                                          const fields = [
+                                              { label: '渠道等级', value: selectedItemForDetails.channelLevel || '-', isAmount: false },
+                                              { label: '协议编号', value: selectedItemForDetails.agreementNo || '-', isAmount: false },
+                                              { label: '匹配价格类型', value: selectedItemForDetails.matchedPriceType || '-', isAmount: false },
+                                              { label: '匹配价格', value: selectedItemForDetails.matchedPrice != null ? `¥${selectedItemForDetails.matchedPrice.toLocaleString()}` : '-', isAmount: true },
+                                              { label: '匹配价格ID', value: selectedItemForDetails.matchedPriceId || '-', isAmount: false },
+                                              { label: '建议销售价', value: selectedItemForDetails.suggestedRetailPrice != null ? `¥${selectedItemForDetails.suggestedRetailPrice.toLocaleString()}` : '-', isAmount: true },
+                                          ];
+                                          return (
+                                              <div className="grid grid-cols-2 gap-x-6">
+                                                  {fields.map((f, idx) => (
+                                                      <div key={idx} className={`flex items-start gap-4 py-3.5 ${idx < fields.length - 2 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}>
+                                                          <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap">{f.label}</span>
+                                                          <span className={`text-sm font-medium flex-1 ${f.isAmount ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>{f.value}</span>
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          );
+                                      })()}
+                                  </div>
+                              </div>
+
+                          </div>
+
+                          {/* 右侧小列 (1/3)：产品交付信息 + 安装包 纵向排列 */}
+                          <div className="space-y-4">
+
+                              {/* 产品交付信息 */}
+                              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10">
+                                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                      <Truck className="w-5 h-5 text-indigo-500" />
+                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">产品交付信息</h4>
+                                  </div>
+                                  <div className="p-5">
+                                      {(() => {
+                                          const activationLabel = selectedItemForDetails.activationMethod === 'LicenseKey' ? '授权码激活'
+                                              : selectedItemForDetails.activationMethod === 'Online' ? '在线激活' : '加密狗';
+                                          const distMode = selectedItemForDetails.distributionMode
+                                              || (selectedItemIndex % 2 === 0 ? '账号分发' : '兑换码分发');
+                                          const enterpriseName = selectedItemForDetails.enterpriseName || selectedOrder.customerName;
+                                          const enterpriseId = selectedItemForDetails.enterpriseId
+                                              || String(parseInt(selectedOrder.id.replace(/\D/g, '').slice(-6) || '100000', 10) + 500000000).slice(0, 9);
+                                          const fields = [
+                                              { label: '分发模式', value: distMode },
+                                              { label: '激活方式', value: activationLabel },
+                                              { label: '企业名称', value: enterpriseName },
+                                              { label: '企业ID', value: enterpriseId },
+                                              { label: '供货组织信息', value: selectedItemForDetails.supplyOrgInfo || '-' },
+                                          ];
+                                          return (
+                                              <div className="divide-y divide-gray-50 dark:divide-white/5">
+                                                  {fields.map((f, idx) => (
+                                                      <div key={idx} className="flex items-center gap-8 py-3.5">
+                                                          <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap">{f.label}</span>
+                                                          <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{f.value}</span>
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          );
+                                      })()}
+                                  </div>
+                              </div>
+
+                              {/* 安装包 */}
+                              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10">
+                                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                      <Disc className="w-5 h-5 text-blue-500" />
+                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">安装包</h4>
+                                  </div>
+                                  <div className="p-5">
+                                      {(() => {
+                                          const product = products.find(p => p.id === selectedItemForDetails.productId);
+                                          const pkg = product?.installPackages?.[0];
+                                          if (!pkg) {
+                                              return (
+                                                  <div className="flex flex-col items-center justify-center py-10 text-center space-y-3">
+                                                      <div className="w-12 h-12 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center">
+                                                          <AlertCircle className="w-6 h-6 text-gray-300" />
+                                                      </div>
+                                                      <div className="text-sm text-gray-400 italic">暂无安装包数据</div>
+                                                  </div>
+                                              );
+                                          }
+                                          const rows: { label: string; value: string; isLink?: boolean }[] = [
+                                              { label: '安装包编号', value: pkg.id },
+                                              { label: '安装包名称', value: pkg.name },
+                                              { label: 'CPU', value: pkg.cpu || '-' },
+                                              { label: '操作系统', value: pkg.os || '-' },
+                                              { label: '架构', value: pkg.arch || '-' },
+                                              { label: '安装包链接', value: pkg.url || '-', isLink: true },
+                                              { label: '安装包备注', value: pkg.remarks || '-' },
+                                          ];
+                                          return (
+                                              <div className="divide-y divide-gray-50 dark:divide-white/5">
+                                                  {rows.map((row, i) => (
+                                                      <div key={i} className="flex items-center gap-8 py-3.5">
+                                                          <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap">{row.label}</span>
+                                                          {row.isLink && row.value !== '-' ? (
+                                                              <a href={row.value} target="_blank" rel="noreferrer" className="text-sm font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline flex-1 truncate">{row.value}</a>
+                                                          ) : (
+                                                              <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{row.value}</span>
+                                                          )}
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          );
+                                      })()}
+                                  </div>
+                              </div>
+
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+
+    </>
+  );
+};
+
+export default OrderItemDetailsDrawer;

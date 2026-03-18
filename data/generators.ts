@@ -392,8 +392,26 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
       sellerContact: '李海瑞 (00019829)',
       customerStatus: '已覆盖',
       channelService: '否',
-      conversionDeductionAmount: i % 3 === 0 && i <= 90 ? Math.floor(total * 0.04 / 100) * 100 || 100 : undefined,
-      conversionAmount: i % 3 === 0 && i <= 90 ? Math.floor(total * 0.7 / 100) * 100 || 500 : undefined,
+      // 按与 OrderDetails 相同的逻辑算出优惠折扣和返利折扣，再计算折算折扣金额
+      // 折算折扣金额 = 产品总金额 - 优惠折扣金额 - 返利折扣金额（使三者恰好加总等于产品总金额）
+      // i%4==0: 两者都有；i%4==1: 只有折算折扣金额；i%4==2: 只有折算金额；i%4==3: 两者都没有
+      ...(() => {
+        const _allItems = [...baseItems, ...extraItems];
+        const _productTotal = _allItems.reduce((s, it) => s + it.priceAtPurchase * it.quantity, 0);
+        const _discountAmt = _allItems.reduce((s, it) => {
+          const lt = it.priceAtPurchase * it.quantity;
+          return s + (it.priceAtPurchase > 1000 ? Math.floor(lt * 0.05 / 10) * 10 : 0);
+        }, 0);
+        const _rebateAmt = _allItems.reduce((s, it) => {
+          const lt = it.priceAtPurchase * it.quantity;
+          return s + (it.priceAtPurchase > 5000 ? Math.floor(lt * 0.02 / 10) * 10 : 0);
+        }, 0);
+        const _convDeduct = Math.max(_productTotal - _discountAmt - _rebateAmt, 0);
+        return {
+          conversionDeductionAmount: (i % 4 === 0 || i % 4 === 1) ? _convDeduct : undefined,
+          conversionAmount: (i % 4 === 0 || i % 4 === 2) ? Math.floor(_productTotal * 0.7 / 100) * 100 || 500 : undefined,
+        };
+      })(),
     });
   }
   return mockOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
