@@ -31,8 +31,8 @@ const availableFilterFields = [
 
 const orderSourceLabelMap: Record<string, string> = {
     Sales: '销售创建',
-    ChannelPortal: '渠道门户',
-    OnlineStore: '线上商城',
+    ChannelPortal: '渠道来源',
+    OnlineStore: '官网',
     APISync: 'API 同步',
     Renewal: '续费',
 };
@@ -53,7 +53,8 @@ const statusMap: Record<string, string> = {
 const buyerTypeMap: Record<string, string> = {
     'Customer': '客户直签',
     'Channel': '渠道代理',
-    'SelfDeal': '自主成交'
+    'SelfDeal': '自主成交',
+    'RedeemCode': '兑换码',
 };
 
 const deliveryMethodMap: Record<string, string> = {
@@ -1089,10 +1090,11 @@ const OrderManager: React.FC = () => {
                   {visibleColumns.includes('source') && <td className="px-4 py-3 whitespace-nowrap">{getSourceBadge(order.source)}</td>}
                   {visibleColumns.includes('buyerType') && (
                       <td className="px-4 py-3 whitespace-nowrap">
-                          {order.buyerType === 'Channel'   && <span className="unified-tag-indigo">{buyerTypeMap['Channel']}</span>}
-                          {order.buyerType === 'SelfDeal'  && <span className="unified-tag-orange">{buyerTypeMap['SelfDeal']}</span>}
-                          {order.buyerType === 'Customer'  && <span className="unified-tag-blue">{buyerTypeMap['Customer']}</span>}
-                          {!order.buyerType                && <span className="unified-tag-gray">{buyerTypeMap['Customer']}</span>}
+                          {order.buyerType === 'Channel'    && <span className="unified-tag-indigo">{buyerTypeMap['Channel']}</span>}
+                          {order.buyerType === 'SelfDeal'   && <span className="unified-tag-orange">{buyerTypeMap['SelfDeal']}</span>}
+                          {order.buyerType === 'RedeemCode' && <span className="unified-tag-purple">{buyerTypeMap['RedeemCode']}</span>}
+                          {order.buyerType === 'Customer'   && <span className="unified-tag-blue">{buyerTypeMap['Customer']}</span>}
+                          {!order.buyerType                 && <span className="unified-tag-gray">{buyerTypeMap['Customer']}</span>}
                       </td>
                   )}
                   {visibleColumns.includes('date') && <td className="px-4 py-3 text-gray-400 dark:text-gray-500 font-mono text-[11px] whitespace-nowrap">{new Date(order.date).toLocaleString('zh-CN', { hour12: false })}</td>}

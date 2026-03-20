@@ -690,7 +690,7 @@ const OrderDetails: React.FC = () => {
                                   <th className="px-5 py-4 pl-6 text-center w-16 whitespace-nowrap">明细编号</th>
                                   <th className="px-5 py-4">产品信息</th>
                                   <th className="px-5 py-4 text-center">数量</th>
-                                  <th className="px-5 py-4 text-center">授权期限</th>
+                                  <th className="px-5 py-4 text-center">授权/服务期限</th>
                                   <th className="px-5 py-4 text-right">单价</th>
                                   <th className="px-5 py-4 text-right">产品金额</th>
                               </tr>
@@ -1892,7 +1892,7 @@ const OrderDetails: React.FC = () => {
                                                 </span>
                                             </div>
                                             <div className="flex items-start gap-4 col-span-2">
-                                                <span className="text-gray-400 text-sm min-w-[100px]">授权期限:</span>
+                                                <span className="text-gray-400 text-sm min-w-[100px]">授权/服务期限:</span>
                                                 <span className="text-gray-900 dark:text-white text-sm font-medium">
                                                     同授权范围中所包含计算机设备的使用年限。
                                                 </span>

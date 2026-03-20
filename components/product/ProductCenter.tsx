@@ -119,7 +119,7 @@ const ProductCenter: React.FC = () => {
       <div className="px-6 pt-6 pb-4 shrink-0 flex items-center justify-between gap-4">
 
         {/* Title */}
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">产品展示</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">产品目录</h1>
 
         {/* Right controls */}
         <div className="flex items-center gap-3">

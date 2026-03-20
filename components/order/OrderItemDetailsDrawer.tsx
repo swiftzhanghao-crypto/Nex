@@ -107,7 +107,7 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
                                           const fields = [
                                               { label: '被授权方', value: selectedItemForDetails.licensee || '-' },
                                               { label: '授权范围', value: selectedItemForDetails.licenseScope || '企业内部使用' },
-                                              { label: '授权期限', value: (selectedItemForDetails.licensePeriod && selectedItemForDetails.licensePeriod !== '永久') ? selectedItemForDetails.licensePeriod : '-' },
+                                              { label: '授权/服务期限', value: (selectedItemForDetails.licensePeriod && selectedItemForDetails.licensePeriod !== '永久') ? selectedItemForDetails.licensePeriod : '-' },
                                               { label: '授权开始计算', value: selectedItemForDetails.licenseStartMethod || '-' },
                                               { label: '授权截止日期', value: selectedItemForDetails.licenseEndDate || '-' },
                                               { label: '是否下级单位提供授权', value: selectedItemForDetails.subUnitLicenseAllowed == null ? '-' : selectedItemForDetails.subUnitLicenseAllowed ? '是' : '否' },

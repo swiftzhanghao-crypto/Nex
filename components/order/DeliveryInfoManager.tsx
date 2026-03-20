@@ -77,7 +77,7 @@ const DeliveryInfoManager: React.FC = () => {
     { id: 'licensee', label: '被授权方', width: 200 },
     { id: 'customer', label: '客户名称/编号', width: 210 },
     { id: 'authCode', label: '授权编号', width: 100 },
-    { id: 'authDuration', label: '授权期限', width: 80 },
+    { id: 'authDuration', label: '授权/服务期限', width: 80 },
     { id: 'authPeriod', label: '授权期间', width: 185 },
     { id: 'servicePeriod', label: '服务期间', width: 185 },
   ];

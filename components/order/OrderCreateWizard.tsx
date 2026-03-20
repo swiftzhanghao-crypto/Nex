@@ -320,7 +320,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         approvalRecords: [], salesRepId: salesRepId, salesRepName: salesUser?.name, 
         businessManagerId: businessManagerId, businessManagerName: businessUser?.name,
         creatorId: creatorUser.id, creatorName: creatorUser.name.replace(/\s*\(.*?\)/g, ''), creatorPhone: creatorUser.phone,
-        buyerType, 
+        buyerType,
         buyerId: buyerType === 'Channel' ? selectedChannelId : (buyerType === 'Customer' ? newOrderCustomer : undefined),
         buyerName: buyerType === 'Channel' ? channels.find(c => c.id === selectedChannelId)?.name : customer?.companyName,
         invoiceInfo: invoiceForm, 
@@ -418,11 +418,38 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                 {currentStep === 1 && (
                     <div className="space-y-10 animate-fade-in max-w-4xl mx-auto">
                         <div>
+                            <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2"><Target className="w-5 h-5 text-purple-500"/> 订单类型</h4>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {[
+                                    { id: 'Customer', title: '客户直签', icon: Target, color: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' },
+                                    { id: 'Channel', title: '渠道代理', icon: Network, color: 'text-purple-500 bg-purple-50 dark:bg-purple-900/20' },
+                                    { id: 'SelfDeal', title: '自主成交', icon: MousePointer2, color: 'text-orange-500 bg-orange-50 dark:bg-orange-900/20' },
+                                    { id: 'RedeemCode', title: '兑换码', icon: Zap, color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/20' }
+                                ].map(type => (
+                                    <button
+                                        key={type.id}
+                                        onClick={() => setBuyerType(type.id as BuyerType)}
+                                        className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all duration-200 ${
+                                            buyerType === type.id
+                                            ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/30 dark:bg-white/5 ring-4 ring-blue-500/10'
+                                            : 'border-gray-100 dark:border-white/5 bg-white dark:bg-[#2C2C2E] hover:border-gray-300 dark:hover:border-white/20 hover:shadow-lg'
+                                        }`}
+                                    >
+                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${type.color}`}>
+                                            <type.icon className="w-6 h-6"/>
+                                        </div>
+                                        <span className={`text-sm font-bold ${buyerType === type.id ? 'text-[#0071E3] dark:text-[#FF2D55]' : 'text-gray-600 dark:text-gray-300'}`}>{type.title}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
                             <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2"><Globe className="w-5 h-5 text-blue-500"/> 订单来源</h4>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {[
-                                    { id: 'OnlineStore', label: '官网下单', icon: Globe, color: 'text-orange-500 bg-orange-50 dark:bg-orange-900/20' },
-                                    { id: 'ChannelPortal', label: '渠道下单', icon: Network, color: 'text-purple-500 bg-purple-50 dark:bg-purple-900/20' },
+                                    { id: 'OnlineStore', label: '官网', icon: Globe, color: 'text-orange-500 bg-orange-50 dark:bg-orange-900/20' },
+                                    { id: 'ChannelPortal', label: '渠道来源', icon: Network, color: 'text-purple-500 bg-purple-50 dark:bg-purple-900/20' },
                                     { id: 'APISync', label: '第三方系统', icon: Radio, color: 'text-teal-500 bg-teal-50 dark:bg-teal-900/20' },
                                     { id: 'Sales', label: '后台下单', icon: UserIcon, color: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' }
                                 ].map(src => (
@@ -439,32 +466,6 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             <src.icon className="w-6 h-6"/>
                                         </div>
                                         <span className={`text-sm font-bold ${orderSource === src.id ? 'text-[#0071E3] dark:text-[#FF2D55]' : 'text-gray-600 dark:text-gray-300'}`}>{src.label}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div>
-                            <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2"><Target className="w-5 h-5 text-purple-500"/> 订单类型</h4>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {[
-                                    { id: 'Customer', title: '客户直签', icon: Target, color: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' },
-                                    { id: 'Channel', title: '渠道代理', icon: Network, color: 'text-purple-500 bg-purple-50 dark:bg-purple-900/20' },
-                                    { id: 'SelfDeal', title: '自主成交', icon: MousePointer2, color: 'text-orange-500 bg-orange-50 dark:bg-orange-900/20' }
-                                ].map(type => (
-                                    <button
-                                        key={type.id}
-                                        onClick={() => setBuyerType(type.id as BuyerType)}
-                                        className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all duration-200 ${
-                                            buyerType === type.id
-                                            ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/30 dark:bg-white/5 ring-4 ring-blue-500/10'
-                                            : 'border-gray-100 dark:border-white/5 bg-white dark:bg-[#2C2C2E] hover:border-gray-300 dark:hover:border-white/20 hover:shadow-lg'
-                                        }`}
-                                    >
-                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${type.color}`}>
-                                            <type.icon className="w-6 h-6"/>
-                                        </div>
-                                        <span className={`text-sm font-bold ${buyerType === type.id ? 'text-[#0071E3] dark:text-[#FF2D55]' : 'text-gray-600 dark:text-gray-300'}`}>{type.title}</span>
                                     </button>
                                 ))}
                             </div>
@@ -711,7 +712,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
                                 {showLicensePeriod && (
                                 <div className="md:col-span-2 space-y-2">
-                                    <label className="text-xs font-bold text-teal-600 uppercase flex items-center gap-1">授权期限</label>
+                                    <label className="text-xs font-bold text-teal-600 uppercase flex items-center gap-1">授权/服务期限</label>
                                     <select
                                         className="w-full p-3 bg-gray-50 dark:bg-black border border-teal-200 dark:border-teal-900/30 rounded-xl outline-none focus:ring-2 focus:ring-teal-200 transition text-sm font-medium text-teal-700 dark:text-teal-400"
                                         value={tempLicensePeriod}
@@ -753,7 +754,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             <div className="bg-white dark:bg-[#2C2C2E] rounded-3xl border border-gray-100 dark:border-white/5 overflow-hidden shadow-apple">
                                 <table className="w-full text-left text-sm min-w-[600px]">
                                     <thead className="unified-table-header">
-                                        <tr><th className="p-5 pl-6">产品/规格</th><th className="p-5">授权类型</th><th className="p-5 text-center">数量</th><th className="p-5 text-center">授权期限</th><th className="p-5 text-right">单价</th><th className="p-5 text-right">小计</th><th className="p-5 text-center">操作</th></tr>
+                                        <tr><th className="p-5 pl-6">产品/规格</th><th className="p-5">授权类型</th><th className="p-5 text-center">数量</th><th className="p-5 text-center">授权/服务期限</th><th className="p-5 text-right">单价</th><th className="p-5 text-right">小计</th><th className="p-5 text-center">操作</th></tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                                         {newOrderItems.map((item, idx) => (

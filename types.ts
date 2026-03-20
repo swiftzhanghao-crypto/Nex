@@ -236,6 +236,23 @@ export interface Customer {
     ownerName?: string;
     enterprises?: Enterprise[];
     nextFollowUpDate?: string;
+
+    crmId?: string;
+    reportTag?: string;
+    customerAttribute?: string;
+    industryLine?: string;
+    industryPromotionType?: string;
+    parentOrg?: string;
+    supervisoryOrg?: string;
+    country?: string;
+    province?: string;
+    city?: string;
+    district?: string;
+    companyPhone?: string;
+    customerDepartment?: string;
+    dealerName?: string;
+    levelFocusUnit?: string;
+    customerGrade?: string;
 }
 
 export type UserRole = 'Admin' | 'Sales' | 'Business' | 'Technical' | 'Logistics' | string; // Updated to allow dynamic strings
@@ -336,7 +353,7 @@ export enum OrderStatus {
 }
 
 export type OrderSource = 'Sales' | 'ChannelPortal' | 'OnlineStore' | 'APISync' | 'Renewal';
-export type BuyerType = 'Customer' | 'Channel' | 'SelfDeal' | 'Direct';
+export type BuyerType = 'Customer' | 'Channel' | 'SelfDeal' | 'Direct' | 'RedeemCode';
 export type DeliveryMethod = 'Online' | 'Offline' | 'Hybrid';
 export type PaymentMethod = 'Online' | 'Transfer' | 'COD';
 
