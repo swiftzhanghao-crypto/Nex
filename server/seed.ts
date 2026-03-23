@@ -91,12 +91,12 @@ export function seedDatabase() {
   // --- Opportunities (generated) ---
   const opportunities = generateOpportunities(customers);
   const insertOpp = db.prepare(`
-    INSERT INTO opportunities (id, crm_id, name, customer_id, customer_name, product_type, stage, probability, amount, expected_revenue, final_user_rev, close_date, owner_id, owner_name, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO opportunities (id, crm_id, name, customer_id, customer_name, product_type, stage, probability, department, amount, expected_revenue, final_user_rev, close_date, owner_id, owner_name, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   for (const o of opportunities) {
     insertOpp.run(o.id, o.crmId ?? null, o.name, o.customerId, o.customerName,
-      o.productType ?? null, o.stage, o.probability, o.amount ?? null,
+      o.productType ?? null, o.stage, o.probability, o.department ?? null, o.amount ?? null,
       o.expectedRevenue, o.finalUserRevenue ?? null, o.closeDate, o.ownerId, o.ownerName, o.createdAt);
   }
 
@@ -139,7 +139,7 @@ export function seedDatabase() {
   }
 
   // --- Contracts ---
-  const contracts = generateContracts();
+  const contracts = generateContracts(customers);
   const insertContract = db.prepare(`INSERT INTO contracts (id, code, name, external_code, contract_type, party_a, party_b, verify_status, verify_remark, amount, sign_date, order_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   for (const c of contracts) {
     insertContract.run(c.id, c.code, c.name, c.externalCode ?? null, c.contractType, c.partyA ?? null, c.partyB ?? null, c.verifyStatus, c.verifyRemark ?? null, c.amount ?? null, c.signDate ?? null, c.orderId ?? null, c.createdAt);

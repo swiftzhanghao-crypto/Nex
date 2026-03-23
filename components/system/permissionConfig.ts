@@ -222,7 +222,7 @@ const permissionTree = [
                   id: 's_product_manage_ext', label: '产品管理扩展',
                   permissions: [
                       { id: 'product_component_pool_view',    label: '查看组件池',   desc: '查看产品组件池列表' },
-                      { id: 'product_package_view',           label: '查看产品安装包',   desc: '查看产品安装包管理列表' },
+                      { id: 'product_package_view',           label: '查看安装包',   desc: '查看安装包管理列表' },
                       { id: 'product_license_template_view',  label: '查看产品授权模板', desc: '查看产品授权模板列表' },
                       { id: 'product_attr_config_view',       label: '查看属性配置',     desc: '查看产品属性配置项' },
                   ]

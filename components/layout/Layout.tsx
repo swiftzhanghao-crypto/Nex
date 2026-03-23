@@ -11,12 +11,20 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+interface PageTab {
+  id: string;
+  title: string;
+  path: string;
+}
+
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { currentUser, users, setCurrentUser, roles } = useAppContext();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [activeTopNav, setActiveTopNav] = useState<'DASHBOARD' | 'ORDER_CENTER' | 'CRM' | 'PRODUCT_CENTER' | 'PERFORMANCE_CENTER' | 'CHANNEL_CENTER' | 'LEADS_CENTER' | 'OPERATIONS_CENTER' | 'SYSTEM_CONFIG'>('DASHBOARD');
+  const [activeTopNav, setActiveTopNav] = useState<'DASHBOARD' | 'ORDER_CENTER' | 'PRODUCT_CENTER' | 'PERFORMANCE_CENTER' | 'CHANNEL_CENTER' | 'LEADS_CENTER' | 'OPERATIONS_CENTER' | 'SYSTEM_CONFIG'>('DASHBOARD');
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
         const saved = localStorage.getItem('theme');
@@ -28,6 +36,77 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isManualOpen, setIsManualOpen] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const toggleSection = (id: string) => setCollapsedSections(prev => ({ ...prev, [id]: !prev[id] }));
+
+  // ── Tab Bar ────────────────────────────────────────────────
+  const [tabs, setTabs] = useState<PageTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string>('');
+
+  const getTabTitle = (pathname: string): string => {
+    const staticMap: Record<string, string> = {
+      '/': '数据看板',
+      '/orders': '订单管理',
+      '/customers': '客户信息',
+      '/opportunities': '商机信息',
+      '/contracts': '合同信息',
+      '/remittances': '汇款管理',
+      '/invoices': '发票管理',
+      '/authorizations': '授权信息',
+      '/delivery-info': '交付信息',
+      '/products': '产品列表',
+      '/product-center': '产品目录',
+      '/product-manage/component-pool': '组件池',
+      '/product-manage/packages': '安装包管理',
+      '/product-manage/license-templates': '产品授权模板',
+      '/product-manage/attr-config': '属性配置',
+      '/performance': '业绩管理',
+      '/channels': '渠道管理',
+      '/leads': '线索中心',
+      '/wps-ops': '运营中心',
+      '/ops/dashboard': '指标看板',
+      '/ops/enterprise': '企业管理',
+      '/organization': '组织架构',
+      '/users': '用户管理',
+      '/roles': '角色管理',
+      '/merchandises': '商品管理',
+      '/product-pricing/msrp': '建议售价',
+      '/product-pricing/channel': '渠道价格',
+    };
+    if (staticMap[pathname]) return staticMap[pathname];
+    const m = pathname.match(/^\/orders\/(.+)$/);
+    if (m) return `订单 ${m[1]}`;
+    const c = pathname.match(/^\/customers\/(.+)$/);
+    if (c) return `客户详情`;
+    const ch = pathname.match(/^\/channels\/(.+)$/);
+    if (ch) return `渠道详情`;
+    return '页面';
+  };
+
+  useEffect(() => {
+    const path = location.pathname;
+    const title = getTabTitle(path);
+    setTabs(prev => {
+      if (prev.find(t => t.id === path)) return prev;
+      return [...prev, { id: path, title, path }];
+    });
+    setActiveTabId(path);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  const closeTab = (e: React.MouseEvent, tabId: string) => {
+    e.stopPropagation();
+    const idx = tabs.findIndex(t => t.id === tabId);
+    const newTabs = tabs.filter(t => t.id !== tabId);
+    setTabs(newTabs);
+    if (tabId === activeTabId) {
+      if (newTabs.length > 0) {
+        const next = newTabs[Math.max(0, idx - 1)];
+        navigate(next.path);
+      } else {
+        navigate('/');
+      }
+    }
+  };
+  // ── End Tab Bar ────────────────────────────────────────────
 
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [feedbackType, setFeedbackType] = useState<'bug' | 'feature' | 'other'>('bug');
@@ -54,8 +133,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }, 2000);
   };
 
-  const location = useLocation();
-  const navigate = useNavigate();
   const hideSidebar = false;
 
   useEffect(() => {
@@ -76,11 +153,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         setActiveTopNav('LEADS_CENTER');
     } else if (location.pathname.startsWith('/wps-ops') || location.pathname.startsWith('/ops')) {
         setActiveTopNav('OPERATIONS_CENTER');
-    } else if (location.pathname.startsWith('/customers') || location.pathname.startsWith('/opportunities')) {
-        setActiveTopNav('CRM');
     } else if (location.pathname.startsWith('/channels')) {
         setActiveTopNav('CHANNEL_CENTER');
-    } else if (location.pathname.startsWith('/contracts') || location.pathname.startsWith('/remittances') || location.pathname.startsWith('/invoices') || location.pathname.startsWith('/authorizations') || location.pathname.startsWith('/delivery-info')) {
+    } else if (location.pathname.startsWith('/customers') || location.pathname.startsWith('/opportunities') || location.pathname.startsWith('/contracts') || location.pathname.startsWith('/remittances') || location.pathname.startsWith('/invoices') || location.pathname.startsWith('/authorizations') || location.pathname.startsWith('/delivery-info')) {
         setActiveTopNav('ORDER_CENTER');
     } else if (location.pathname.startsWith('/organization') || location.pathname.startsWith('/users') || location.pathname.startsWith('/roles')) {
           setActiveTopNav('SYSTEM_CONFIG');
@@ -132,7 +207,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const topNavItems = [
       { id: 'DASHBOARD', label: '数据看板', path: '/', permissions: ['dashboard_view'] },
       { id: 'ORDER_CENTER', label: '订单中心', path: '/orders', permissions: ['order_list_view', 'order_view_all', 'order_view_pending_approval', 'order_view_pending_confirm', 'order_view_auth_confirm', 'order_view_stock_pkg', 'order_view_stock_ship', 'order_view_stock_cd', 'order_view_payment', 'order_view_shipped', 'order_view_completed', 'contract_view', 'remittance_view', 'invoice_manage', 'authorization_view', 'delivery_info_view'] },
-      { id: 'CRM', label: 'CRM', path: '/customers', permissions: ['customer_view', 'opportunity_manage'] },
       { id: 'PRODUCT_CENTER', label: '产品中心', path: '/product-center', permissions: ['product_display_view', 'product_display_preview', 'product_view', 'merchandise_view', 'product_msrp_view', 'product_channel_price_view', 'product_component_pool_view', 'product_package_view', 'product_license_template_view', 'product_attr_config_view'] },
       { id: 'PERFORMANCE_CENTER', label: '业绩中心', path: '/performance', permissions: ['performance_view'] },
       { id: 'CHANNEL_CENTER', label: '渠道中心', path: '/channels', permissions: ['channel_view'] },
@@ -183,7 +257,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="h-screen flex flex-col font-sans overflow-hidden bg-[#F5F5F7] dark:bg-black transition-colors duration-300 selection:bg-blue-500/30">
       
       {/* Top Header */}
-      <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 z-30 sticky top-0 bg-white/70 backdrop-blur-xl border-b border-gray-200/50 dark:bg-[#1C1C1E]/70 dark:border-white/10 transition-all">
+      <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 z-30 sticky top-0 bg-white border-b border-gray-200/50 dark:bg-[#1C1C1E] dark:border-white/10 transition-all">
           <div className="flex items-center gap-6">
               {/* Logo Area */}
               <div className="flex items-center gap-3">
@@ -365,12 +439,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           </>,
                           ['contract_view', 'authorization_view', 'delivery_info_view']
                         )}
-                      </>
-                    )}
-
-                    {activeTopNav === 'CRM' && (
-                      <>
-                        {renderSectionGroup('crm_main', 'CRM',
+                        {renderSectionGroup('crm_info', 'CRM 信息',
                           <>
                             <NavItem to="/customers" icon={Users} label="客户信息" permission="customer_view" />
                             <NavItem to="/opportunities" icon={Target} label="商机信息" permission="opportunity_manage" />
@@ -400,7 +469,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           <>
                             <NavItem to="/products" icon={Package} label="产品列表" permission="product_view" />
                             <NavItem to="/product-manage/component-pool" icon={ListTree} label="组件池" permission="product_component_pool_view" />
-                            <NavItem to="/product-manage/packages" icon={HardDriveDownload} label="产品安装包管理" permission="product_package_view" />
+                            <NavItem to="/product-manage/packages" icon={HardDriveDownload} label="安装包管理" permission="product_package_view" />
                             <NavItem to="/product-manage/license-templates" icon={FileKey} label="产品授权模板" permission="product_license_template_view" />
                             <NavItem to="/product-manage/attr-config" icon={SlidersHorizontal} label="属性配置" permission="product_attr_config_view" />
                           </>,
@@ -494,9 +563,44 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           )}
 
           {/* Content Area */}
-          <main className="flex-1 overflow-auto scroll-smooth relative custom-scrollbar p-0 lg:p-0">
-              {children}
-          </main>
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Tab Bar */}
+            {tabs.length > 0 && (
+              <div className="shrink-0 flex items-end bg-[#F0F0F2] dark:bg-[#111] border-b border-gray-200 dark:border-white/10 px-2 overflow-x-auto no-scrollbar" style={{ height: 36 }}>
+                {tabs.map(tab => {
+                  const isActive = activeTabId === tab.id;
+                  return (
+                    <div
+                      key={tab.id}
+                      onClick={() => navigate(tab.path)}
+                      className={`group relative flex items-center gap-1.5 px-3 cursor-pointer shrink-0 select-none transition-colors duration-150 rounded-t-lg mr-0.5 ${
+                        isActive
+                          ? 'bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white shadow-[0_-1px_0_0_#e5e7eb] dark:shadow-[0_-1px_0_0_rgba(255,255,255,0.1)]'
+                          : 'bg-transparent text-gray-500 dark:text-gray-400 hover:bg-white/70 dark:hover:bg-white/8 hover:text-gray-800 dark:hover:text-gray-200'
+                      }`}
+                      style={{ height: 34, maxWidth: 160 }}
+                    >
+                      <span className="text-xs font-medium truncate max-w-[110px] whitespace-nowrap">{tab.title}</span>
+                      <button
+                        onClick={(e) => closeTab(e, tab.id)}
+                        className={`shrink-0 w-4 h-4 rounded-full flex items-center justify-center transition-all hover:bg-gray-200 dark:hover:bg-white/20 ${
+                          isActive ? 'opacity-60 hover:opacity-100' : 'opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100'
+                        }`}
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                      {isActive && (
+                        <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#0071E3] dark:bg-[#0A84FF] rounded-t-full" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <main className="flex-1 overflow-auto scroll-smooth relative custom-scrollbar p-0 lg:p-0">
+                {children}
+            </main>
+          </div>
       </div>
 
       {/* Manual Panel Overlay */}
@@ -560,20 +664,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Feedback FAB */}
       {!isFeedbackOpen && (
-        <button
-          onClick={() => { resetFeedback(); setIsFeedbackOpen(true); }}
-          className="fixed bottom-6 right-6 z-[60] group flex items-center gap-2 bg-white dark:bg-[#232326] text-[#0071E3] dark:text-blue-400 pl-4 pr-5 py-2.5 rounded-full shadow-sm border border-gray-200 dark:border-white/10 hover:shadow-md hover:border-gray-300 dark:hover:border-white/20 transition-all duration-300 active:scale-95"
-        >
-          <MessageSquarePlus className="w-5 h-5" />
-          <span className="text-sm font-medium">反馈</span>
-        </button>
+        <div className="fixed bottom-[104px] right-0 z-[60]">
+          <button
+            onClick={() => { resetFeedback(); setIsFeedbackOpen(true); }}
+            className="flex items-center gap-2 bg-white dark:bg-[#232326] text-[#0071E3] dark:text-blue-400 pl-4 pr-5 py-2.5 rounded-l-full shadow-md border border-gray-200 dark:border-white/10 translate-x-[calc(100%-40px)] hover:translate-x-0 transition-transform duration-300 ease-in-out active:scale-95"
+          >
+            <MessageSquarePlus className="w-5 h-5 shrink-0" />
+            <span className="text-sm font-medium whitespace-nowrap">反馈</span>
+          </button>
+        </div>
       )}
 
       {/* Feedback Panel */}
       {isFeedbackOpen && (
         <>
           <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-[60]" onClick={() => { setIsFeedbackOpen(false); setTimeout(resetFeedback, 300); }} />
-          <div className="fixed bottom-6 right-6 z-[61] w-[420px] max-h-[85vh] flex flex-col bg-white dark:bg-[#232326] rounded-2xl shadow-2xl shadow-black/20 border border-gray-200/60 dark:border-white/10 overflow-hidden animate-feedback-enter">
+          <div className="fixed bottom-[104px] right-[8px] z-[61] w-[420px] max-h-[85vh] flex flex-col bg-white dark:bg-[#232326] rounded-2xl shadow-2xl shadow-black/20 border border-gray-200/60 dark:border-white/10 overflow-hidden animate-feedback-enter">
             {feedbackSubmitted ? (
               <div className="flex flex-col items-center justify-center py-16 px-6">
                 <div className="w-16 h-16 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center mb-4">

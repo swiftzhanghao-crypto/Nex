@@ -16,7 +16,7 @@ import OrderDetails from './components/order/OrderDetails';
 import CustomerDetails from './components/crm/CustomerDetails';
 import MerchandiseDetails from './components/product/MerchandiseDetails';
 import ChannelDetails from './components/channel/ChannelDetails';
-import OpportunityDetails from './components/crm/OpportunityDetails';
+
 import LeadsManager from './components/crm/LeadsManager';
 import Dashboard from './components/layout/Dashboard';
 import ProductPreview from './components/product/ProductPreview';
@@ -28,6 +28,8 @@ import PerformanceManager from './components/performance/PerformanceManager';
 import AuthorizationManager from './components/order/AuthorizationManager';
 import DeliveryInfoManager from './components/order/DeliveryInfoManager';
 import OperationsManager from './components/operations/OperationsManager';
+import OpsEnterpriseManager from './components/operations/OpsEnterpriseManager';
+import OpsDashboard from './components/operations/OpsDashboard';
 import ProjectManager from './components/project/ProjectManager';
 import ProjectDetails from './components/project/ProjectDetails';
 import ProductComponentPoolManager from './components/product/ProductComponentPoolManager';
@@ -63,7 +65,6 @@ function AppRoutes() {
         <Route path="/channels/:id" element={<ChannelDetails />} />
 
         <Route path="/opportunities" element={<OpportunityManager />} />
-        <Route path="/opportunities/:id" element={<OpportunityDetails />} />
 
         <Route path="/contracts" element={<ContractManager />} />
         <Route path="/remittances" element={<RemittanceManager />} />
@@ -91,6 +92,8 @@ function AppRoutes() {
 
         {/* 运营中心 */}
         <Route path="/wps-ops" element={<OperationsManager />} />
+        <Route path="/ops/dashboard" element={<OpsDashboard />} />
+        <Route path="/ops/enterprise" element={<OpsEnterpriseManager />} />
         <Route path="/ops/*" element={<OperationsManager />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />

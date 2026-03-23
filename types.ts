@@ -157,6 +157,11 @@ export interface InstallPackage {
     os?: string;
     arch?: string;
     remarks?: string;
+    deliveryItemId?: string;
+    deliveryItemName?: string;
+    productSpec?: string;
+    enabled?: boolean;
+    packageType?: 'public' | 'private';
 }
 
 export interface Product {
@@ -191,8 +196,8 @@ export interface SalesMerchandise {
     items: MerchandiseItem[];
 }
 
-export type CustomerType = 'Enterprise' | 'SMB' | 'Government' | 'Education' | 'Partner';
-export type CustomerLevel = 'KA' | 'A' | 'B' | 'C';
+export type CustomerType = string;
+export type CustomerLevel = string;
 export type ContactRole = 'Purchasing' | 'IT' | 'Finance' | 'Management' | 'Other';
 
 export interface CustomerContact {
@@ -203,9 +208,13 @@ export interface CustomerContact {
     position?: string;
     roles: ContactRole[];
     isPrimary: boolean;
+    creatorId?: string;
+    creatorName?: string;
+    createdAt?: string;
 }
 
 export interface BillingInfo {
+    invoiceType?: '增值税普通发票' | '增值税专用发票';
     taxId: string;
     title: string;
     bankName: string;
@@ -214,9 +223,13 @@ export interface BillingInfo {
     registerPhone: string;
 }
 
+export type EnterpriseSource = '客户创建' | '渠道人员创建';
+
 export interface Enterprise {
     id: string;
     name: string;
+    createdAt?: string;
+    source?: EnterpriseSource;
 }
 
 export interface Customer {
@@ -253,6 +266,7 @@ export interface Customer {
     dealerName?: string;
     levelFocusUnit?: string;
     customerGrade?: string;
+    createdAt?: string;
 }
 
 export type UserRole = 'Admin' | 'Sales' | 'Business' | 'Technical' | 'Logistics' | string; // Updated to allow dynamic strings
@@ -309,6 +323,7 @@ export type ChannelType = 'Distributor' | 'Reseller' | 'SI' | 'ISV';
 
 export interface Channel {
     id: string;
+    crmId?: string;
     name: string;
     type: ChannelType;
     level: 'Tier1' | 'Tier2' | 'Tier3';
@@ -316,24 +331,28 @@ export interface Channel {
     contactPhone: string;
     email: string;
     region: string;
+    province?: string;
     status: 'Active' | 'Inactive';
+    contractStatus?: '已签约' | '未签约';
+    erpSyncStatus?: '已同步' | '未同步';
     agreementDate: string;
 }
 
-export type OpportunityStage = 'New' | 'Qualification' | 'Proposal' | 'Negotiation' | 'Closed Won' | 'Closed Lost';
+export type OpportunityStage = '需求判断' | '确认商机' | '确认渠道' | '证实方案' | '赢单' | '输单';
 
 export interface Opportunity {
     id: string;
-    crmId?: string; // 商机名称(CRM)
+    crmId?: string;
     name: string;
     customerId: string;
     customerName: string;
-    productType?: string; // 产品类型/授权方式
+    productType?: string;
     stage: OpportunityStage;
     probability: number;
-    amount?: number; // 商机金额
+    department?: string;
+    amount?: number;
     expectedRevenue: number;
-    finalUserRevenue?: number; // 最终用户成交额
+    finalUserRevenue?: number;
     closeDate: string;
     ownerId: string;
     ownerName: string;
@@ -341,6 +360,7 @@ export interface Opportunity {
 }
 
 export enum OrderStatus {
+    DRAFT = 'DRAFT',
     PENDING_APPROVAL = 'PENDING_APPROVAL',
     PENDING_CONFIRM = 'PENDING_CONFIRM',
     PROCESSING_PROD = 'PROCESSING_PROD',
@@ -511,6 +531,11 @@ export interface Order {
 
     conversionDeductionAmount?: number; // 折算抵扣金额
     conversionAmount?: number;          // 折算金额（低于实付金额）
+
+    orderRemark?: string;
+
+    linkedContractIds?: string[];
+    linkedContractNames?: string[];
 }
 
 export type ProjectStatus = 'Planning' | 'Ongoing' | 'OnHold' | 'Completed' | 'Cancelled';
@@ -550,6 +575,7 @@ export interface Contract {
     signDate?: string;
     createdAt: string;
     orderId?: string;
+    customerId?: string;
 }
 
 // --- Remittance (migrated from RemittanceManager.tsx) ---
@@ -633,4 +659,40 @@ export interface DeliveryInfo {
     authEndDate?: string;
     serviceStartDate?: string;
     serviceEndDate?: string;
+}
+
+export interface OrderDraft {
+    id: string;
+    savedAt: string;
+    currentStep: number;
+    // Step 1
+    buyerType: BuyerType | '';
+    orderSource: OrderSource;
+    creatorId: string;
+    originalOrderId?: string;
+    // Step 2
+    hasOpportunity: 'yes' | 'no' | '';
+    linkedOpportunityId: string;
+    newOrderCustomer: string;
+    orderEnterpriseId: string;
+    selectedChannelId: string;
+    salesRepId: string;
+    businessManagerId: string;
+    // Step 3
+    newOrderItems: OrderItem[];
+    tempCategory: string;
+    // Step 4
+    invoiceForm: InvoiceInfo;
+    paymentMethod: PaymentMethod;
+    paymentTerms: string;
+    deliveryMethod: DeliveryMethod;
+    receivingParty: string;
+    receivingCompany: string;
+    receivingMethod: string;
+    shippingAddress: string;
+    acceptanceForm: AcceptanceInfo;
+    acceptanceType: AcceptanceType;
+    phaseDrafts: { name: string; percentage: number }[];
+    orderRemark: string;
+    linkedContractIds: string[];
 }

@@ -1,60 +1,17 @@
 
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Enterprise, CustomerType, CustomerLevel, CustomerContact, ContactRole, OrderStatus } from '../../types';
-import { ArrowLeft, Building2, MapPin, Phone, Mail, CreditCard, History, Briefcase, Save, Edit2, X, Plus, Trash2, Building, Bell, Clock, Users, CheckSquare, Tag, ArrowUpCircle, Archive, Target, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, Building2, Phone, Mail, CreditCard, Building, Users, Plus, X, MapPin, Trash2, FileText, UserCircle, CheckSquare, Pencil } from 'lucide-react';
+import { CustomerContact, ContactRole } from '../../types';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
 
-const statusMap: Record<string, string> = {
-    [OrderStatus.PENDING_APPROVAL]: '待审批',
-    [OrderStatus.PENDING_CONFIRM]: '待确认',
-    [OrderStatus.PROCESSING_PROD]: '备货中',
-    [OrderStatus.PENDING_PAYMENT]: '待支付',
-    [OrderStatus.SHIPPED]: '已发货',
-    [OrderStatus.DELIVERED]: '已完成',
-    [OrderStatus.CANCELLED]: '已取消',
-    [OrderStatus.REFUND_PENDING]: '退款中',
-    [OrderStatus.REFUNDED]: '已退款',
-};
-
-const roleLabel = (r: string) =>
-    r === 'Purchasing' ? '采购' : r === 'IT' ? '技术' : r === 'Finance' ? '财务' : r === 'Management' ? '管理' : '其他';
-
 const CustomerDetails: React.FC = () => {
-  const { customers, setCustomers, orders, users } = useAppContext();
+  const { customers, setCustomers, users, currentUser } = useAppContext();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   const customer = customers.find(c => c.id === id);
-  const [selectedOwnerId, setSelectedOwnerId] = useState(customer?.ownerId || '');
-
-  const [isEditingOwner, setIsEditingOwner] = useState(false);
-  const [isEditingInfo, setIsEditingInfo] = useState(false);
-  const [isEditingBasic, setIsEditingBasic] = useState(false);
-  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
-  const [editingContactId, setEditingContactId] = useState<string | null>(null);
-  const [contactForm, setContactForm] = useState<CustomerContact>({
-      id: '', name: '', phone: '', email: '', position: '', roles: [], isPrimary: false
-  });
-
-  const [infoForm, setInfoForm] = useState({
-      address: '', shippingAddress: '', taxId: '', title: '',
-      bankName: '', accountNumber: '', registerAddress: '', registerPhone: ''
-  });
-  const [basicForm, setBasicForm] = useState<{
-      companyName: string; status: 'Active' | 'Inactive'; level: CustomerLevel;
-      customerType: CustomerType; industry: string; region: string;
-      crmId: string; reportTag: string; customerAttribute: string;
-      industryLine: string; industryPromotionType: string;
-      parentOrg: string; supervisoryOrg: string;
-      country: string; province: string; city: string; district: string;
-      companyPhone: string; customerGrade: string; levelFocusUnit: string;
-  }>({ companyName: '', status: 'Active', level: 'B', customerType: 'Enterprise', industry: '', region: '', crmId: '', reportTag: '', customerAttribute: '', industryLine: '', industryPromotionType: '', parentOrg: '', supervisoryOrg: '', country: '', province: '', city: '', district: '', companyPhone: '', customerGrade: '', levelFocusUnit: '' });
-  const [newEnterprise, setNewEnterprise] = useState<Partial<Enterprise>>({ id: '', name: '' });
-
-  const customerOrders = orders.filter(o => o.customerId === id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const salesUsers = users.filter(u => u.role === 'Sales' || u.role === 'Admin');
 
   if (!customer) {
     return (
@@ -67,87 +24,127 @@ const CustomerDetails: React.FC = () => {
     );
   }
 
-  const handleSaveOwner = () => {
-      const owner = users.find(u => u.id === selectedOwnerId);
-      setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, ownerId: selectedOwnerId, ownerName: owner?.name } : c));
-      setIsEditingOwner(false);
+  const roleLabel = (r: string) =>
+      r === 'Purchasing' ? '采购' : r === 'IT' ? 'IT' : r === 'Finance' ? '财务' : r === 'Management' ? '管理' : '其他';
+
+  const [activeTab, setActiveTab] = useState<'info' | 'org' | 'contacts' | 'address' | 'invoice'>('info');
+
+  interface ShippingAddress {
+      id: string; receiver: string; country: string; province: string; city: string;
+      detail: string; phone: string; email: string; creator: string;
+  }
+  const [addresses, setAddresses] = useState<ShippingAddress[]>(() => [
+      { id: 'addr-1', receiver: '陈经理', country: '中国', province: customer.province || '北京市', city: customer.city || customer.region || '北京市', detail: customer.address || '高新区科技路100号', phone: customer.contacts[0]?.phone || '13900001000', email: customer.contacts[0]?.email || '', creator: customer.ownerName || '系统' },
+  ]);
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const emptyAddr = { receiver: '', country: '中国', province: '', city: '', detail: '', phone: '', email: '' };
+  const [addrForm, setAddrForm] = useState(emptyAddr);
+  const openAddAddress = () => {
+      setAddrForm(emptyAddr);
+      setIsEditingAddress(false);
+      setEditingAddressId(null);
+      setIsAddressModalOpen(true);
   };
-  const handleEditInfo = () => {
-      setInfoForm({
-          address: customer.address || '', shippingAddress: customer.shippingAddress || '',
-          taxId: customer.billingInfo?.taxId || '', title: customer.billingInfo?.title || '',
-          bankName: customer.billingInfo?.bankName || '', accountNumber: customer.billingInfo?.accountNumber || '',
-          registerAddress: customer.billingInfo?.registerAddress || '', registerPhone: customer.billingInfo?.registerPhone || ''
-      });
-      setIsEditingInfo(true);
+  const openEditAddress = (addr: { id: string; receiver: string; country: string; province: string; city: string; detail: string; phone: string; email: string; creator: string }) => {
+      setAddrForm({ receiver: addr.receiver, country: addr.country, province: addr.province, city: addr.city, detail: addr.detail, phone: addr.phone, email: addr.email });
+      setIsEditingAddress(true);
+      setEditingAddressId(addr.id);
+      setIsAddressModalOpen(true);
   };
-  const handleSaveInfo = () => {
-      setCustomers(prev => prev.map(c => c.id === customer.id ? {
-          ...c, address: infoForm.address, shippingAddress: infoForm.shippingAddress,
-          billingInfo: { taxId: infoForm.taxId, title: infoForm.title, bankName: infoForm.bankName, accountNumber: infoForm.accountNumber, registerAddress: infoForm.registerAddress, registerPhone: infoForm.registerPhone }
-      } : c));
-      setIsEditingInfo(false);
-  };
-  const handleEditBasic = () => {
-      setBasicForm({
-          companyName: customer.companyName, status: customer.status, level: customer.level,
-          customerType: customer.customerType, industry: customer.industry, region: customer.region,
-          crmId: customer.crmId || '', reportTag: customer.reportTag || '',
-          customerAttribute: customer.customerAttribute || '',
-          industryLine: customer.industryLine || '', industryPromotionType: customer.industryPromotionType || '',
-          parentOrg: customer.parentOrg || '', supervisoryOrg: customer.supervisoryOrg || '',
-          country: customer.country || '', province: customer.province || '',
-          city: customer.city || '', district: customer.district || '',
-          companyPhone: customer.companyPhone || '', customerGrade: customer.customerGrade || '',
-          levelFocusUnit: customer.levelFocusUnit || '',
-      });
-      setIsEditingBasic(true);
-  };
-  const handleSaveBasic = () => {
-      setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, ...basicForm } : c));
-      setIsEditingBasic(false);
-  };
-  const handleAddContact = () => {
-      setEditingContactId(null);
-      setContactForm({ id: `ct-${Date.now()}`, name: '', phone: '', email: '', position: '', roles: ['Purchasing'], isPrimary: false });
-      setIsContactModalOpen(true);
-  };
-  const handleEditContact = (contact: CustomerContact) => { setEditingContactId(contact.id); setContactForm({ ...contact }); setIsContactModalOpen(true); };
-  const handleDeleteContact = (contactId: string) => {
-      if (confirm('确定要删除此联系人吗？')) {
-          setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, contacts: c.contacts.filter(ct => ct.id !== contactId) } : c));
+  const handleSaveAddress = () => {
+      if (!addrForm.receiver || !addrForm.phone || !addrForm.province || !addrForm.city || !addrForm.detail) return;
+      if (isEditingAddress && editingAddressId) {
+          setAddresses(prev => prev.map(a => a.id === editingAddressId ? { ...a, ...addrForm } : a));
+      } else {
+          setAddresses(prev => [...prev, { ...addrForm, id: `addr-${Date.now()}`, creator: currentUser?.name || '当前用户' }]);
       }
+      setIsAddressModalOpen(false);
   };
-  const handleSaveContact = () => {
-      if (!contactForm.name) return;
-      let contacts = [...customer.contacts];
-      if (contactForm.isPrimary) contacts = contacts.map(c => ({ ...c, isPrimary: false }));
-      if (editingContactId) contacts = contacts.map(c => c.id === editingContactId ? contactForm : c);
-      else contacts.push(contactForm);
-      if (contacts.length === 1) contacts[0].isPrimary = true;
-      setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, contacts } : c));
-      setIsContactModalOpen(false);
+
+  const [isLinkEnterpriseOpen, setIsLinkEnterpriseOpen] = useState(false);
+  const [linkEnterpriseId, setLinkEnterpriseId] = useState('');
+  const [linkEnterpriseName, setLinkEnterpriseName] = useState('');
+  const handleLinkEnterprise = () => {
+      if (!linkEnterpriseId.trim()) return;
+      const today = new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(/\//g, '-');
+      const newEnt = { id: linkEnterpriseId.trim(), name: linkEnterpriseName.trim() || linkEnterpriseId.trim(), createdAt: today, source: '渠道人员创建' as const };
+      const enterprises = [...(customer.enterprises || []), newEnt];
+      setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, enterprises } : c));
+      setLinkEnterpriseId('');
+      setLinkEnterpriseName('');
+      setIsLinkEnterpriseOpen(false);
   };
+
+  const [isCreateEnterpriseOpen, setIsCreateEnterpriseOpen] = useState(false);
+  const emptyEnt = { name: '', industry: '', province: '', contact: '', phone: '' };
+  const [createEntForm, setCreateEntForm] = useState(emptyEnt);
+  const handleCreateEnterprise = () => {
+      if (!createEntForm.name.trim()) return;
+      const newId = (600000000 + Math.floor(Math.random() * 999999)).toString();
+      const today = new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(/\//g, '-');
+      const newEnt = { id: newId, name: createEntForm.name.trim(), createdAt: today, source: '客户创建' as const };
+      const enterprises = [...(customer.enterprises || []), newEnt];
+      setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, enterprises } : c));
+      setCreateEntForm(emptyEnt);
+      setIsCreateEnterpriseOpen(false);
+  };
+
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [invoiceFormTouched, setInvoiceFormTouched] = useState(false);
+  const emptyInvoice = { invoiceType: '增值税专用发票' as '增值税普通发票' | '增值税专用发票', title: customer.companyName, taxId: '', registerAddress: '', registerPhone: '', accountNumber: '', bankName: '' };
+  const [invoiceForm, setInvoiceForm] = useState(emptyInvoice);
+  const handleSaveInvoice = () => {
+      setInvoiceFormTouched(true);
+      const { taxId, registerAddress, registerPhone, accountNumber, bankName } = invoiceForm;
+      if (!taxId || !registerAddress || !registerPhone || !accountNumber || !bankName) return;
+      const billingInfo = { ...invoiceForm };
+      setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, billingInfo } : c));
+      setIsInvoiceModalOpen(false);
+      setInvoiceFormTouched(false);
+  };
+
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [isEditingContact, setIsEditingContact] = useState(false);
+  const emptyContact: CustomerContact = { id: '', name: '', phone: '', email: '', position: '', roles: ['Purchasing'], isPrimary: false };
+  const [contactForm, setContactForm] = useState<CustomerContact>(emptyContact);
   const toggleRole = (role: ContactRole) => {
       setContactForm(f => ({ ...f, roles: f.roles.includes(role) ? f.roles.filter(r => r !== role) : [...f.roles, role] }));
   };
-  const handleAddEnterprise = () => {
-      if (!newEnterprise.name || !newEnterprise.id) return;
-      setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, enterprises: [...(c.enterprises || []), newEnterprise as Enterprise] } : c));
-      setNewEnterprise({ id: '', name: '' });
+  const openAddContact = () => {
+      setContactForm(emptyContact);
+      setIsEditingContact(false);
+      setIsContactModalOpen(true);
   };
-  const handleRemoveEnterprise = (entId: string) => {
-      setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, enterprises: (c.enterprises || []).filter(e => e.id !== entId) } : c));
+  const openEditContact = (contact: CustomerContact) => {
+      setContactForm({ ...contact });
+      setIsEditingContact(true);
+      setIsContactModalOpen(true);
   };
-  const handleSetFollowUp = () => {
-      if (customerOrders.length === 0) { alert('该客户暂无订单记录，无法计算基于订单的回访日期。'); return; }
-      const next = new Date(customerOrders[0].date);
-      next.setDate(next.getDate() + 30);
-      setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, nextFollowUpDate: next.toISOString() } : c));
+  const handleSaveContact = () => {
+      if (!contactForm.name || !contactForm.phone || !contactForm.email || contactForm.roles.length === 0) return;
+      let contacts = [...customer.contacts];
+      if (isEditingContact) {
+          if (contactForm.isPrimary) contacts = contacts.map(c => ({ ...c, isPrimary: c.id === contactForm.id }));
+          contacts = contacts.map(c => c.id === contactForm.id ? { ...contactForm } : c);
+      } else {
+          const newContact: CustomerContact = {
+              ...contactForm,
+              id: `ct-${Date.now()}`,
+              creatorId: currentUser.id,
+              creatorName: currentUser.name,
+              createdAt: new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(/\//g, '-'),
+          };
+          if (newContact.isPrimary) contacts = contacts.map(c => ({ ...c, isPrimary: false }));
+          contacts.push(newContact);
+          if (contacts.length === 1) contacts[0].isPrimary = true;
+      }
+      setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, contacts } : c));
+      setIsContactModalOpen(false);
   };
 
   const ownerUser = users.find(u => u.id === customer.ownerId);
-  const totalOrderAmount = customerOrders.reduce((s, o) => s + o.total, 0);
 
   const levelColors: Record<string, string> = {
       KA: 'bg-purple-100 text-purple-700 border-purple-200',
@@ -156,512 +153,614 @@ const CustomerDetails: React.FC = () => {
       C: 'bg-gray-100 text-gray-600 border-gray-200',
   };
   const typeLabel: Record<string, string> = {
-      Enterprise: '企业', Government: '政府', Education: '教育', Partner: '合作伙伴', SMB: '中小企业'
+      Enterprise: '企业', Government: '政府', Education: '教育', Partner: '合作伙伴', SMB: '中小企业',
   };
-
-  /* ── shared card header style ── */
-  const CardHeader = ({ icon: Icon, color, title, action }: { icon: React.ElementType; color: string; title: string; action?: React.ReactNode }) => (
-      <div className="border-b border-gray-100 dark:border-white/10 pb-2.5 flex items-center justify-between">
-          <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-              <Icon className={`w-5 h-5 ${color}`} /> {title}
-          </h4>
-          {action}
-      </div>
-  );
-
-  const FieldRow = ({ label, children }: { label: string; children: React.ReactNode }) => (
-      <div className="flex items-start gap-8 py-3 border-b border-gray-50 dark:border-white/5 last:border-0">
-          <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-28 shrink-0 whitespace-nowrap">{label}</span>
-          <div className="text-sm font-medium text-gray-900 dark:text-white flex-1">{children}</div>
-      </div>
-  );
+  const getTypeDisplay = (t: string) => typeLabel[t] || t;
 
   return (
-    <div className="p-4 lg:p-6 max-w-[2400px] mx-auto w-full animate-page-enter pb-20 space-y-0">
+    <div className="max-w-[2400px] mx-auto w-full animate-page-enter pb-20">
 
-      {/* ── Sticky Top Bar ── */}
-      <div className="sticky top-0 z-20 bg-white/80 dark:bg-[#1C1C1E]/80 backdrop-blur-xl border-b border-gray-200/60 dark:border-white/10 -mx-4 lg:-mx-6 px-4 lg:px-6 py-3 mb-6">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-4">
-                  <button onClick={() => navigate('/customers')} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 hover:text-gray-700 dark:hover:text-white transition">
-                      <ArrowLeft className="w-5 h-5" />
-                  </button>
-                  {/* Avatar */}
-                  <div className="w-11 h-11 rounded-2xl bg-[#0071E3]/10 dark:bg-blue-900/30 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-800/30 overflow-hidden">
-                      {customer.logo
-                          ? <img src={customer.logo} alt="" className="w-full h-full object-cover" />
-                          : <Building2 className="w-5 h-5 text-[#0071E3]" />}
-                  </div>
-                  <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                          <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white tracking-tight">{customer.companyName}</h1>
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${levelColors[customer.level] || levelColors.C}`}>{customer.level}</span>
-                          <span className={`unified-tag-xs ${customer.status === 'Active' ? 'unified-tag-blue' : 'unified-tag-gray'} flex items-center gap-1`}>
-                              {customer.status === 'Active' ? <ArrowUpCircle className="w-3 h-3" /> : <Archive className="w-3 h-3" />}
-                              {customer.status === 'Active' ? '合作中' : '已暂停'}
-                          </span>
-                          <span className="hidden sm:inline text-xs text-gray-400 font-mono">ID: {customer.id}</span>
-                      </div>
-                      <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
-                          <span className="flex items-center gap-1"><Building className="w-3 h-3" />{customer.industry}</span>
-                          <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{customer.region}</span>
-                          <span className="flex items-center gap-1"><ShoppingCart className="w-3 h-3" />{customerOrders.length} 笔订单</span>
-                      </div>
-                  </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                  <button onClick={handleSetFollowUp} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 text-gray-600 dark:text-gray-300 text-sm font-medium transition">
-                      <Clock className="w-4 h-4" />
-                      {customer.nextFollowUpDate ? `跟进: ${new Date(customer.nextFollowUpDate).toLocaleDateString()}` : '设置回访'}
-                  </button>
-              </div>
-          </div>
-      </div>
-
-      {/* ── Stats Bar ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          {[
-              { label: '历史订单', value: customerOrders.length, suffix: '笔', icon: ShoppingCart, color: 'text-[#0071E3]', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-              { label: '累计消费', value: `¥${totalOrderAmount.toLocaleString()}`, suffix: '', icon: CreditCard, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20' },
-              { label: '联系人', value: customer.contacts.length, suffix: '位', icon: Users, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/20' },
-              { label: '关联租户', value: (customer.enterprises || []).length, suffix: '个', icon: Building2, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/20' },
-          ].map((s, i) => (
-              <div key={i} className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 p-4 flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${s.bg}`}>
-                      <s.icon className={`w-5 h-5 ${s.color}`} />
-                  </div>
-                  <div>
-                      <div className="text-xs text-gray-400 dark:text-gray-500">{s.label}</div>
-                      <div className="text-lg font-bold text-gray-900 dark:text-white">{s.value}<span className="text-sm font-normal text-gray-400 ml-0.5">{s.suffix}</span></div>
-                  </div>
-              </div>
-          ))}
-      </div>
-
-      {/* ── 基本信息 (Full Width Table) ── */}
-      <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden mb-4">
-          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-white/10">
-              <h4 className="text-sm font-bold text-gray-800 dark:text-white">基本信息</h4>
-              <button onClick={isEditingBasic ? handleSaveBasic : handleEditBasic} className="flex items-center gap-1 text-xs font-medium text-[#0071E3] hover:text-blue-700 transition">
-                  {isEditingBasic ? <Save className="w-3.5 h-3.5" /> : <Edit2 className="w-3.5 h-3.5" />}
-                  {isEditingBasic ? '保存' : '编辑'}
+      {/* ── Sticky Header + Tabs ── */}
+      <div className="sticky top-0 z-20 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-white/10 px-4 md:px-6 pt-4 flex flex-col">
+          <div className="flex items-center gap-4 pb-3">
+              <button onClick={() => navigate('/customers')} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition text-gray-500 dark:text-gray-400 shrink-0">
+                  <ArrowLeft className="w-5 h-5" />
               </button>
+              <div className="shrink-0">
+                  <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">{customer.companyName}</h1>
+                  <span className="text-xs text-gray-400 font-mono mt-0.5 block">{customer.id}</span>
+              </div>
           </div>
-          {isEditingBasic ? (
-              <div className="p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
-                  {([
-                      { label: '客户名称', key: 'companyName' },
-                      { label: '客户编号(CRM)', key: 'crmId' },
-                      { label: '报备标签', key: 'reportTag' },
-                      { label: '客户属性', key: 'customerAttribute' },
-                      { label: '行业条线', key: 'industryLine' },
-                      { label: '行业推广类', key: 'industryPromotionType' },
-                      { label: '客户级别', key: 'customerGrade' },
-                      { label: '上级单位', key: 'parentOrg' },
-                      { label: '层级维度关注一级单位', key: 'levelFocusUnit' },
-                      { label: '监管机构', key: 'supervisoryOrg' },
-                      { label: '所在国家', key: 'country' },
-                      { label: '所在省份', key: 'province' },
-                      { label: '所在城市', key: 'city' },
-                      { label: '所在区县', key: 'district' },
-                      { label: '公司地址', key: 'address' },
-                      { label: '公司电话', key: 'companyPhone' },
-                  ] as { label: string; key: string }[]).map(f => (
-                      <div key={f.key}>
-                          <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{f.label}</label>
-                          <input value={(basicForm as any)[f.key]} onChange={e => setBasicForm(p => ({ ...p, [f.key]: e.target.value }))} className="w-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 rounded-xl p-2 text-sm outline-none focus:border-[#0071E3] dark:text-white" />
+
+          <div className="flex gap-1 overflow-x-auto no-scrollbar pt-2 border-b border-gray-200 dark:border-white/10">
+              {([
+                  { id: 'info' as const, label: '客户信息' },
+                  { id: 'org' as const, label: '组织信息' },
+                  { id: 'contacts' as const, label: '联系人信息' },
+                  { id: 'address' as const, label: '收货地址' },
+                  { id: 'invoice' as const, label: '发票信息' },
+              ]).map(tab => (
+                  <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`relative px-5 py-2 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                          activeTab === tab.id
+                              ? 'text-[#0071E3] dark:text-[#0A84FF] border-[#0071E3] dark:border-[#0A84FF]'
+                              : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-200'
+                      }`}
+                  >
+                      {tab.label}
+                  </button>
+              ))}
+          </div>
+      </div>
+
+      <div className="p-4 lg:p-6 space-y-4">
+
+      {/* ── Tab: 客户信息 ── */}
+      {activeTab === 'info' && (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* 基本信息 (span 2) */}
+          <div className="md:col-span-2 unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                  <FileText className="w-4.5 h-4.5 text-[#0071E3]" />
+                  <h4 className="text-base font-bold text-gray-800 dark:text-white">基本信息</h4>
+              </div>
+              <div className="grid grid-cols-3 gap-0">
+                  {[
+                      { label: '客户编号', value: customer.id, mono: true },
+                      { label: '客户名称', value: customer.companyName },
+                      { label: '报备标签', value: customer.reportTag || '-' },
+                      { label: '客户属性', value: customer.customerAttribute || '-' },
+                      { label: '客户类型', value: typeLabel[customer.customerType] || customer.customerType },
+                      { label: '行业条线', value: customer.industryLine || customer.industry || '-' },
+                      { label: '行业推广类', value: customer.industryPromotionType || '-' },
+                      { label: '客户级别', value: customer.customerGrade || customer.level },
+                      { label: '上级单位', value: customer.parentOrg || '-' },
+                      { label: '层级维度关注一级单位', value: customer.levelFocusUnit || '-' },
+                      { label: '监管机构', value: customer.supervisoryOrg || '-' },
+                      { label: '所在国家', value: customer.country || '-' },
+                      { label: '所在省份', value: customer.province || '-' },
+                      { label: '所在城市', value: customer.city || customer.region || '-' },
+                      { label: '所在区县', value: customer.district || '-' },
+                      { label: '公司地址', value: customer.address || '-' },
+                      { label: '公司电话', value: customer.companyPhone || '-' },
+                      { label: '创建时间', value: customer.createdAt || '-' },
+                  ].map((field, idx) => (
+                      <div key={idx} className="px-5 py-3 border-b border-gray-100/80 dark:border-white/5">
+                          <div className="text-sm text-gray-400 dark:text-gray-500 mb-1">{field.label}</div>
+                          <div className={`text-sm text-gray-900 dark:text-white ${field.mono ? 'font-mono' : ''}`}>{field.value}</div>
                       </div>
                   ))}
-                  <div>
-                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">客户类型</label>
-                      <select value={basicForm.customerType} onChange={e => setBasicForm(p => ({ ...p, customerType: e.target.value as CustomerType }))} className="w-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 rounded-xl p-2 text-sm outline-none focus:border-[#0071E3] dark:text-white">
-                          {Object.entries(typeLabel).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                      </select>
-                  </div>
-                  <div>
-                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">等级</label>
-                      <select value={basicForm.level} onChange={e => setBasicForm(p => ({ ...p, level: e.target.value as CustomerLevel }))} className="w-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 rounded-xl p-2 text-sm outline-none focus:border-[#0071E3] dark:text-white">
-                          {['KA', 'A', 'B', 'C'].map(v => <option key={v} value={v}>{v}</option>)}
-                      </select>
-                  </div>
-                  <div>
-                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">状态</label>
-                      <select value={basicForm.status} onChange={e => setBasicForm(p => ({ ...p, status: e.target.value as 'Active' | 'Inactive' }))} className="w-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 rounded-xl p-2 text-sm outline-none focus:border-[#0071E3] dark:text-white">
-                          <option value="Active">合作中</option>
-                          <option value="Inactive">暂停/非活跃</option>
-                      </select>
-                  </div>
-                  <div className="lg:col-span-3 flex justify-end gap-2 pt-3">
-                      <button onClick={() => setIsEditingBasic(false)} className="px-4 py-1.5 rounded-xl bg-gray-100 dark:bg-white/10 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-200 transition">取消</button>
-                      <button onClick={handleSaveBasic} className="unified-button-primary bg-[#0071E3]">保存</button>
+              </div>
+          </div>
+
+          {/* 归属信息 (span 1) */}
+          <div className="md:col-span-1 unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden self-start">
+              <div className="px-5 py-3.5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                  <UserCircle className="w-4.5 h-4.5 text-indigo-500" />
+                  <h4 className="text-base font-bold text-gray-800 dark:text-white">归属信息</h4>
+              </div>
+              <div className="divide-y divide-gray-100/80 dark:divide-white/5">
+                  {[
+                      { label: '客户所有人', value: ownerUser?.name || '未分配', avatar: ownerUser?.avatar || (ownerUser ? `https://api.dicebear.com/9.x/avataaars/svg?seed=${ownerUser.name}` : '') },
+                      { label: '客户所属部门', value: customer.customerDepartment || '-' },
+                      { label: '客户所属经销商', value: customer.dealerName || '-' },
+                  ].map((item, idx) => (
+                      <div key={idx} className="px-5 py-3.5">
+                          <div className="text-sm text-gray-400 dark:text-gray-500 mb-1">{item.label}</div>
+                          <div className="text-sm text-gray-900 dark:text-white flex items-center gap-2">
+                              {item.avatar && <img src={item.avatar} className="w-5 h-5 rounded-full" alt="" />}
+                              <span>{item.value}</span>
+                          </div>
+                      </div>
+                  ))}
+              </div>
+          </div>
+      </div>
+      )}
+
+      {/* ── Tab: 组织信息 ── */}
+      {activeTab === 'org' && (
+      <div className="space-y-4">
+          <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                  <Building className="w-5 h-5 text-[#0071E3]" />
+                  <span className="text-base font-bold text-gray-800 dark:text-white">关联企业</span>
+                  <span className="text-xs text-gray-400">（共 {(customer.enterprises || []).length} 个）</span>
+              </div>
+              <div className="flex items-center gap-2">
+                  <button
+                      onClick={() => { setLinkEnterpriseId(''); setLinkEnterpriseName(''); setIsLinkEnterpriseOpen(true); }}
+                      className="flex items-center gap-1.5 text-xs px-3.5 py-2 rounded-xl border border-[#0071E3] text-[#0071E3] hover:bg-blue-50 dark:hover:bg-blue-900/20 transition font-medium"
+                  >
+                      <Plus className="w-3.5 h-3.5" /> 关联企业
+                  </button>
+                  <button
+                      onClick={() => { setCreateEntForm(emptyEnt); setIsCreateEnterpriseOpen(true); }}
+                      className="flex items-center gap-1.5 bg-[#0071E3] text-white text-xs px-3.5 py-2 rounded-xl hover:bg-blue-700 transition"
+                  >
+                      <Plus className="w-3.5 h-3.5" /> 创建企业
+                  </button>
+              </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {(customer.enterprises || []).length === 0 ? (
+                  <div className="md:col-span-3 unified-card dark:bg-[#1C1C1E] p-10 text-center text-sm text-gray-400">暂无关联企业，点击右上角添加。</div>
+              ) : (
+                  (customer.enterprises || []).map(ent => (
+                      <div key={ent.id} className="md:col-span-1 unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden self-start">
+                          <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                              <span className="text-sm font-bold text-gray-900 dark:text-white">{ent.name}</span>
+                              {ent.source && (
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${ent.source === '客户创建' ? 'bg-green-50 text-green-700 border-green-100 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800/30' : 'bg-purple-50 text-purple-700 border-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800/30'}`}>
+                                      {ent.source}
+                                  </span>
+                              )}
+                          </div>
+                          <div className="divide-y divide-gray-100/80 dark:divide-white/5">
+                              <div className="px-5 py-3">
+                                  <div className="text-sm text-gray-400 dark:text-gray-500 mb-1">企业 ID</div>
+                                  <div className="text-sm font-mono text-gray-900 dark:text-white flex items-center gap-2">
+                                      <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" /><span>{ent.id}</span>
+                                  </div>
+                              </div>
+                              {ent.createdAt && (
+                                  <div className="px-5 py-3 bg-gray-50/60 dark:bg-white/[0.02]">
+                                      <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
+                                          <span>创建时间：<span className="text-gray-600 dark:text-gray-300 font-medium">{ent.createdAt}</span></span>
+                                      </div>
+                                  </div>
+                              )}
+                          </div>
+                      </div>
+                  ))
+              )}
+          </div>
+      </div>
+      )}
+
+      {/* ── 关联企业弹窗 ── */}
+      {isLinkEnterpriseOpen && (
+          <ModalPortal>
+              <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-modal-enter">
+                      <div className="flex items-center justify-between mb-5">
+                          <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                              <Building2 className="w-4 h-4 text-[#0071E3]" /> 关联企业
+                          </h3>
+                          <button onClick={() => setIsLinkEnterpriseOpen(false)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 hover:text-gray-600 transition"><X className="w-4 h-4" /></button>
+                      </div>
+                      <div className="space-y-3">
+                          <div>
+                              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">企业 ID <span className="text-red-500">*</span></label>
+                              <input
+                                  value={linkEnterpriseId}
+                                  onChange={e => setLinkEnterpriseId(e.target.value)}
+                                  placeholder="输入企业 ID，例：600000100"
+                                  className="w-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 rounded-xl p-2.5 text-sm outline-none focus:border-[#0071E3] dark:text-white font-mono"
+                              />
+                          </div>
+                          <div>
+                              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">企业名称</label>
+                              <input
+                                  value={linkEnterpriseName}
+                                  onChange={e => setLinkEnterpriseName(e.target.value)}
+                                  placeholder="选填，不填则以 ID 展示"
+                                  className="w-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 rounded-xl p-2.5 text-sm outline-none focus:border-[#0071E3] dark:text-white"
+                              />
+                          </div>
+                      </div>
+                      <div className="flex gap-2 mt-5">
+                          <button onClick={() => setIsLinkEnterpriseOpen(false)} className="flex-1 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition">取消</button>
+                          <button onClick={handleLinkEnterprise} disabled={!linkEnterpriseId.trim()} className="flex-1 bg-[#0071E3] text-white py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition">确认关联</button>
+                      </div>
                   </div>
               </div>
+          </ModalPortal>
+      )}
+
+      {/* ── 创建企业弹窗 ── */}
+      {isCreateEnterpriseOpen && (
+          <ModalPortal>
+              <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-modal-enter">
+                      <div className="flex items-center justify-between mb-5">
+                          <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                              <Building2 className="w-4 h-4 text-[#0071E3]" /> 创建企业
+                          </h3>
+                          <button onClick={() => setIsCreateEnterpriseOpen(false)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 hover:text-gray-600 transition"><X className="w-4 h-4" /></button>
+                      </div>
+                      <div className="space-y-3">
+                          {[
+                              { label: '企业名称', key: 'name', placeholder: '请输入企业名称', required: true },
+                              { label: '所属行业', key: 'industry', placeholder: '例：互联网' },
+                              { label: '所在省份', key: 'province', placeholder: '例：北京市' },
+                              { label: '联系人',   key: 'contact', placeholder: '企业联系人姓名' },
+                              { label: '联系电话', key: 'phone',   placeholder: '联系人电话' },
+                          ].map(f => (
+                              <div key={f.key}>
+                                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{f.label}{f.required && <span className="text-red-500 ml-0.5">*</span>}</label>
+                                  <input
+                                      value={(createEntForm as any)[f.key]}
+                                      onChange={e => setCreateEntForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                                      placeholder={f.placeholder}
+                                      className="w-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 rounded-xl p-2.5 text-sm outline-none focus:border-[#0071E3] dark:text-white"
+                                  />
+                              </div>
+                          ))}
+                      </div>
+                      <div className="flex gap-2 mt-5">
+                          <button onClick={() => setIsCreateEnterpriseOpen(false)} className="flex-1 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition">取消</button>
+                          <button onClick={handleCreateEnterprise} disabled={!createEntForm.name.trim()} className="flex-1 bg-[#0071E3] text-white py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition">创建并关联</button>
+                      </div>
+                  </div>
+              </div>
+          </ModalPortal>
+      )}
+
+      {/* ── Tab: 联系人信息 ── */}
+      {activeTab === 'contacts' && (
+      <div className="space-y-4">
+          <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-[#0071E3]" />
+                  <span className="text-base font-bold text-gray-800 dark:text-white">联系人信息</span>
+                  <span className="text-xs text-gray-400">（共 {customer.contacts.length} 人）</span>
+              </div>
+              <button onClick={openAddContact} className="flex items-center gap-1.5 bg-[#0071E3] text-white text-xs px-3.5 py-2 rounded-xl hover:bg-blue-700 transition">
+                  <Plus className="w-3.5 h-3.5" /> 添加联系人
+              </button>
+          </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {customer.contacts.length === 0 ? (
+              <div className="md:col-span-3 unified-card dark:bg-[#1C1C1E] p-10 text-center text-sm text-gray-400">暂无联系人信息，点击右上角"添加联系人"。</div>
           ) : (
-              <table className="w-full text-sm border-collapse">
-                  <colgroup>
-                      <col className="w-[130px]" />
-                      <col />
-                      <col className="w-[130px]" />
-                      <col />
-                      <col className="w-[130px]" />
-                      <col />
-                  </colgroup>
-                  <tbody>
-                      <tr className="border-b border-gray-100 dark:border-white/5">
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">客户编号</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5 font-mono">{customer.id}</td>
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">客户编号(CRM)</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5 font-mono">{customer.crmId || '-'}</td>
-                          <td className="px-4 py-2.5 bg-gray-50/50 dark:bg-white/[0.02] border-r border-gray-100/80 dark:border-white/5"></td>
-                          <td className="px-4 py-2.5"></td>
-                      </tr>
-                      <tr className="border-b border-gray-100 dark:border-white/5">
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">客户名称</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.companyName}</td>
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">报备标签</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.reportTag || '-'}</td>
-                          <td className="px-4 py-2.5 bg-gray-50/50 dark:bg-white/[0.02] border-r border-gray-100/80 dark:border-white/5"></td>
-                          <td className="px-4 py-2.5"></td>
-                      </tr>
-                      <tr className="border-b border-gray-100 dark:border-white/5">
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">客户属性</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.customerAttribute || '-'}</td>
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">客户类型</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{typeLabel[customer.customerType] || customer.customerType}</td>
-                          <td className="px-4 py-2.5 bg-gray-50/50 dark:bg-white/[0.02] border-r border-gray-100/80 dark:border-white/5"></td>
-                          <td className="px-4 py-2.5"></td>
-                      </tr>
-                      <tr className="border-b border-gray-100 dark:border-white/5">
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">行业条线</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.industryLine || customer.industry || '-'}</td>
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">行业推广类</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.industryPromotionType || '-'}</td>
-                          <td className="px-4 py-2.5 bg-gray-50/50 dark:bg-white/[0.02] border-r border-gray-100/80 dark:border-white/5"></td>
-                          <td className="px-4 py-2.5"></td>
-                      </tr>
-                      <tr className="border-b border-gray-100 dark:border-white/5">
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">客户级别</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.customerGrade || customer.level}</td>
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">上级单位</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.parentOrg || '-'}</td>
-                          <td className="px-4 py-2.5 bg-gray-50/50 dark:bg-white/[0.02] border-r border-gray-100/80 dark:border-white/5"></td>
-                          <td className="px-4 py-2.5"></td>
-                      </tr>
-                      <tr className="border-b border-gray-100 dark:border-white/5">
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">层级维度关注一级单位</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.levelFocusUnit || '-'}</td>
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">监管机构</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.supervisoryOrg || '-'}</td>
-                          <td className="px-4 py-2.5 bg-gray-50/50 dark:bg-white/[0.02] border-r border-gray-100/80 dark:border-white/5"></td>
-                          <td className="px-4 py-2.5"></td>
-                      </tr>
-                      <tr className="border-b border-gray-100 dark:border-white/5">
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">所在国家</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.country || '-'}</td>
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">所在省份</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.province || '-'}</td>
-                          <td className="px-4 py-2.5 bg-gray-50/50 dark:bg-white/[0.02] border-r border-gray-100/80 dark:border-white/5"></td>
-                          <td className="px-4 py-2.5"></td>
-                      </tr>
-                      <tr className="border-b border-gray-100 dark:border-white/5">
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">所在城市</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.city || customer.region || '-'}</td>
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">所在区县</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.district || '-'}</td>
-                          <td className="px-4 py-2.5 bg-gray-50/50 dark:bg-white/[0.02] border-r border-gray-100/80 dark:border-white/5"></td>
-                          <td className="px-4 py-2.5"></td>
-                      </tr>
-                      <tr>
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">公司地址</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.address || '-'}</td>
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">公司电话</td>
-                          <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.companyPhone || '-'}</td>
-                          <td className="px-4 py-2.5 bg-gray-50/50 dark:bg-white/[0.02] border-r border-gray-100/80 dark:border-white/5"></td>
-                          <td className="px-4 py-2.5"></td>
-                      </tr>
-                  </tbody>
-              </table>
+              customer.contacts.map(contact => (
+                  <div key={contact.id} className="md:col-span-1 unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden self-start">
+                      <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-gray-900 dark:text-white">{contact.name}</span>
+                              {contact.isPrimary && (
+                                  <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-bold border border-amber-200">主联系人</span>
+                              )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                              {contact.roles.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                      {contact.roles.map(r => (
+                                          <span key={r} className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] border border-blue-100 dark:border-blue-800/30 font-medium">{roleLabel(r)}</span>
+                                      ))}
+                                  </div>
+                              )}
+                              <button
+                                  onClick={() => openEditContact(contact)}
+                                  className="p-1.5 rounded-lg text-gray-400 hover:text-[#0071E3] hover:bg-blue-50 dark:hover:bg-blue-900/20 transition"
+                                  title="编辑联系人"
+                              >
+                                  <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                          </div>
+                      </div>
+                      <div className="divide-y divide-gray-100/80 dark:divide-white/5">
+                          {contact.phone && (
+                              <div className="px-5 py-3">
+                                  <div className="text-sm text-gray-400 dark:text-gray-500 mb-1">电话</div>
+                                  <div className="text-sm text-gray-900 dark:text-white flex items-center gap-2">
+                                      <Phone className="w-3.5 h-3.5 text-gray-400" /><span>{contact.phone}</span>
+                                  </div>
+                              </div>
+                          )}
+                          {contact.email && (
+                              <div className="px-5 py-3">
+                                  <div className="text-sm text-gray-400 dark:text-gray-500 mb-1">邮箱</div>
+                                  <div className="text-sm text-gray-900 dark:text-white flex items-center gap-2">
+                                      <Mail className="w-3.5 h-3.5 text-gray-400" /><span className="truncate">{contact.email}</span>
+                                  </div>
+                              </div>
+                          )}
+                          {contact.creatorName && (
+                              <div className="px-5 py-3 bg-gray-50/60 dark:bg-white/[0.02]">
+                                  <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
+                                      <span>创建人：<span className="text-gray-600 dark:text-gray-300 font-medium">{contact.creatorName}</span></span>
+                                      {contact.createdAt && <span>{contact.createdAt}</span>}
+                                  </div>
+                              </div>
+                          )}
+                      </div>
+                  </div>
+              ))
           )}
       </div>
 
-      {/* ── 归属信息 (Full Width Table) ── */}
-      <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden mb-4">
-          <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10">
-              <h4 className="text-sm font-bold text-gray-800 dark:text-white">归属信息</h4>
-          </div>
-          <table className="w-full text-sm border-collapse">
-              <colgroup>
-                  <col className="w-[130px]" />
-                  <col />
-                  <col className="w-[130px]" />
-                  <col />
-                  <col className="w-[130px]" />
-                  <col />
-              </colgroup>
-              <tbody>
-                  <tr className="border-b border-gray-100 dark:border-white/5">
-                      <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">客户所有人</td>
-                      <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">
-                          <div className="flex items-center gap-2">
-                              {ownerUser && <img src={ownerUser.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${ownerUser.name}`} className="w-5 h-5 rounded-full" alt="" />}
-                              <span>{ownerUser?.name || '未分配'}</span>
-                              {!isEditingOwner && (
-                                  <button onClick={() => setIsEditingOwner(true)} className="text-[10px] text-[#0071E3] hover:text-blue-700 ml-1">变更</button>
-                              )}
-                          </div>
-                          {isEditingOwner && (
-                              <div className="mt-2 flex items-center gap-2">
-                                  <select value={selectedOwnerId} onChange={e => setSelectedOwnerId(e.target.value)} className="flex-1 border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 rounded-lg p-1.5 text-xs outline-none focus:border-[#0071E3] dark:text-white">
-                                      <option value="">-- 选择 --</option>
-                                      {salesUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                                  </select>
-                                  <button onClick={handleSaveOwner} className="text-xs text-white bg-[#0071E3] px-2.5 py-1 rounded-lg hover:bg-blue-700 transition">确定</button>
-                                  <button onClick={() => setIsEditingOwner(false)} className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">取消</button>
+      {isContactModalOpen && (
+          <ModalPortal>
+              <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-md p-6 animate-modal-enter">
+                      <div className="flex items-center justify-between mb-5">
+                          <h3 className="text-base font-bold text-gray-900 dark:text-white">{isEditingContact ? '编辑联系人' : '添加联系人'}</h3>
+                          <button onClick={() => setIsContactModalOpen(false)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 hover:text-gray-600 transition"><X className="w-4 h-4" /></button>
+                      </div>
+                      <div className="space-y-3">
+                          {[
+                              { label: '姓名', key: 'name', placeholder: '联系人姓名', required: true },
+                              { label: '手机/电话', key: 'phone', placeholder: '联系电话', required: true },
+                              { label: '邮箱', key: 'email', placeholder: '工作邮箱', required: true },
+                          ].map(f => (
+                              <div key={f.key}>
+                                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{f.label}{f.required && <span className="text-red-500 ml-0.5">*</span>}</label>
+                                  <input
+                                      value={(contactForm as any)[f.key]}
+                                      onChange={e => setContactForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                                      placeholder={f.placeholder}
+                                      className="w-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 rounded-xl p-2.5 text-sm outline-none focus:border-[#0071E3] dark:text-white"
+                                  />
                               </div>
-                          )}
-                      </td>
-                      <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">客户所属部门</td>
-                      <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.customerDepartment || '-'}</td>
-                      <td className="px-4 py-2.5 bg-gray-50/50 dark:bg-white/[0.02] border-r border-gray-100/80 dark:border-white/5"></td>
-                      <td className="px-4 py-2.5"></td>
-                  </tr>
-                  <tr>
-                      <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.02] whitespace-nowrap font-medium border-r border-gray-100/80 dark:border-white/5">客户所属经销商</td>
-                      <td className="px-4 py-2.5 text-gray-900 dark:text-white border-r border-gray-100/80 dark:border-white/5">{customer.dealerName || '-'}</td>
-                      <td className="px-4 py-2.5 bg-gray-50/50 dark:bg-white/[0.02] border-r border-gray-100/80 dark:border-white/5"></td>
-                      <td className="px-4 py-2.5 border-r border-gray-100/80 dark:border-white/5"></td>
-                      <td className="px-4 py-2.5 bg-gray-50/50 dark:bg-white/[0.02] border-r border-gray-100/80 dark:border-white/5"></td>
-                      <td className="px-4 py-2.5"></td>
-                  </tr>
-              </tbody>
-          </table>
-      </div>
-
-      {/* ── Main Grid ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-          {/* Left (2/3) */}
-          <div className="md:col-span-2 space-y-4">
-
-              {/* 联系人 */}
-              <div className="unified-card dark:bg-[#1C1C1E] p-5 border-gray-100/50 dark:border-white/10">
-                  <CardHeader icon={Users} color="text-purple-500" title={`联系人（${customer.contacts.length}）`} action={
-                      <button onClick={handleAddContact} className="flex items-center gap-1 text-sm font-medium text-[#0071E3] hover:text-blue-700 transition">
-                          <Plus className="w-4 h-4" /> 添加
-                      </button>
-                  } />
-                  <div className="pt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {customer.contacts.map(contact => (
-                          <div key={contact.id} className={`p-4 rounded-2xl border flex flex-col gap-2 relative group hover:shadow-apple transition ${contact.isPrimary ? 'border-blue-200 dark:border-blue-800/40 bg-blue-50/30 dark:bg-blue-900/10' : 'border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5'}`}>
-                              <div className="flex justify-between items-start">
-                                  <div className="flex items-center gap-2.5">
-                                      <img src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${contact.name}`} className="w-9 h-9 rounded-full bg-white border border-gray-200 dark:border-white/10" alt={contact.name} />
-                                      <div>
-                                          <div className="font-bold text-gray-900 dark:text-white text-sm flex items-center gap-1.5">
-                                              {contact.name}
-                                              {contact.isPrimary && <span className="unified-button-primary text-[10px] bg-[#0071E3]">主要</span>}
-                                          </div>
-                                          <div className="text-xs text-gray-400">{contact.position || '职位未知'}</div>
-                                      </div>
-                                  </div>
-                                  <div className="opacity-0 group-hover:opacity-100 transition flex gap-1">
-                                      <button onClick={() => handleEditContact(contact)} className="p-1.5 text-gray-400 hover:text-[#0071E3] hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition"><Edit2 className="w-3.5 h-3.5" /></button>
-                                      <button onClick={() => handleDeleteContact(contact.id)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"><Trash2 className="w-3.5 h-3.5" /></button>
-                                  </div>
-                              </div>
-                              <div className="space-y-1">
-                                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"><Phone className="w-3 h-3" />{contact.phone || '-'}</div>
-                                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"><Mail className="w-3 h-3" />{contact.email || '-'}</div>
-                              </div>
-                              <div className="flex flex-wrap gap-1">
-                                  {contact.roles.map(r => (
-                                      <span key={r} className="text-[10px] px-1.5 py-0.5 rounded-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-500 dark:text-gray-400">{roleLabel(r)}</span>
+                          ))}
+                          <div>
+                              <label className="text-xs text-gray-500 dark:text-gray-400 mb-2 block">联系人类型（可多选）<span className="text-red-500 ml-0.5">*</span></label>
+                              <div className="flex flex-wrap gap-2">
+                                  {(['Purchasing', 'IT'] as ContactRole[]).map(role => (
+                                      <button key={role} type="button" onClick={() => toggleRole(role)}
+                                          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border transition-all duration-150 font-medium ${contactForm.roles.includes(role) ? 'bg-[#0071E3] text-white border-[#0071E3]' : 'bg-gray-50 dark:bg-white/5 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:border-[#0071E3]'}`}>
+                                          {contactForm.roles.includes(role) && <CheckSquare className="w-3 h-3" />} {roleLabel(role)}
+                                      </button>
                                   ))}
                               </div>
                           </div>
-                      ))}
-                      {customer.contacts.length === 0 && (
-                          <div className="col-span-2 text-center py-8 text-sm text-gray-400 dark:text-gray-500 italic">暂无联系人信息</div>
-                      )}
+                          <div className="flex items-center gap-2 py-1">
+                              <input type="checkbox" id="isPrimary" checked={contactForm.isPrimary} onChange={e => setContactForm(f => ({ ...f, isPrimary: e.target.checked }))} className="rounded" />
+                              <label htmlFor="isPrimary" className="text-sm text-gray-700 dark:text-gray-300 select-none">设为主联系人</label>
+                          </div>
+                      </div>
+                      <div className="flex gap-2 mt-5">
+                          <button onClick={() => setIsContactModalOpen(false)} className="flex-1 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition">取消</button>
+                          <button onClick={handleSaveContact} disabled={!contactForm.name || !contactForm.phone || !contactForm.email || contactForm.roles.length === 0} className="flex-1 bg-[#0071E3] text-white py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition">保存</button>
+                      </div>
                   </div>
               </div>
+          </ModalPortal>
+      )}
+      </div>
+      )}
 
-              {/* 历史订单 */}
-              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
-                  <div className="p-5 border-b border-gray-100 dark:border-white/10">
-                      <CardHeader icon={History} color="text-indigo-500" title={`历史订单（${customerOrders.length}）`} />
-                  </div>
-                  <div className="overflow-x-auto">
-                      <table className="w-full text-left text-sm">
-                          <thead className="unified-table-header">
-                              <tr>
-                                  <th className="px-5 py-3">订单编号</th>
-                                  <th className="px-5 py-3">下单日期</th>
-                                  <th className="px-5 py-3">包含产品</th>
-                                  <th className="px-5 py-3 text-right">金额</th>
-                                  <th className="px-5 py-3">状态</th>
-                              </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-50 dark:divide-white/5">
-                              {customerOrders.map(order => (
-                                  <tr key={order.id} onClick={() => navigate(`/orders/${order.id}`)} className="hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer transition text-sm">
-                                      <td className="px-5 py-3 font-bold font-mono text-[#0071E3] dark:text-[#0A84FF] hover:underline">{order.id}</td>
-                                      <td className="px-5 py-3 text-gray-500 dark:text-gray-400">{new Date(order.date).toLocaleDateString()}</td>
-                                      <td className="px-5 py-3 text-gray-800 dark:text-gray-200">
-                                          {order.items[0].productName}
-                                          {order.items.length > 1 && <span className="text-xs text-gray-400 ml-1">等 {order.items.length} 件</span>}
-                                      </td>
-                                      <td className="px-5 py-3 text-right font-medium text-red-600 dark:text-red-400 font-mono">¥{order.total.toLocaleString()}</td>
-                                      <td className="px-5 py-3">
-                                          <span className={`unified-tag-xs ${order.status === OrderStatus.DELIVERED ? 'unified-tag-green' : order.status === OrderStatus.CANCELLED ? 'unified-tag-gray' : 'unified-tag-blue'}`}>
-                                              {statusMap[order.status] || order.status}
-                                          </span>
+      {/* ── Tab: 收货地址 ── */}
+      {activeTab === 'address' && (
+      <div className="space-y-4">
+          <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-[#0071E3]" />
+                  <span className="text-base font-bold text-gray-800 dark:text-white">收货地址</span>
+                  <span className="text-xs text-gray-400">（共 {addresses.length} 条）</span>
+              </div>
+              <button onClick={openAddAddress} className="flex items-center gap-1.5 bg-[#0071E3] text-white text-xs px-3.5 py-2 rounded-xl hover:bg-blue-700 transition">
+                  <Plus className="w-3.5 h-3.5" /> 添加收货地址
+              </button>
+          </div>
+          <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
+              <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm min-w-[900px]">
+                      <thead>
+                          <tr className="border-b border-gray-200/50 dark:border-white/10 text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider bg-gray-50 dark:bg-[#1C1C1E]">
+                              <th className="px-4 py-3 font-semibold">收货人</th>
+                              <th className="px-4 py-3 font-semibold">国家</th>
+                              <th className="px-4 py-3 font-semibold">省份</th>
+                              <th className="px-4 py-3 font-semibold">城市</th>
+                              <th className="px-4 py-3 font-semibold">详细地址</th>
+                              <th className="px-4 py-3 font-semibold">手机号码</th>
+                              <th className="px-4 py-3 font-semibold">邮箱地址</th>
+                              <th className="px-4 py-3 font-semibold">创建人</th>
+                              <th className="px-4 py-3 font-semibold text-center">操作</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100/50 dark:divide-white/5">
+                          {addresses.length === 0 ? (
+                              <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-gray-400">暂无数据</td></tr>
+                          ) : (
+                              addresses.map(addr => (
+                                  <tr key={addr.id} className="hover:bg-gray-50/50 dark:hover:bg-white/[0.03] transition-colors">
+                                      <td className="px-4 py-3 text-gray-900 dark:text-white font-medium">{addr.receiver}</td>
+                                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{addr.country}</td>
+                                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{addr.province}</td>
+                                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{addr.city}</td>
+                                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{addr.detail}</td>
+                                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300 font-mono text-xs">{addr.phone}</td>
+                                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300 text-xs">{addr.email || '-'}</td>
+                                      <td className="px-4 py-3 text-gray-400 text-xs">{addr.creator}</td>
+                                      <td className="px-4 py-3 text-center whitespace-nowrap">
+                                          <div className="flex items-center justify-center gap-1">
+                                              <button onClick={() => openEditAddress(addr)} className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-400 hover:text-[#0071E3] transition" title="编辑">
+                                                  <Pencil className="w-3.5 h-3.5" />
+                                              </button>
+                                              <button onClick={() => setAddresses(prev => prev.filter(a => a.id !== addr.id))} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition" title="删除">
+                                                  <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
+                                          </div>
                                       </td>
                                   </tr>
-                              ))}
-                              {customerOrders.length === 0 && (
-                                  <tr><td colSpan={5} className="px-5 py-8 text-center text-gray-400 italic text-sm">暂无历史订单</td></tr>
-                              )}
-                          </tbody>
-                      </table>
-                  </div>
+                              ))
+                          )}
+                      </tbody>
+                  </table>
               </div>
           </div>
 
-          {/* Right (1/3) */}
-          <div className="space-y-4">
+          {isAddressModalOpen && (
+              <ModalPortal>
+                  <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                      <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-lg p-6 animate-modal-enter">
+                          <div className="flex items-center justify-between mb-5">
+                              <h3 className="text-base font-bold text-gray-900 dark:text-white">{isEditingAddress ? '编辑收货地址' : '添加收货地址'}</h3>
+                              <button onClick={() => setIsAddressModalOpen(false)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 hover:text-gray-600 transition"><X className="w-4 h-4" /></button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                              {[
+                                  { label: '收货人', key: 'receiver', required: true, span: 1 },
+                                  { label: '手机号码', key: 'phone', required: true, span: 1 },
+                                  { label: '国家', key: 'country', span: 1 },
+                                  { label: '省份', key: 'province', required: true, span: 1 },
+                                  { label: '城市', key: 'city', required: true, span: 1 },
+                                  { label: '邮箱地址', key: 'email', span: 1 },
+                                  { label: '详细地址', key: 'detail', required: true, span: 2 },
+                              ].map(f => (
+                                  <div key={f.key} className={f.span === 2 ? 'col-span-2' : ''}>
+                                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{f.label}{f.required && <span className="text-red-500 ml-0.5">*</span>}</label>
+                                      <input
+                                          value={(addrForm as any)[f.key]}
+                                          onChange={e => setAddrForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                                          className="w-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 rounded-xl p-2.5 text-sm outline-none focus:border-[#0071E3] dark:text-white"
+                                      />
+                                  </div>
+                              ))}
+                          </div>
+                          <div className="flex gap-2 mt-5">
+                              <button onClick={() => setIsAddressModalOpen(false)} className="flex-1 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-white/20 transition">取消</button>
+                              <button
+                                  onClick={handleSaveAddress}
+                                  disabled={!addrForm.receiver || !addrForm.phone || !addrForm.province || !addrForm.city || !addrForm.detail}
+                                  className="flex-1 bg-[#0071E3] text-white py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                              >保存</button>
+                          </div>
+                      </div>
+                  </div>
+              </ModalPortal>
+          )}
+      </div>
+      )}
 
-              {/* 跟进计划 */}
-              <div className="unified-card dark:bg-[#1C1C1E] p-5 border-gray-100/50 dark:border-white/10 space-y-3">
-                  <CardHeader icon={Bell} color="text-amber-500" title="客户跟进" />
-                  {customer.nextFollowUpDate ? (
-                      <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-2xl border border-blue-100 dark:border-blue-800/30 text-center space-y-1">
-                          <div className="text-xs text-[#0071E3] dark:text-blue-400 font-bold uppercase tracking-wider">下次计划跟进</div>
-                          <div className="text-2xl font-bold text-gray-900 dark:text-white">{new Date(customer.nextFollowUpDate).toLocaleDateString()}</div>
-                          <div className="text-xs text-gray-400 dark:text-gray-500">基于订单 {customerOrders[0]?.id} 自动计算</div>
-                      </div>
-                  ) : (
-                      <div className="text-center py-4 space-y-2">
-                          <div className="text-sm text-gray-400">暂无跟进计划</div>
-                          <button onClick={handleSetFollowUp} className="text-xs text-[#0071E3] hover:underline">基于订单自动设置</button>
-                      </div>
-                  )}
+      {/* ── Tab: 发票信息 ── */}
+      {activeTab === 'invoice' && (
+      <div className="space-y-4">
+          <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-[#0071E3]" />
+                  <span className="text-base font-bold text-gray-800 dark:text-white">发票信息</span>
               </div>
-
-              {/* 财务/开票信息 */}
-              <div className="unified-card dark:bg-[#1C1C1E] p-5 border-gray-100/50 dark:border-white/10 space-y-0">
-                  <CardHeader icon={CreditCard} color="text-green-500" title="财务/开票信息" action={
-                      <button onClick={isEditingInfo ? handleSaveInfo : handleEditInfo} className="flex items-center gap-1 text-sm font-medium text-[#0071E3] hover:text-blue-700 transition">
-                          {isEditingInfo ? <Save className="w-4 h-4" /> : <Edit2 className="w-4 h-4" />}
-                          {isEditingInfo ? '保存' : '编辑'}
-                      </button>
-                  } />
-                  {isEditingInfo ? (
-                      <div className="pt-3 space-y-2">
+              <button
+                  onClick={() => { setInvoiceForm({ ...emptyInvoice, title: customer.companyName }); setInvoiceFormTouched(false); setIsInvoiceModalOpen(true); }}
+                  className="flex items-center gap-1.5 bg-[#0071E3] text-white text-xs px-3.5 py-2 rounded-xl hover:bg-blue-700 transition"
+              >
+                  <Plus className="w-3.5 h-3.5" /> 添加发票信息
+              </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {!customer.billingInfo?.taxId ? (
+                  <div className="md:col-span-3 unified-card dark:bg-[#1C1C1E] p-10 text-center text-sm text-gray-400">暂无发票信息，点击右上角"添加发票信息"。</div>
+              ) : (
+                  <div className="md:col-span-1 unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden self-start">
+                      <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                          <h4 className="text-base font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                              <CreditCard className="w-4 h-4 text-green-500" /> 财务/开票信息
+                          </h4>
+                          {customer.billingInfo?.invoiceType && (
+                              <span className="text-[11px] px-2 py-0.5 rounded-full font-medium border bg-blue-50 text-[#0071E3] border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/30">{customer.billingInfo.invoiceType}</span>
+                          )}
+                      </div>
+                      <div className="divide-y divide-gray-100/80 dark:divide-white/5">
                           {[
-                              ['税号', 'taxId'], ['开票抬头', 'title'], ['开户行', 'bankName'],
-                              ['账号', 'accountNumber'], ['注册地址', 'registerAddress'], ['注册电话', 'registerPhone']
-                          ].map(([label, key]) => (
-                              <input key={key} placeholder={label} value={(infoForm as any)[key]} onChange={e => setInfoForm(f => ({ ...f, [key]: e.target.value }))} className="w-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 rounded-xl p-2 text-xs outline-none focus:border-[#0071E3]" />
-                          ))}
-                          <div className="flex gap-2 pt-1">
-                              <button onClick={() => setIsEditingInfo(false)} className="flex-1 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 py-1.5 rounded-xl text-xs hover:bg-gray-200 transition">取消</button>
-                              <button onClick={handleSaveInfo} className="unified-button-primary -1 bg-[#0071E3]">保存</button>
-                          </div>
-                      </div>
-                  ) : (
-                      <div>
-                          <FieldRow label="税号"><span className="font-mono">{customer.billingInfo?.taxId || '-'}</span></FieldRow>
-                          <FieldRow label="开票抬头">{customer.billingInfo?.title || '-'}</FieldRow>
-                          <FieldRow label="开户行">{customer.billingInfo?.bankName || '-'}</FieldRow>
-                          <FieldRow label="账号"><span className="font-mono text-xs">{customer.billingInfo?.accountNumber || '-'}</span></FieldRow>
-                          <FieldRow label="注册地址"><span className="text-xs">{customer.billingInfo?.registerAddress || '-'}</span></FieldRow>
-                          <FieldRow label="注册电话">{customer.billingInfo?.registerPhone || '-'}</FieldRow>
-                      </div>
-                  )}
-              </div>
-
-              {/* 关联企业/租户 */}
-              <div className="unified-card dark:bg-[#1C1C1E] p-5 border-gray-100/50 dark:border-white/10 space-y-3">
-                  <CardHeader icon={Building2} color="text-indigo-500" title="关联企业/租户" />
-                  <div className="space-y-2">
-                      {(customer.enterprises || []).map((ent, idx) => (
-                          <div key={idx} className="flex justify-between items-center bg-gray-50 dark:bg-white/5 p-3 rounded-2xl border border-gray-100 dark:border-white/10">
-                              <div>
-                                  <div className="font-medium text-sm text-gray-800 dark:text-white">{ent.name}</div>
-                                  <div className="text-xs text-gray-400 font-mono">ID: {ent.id}</div>
+                              { label: '开票抬头', value: customer.billingInfo?.title || '-' },
+                              { label: '税号', value: customer.billingInfo?.taxId || '-', mono: true },
+                              { label: '单位地址', value: customer.billingInfo?.registerAddress || '-' },
+                              { label: '电话号码', value: customer.billingInfo?.registerPhone || '-' },
+                              { label: '银行账户', value: customer.billingInfo?.accountNumber || '-', mono: true },
+                              { label: '开户银行', value: customer.billingInfo?.bankName || '-' },
+                          ].map((item, idx) => (
+                              <div key={idx} className="px-5 py-3.5">
+                                  <div className="text-sm text-gray-400 dark:text-gray-500 mb-1">{item.label}</div>
+                                  <div className={`text-sm text-gray-900 dark:text-white ${item.mono ? 'font-mono' : ''}`}>{item.value}</div>
                               </div>
-                              <button onClick={() => handleRemoveEnterprise(ent.id)} className="text-gray-300 hover:text-red-500 transition p-1"><X className="w-4 h-4" /></button>
-                          </div>
-                      ))}
-                      {(!customer.enterprises || customer.enterprises.length === 0) && (
-                          <div className="text-xs text-gray-400 text-center py-2 italic">无关联租户信息</div>
-                      )}
+                          ))}
+                      </div>
                   </div>
-                  <div className="flex gap-2">
-                      <input placeholder="租户 ID" className="w-1/3 border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-2 rounded-xl text-xs outline-none focus:border-[#0071E3]" value={newEnterprise.id} onChange={e => setNewEnterprise(p => ({ ...p, id: e.target.value }))} />
-                      <input placeholder="租户名称" className="flex-1 border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-2 rounded-xl text-xs outline-none focus:border-[#0071E3]" value={newEnterprise.name} onChange={e => setNewEnterprise(p => ({ ...p, name: e.target.value }))} />
-                      <button onClick={handleAddEnterprise} disabled={!newEnterprise.id || !newEnterprise.name} className="unified-button-primary bg-[#0071E3] disabled:opacity-40">
-                          <Plus className="w-4 h-4" />
-                      </button>
-                  </div>
-              </div>
+              )}
           </div>
       </div>
+      )}
 
-      {/* ── Contact Modal ── */}
-      {isContactModalOpen && (
-
+      {/* ── 添加发票信息弹窗 ── */}
+      {isInvoiceModalOpen && (
           <ModalPortal>
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[500] p-4 animate-fade-in">
-              <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-lg border-gray-200/50 dark:border-white/10 animate-modal-enter">
-                  <div className="p-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center">
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">{editingContactId ? '编辑联系人' : '添加联系人'}</h3>
-                      <button onClick={() => setIsContactModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition"><X className="w-5 h-5" /></button>
-                  </div>
-                  <div className="p-5 space-y-4">
-                      {[
-                          { label: '姓名 *', key: 'name', required: true },
-                          { label: '职位', key: 'position' },
-                      ].map(f => (
-                          <div key={f.key}>
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{f.label}</label>
-                              <input value={(contactForm as any)[f.key]} onChange={e => setContactForm(p => ({ ...p, [f.key]: e.target.value }))} className="w-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 rounded-xl p-2.5 text-sm outline-none focus:border-[#0071E3]" />
+              <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-md animate-modal-enter overflow-hidden">
+                      <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 dark:border-white/10">
+                          <button onClick={() => setIsInvoiceModalOpen(false)} className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 hover:text-gray-600 transition">
+                              <ArrowLeft className="w-4 h-4" />
+                          </button>
+                          <h3 className="text-base font-bold text-gray-900 dark:text-white">添加发票</h3>
+                      </div>
+                      <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                          {/* 提示 */}
+                          <div className="flex gap-2.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30 rounded-xl p-3.5">
+                              <span className="text-[#0071E3] mt-0.5 shrink-0">ℹ</span>
+                              <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">请准确填写开票信息，如因填写信息错误而造成开票错误，需自行承担相关责任。另外，请确保银行账户信息已添加为【银行账号】信息，否则无法正常开发票。</p>
                           </div>
-                      ))}
-                      <div className="grid grid-cols-2 gap-4">
-                          {[{ label: '电话', key: 'phone' }, { label: '邮箱', key: 'email' }].map(f => (
-                              <div key={f.key}>
-                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{f.label}</label>
-                                  <input value={(contactForm as any)[f.key]} onChange={e => setContactForm(p => ({ ...p, [f.key]: e.target.value }))} className="w-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 rounded-xl p-2.5 text-sm outline-none focus:border-[#0071E3]" />
+                          {/* 发票类型 */}
+                          <div>
+                              <label className="text-xs text-gray-500 dark:text-gray-400 mb-2 block">发票类型：</label>
+                              <div className="flex items-center gap-6">
+                                  {(['增值税普通发票', '增值税专用发票'] as const).map(type => (
+                                      <label key={type} className="flex items-center gap-2 cursor-pointer">
+                                          <input
+                                              type="radio"
+                                              name="invoiceType"
+                                              checked={invoiceForm.invoiceType === type}
+                                              onChange={() => setInvoiceForm(f => ({ ...f, invoiceType: type }))}
+                                              className="accent-[#0071E3] w-4 h-4"
+                                          />
+                                          <span className={`text-sm ${invoiceForm.invoiceType === type ? 'text-[#0071E3] font-medium' : 'text-gray-600 dark:text-gray-300'}`}>{type}</span>
+                                      </label>
+                                  ))}
                               </div>
-                          ))}
-                      </div>
-                      <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">角色标签（可多选）</label>
-                          <div className="flex flex-wrap gap-2">
-                              {(['Purchasing', 'IT', 'Finance', 'Management', 'Other'] as ContactRole[]).map(role => (
-                                  <button key={role} onClick={() => toggleRole(role)} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition flex items-center gap-1 ${contactForm.roles.includes(role) ? 'bg-[#0071E3] text-white border-[#0071E3]' : 'bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:border-[#0071E3]'}`}>
-                                      {contactForm.roles.includes(role) && <CheckSquare className="w-3 h-3" />}
-                                      {roleLabel(role)}
-                                  </button>
-                              ))}
                           </div>
+                          {/* 名称（只读） */}
+                          <div>
+                              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">名称：</label>
+                              <input
+                                  value={invoiceForm.title}
+                                  readOnly
+                                  className="w-full border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/5 rounded-xl p-2.5 text-sm text-gray-500 dark:text-gray-400 outline-none cursor-not-allowed"
+                              />
+                          </div>
+                          {/* 必填字段 */}
+                          {[
+                              { label: '税号', key: 'taxId', placeholder: '请输入纳税人识别号' },
+                              { label: '单位地址', key: 'registerAddress', placeholder: '请输入单位地址信息' },
+                              { label: '电话号码', key: 'registerPhone', placeholder: '请输入电话号码' },
+                              { label: '银行账户', key: 'accountNumber', placeholder: '请输入银行账户号码' },
+                              { label: '开户银行', key: 'bankName', placeholder: '请输入开户银行名称' },
+                          ].map(f => {
+                              const val = (invoiceForm as any)[f.key];
+                              const invalid = invoiceFormTouched && !val;
+                              return (
+                                  <div key={f.key}>
+                                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">
+                                          <span className="text-red-500 mr-0.5">*</span>{f.label}：
+                                      </label>
+                                      <input
+                                          value={val}
+                                          onChange={e => setInvoiceForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                                          placeholder={f.placeholder}
+                                          className={`w-full border rounded-xl p-2.5 text-sm outline-none transition bg-white dark:bg-white/5 dark:text-white ${invalid ? 'border-red-400 focus:border-red-500' : 'border-gray-200 dark:border-white/10 focus:border-[#0071E3]'}`}
+                                      />
+                                      {invalid && <p className="text-xs text-red-500 mt-1">必填字段</p>}
+                                  </div>
+                              );
+                          })}
                       </div>
-                      <div className="flex items-center gap-2">
-                          <input type="checkbox" id="isPrimary" checked={contactForm.isPrimary} onChange={e => setContactForm(p => ({ ...p, isPrimary: e.target.checked }))} className="rounded text-[#0071E3] w-4 h-4" />
-                          <label htmlFor="isPrimary" className="text-sm text-gray-700 dark:text-gray-300 select-none">设为主要联系人</label>
+                      <div className="px-5 py-4 border-t border-gray-100 dark:border-white/10">
+                          <button
+                              onClick={handleSaveInvoice}
+                              className="w-28 bg-[#0071E3] text-white py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 transition"
+                          >
+                              确定
+                          </button>
                       </div>
-                  </div>
-                  <div className="p-5 bg-gray-50/50 dark:bg-white/5 border-t border-gray-100 dark:border-white/10 flex justify-end gap-2">
-                      <button onClick={() => setIsContactModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 rounded-xl transition">取消</button>
-                      <button onClick={handleSaveContact} disabled={!contactForm.name} className="unified-button-primary bg-[#0071E3] disabled:opacity-40">保存联系人</button>
                   </div>
               </div>
-          </div>
           </ModalPortal>
-
       )}
+
+      </div>
     </div>
   );
 };

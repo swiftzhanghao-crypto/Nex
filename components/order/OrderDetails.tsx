@@ -6,7 +6,7 @@ import {
     ArrowLeft, Box, Printer, Award, X, Lock, CheckCircle, Truck, ClipboardCheck, 
     UploadCloud, AlertOctagon, RefreshCcw, Key, Package, Disc, Receipt, FileText, 
     Briefcase, History, Eye, CheckSquare, CreditCard, ShieldCheck, User as UserIcon, Building,
-    AlertCircle, Clock, MapPin, Target, Users, Paperclip, Scroll, Camera
+    AlertCircle, Clock, MapPin, Target, Users, Paperclip, Scroll, Camera, ScrollText, Copy, Check
 } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
@@ -28,7 +28,7 @@ const statusMap: Record<string, string> = {
 };
 
 const OrderDetails: React.FC = () => {
-  const { orders, setOrders, products, customers, currentUser, users, departments, opportunities, roles } = useAppContext();
+  const { orders, setOrders, products, customers, currentUser, users, departments, opportunities, contracts, roles } = useAppContext();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -43,7 +43,6 @@ const OrderDetails: React.FC = () => {
     const cards: { id: string; span: number }[] = [];
     if (hasMediumCards) cards.push({ id: 'medium', span: 2 });
     if (hasPermission('order_detail_opportunity')) cards.push({ id: 'opportunity', span: 1 });
-    if (hasPermission('order_detail_contract')) cards.push({ id: 'contract', span: 1 });
     if (hasPermission('order_detail_invoice')) cards.push({ id: 'invoice', span: 1 });
     if (hasPermission('order_detail_original')) cards.push({ id: 'original', span: 1 });
 
@@ -84,7 +83,14 @@ const OrderDetails: React.FC = () => {
   const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
   const [isSnapshotClosing, setIsSnapshotClosing] = useState(false);
   const [showCreatorPhone, setShowCreatorPhone] = useState(false);
-  
+  const [copiedOrderId, setCopiedOrderId] = useState(false);
+  const handleCopyOrderId = () => {
+      navigator.clipboard.writeText(selectedOrder?.id || '').then(() => {
+          setCopiedOrderId(true);
+          setTimeout(() => setCopiedOrderId(false), 1500);
+      });
+  };
+
   const [fulfillmentItemIndex, setFulfillmentItemIndex] = useState<number | null>(null);
   const [fulfillmentContent, setFulfillmentContent] = useState('');
   const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'FULFILLMENT' | 'EMAIL'>('MANAGEMENT');
@@ -489,7 +495,18 @@ const OrderDetails: React.FC = () => {
                {/* Group 1: 返回 + 订单编号 */}
                <button onClick={() => navigate('/orders')} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition text-gray-500 dark:text-gray-400 shrink-0"><ArrowLeft className="w-5 h-5" /></button>
                <div className="shrink-0">
-                   <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">订单 {selectedOrder.id}</h1>
+                   <div className="flex items-center gap-2">
+                       <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">订单 {selectedOrder.id}</h1>
+                       <button
+                           onClick={handleCopyOrderId}
+                           className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-all"
+                           title="复制订单编号"
+                       >
+                           {copiedOrderId
+                               ? <Check className="w-3.5 h-3.5 text-green-500" />
+                               : <Copy className="w-3.5 h-3.5" />}
+                       </button>
+                   </div>
                    <span className="text-[11px] text-gray-400 dark:text-gray-500 hidden sm:block mt-0.5">提单时间：<span className="font-mono">{new Date(selectedOrder.date).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</span></span>
                </div>
 
@@ -836,7 +853,7 @@ const OrderDetails: React.FC = () => {
                       {(() => {
                           const fields = [
                               { label: '客户名称', value: selectedOrder.customerName, isLink: true, linkTo: `/customers/${selectedOrder.customerId}` },
-                              { label: '客户类型', value: selectedOrder.customerType === 'Enterprise' ? '央企' : selectedOrder.customerType },
+                              { label: '客户类型', value: selectedOrder.customerType },
                               { label: '行业条线', value: selectedOrder.industryLine },
                               { label: '所在地区', value: [selectedOrder.province, selectedOrder.city, selectedOrder.district].filter(Boolean).join(' / ') || undefined },
                               { label: '报备标签', value: selectedOrder.reportTag },
@@ -912,11 +929,11 @@ const OrderDetails: React.FC = () => {
                           <div className="divide-y divide-gray-50 dark:divide-white/5">
                               {[
                                   { label: '商机名称', value: opp.name },
-                                  { label: '商机编号', value: opp.crmId || opp.id },
+                                  { label: '商机编号', value: opp.id },
                                   { label: '商机客户名称', value: selectedOrder.customerName },
                                   { label: '商机产品名称', value: selectedOrder.items?.[0]?.productName },
                                   { label: '商机授权类型', value: selectedOrder.items?.[0]?.licenseType },
-                                  { label: '商机阶段', value: opp.stage === 'Negotiation' ? '商务洽谈' : opp.stage === 'Qualification' ? '资格确定' : opp.stage === 'Proposal' ? '方案建议' : opp.stage === 'Closed Won' ? '已赢单' : opp.stage === 'Closed Lost' ? '已输单' : opp.stage },
+                                  { label: '商机阶段', value: opp.stage },
                                   { label: '商机金额', value: `¥${(opp.amount || opp.expectedRevenue).toLocaleString()}` },
                                   { label: '结单日期', value: opp.closeDate },
                               ].map((item, idx) => (
@@ -928,38 +945,6 @@ const OrderDetails: React.FC = () => {
                           </div>
                       );
                   })()}
-              </div>
-              )}
-
-              {/* Contract Info (dynamic) */}
-              {hasPermission('order_detail_contract') && (
-              <div className={`unified-card ${cardSpans.contract} dark:bg-[#1C1C1E] p-4 border-gray-100/50 dark:border-white/10 space-y-3`}>
-                  <div className="border-b border-gray-100 dark:border-white/10 pb-2.5 flex items-center justify-between">
-                      <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                          <Scroll className="w-5 h-5 text-blue-500"/> 合同信息
-                      </h4>
-                      <button
-                          onClick={() => setIsContractPreviewOpen(true)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-[#0A84FF] hover:bg-blue-100 dark:hover:bg-blue-900/40 transition border border-blue-100 dark:border-blue-800/40"
-                      >
-                          <Paperclip className="w-3.5 h-3.5" /> 合同预览
-                      </button>
-                  </div>
-                  <div className="divide-y divide-gray-50 dark:divide-white/5">
-                      {[
-                          { label: '合同名称', value: `${selectedOrder.customerName}软件产品采购合同` },
-                          { label: '合同编号', value: `HT-${new Date(selectedOrder.date).getFullYear()}-${selectedOrder.id.slice(-6).toUpperCase()}` },
-                          { label: '签约金额', value: `¥${selectedOrder.total.toLocaleString()}`, highlight: true },
-                      ].map((item, idx) => (
-                          <div key={idx} className="flex items-center gap-8 py-3.5">
-                              <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap whitespace-nowrap">{item.label}</span>
-                              {item.highlight
-                                  ? <span className="text-sm font-bold text-red-600 dark:text-red-400 font-mono flex-1">{item.value}</span>
-                                  : <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{item.value || '-'}</span>
-                              }
-                          </div>
-                      ))}
-                  </div>
               </div>
               )}
 
@@ -1060,6 +1045,71 @@ const OrderDetails: React.FC = () => {
                     </div>
                 </div>
             )}
+          {/* 订单备注 & 关联合同 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
+                  <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-500" />
+                      <h3 className="text-sm font-bold text-gray-800 dark:text-white">订单备注</h3>
+                  </div>
+                  <div className="p-5">
+                      {selectedOrder.orderRemark ? (
+                          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{selectedOrder.orderRemark}</p>
+                      ) : (
+                          <p className="text-sm text-gray-400 dark:text-gray-500 italic">暂无备注</p>
+                      )}
+                  </div>
+              </div>
+              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
+                  <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                          <Scroll className="w-4 h-4 text-blue-500" />
+                          <h3 className="text-sm font-bold text-gray-800 dark:text-white">合同信息</h3>
+                          {(selectedOrder.linkedContractIds?.length ?? 0) > 0 && (
+                              <span className="text-xs text-gray-400 font-mono">({selectedOrder.linkedContractIds!.length})</span>
+                          )}
+                      </div>
+                      <button
+                          onClick={() => setIsContractPreviewOpen(true)}
+                          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-[#0A84FF] hover:bg-blue-100 dark:hover:bg-blue-900/40 transition border border-blue-100 dark:border-blue-800/40"
+                      >
+                          <Paperclip className="w-3 h-3" /> 合同预览
+                      </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                      {(() => {
+                          const ids = selectedOrder.linkedContractIds;
+                          if (!ids || ids.length === 0) return (
+                              <div className="p-5"><p className="text-sm text-gray-400 dark:text-gray-500 italic">暂未关联合同</p></div>
+                          );
+                          const linkedContracts = ids.map(cid => contracts.find(c => c.id === cid)).filter(Boolean);
+                          if (linkedContracts.length === 0) return (
+                              <div className="p-5"><p className="text-sm text-gray-400 dark:text-gray-500 italic">暂未关联合同</p></div>
+                          );
+                          return (
+                              <table className="w-full text-left text-sm">
+                                  <thead>
+                                      <tr className="border-b border-gray-100 dark:border-white/10 text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                                          <th className="px-5 py-2.5 font-semibold">合同编号</th>
+                                          <th className="px-5 py-2.5 font-semibold">合同名称</th>
+                                          <th className="px-5 py-2.5 font-semibold text-right">合同金额</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                                      {linkedContracts.map(contract => (
+                                          <tr key={contract!.id} className="hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors">
+                                              <td className="px-5 py-3 font-mono text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">{contract!.code}</td>
+                                              <td className="px-5 py-3 text-sm font-medium text-gray-900 dark:text-white">{contract!.name}</td>
+                                              <td className="px-5 py-3 text-sm font-mono font-semibold text-right text-gray-900 dark:text-white whitespace-nowrap">{contract!.amount != null ? `¥${contract!.amount.toLocaleString()}` : '-'}</td>
+                                          </tr>
+                                      ))}
+                                  </tbody>
+                              </table>
+                          );
+                      })()}
+                  </div>
+              </div>
+          </div>
           </>
         )}
 

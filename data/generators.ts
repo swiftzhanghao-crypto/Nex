@@ -36,13 +36,32 @@ export function generateLicenseKey(): string {
 }
 
 export function generateCustomers(users: User[]): Customer[] {
-  const industries = ['互联网', '金融', '教育', '制造', '政府', '医疗', '零售'];
-  const regions = ['北京', '上海', '广州', '深圳', '杭州', '成都', '武汉'];
-  const types: CustomerType[] = ['Enterprise', 'SMB', 'Government', 'Education', 'Partner'];
-  const levels: CustomerLevel[] = ['KA', 'A', 'B', 'C'];
+  const customerTypes = [
+      '学校', '中央党政机关', '地方党政机关', '中央事业单位', '地方事业单位',
+      '军队', '央企', '地方国企', '民企', '金融', '其他中央企业',
+      '港澳台企业', '外资企业', '海外', '中央团体', '地方团体',
+  ];
+  const industryLines = [
+      '政务特种', '大客民企', '政务区域党政', '企业区域金融', '企业区域民企',
+      '区域新闻出版传媒', '部委党政', '部委医疗', '部委新闻出版传媒', '其他',
+      '大客央国企', '大客特种', '渠道和生态', '国内SaaS', '大客金融',
+      '教育业务', '企业区域国企', '医疗行业',
+  ];
+  const provinces = [
+      '北京市', '天津市', '上海市', '重庆市',
+      '河北省', '山西省', '辽宁省', '吉林省', '黑龙江省',
+      '江苏省', '浙江省', '安徽省', '福建省', '江西省', '山东省',
+      '河南省', '湖北省', '湖南省', '广东省', '海南省',
+      '四川省', '贵州省', '云南省', '陕西省', '甘肃省', '青海省',
+      '台湾省', '内蒙古自治区', '广西壮族自治区', '西藏自治区',
+      '宁夏回族自治区', '新疆维吾尔自治区',
+      '香港特别行政区', '澳门特别行政区',
+  ];
+  const grades = ['一级/中央级', '二级/省级', '三级/市级', '四级/县级', '四级以下/县级以下'];
+  const attributes = ['2B', '2C', '2B&2C'];
 
   return Array.from({ length: 60 }).map((_, i) => {
-    const id = `C${(i + 1).toString().padStart(8, '0')}`;
+    const id = `C-${(i + 1).toString().padStart(8, '0')}`;
     const name = `${['科技', '发展', '贸易', '网络', '信息', '实业'][i % 6]}有限公司`;
     const prefix = ['华兴', '信达', '中科', '远洋', '天行', '博大', '瑞通', '金桥', '海纳', '智汇'][i % 10];
     const companyName = `${prefix}${name}`;
@@ -50,100 +69,229 @@ export function generateCustomers(users: User[]): Customer[] {
 
     const entCount = Math.floor(Math.random() * 3) + 1;
     const enterprises = Array.from({ length: entCount }).map((_, idx) => ({
-      id: (88000000 + i * 100 + idx).toString(),
+      id: (600000000 + i * 100 + idx).toString(),
       name: `${companyName} ${idx === 0 ? '总租户' : `分租户 ${idx}`}`,
+      createdAt: `202${3 + (i % 2)}-${String((i % 12) + 1).padStart(2, '0')}-${String((idx * 7 + i % 28 + 1) % 28 + 1).padStart(2, '0')} ${String((i * 3 + idx * 7) % 24).padStart(2, '0')}:${String((i * 17 + idx * 11) % 60).padStart(2, '0')}:${String((i * 13 + idx * 23) % 60).padStart(2, '0')}`,
+      source: (idx % 2 === 0 ? '客户创建' : '渠道人员创建') as '客户创建' | '渠道人员创建',
     }));
 
     return {
       id,
       companyName,
-      industry: industries[i % industries.length],
-      customerType: types[i % types.length],
-      level: levels[i % levels.length],
-      region: regions[i % regions.length],
-      address: `${regions[i % regions.length]}市高新区科技路 ${100 + i} 号`,
-      shippingAddress: `${regions[i % regions.length]}市高新区科技路 ${100 + i} 号`,
+      industry: industryLines[i % industryLines.length],
+      customerType: customerTypes[i % customerTypes.length],
+      level: grades[i % grades.length],
+      region: provinces[i % provinces.length],
+      address: `${provinces[i % provinces.length]}高新区科技路 ${100 + i} 号`,
+      shippingAddress: `${provinces[i % provinces.length]}高新区科技路 ${100 + i} 号`,
       status: Math.random() > 0.1 ? 'Active' : 'Inactive',
       logo: `https://ui-avatars.com/api/?name=${companyName.substring(0, 2)}&background=random&color=fff`,
       contacts: [
-        { id: `ct-${i}-1`, name: '陈经理', phone: `1390000${1000 + i}`, email: `contact@${id.toLowerCase()}.com`, position: '采购经理', roles: ['Purchasing'], isPrimary: true },
-        { id: `ct-${i}-2`, name: '张工', phone: `1380000${1000 + i}`, email: `it@${id.toLowerCase()}.com`, position: 'IT负责人', roles: ['IT'], isPrimary: false },
+        { id: `ct-${i}-1`, name: '陈经理', phone: `1390000${1000 + i}`, email: `${String(10000000 + i * 137).padStart(8, '0')}@qq.com`, position: '采购经理', roles: ['Purchasing'], isPrimary: true, creatorId: owner.id, creatorName: owner.name, createdAt: `2024-${String((i % 9) + 1).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')} ${String((i * 7) % 24).padStart(2, '0')}:${String((i * 11) % 60).padStart(2, '0')}:${String((i * 17) % 60).padStart(2, '0')}` },
+        { id: `ct-${i}-2`, name: '张工', phone: `1380000${1000 + i}`, email: `${String(20000000 + i * 173).padStart(8, '0')}@qq.com`, position: 'IT负责人', roles: ['IT'], isPrimary: false, creatorId: owner.id, creatorName: owner.name, createdAt: `2024-${String((i % 9) + 1).padStart(2, '0')}-${String((i % 28) + 2).padStart(2, '0')} ${String((i * 5) % 24).padStart(2, '0')}:${String((i * 13) % 60).padStart(2, '0')}:${String((i * 19) % 60).padStart(2, '0')}` },
       ],
       billingInfo: {
         taxId: `91110108MA00${1000 + i}`,
         title: companyName,
         bankName: '招商银行',
         accountNumber: `622202${10000000 + i}`,
-        registerAddress: `${regions[i % regions.length]}市`,
+        registerAddress: provinces[i % provinces.length],
         registerPhone: `010-8888${1000 + i}`,
       },
       ownerId: owner.id,
       ownerName: owner.name,
       enterprises,
-    };
+      industryLine: industryLines[i % industryLines.length],
+      province: provinces[i % provinces.length],
+      customerGrade: grades[i % grades.length],
+      customerAttribute: attributes[i % attributes.length],
+      createdAt: `202${3 + (i % 2)}-${String((i % 12) + 1).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')} ${String((i * 7 + 8) % 24).padStart(2, '0')}:${String((i * 11) % 60).padStart(2, '0')}:${String((i * 17) % 60).padStart(2, '0')}`,
+    } as Customer;
   });
 }
 
 export function generateOpportunities(customers: Customer[]): Opportunity[] {
   const opps: Opportunity[] = [
     {
-      id: 'OPP001',
-      crmId: 'PR-00199303',
-      name: '华兴科技-WPS 365 年度采购',
+      id: 'PR-20230025',
+      crmId: '-00097796',
+      name: '2022-银联商务-文档中台V7-增购',
       customerId: customers[0]?.id,
-      customerName: customers[0]?.companyName,
-      productType: '数科OFD用户端/随机数量授权 linux版云混合Lic（X+L）（政府）/年授权（1+L）',
-      expectedRevenue: 500000,
-      amount: 1000000,
-      finalUserRevenue: 2000000,
-      stage: 'Negotiation',
+      customerName: '银联商务支付股份有限公司',
+      productType: '文档中台V6/年授权、文档中台V7/服务器年授权',
+      stage: '确认渠道',
       probability: 80,
-      closeDate: '2026-03-20',
+      department: '上海金融销售组',
+      amount: 280000,
+      expectedRevenue: 280000,
+      finalUserRevenue: 370000,
+      closeDate: '2026-03-25',
       ownerId: 'u2',
       ownerName: '李娜',
       createdAt: '2024-01-10',
     },
     {
-      id: 'OPP002',
-      crmId: 'PR-00199304',
-      name: '信达发展-信创终端替换一期',
+      id: 'PR-20230041',
+      crmId: '-00137587',
+      name: '2024-建行-文档中台V7-增购',
       customerId: customers[1]?.id,
-      customerName: customers[1]?.companyName,
-      productType: 'WPS Office 专业版/永久授权',
-      expectedRevenue: 850000,
-      amount: 850000,
-      finalUserRevenue: 1200000,
-      stage: 'Proposal',
+      customerName: '中国建设银行股份有限公司',
+      productType: '私有云单品增值服务包/软件保障、文档中台V7/服务器授权',
+      stage: '确认渠道',
       probability: 60,
-      closeDate: '2024-07-15',
+      department: '大客金融销售组',
+      amount: 7299999,
+      expectedRevenue: 7299999,
+      finalUserRevenue: 7300000,
+      closeDate: '2026-03-28',
       ownerId: 'u6',
       ownerName: '周杰',
       createdAt: '2024-02-05',
     },
     {
-      id: 'OPP003',
-      crmId: 'PR-00199305',
-      name: '中科网络-私有云扩容',
+      id: 'PR-20230067',
+      crmId: '-00145514',
+      name: '2024-京东-WPS365高级版-新购',
       customerId: customers[2]?.id,
-      customerName: customers[2]?.companyName,
-      productType: 'WPS 365 私有云/年度订阅',
-      expectedRevenue: 300000,
-      amount: 300000,
-      finalUserRevenue: 450000,
-      stage: 'Qualification',
+      customerName: '北京京东世纪贸易有限公司',
+      productType: 'WPS365高级版/用户订阅许可（含端年场地）',
+      stage: '确认商机',
       probability: 40,
-      closeDate: '2024-08-01',
+      department: '生态支撑组',
+      amount: 399,
+      expectedRevenue: 399,
+      finalUserRevenue: 399,
+      closeDate: '2026-03-30',
       ownerId: 'u2',
       ownerName: '李娜',
       createdAt: '2024-03-12',
     },
-    { id: 'OPP004', name: '远洋贸易-海外版部署咨询', customerId: customers[3]?.id, customerName: customers[3]?.companyName, expectedRevenue: 120000, stage: 'New', probability: 10, closeDate: '2024-12-31', ownerId: 'u2', ownerName: '李娜', createdAt: '2024-04-10' },
-    { id: 'OPP005', name: '天行实业-全员订阅升级', customerId: customers[4]?.id, customerName: customers[4]?.companyName, expectedRevenue: 2000000, stage: 'Closed Won', probability: 100, closeDate: '2024-05-20', ownerId: 'u6', ownerName: '周杰', createdAt: '2023-11-20' },
-    { id: 'OPP006', name: '博大教育-校园正版化', customerId: customers[5]?.id, customerName: customers[5]?.companyName, expectedRevenue: 450000, stage: 'Negotiation', probability: 75, closeDate: '2024-09-10', ownerId: 'u1', ownerName: '张伟', createdAt: '2024-01-22' },
-    { id: 'OPP007', name: '瑞通物流-移动办公接入', customerId: customers[6]?.id, customerName: customers[6]?.companyName, expectedRevenue: 180000, stage: 'Closed Lost', probability: 0, closeDate: '2024-04-01', ownerId: 'u2', ownerName: '李娜', createdAt: '2024-02-18' },
-    { id: 'OPP008', name: '金桥金融-文档安全管控', customerId: customers[7]?.id, customerName: customers[7]?.companyName, expectedRevenue: 1500000, stage: 'Proposal', probability: 55, closeDate: '2024-10-15', ownerId: 'u6', ownerName: '周杰', createdAt: '2024-03-05' },
-    { id: 'OPP009', name: '海纳制造-PLM集成', customerId: customers[8]?.id, customerName: customers[8]?.companyName, expectedRevenue: 600000, stage: 'Qualification', probability: 30, closeDate: '2024-11-30', ownerId: 'u2', ownerName: '李娜', createdAt: '2024-04-01' },
-    { id: 'OPP010', name: '智汇科技-API接口调用包', customerId: customers[9]?.id, customerName: customers[9]?.companyName, expectedRevenue: 50000, stage: 'Closed Won', probability: 100, closeDate: '2024-05-15', ownerId: 'u1', ownerName: '张伟', createdAt: '2024-05-01' },
+    {
+      id: 'PR-20230093',
+      crmId: '-00148726',
+      name: '2024-大连捷成实业-WPS365高级版-新购',
+      customerId: customers[3]?.id,
+      customerName: '大连捷成实业发展有限公司',
+      productType: 'WPS365高级版/用户订阅许可（含端年场地）',
+      stage: '证实方案',
+      probability: 65,
+      department: '客户培育组',
+      amount: 20000,
+      expectedRevenue: 20000,
+      finalUserRevenue: 20000,
+      closeDate: '2026-03-31',
+      ownerId: 'u2',
+      ownerName: '李娜',
+      createdAt: '2024-04-10',
+    },
+    {
+      id: 'PR-20230118',
+      crmId: '-00158382',
+      name: '2024-深圳技尔通-WPS365协作版-新购',
+      customerId: customers[4]?.id,
+      customerName: '深圳市技尔通科技有限公司',
+      productType: 'WPS365协作版/用户订阅许可',
+      stage: '需求判断',
+      probability: 30,
+      department: '民企协销',
+      amount: 3990,
+      expectedRevenue: 3990,
+      finalUserRevenue: 3990,
+      closeDate: '2026-03-28',
+      ownerId: 'u6',
+      ownerName: '周杰',
+      createdAt: '2023-11-20',
+    },
+    {
+      id: 'PR-20230152',
+      crmId: '-00162845',
+      name: '2024-博大教育-WPS365教育版-新购',
+      customerId: customers[5]?.id,
+      customerName: customers[5]?.companyName,
+      productType: 'WPS365教育版/校园正版化授权',
+      stage: '确认商机',
+      probability: 75,
+      department: '教育行业组',
+      amount: 450000,
+      expectedRevenue: 450000,
+      finalUserRevenue: 450000,
+      closeDate: '2026-04-10',
+      ownerId: 'u1',
+      ownerName: '张伟',
+      createdAt: '2024-01-22',
+    },
+    {
+      id: 'PR-20230186',
+      crmId: '-00175930',
+      name: '2024-瑞通物流-移动办公接入',
+      customerId: customers[6]?.id,
+      customerName: customers[6]?.companyName,
+      productType: 'WPS365标准版/用户订阅许可',
+      stage: '输单',
+      probability: 0,
+      department: '物流行业组',
+      amount: 180000,
+      expectedRevenue: 180000,
+      finalUserRevenue: 180000,
+      closeDate: '2024-04-01',
+      ownerId: 'u2',
+      ownerName: '李娜',
+      createdAt: '2024-02-18',
+    },
+    {
+      id: 'PR-20240012',
+      crmId: '-00183462',
+      name: '2024-金桥金融-文档安全管控',
+      customerId: customers[7]?.id,
+      customerName: customers[7]?.companyName,
+      productType: '文档中台V7/服务器年授权、安全管控组件/年授权',
+      stage: '证实方案',
+      probability: 55,
+      department: '大客金融销售组',
+      amount: 1500000,
+      expectedRevenue: 1500000,
+      finalUserRevenue: 1500000,
+      closeDate: '2026-05-15',
+      ownerId: 'u6',
+      ownerName: '周杰',
+      createdAt: '2024-03-05',
+    },
+    {
+      id: 'PR-20240047',
+      crmId: '-00191027',
+      name: '2024-海纳制造-PLM集成方案',
+      customerId: customers[8]?.id,
+      customerName: customers[8]?.companyName,
+      productType: 'WPS365高级版/用户订阅许可、API调用包/年授权',
+      stage: '确认渠道',
+      probability: 30,
+      department: '制造行业组',
+      amount: 600000,
+      expectedRevenue: 600000,
+      finalUserRevenue: 600000,
+      closeDate: '2026-06-30',
+      ownerId: 'u2',
+      ownerName: '李娜',
+      createdAt: '2024-04-01',
+    },
+    {
+      id: 'PR-20240083',
+      crmId: '-00199303',
+      name: '2024-智汇科技-API接口调用包',
+      customerId: customers[9]?.id,
+      customerName: customers[9]?.companyName,
+      productType: 'API调用包/年度订阅',
+      stage: '赢单',
+      probability: 100,
+      department: '生态支撑组',
+      amount: 50000,
+      expectedRevenue: 50000,
+      finalUserRevenue: 50000,
+      closeDate: '2024-05-15',
+      ownerId: 'u1',
+      ownerName: '张伟',
+      createdAt: '2024-05-01',
+    },
   ];
   return opps;
 }
@@ -155,10 +303,11 @@ export interface OrderGeneratorParams {
   merchandises: SalesMerchandise[];
   opportunities: Opportunity[];
   channels: Channel[];
+  contracts: Contract[];
 }
 
 export function generateOrders(params: OrderGeneratorParams): Order[] {
-  const { customers, products, users, merchandises, opportunities, channels } = params;
+  const { customers, products, users, merchandises, opportunities, channels, contracts } = params;
   const mockOrders: Order[] = [];
   const statuses = Object.values(OrderStatus);
   const sources: OrderSource[] = ['Sales', 'ChannelPortal', 'OnlineStore', 'APISync'];
@@ -240,11 +389,11 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
     };
 
     const extraProductPool = [
-      { productId: 'PROD-PUB-002', productName: 'WPS 365 高级版', skuId: 's2', skuName: '标准版', price: 499 },
-      { productId: 'PROD-PUB-001-2', productName: 'WPS 365 基础版 (政府)', skuId: 's1-2', skuName: '基础版', price: 199 },
-      { productId: 'PROD-PVT-001', productName: 'WPS 365 高级版 (私有云)', skuId: 's5', skuName: '标准版', price: 50000 },
-      { productId: 'PROD-ITEM-001', productName: 'Web Office 核心组件', skuId: 's8', skuName: '标准版', price: 20000 },
-      { productId: 'PROD-PUB-001', productName: 'WPS 365 标准版 (政府)', skuId: 's1', skuName: '标准版', price: 299 },
+      { productId: 'AB0000003', productName: 'WPS 365 高级版', skuId: 's2', skuName: '标准版', price: 499 },
+      { productId: 'AB0000002', productName: 'WPS 365 基础版 (政府)', skuId: 's1-2', skuName: '基础版', price: 199 },
+      { productId: 'AB0000005', productName: 'WPS 365 高级版 (私有云)', skuId: 's5', skuName: '标准版', price: 50000 },
+      { productId: 'AB0000007', productName: 'Web Office 核心组件', skuId: 's8', skuName: '标准版', price: 20000 },
+      { productId: 'AB0000001', productName: 'WPS 365 标准版 (政府)', skuId: 's1', skuName: '标准版', price: 299 },
     ];
 
     const makeItem = (mItem: { productId: string; productName: string; skuId: string; skuName: string; quantity?: number }, unitPrice: number, idxOffset: number): OrderItem => {
@@ -383,8 +532,8 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
       creatorId: 'u10',
       creatorName: '苏雪松',
       creatorPhone: '17610166961',
-      industryLine: '大客央国企',
-      province: '浙江省',
+      industryLine: customer.industryLine || customer.industry,
+      province: customer.province || customer.region,
       city: '嘉兴市',
       district: '桐乡市',
       reportTag: 'EA',
@@ -412,55 +561,73 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
           conversionAmount: (i % 4 === 0 || i % 4 === 2) ? Math.floor(_productTotal * 0.7 / 100) * 100 || 500 : undefined,
         };
       })(),
+      linkedContractIds: (() => {
+        const customerContracts = contracts.filter(c => c.customerId === customer.id);
+        if (customerContracts.length === 0) return [];
+        if (customerContracts.length === 1) return [customerContracts[0].id];
+        const count = Math.min(customerContracts.length, i % 3 === 0 ? 3 : i % 2 === 0 ? 2 : 1);
+        return customerContracts.slice(0, count).map(c => c.id);
+      })(),
+      orderRemark: [
+        `${customer.companyName}年度采购，需优先安排发货，请尽快处理。`,
+        `客户要求发票与合同同步寄送，注意核对抬头信息。`,
+        `本订单为续费订单，续费周期与上一年保持一致，授权数量不变。`,
+        `渠道商特殊价格，已获得销售总监审批，详见附件审批单。`,
+        `客户信创项目配套采购，需提供国产化兼容证明材料。`,
+        `付款方式为分期，首付 30%，剩余款项在验收后 30 日内结清。`,
+        `本单需提前协调交付团队完成安装部署，客户有上线时间节点要求。`,
+        `客户采购预算有限，已协商优惠价格，利润率较低，请注意审批。`,
+        `政府项目，需提供正规发票及授权书盖章原件，不接受电子版。`,
+        `该订单关联招标项目，合同编号见附件，需与采购部对接确认。`,
+        '',
+        '',
+        '',
+      ][i % 13],
     });
   }
   return mockOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
-export function generateContracts(): Contract[] {
+export function generateContracts(customers: Customer[]): Contract[] {
   const contractTypes = ['渠道最终用户合同', '直销合同', '框架合同', '服务合同', '补充协议'];
   const verifyStatuses: Contract['verifyStatus'][] = ['PENDING_BUSINESS', 'PENDING', 'VERIFIED', 'APPROVED', 'REJECTED'];
   const sellerCompanies = [
-    '广西金奇志科技有限公司', '郑州海友科伟电子科技有限公司', '广州瑞斯信息科技有限公司',
-    '杭州连邦电脑信息技术有限公司', '成都连邦信息技术有限公司', '成都中创亚太信息科技有限公司',
-    '云南铠炫科技有限公司', '北京神州数码信息服务有限公司', '上海软通动力信息技术有限公司',
-    '深圳市汇众腾达科技有限公司', '武汉中软国际科技有限公司', '南京太极股份有限公司',
+    '珠海金山办公软件有限公司', '武汉金山办公软件有限公司', '北京金山办公软件有限公司',
   ];
-  const buyerCompanies = [
-    '广州市公用公交站场管理服务有限公司', '-', '崇左幼儿师范高等专科学校', '梁园区委',
-    '马边政法委', '普洱市教育体育局', '广西凭祥产业园区管理委员会', '交投40',
-    '中创智库', '北京市海淀区教育委员会', '重庆市人力资源和社会保障局', '天津滨海新区政府',
+  const nameSuffixes = [
+    'WPS 365采购合同', '信创替换项目合同', '办公软件年度订阅协议', '正版化采购合同',
+    '协作办公平台采购合同', '文档安全管控协议', '私有云部署服务合同',
   ];
-  const contractNames = [
-    '崇左幼儿师范高等专科学校附属幼儿园-30套', '梁园区委合同', 'WPS365协作办公高级平台V12授校采购合同',
-    '交投40', '马边政法委', '中创-智库.pdf', '普洱市教育体育局最终用户合同',
-    '广西凭祥产业园区管理委员会', '北京市海淀区教委WPS采购合同', '重庆人社局信创替换项目合同',
-    '天津滨海新区政务云协议', '华兴科技年度订阅合同', '信达发展信创终端合同', '中科网络私有云服务合同',
-    '远洋贸易全球授权框架协议', '天行实业全员订阅协议', '博大教育校园正版化合同', '瑞通物流移动办公协议',
-    '金桥金融文档安全管控合同', '海纳制造PLM集成服务合同', '智汇科技API调用包协议',
-    '南京市玄武区教育局采购合同', '西安市市政工程设计研究院合同', '福州市数字办信创项目协议',
-    '厦门市卫生健康委员会WPS采购', '哈尔滨工业大学正版化合同', '成都市政府数字化转型采购',
-    '广州开发区企业服务协议', '昆明市公安局信息化采购合同', '武汉大学图书馆协议',
-  ];
+  const amounts = [15000, 38000, 50000, 86000, 120000, 199000, 299000, 500000, 850000, 1200000];
 
-  return Array.from({ length: 30 }, (_, i) => {
-    const baseCode = 46543 + (29 - i);
-    const statusIndex = i % verifyStatuses.length;
-    return {
-      id: `CT${(i + 1).toString().padStart(8, '0')}`,
-      code: `HT${baseCode.toString().padStart(9, '0')}`,
-      name: contractNames[i % contractNames.length],
-      externalCode: i % 4 === 0 ? `EXT-${2024 + (i % 3)}-${(1000 + i).toString()}` : undefined,
-      contractType: contractTypes[i % contractTypes.length],
-      partyA: buyerCompanies[i % buyerCompanies.length] === '-' ? undefined : buyerCompanies[i % buyerCompanies.length],
-      partyB: sellerCompanies[i % sellerCompanies.length],
-      verifyStatus: verifyStatuses[statusIndex],
-      verifyRemark: verifyStatuses[statusIndex] === 'REJECTED' ? '合同条款不符合规范，请修改后重新提交' : undefined,
-      amount: [15000, 50000, 120000, 299000, 500000, 850000, 1200000][i % 7],
-      signDate: `2026-0${(i % 3) + 1}-${(10 + (i % 18)).toString().padStart(2, '0')}`,
-      createdAt: new Date(Date.now() - i * 86400000 * 2).toISOString(),
-    };
-  });
+  const result: Contract[] = [];
+  let seq = 1;
+  for (let ci = 0; ci < customers.length; ci++) {
+    const customer = customers[ci];
+    const count = ci < 10 ? 3 : ci < 30 ? 2 : 1;
+    for (let j = 0; j < count; j++) {
+      const statusIndex = (ci + j) % verifyStatuses.length;
+      const month = ((ci + j) % 3) + 1;
+      const day = 10 + ((ci * 3 + j * 7) % 18);
+      result.push({
+        id: `CT${seq.toString().padStart(8, '0')}`,
+        code: `HT${(46600 - seq).toString().padStart(9, '0')}`,
+        name: `${customer.companyName}${nameSuffixes[(ci + j) % nameSuffixes.length]}`,
+        externalCode: j === 0 && ci % 3 === 0 ? `EXT-${2025 + (ci % 2)}-${(1000 + seq).toString()}` : undefined,
+        contractType: contractTypes[(ci + j) % contractTypes.length],
+        partyA: customer.companyName,
+        partyB: sellerCompanies[(ci + j) % sellerCompanies.length],
+        verifyStatus: verifyStatuses[statusIndex],
+        verifyRemark: verifyStatuses[statusIndex] === 'REJECTED' ? '合同条款不符合规范，请修改后重新提交' : undefined,
+        amount: amounts[(ci + j) % amounts.length],
+        signDate: `2026-0${month}-${day.toString().padStart(2, '0')}`,
+        createdAt: new Date(Date.now() - seq * 86400000).toISOString(),
+        customerId: customer.id,
+      });
+      seq++;
+    }
+  }
+  return result;
 }
 
 export function generateRemittances(): Remittance[] {

@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Order, OrderStatus, OrderItem, User, ApprovalRecord, OrderSource } from '../../types';
-import { Search, Plus, Trash2, Disc, CheckCircle, FileText, CreditCard, Truck, X, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, FileCheck, CheckSquare, Package, Settings, Filter, ChevronDown, Calendar, Shield, RotateCcw } from 'lucide-react';
+import { Order, OrderStatus, OrderItem, User, ApprovalRecord, OrderSource, OrderDraft } from '../../types';
+import { Search, Plus, Trash2, Disc, CheckCircle, FileText, CreditCard, Truck, X, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, FileCheck, CheckSquare, Package, Settings, Filter, ChevronDown, Calendar, Shield, RotateCcw, Save, ChevronRight, Copy, Check } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import OrderCreateWizard from './OrderCreateWizard';
 import { useAppContext } from '../../contexts/AppContext';
@@ -39,6 +39,7 @@ const orderSourceLabelMap: Record<string, string> = {
 
 
 const statusMap: Record<string, string> = {
+    [OrderStatus.DRAFT]: '草稿',
     [OrderStatus.PENDING_APPROVAL]: '待审批',
     [OrderStatus.PENDING_CONFIRM]: '待确认',
     [OrderStatus.PROCESSING_PROD]: '备货中',
@@ -70,7 +71,7 @@ const paymentMethodMap: Record<string, string> = {
 };
 
 const OrderManager: React.FC = () => {
-  const { orders, setOrders, products, customers, currentUser, users, departments, opportunities, channels, roles, standaloneEnterprises } = useAppContext();
+  const { orders, setOrders, products, customers, currentUser, users, departments, opportunities, channels, roles, standaloneEnterprises, orderDrafts, setOrderDrafts } = useAppContext();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -81,6 +82,7 @@ const OrderManager: React.FC = () => {
 
   // Pipeline Status Definitions
   const pipelineStatuses = [
+      { id: OrderStatus.DRAFT, label: '草稿', desc: '已暂存、待继续提交', icon: Save, permission: 'order_create' },
       { id: OrderStatus.PENDING_APPROVAL, label: '待审批', desc: '等待经理或财务审批', icon: FileCheck, permission: 'order_view_pending_approval' },
       { id: OrderStatus.PENDING_CONFIRM, label: '待确认', desc: '等待商务确认订单', icon: CheckSquare, permission: 'order_view_pending_confirm' },
       { id: 'STOCK_AUTH', label: '授权确认', desc: '生成并确认产品授权码', icon: CheckCircle, permission: 'order_view_auth_confirm' },
@@ -307,6 +309,15 @@ const OrderManager: React.FC = () => {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [renewalOrder, setRenewalOrder] = useState<Order | undefined>(undefined);
+  const [resumeDraft, setResumeDraft] = useState<OrderDraft | undefined>(undefined);
+  const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
+  const handleCopyOrderId = (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
+      navigator.clipboard.writeText(id).then(() => {
+          setCopiedOrderId(id);
+          setTimeout(() => setCopiedOrderId(null), 1500);
+      });
+  };
 
   // --- Handle Renewal Initialization from navigation state ---
   useEffect(() => {
@@ -322,6 +333,7 @@ const OrderManager: React.FC = () => {
     const text = statusMap[status] || status;
     let className = '';
     switch (status) {
+      case OrderStatus.DRAFT:             className = 'unified-tag-gray !rounded-full !border-dashed'; break;
       case OrderStatus.PENDING_PAYMENT:   className = 'unified-tag-blue !rounded-full';   break;
       case OrderStatus.PENDING_APPROVAL:  className = 'unified-tag-blue !rounded-full';   break;
       case OrderStatus.PENDING_CONFIRM:   className = 'unified-tag-blue !rounded-full';   break;
@@ -582,18 +594,39 @@ const OrderManager: React.FC = () => {
       setSelectedOrderIds(new Set());
   };
 
+  const handleDeleteDraft = (e: React.MouseEvent, orderId: string) => {
+      e.stopPropagation();
+      setOrderDrafts(prev => prev.filter(d => d.id !== orderId));
+      setOrders(prev => prev.filter(o => o.id !== orderId));
+  };
+
   const getAction = (order: Order) => {
       const navigateToStep = (step: string) => navigate(`/orders/${order.id}`, { state: { openAction: step } });
+      const btnCls = "px-1 py-0.5 text-[#0071E3] dark:text-[#0A84FF] hover:text-[#0060C0] dark:hover:text-[#007AEB] text-xs font-medium whitespace-nowrap transition";
+      if (order.status === OrderStatus.DRAFT)
+          return (
+              <div className="flex items-center justify-end gap-1.5 mr-[-40px]">
+                  <button
+                      onClick={(e) => { e.stopPropagation(); const draft = orderDrafts.find(d => d.id === order.id); if (draft) { setResumeDraft(draft); setIsCreateOpen(true); } }}
+                      className={btnCls}
+                  >继续编辑</button>
+                  <button
+                      onClick={(e) => handleDeleteDraft(e, order.id)}
+                      className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 dark:text-gray-600 transition"
+                      title="删除草稿"
+                  ><Trash2 className="w-3.5 h-3.5" /></button>
+              </div>
+          );
       if (order.status === OrderStatus.PENDING_APPROVAL && hasPermission('order_workflow_approval'))
-          return <button onClick={(e) => { e.stopPropagation(); navigateToStep('APPROVAL'); }} className="px-2 py-1 bg-yellow-50 hover:bg-yellow-100 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400 rounded-lg text-[10px] font-bold whitespace-nowrap transition border border-yellow-100 dark:border-yellow-800/30">去审批</button>;
+          return <button onClick={(e) => { e.stopPropagation(); navigateToStep('APPROVAL'); }} className={btnCls}>去审批</button>;
       if (order.status === OrderStatus.PENDING_CONFIRM && hasPermission('order_workflow_confirm'))
-          return <button onClick={(e) => { e.stopPropagation(); navigateToStep('CONFIRM'); }} className="px-2 py-1 bg-orange-50 hover:bg-orange-100 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400 rounded-lg text-[10px] font-bold whitespace-nowrap transition border border-orange-100 dark:border-orange-800/30">去确认</button>;
+          return <button onClick={(e) => { e.stopPropagation(); navigateToStep('CONFIRM'); }} className={btnCls}>去确认</button>;
       if (order.status === OrderStatus.PENDING_PAYMENT && hasPermission('order_workflow_payment'))
-          return <button onClick={(e) => { e.stopPropagation(); navigateToStep('PAYMENT'); }} className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-lg text-[10px] font-bold whitespace-nowrap transition border border-blue-100 dark:border-blue-800/30">去支付</button>;
+          return <button onClick={(e) => { e.stopPropagation(); navigateToStep('PAYMENT'); }} className={btnCls}>去支付</button>;
       if (order.status === OrderStatus.PROCESSING_PROD && hasPermission('order_workflow_stock'))
-          return <button onClick={(e) => { e.stopPropagation(); navigateToStep('STOCK_PREP'); }} className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400 rounded-lg text-[10px] font-bold whitespace-nowrap transition border border-indigo-100 dark:border-indigo-800/30">去备货</button>;
+          return <button onClick={(e) => { e.stopPropagation(); navigateToStep('STOCK_PREP'); }} className={btnCls}>去备货</button>;
       if (order.status === OrderStatus.SHIPPED && hasPermission('order_workflow_acceptance'))
-          return <button onClick={(e) => { e.stopPropagation(); navigateToStep('ACCEPTANCE'); }} className="px-2 py-1 bg-green-50 hover:bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400 rounded-lg text-[10px] font-bold whitespace-nowrap transition border border-green-100 dark:border-green-800/30">去验收</button>;
+          return <button onClick={(e) => { e.stopPropagation(); navigateToStep('ACCEPTANCE'); }} className={btnCls}>去验收</button>;
       return null;
   };
 
@@ -614,11 +647,49 @@ const OrderManager: React.FC = () => {
 
   const { confirm: confirmCount, ship: shipCount } = getEligibleCounts();
 
-  const toggleColumn = (id: string) => {
-      setVisibleColumns(prev => 
-          prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
-      );
+  const DEFAULT_VISIBLE = ['id', 'customer', 'buyer', 'products', 'sales', 'businessManager', 'department', 'source', 'buyerType', 'date', 'status', 'paymentStatus', 'stockStatus', 'total', 'action'];
+  const FIXED_COLUMNS = new Set(['id', 'action']);
+  const [tempVisible, setTempVisible] = useState<string[]>(visibleColumns);
+  const [leftSearch, setLeftSearch] = useState('');
+  const [rightSearch, setRightSearch] = useState('');
+  const [leftChecked, setLeftChecked] = useState<Set<string>>(new Set());
+  const [rightChecked, setRightChecked] = useState<Set<string>>(new Set());
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+
+  const openColumnConfig = () => {
+    setTempVisible([...visibleColumns]);
+    setLeftSearch(''); setRightSearch('');
+    setLeftChecked(new Set()); setRightChecked(new Set());
+    setIsColumnConfigOpen(true);
   };
+  const availableCols = allColumns.filter(c => !tempVisible.includes(c.id) && !FIXED_COLUMNS.has(c.id));
+  const displayCols = tempVisible.map(id => allColumns.find(c => c.id === id)!).filter(Boolean);
+
+  const filteredAvailable = availableCols.filter(c => !leftSearch || c.label.includes(leftSearch));
+  const filteredDisplay = displayCols.filter(c => !rightSearch || c.label.includes(rightSearch));
+
+  const addToDisplay = () => {
+    if (leftChecked.size === 0) return;
+    setTempVisible(prev => [...prev.filter(id => id !== 'action'), ...Array.from(leftChecked), 'action'].filter((v, i, a) => a.indexOf(v) === i));
+    setLeftChecked(new Set());
+  };
+  const removeFromDisplay = () => {
+    if (rightChecked.size === 0) return;
+    setTempVisible(prev => prev.filter(id => !rightChecked.has(id)));
+    setRightChecked(new Set());
+  };
+  const toggleLeftCheck = (id: string) => setLeftChecked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleRightCheck = (id: string) => { if (FIXED_COLUMNS.has(id)) return; setRightChecked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); };
+  const toggleLeftAll = () => { const ids = filteredAvailable.map(c => c.id); setLeftChecked(prev => prev.size === ids.length ? new Set() : new Set(ids)); };
+  const toggleRightAll = () => { const ids = filteredDisplay.filter(c => !FIXED_COLUMNS.has(c.id)).map(c => c.id); setRightChecked(prev => prev.size === ids.length ? new Set() : new Set(ids)); };
+  const invertLeft = () => { const ids = filteredAvailable.map(c => c.id); setLeftChecked(prev => new Set(ids.filter(id => !prev.has(id)))); };
+  const invertRight = () => { const ids = filteredDisplay.filter(c => !FIXED_COLUMNS.has(c.id)).map(c => c.id); setRightChecked(prev => new Set(ids.filter(id => !prev.has(id)))); };
+  const removeOneFromDisplay = (id: string) => { if (FIXED_COLUMNS.has(id)) return; setTempVisible(prev => prev.filter(x => x !== id)); setRightChecked(prev => { const n = new Set(prev); n.delete(id); return n; }); };
+  const handleDragStart = (idx: number) => setDragIdx(idx);
+  const handleDragOver = (e: React.DragEvent, idx: number) => { e.preventDefault(); if (dragIdx === null || dragIdx === idx) return; const arr = [...tempVisible]; const [item] = arr.splice(dragIdx, 1); arr.splice(idx, 0, item); setTempVisible(arr); setDragIdx(idx); };
+  const handleDragEnd = () => setDragIdx(null);
+  const confirmColumnConfig = () => { setVisibleColumns(tempVisible); setIsColumnConfigOpen(false); };
+  const restoreDefault = () => { setTempVisible([...DEFAULT_VISIBLE]); setLeftChecked(new Set()); setRightChecked(new Set()); };
 
   const searchFieldOptions: { value: 'id' | 'customerName' | 'buyerName' | 'productName'; label: string; placeholder: string }[] = [
     { value: 'id',           label: '订单编号', placeholder: '搜索订单编号…' },
@@ -652,6 +723,7 @@ const OrderManager: React.FC = () => {
         {/* Left: title */}
         <div className="flex items-center gap-4 w-full lg:w-auto">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">订单管理</h1>
+            <a href="https://365.kdocs.cn/latest" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline shrink-0"><FileText className="w-3.5 h-3.5" />使用说明</a>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
@@ -739,42 +811,72 @@ const OrderManager: React.FC = () => {
                 <RotateCcw className="w-4 h-4" />
             </button>
 
-            {/* 设置字段按钮（原筛选位置） */}
+            {/* 设置字段按钮 */}
             {hasPermission('order_column_config') && (
-            <div className="relative">
-                <button 
-                    onClick={() => setIsColumnConfigOpen(!isColumnConfigOpen)}
-                    className={`p-2 rounded-lg border transition shadow-apple ${isColumnConfigOpen ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
-                    title="配置列"
-                >
-                    <Settings className="w-4 h-4" />
-                </button>
-                {isColumnConfigOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#2C2C2E] shadow-xl z-50 p-2 rounded-xl border border-gray-100 dark:border-white/10 animate-fade-in max-h-80 overflow-y-auto custom-scrollbar">
-                        <div className="text-xs font-bold text-gray-400 uppercase px-2 py-1 mb-1">显示列配置</div>
-                        {allColumns.map(col => (
-                            <label key={col.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg cursor-pointer transition">
-                                <input 
-                                    type="checkbox" 
-                                    checked={visibleColumns.includes(col.id)} 
-                                    onChange={() => toggleColumn(col.id)}
-                                    disabled={col.id === 'id' || col.id === 'action'} 
-                                    className="w-4 h-4 rounded-lg border-gray-300 text-[#0071E3] focus:ring-blue-500"
-                                />
-                                <span className="text-sm text-gray-700 dark:text-gray-300">{col.label}</span>
-                            </label>
-                        ))}
-                    </div>
-                )}
-            </div>
+            <button
+                onClick={openColumnConfig}
+                className={`p-2 rounded-lg border transition shadow-apple ${isColumnConfigOpen ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
+                title="配置列"
+            >
+                <Settings className="w-4 h-4" />
+            </button>
             )}
 
             <div className="w-px h-6 bg-gray-200 dark:bg-white/10 mx-1 hidden sm:block"></div>
 
             {hasPermission('order_create') && (
-                <button onClick={() => setIsCreateOpen(true)} className="unified-button-primary">
-                    <Plus className="w-4 h-4" /> 新建订单
-                </button>
+                <div className="flex items-center gap-2">
+                    {orderDrafts.length > 0 && (
+                        <div className="relative group">
+                            <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-100 dark:hover:bg-amber-900/40 transition">
+                                <Save className="w-3.5 h-3.5"/>
+                                草稿箱
+                                <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">{orderDrafts.length}</span>
+                            </button>
+                            {/* Draft dropdown */}
+                            <div className="absolute right-0 top-full mt-1 w-80 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden hidden group-focus-within:block group-hover:block">
+                                <div className="p-3 border-b border-gray-100 dark:border-white/10 flex justify-between items-center">
+                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">暂存草稿</span>
+                                    <span className="text-xs text-gray-400">{orderDrafts.length} 条</span>
+                                </div>
+                                <div className="max-h-64 overflow-y-auto">
+                                    {orderDrafts.map(draft => (
+                                        <div key={draft.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-white/5 transition group/item border-b border-gray-50 dark:border-white/5 last:border-0">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-xs font-mono text-gray-500 dark:text-gray-400">{draft.id}</div>
+                                                <div className="text-xs text-gray-400 mt-0.5">
+                                                    第 {draft.currentStep} 步 · {draft.buyerType || '未选类型'}
+                                                    {draft.newOrderItems.length > 0 && ` · ${draft.newOrderItems.length} 个产品`}
+                                                </div>
+                                                <div className="text-[10px] text-gray-300 dark:text-gray-600 mt-0.5">{new Date(draft.savedAt).toLocaleString('zh-CN')}</div>
+                                            </div>
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <button
+                                                    onClick={() => { setResumeDraft(draft); setIsCreateOpen(true); }}
+                                                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-[#0071E3] dark:text-[#FF2D55] bg-blue-50 dark:bg-white/5 rounded-lg hover:bg-blue-100 dark:hover:bg-white/10 transition"
+                                                >
+                                                    继续 <ChevronRight className="w-3 h-3"/>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setOrderDrafts(prev => prev.filter(d => d.id !== draft.id));
+                                                        setOrders(prev => prev.filter(o => o.id !== draft.id));
+                                                    }}
+                                                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+                                                >
+                                                    <X className="w-3.5 h-3.5"/>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    <button onClick={() => { setResumeDraft(undefined); setIsCreateOpen(true); }} className="unified-button-primary">
+                        <Plus className="w-4 h-4" /> 新建订单
+                    </button>
+                </div>
             )}
         </div>
       </div>
@@ -907,7 +1009,7 @@ const OrderManager: React.FC = () => {
                             col.id === 'id'
                                 ? 'sticky left-[52px] z-10 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.08)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.3)]'
                                 : col.id === 'action'
-                                ? 'sticky right-[52px] z-10 shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.08)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.3)] text-center'
+                                ? 'sticky right-[52px] z-10 shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.08)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.3)] text-right'
                                 : ''
                         }`}>{col.label}</th>
                     ))}
@@ -941,11 +1043,31 @@ const OrderManager: React.FC = () => {
                       />
                   </td>
                   {visibleColumns.includes('id') && (
-                      <td
-                          className={`px-4 py-3 font-mono font-bold text-[#0071E3] dark:text-[#FF2D55] whitespace-nowrap sticky left-[52px] z-20 ${stickyBg} shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors cursor-pointer hover:underline`}
-                          onClick={() => navigate(`/orders/${order.id}`)}
-                      >
-                          {order.id}
+                      <td className={`px-4 py-3 whitespace-nowrap sticky left-[52px] z-20 ${stickyBg} shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors`}>
+                          <div className="flex items-center gap-1.5">
+                              <span
+                                  className={`font-mono font-bold cursor-pointer hover:underline ${order.status === OrderStatus.DRAFT ? 'text-amber-500 dark:text-amber-400' : 'text-[#0071E3] dark:text-[#FF2D55]'}`}
+                                  onClick={() => {
+                                      if (order.status === OrderStatus.DRAFT) {
+                                          const draft = orderDrafts.find(d => d.id === order.id);
+                                          if (draft) { setResumeDraft(draft); setIsCreateOpen(true); }
+                                      } else {
+                                          navigate(`/orders/${order.id}`);
+                                      }
+                                  }}
+                              >
+                                  {order.id}
+                              </span>
+                              <button
+                                  onClick={(e) => handleCopyOrderId(e, order.id)}
+                                  className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-white/10 text-gray-300 hover:text-gray-500 dark:hover:text-gray-300 transition-all shrink-0"
+                                  title="复制订单编号"
+                              >
+                                  {copiedOrderId === order.id
+                                      ? <Check className="w-3 h-3 text-green-500" />
+                                      : <Copy className="w-3 h-3" />}
+                              </button>
+                          </div>
                       </td>
                   )}
                   {visibleColumns.includes('customer') && (
@@ -1133,7 +1255,7 @@ const OrderManager: React.FC = () => {
                       </td>
                   )}
                   {visibleColumns.includes('action') && (
-                      <td className={`px-4 py-3 text-center whitespace-nowrap sticky right-[52px] z-20 ${stickyBg} shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors`}>
+                      <td className={`px-4 py-3 text-right whitespace-nowrap sticky right-[52px] z-20 ${stickyBg} shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors`}>
                           {getAction(order)}
                       </td>
                   )}
@@ -1531,8 +1653,9 @@ const OrderManager: React.FC = () => {
       {/* --- Create Order Wizard --- */}
       <OrderCreateWizard
         isOpen={isCreateOpen}
-        onClose={() => { setIsCreateOpen(false); setRenewalOrder(undefined); }}
+        onClose={() => { setIsCreateOpen(false); setRenewalOrder(undefined); setResumeDraft(undefined); }}
         renewalOrder={renewalOrder}
+        initialDraft={resumeDraft}
       />
 
       {/* User Details Drawer */}
@@ -1620,6 +1743,104 @@ const OrderManager: React.FC = () => {
             </div>
           </div>
         </div>
+        </ModalPortal>
+      )}
+
+      {/* Column Config Modal */}
+      {isColumnConfigOpen && (
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[500] p-4 animate-fade-in" onClick={() => setIsColumnConfigOpen(false)}>
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-2xl w-full max-w-[720px] flex flex-col animate-modal-enter border border-gray-200/50 dark:border-white/10" onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">请选择列字段</h3>
+                <button onClick={() => setIsColumnConfigOpen(false)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition"><X className="w-4 h-4"/></button>
+              </div>
+
+              {/* Body: two panels */}
+              <div className="flex items-stretch p-5 gap-4" style={{ minHeight: 380 }}>
+                {/* Left: Available */}
+                <div className="flex-1 flex flex-col border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden">
+                  <div className="px-3 py-2.5 border-b border-gray-100 dark:border-white/10 flex items-center justify-between bg-gray-50 dark:bg-white/5 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" checked={leftChecked.size > 0 && leftChecked.size === filteredAvailable.length} onChange={toggleLeftAll} className="w-3.5 h-3.5 rounded border-gray-300 text-[#0071E3]"/>
+                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">可用字段</span>
+                    </div>
+                    <button onClick={invertLeft} className="text-[11px] text-[#0071E3] dark:text-[#0A84FF] font-medium hover:underline">反选</button>
+                  </div>
+                  <div className="px-3 py-2 border-b border-gray-50 dark:border-white/5 shrink-0">
+                    <input type="text" value={leftSearch} onChange={e => setLeftSearch(e.target.value)} placeholder="请输入搜索内容" className="w-full text-xs px-2.5 py-1.5 border border-gray-200 dark:border-white/10 rounded-lg bg-white dark:bg-black outline-none text-gray-700 dark:text-gray-200 placeholder:text-gray-400 focus:border-blue-300"/>
+                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar px-1 py-1">
+                    {filteredAvailable.length > 0 ? filteredAvailable.map(col => (
+                      <label key={col.id} className="flex items-center gap-2 px-2.5 py-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg cursor-pointer transition">
+                        <input type="checkbox" checked={leftChecked.has(col.id)} onChange={() => toggleLeftCheck(col.id)} className="w-3.5 h-3.5 rounded border-gray-300 text-[#0071E3]"/>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{col.label}</span>
+                      </label>
+                    )) : (
+                      <div className="text-xs text-gray-400 text-center py-6">无可用字段</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Middle: Arrows */}
+                <div className="flex flex-col items-center justify-center gap-2 shrink-0">
+                  <button onClick={addToDisplay} disabled={leftChecked.size === 0} className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition whitespace-nowrap">
+                    添加 →
+                  </button>
+                  <button onClick={removeFromDisplay} disabled={rightChecked.size === 0} className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition whitespace-nowrap">
+                    ← 移除
+                  </button>
+                </div>
+
+                {/* Right: Display */}
+                <div className="flex-1 flex flex-col border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden">
+                  <div className="px-3 py-2.5 border-b border-gray-100 dark:border-white/10 flex items-center justify-between bg-gray-50 dark:bg-white/5 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" checked={rightChecked.size > 0 && rightChecked.size === filteredDisplay.filter(c => !FIXED_COLUMNS.has(c.id)).length} onChange={toggleRightAll} className="w-3.5 h-3.5 rounded border-gray-300 text-[#0071E3]"/>
+                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">显示字段</span>
+                    </div>
+                    <button onClick={restoreDefault} className="text-[11px] text-[#0071E3] dark:text-[#0A84FF] font-medium hover:underline">恢复默认</button>
+                  </div>
+                  <div className="px-3 py-2 border-b border-gray-50 dark:border-white/5 shrink-0">
+                    <input type="text" value={rightSearch} onChange={e => setRightSearch(e.target.value)} placeholder="请输入搜索内容" className="w-full text-xs px-2.5 py-1.5 border border-gray-200 dark:border-white/10 rounded-lg bg-white dark:bg-black outline-none text-gray-700 dark:text-gray-200 placeholder:text-gray-400 focus:border-blue-300"/>
+                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar px-1 py-1">
+                    {filteredDisplay.length > 0 ? filteredDisplay.map((col, idx) => {
+                      const isFixed = FIXED_COLUMNS.has(col.id);
+                      return (
+                        <div
+                          key={col.id}
+                          draggable={!isFixed}
+                          onDragStart={() => handleDragStart(tempVisible.indexOf(col.id))}
+                          onDragOver={e => handleDragOver(e, tempVisible.indexOf(col.id))}
+                          onDragEnd={handleDragEnd}
+                          className={`flex items-center gap-2 px-2.5 py-2 rounded-lg transition group ${dragIdx === tempVisible.indexOf(col.id) ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                        >
+                          <span className={`cursor-grab text-gray-300 dark:text-gray-600 ${isFixed ? 'invisible' : ''}`}>☰</span>
+                          <input type="checkbox" checked={rightChecked.has(col.id)} onChange={() => toggleRightCheck(col.id)} disabled={isFixed} className="w-3.5 h-3.5 rounded border-gray-300 text-[#0071E3] disabled:opacity-40"/>
+                          <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">{col.label}</span>
+                          {isFixed ? (
+                            <span className="text-[10px] text-orange-500 font-medium">(系统字段)</span>
+                          ) : (
+                            <button onClick={() => removeOneFromDisplay(col.id)} className="text-[11px] text-red-400 hover:text-red-600 dark:hover:text-red-300 opacity-0 group-hover:opacity-100 transition font-medium">移除</button>
+                          )}
+                        </div>
+                      );
+                    }) : (
+                      <div className="text-xs text-gray-400 text-center py-6">无显示字段</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
+                <button onClick={() => setIsColumnConfigOpen(false)} className="px-5 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/10 transition">取 消</button>
+                <button onClick={confirmColumnConfig} className="px-5 py-2 rounded-xl text-sm font-bold text-white bg-[#0071E3] hover:bg-[#0060C0] dark:bg-[#0A84FF] dark:hover:bg-[#007AEB] transition">确 定</button>
+              </div>
+            </div>
+          </div>
         </ModalPortal>
       )}
     </div>

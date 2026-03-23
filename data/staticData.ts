@@ -65,7 +65,7 @@ export const initialLicenseDefs: LicenseTypeDefinition[] = [
 // --- Products ---
 export const initialProducts: Product[] = [
   {
-    id: 'PROD-PUB-001', name: 'WPS 365 标准版 (政府)', category: 'WPS365公有云', subCategory: 'WPS365标准版（政府）（服务）', status: 'OnShelf', tags: ['IM', 'AI', '生态'],
+    id: 'AB0000001', name: 'WPS 365 标准版 (政府)', category: 'WPS365公有云', subCategory: 'WPS365标准版（政府）（服务）', status: 'OnShelf', tags: ['IM', 'AI', '生态'],
     skus: [{
       id: 's1', code: 'S1', name: '标准版', price: 299, status: 'Active', stock: 100,
       pricingOptions: [
@@ -88,7 +88,7 @@ export const initialProducts: Product[] = [
     ]
   },
   {
-    id: 'PROD-PUB-001-2', name: 'WPS 365 基础版 (政府)', category: 'WPS365公有云', subCategory: 'WPS365标准版（政府）（服务）', status: 'OnShelf', tags: ['IM', '生态'],
+    id: 'AB0000002', name: 'WPS 365 基础版 (政府)', category: 'WPS365公有云', subCategory: 'WPS365标准版（政府）（服务）', status: 'OnShelf', tags: ['IM', '生态'],
     skus: [{
       id: 's1-2', code: 'S1-2', name: '基础版', price: 199, status: 'Active', stock: 100,
       pricingOptions: [
@@ -104,7 +104,7 @@ export const initialProducts: Product[] = [
     installPackages: [{ id: 'pkg1-2-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 10/11' }]
   },
   {
-    id: 'PROD-PUB-002', name: 'WPS 365 高级版', category: 'WPS365公有云', subCategory: 'WPS365高级版', status: 'OnShelf', tags: ['AI', '生态'],
+    id: 'AB0000003', name: 'WPS 365 高级版', category: 'WPS365公有云', subCategory: 'WPS365高级版', status: 'OnShelf', tags: ['AI', '生态'],
     skus: [{
       id: 's2', code: 'S2', name: '标准版', price: 499, status: 'Active', stock: 100,
       pricingOptions: [
@@ -128,95 +128,115 @@ export const initialProducts: Product[] = [
     ]
   },
   {
-    id: 'PROD-PUB-002-2', name: 'WPS 365 高级版 (教育)', category: 'WPS365公有云', subCategory: 'WPS365高级版', status: 'OnShelf', tags: ['AI', '生态'],
+    id: 'AB0000004', name: 'WPS 365 高级版 (教育)', category: 'WPS365公有云', subCategory: 'WPS365高级版', status: 'OnShelf', tags: ['AI', '生态'],
     skus: [{ id: 's2-2', code: 'S2-2', name: '教育版', price: 299, status: 'Active', stock: 100, pricingOptions: [{id:'o2-2-1', title:'年度订阅 (教育版)', price:299, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}},{id:'o2-2-2', title:'永久授权 (教育版)', price:999, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 User'}}] }],
     composition: [{ id: 'c22-1', name: 'WPS Office 专业版', type: 'Component' },{ id: 'c22-2', name: 'WPS云文档', type: 'Service' },{ id: 'c22-3', name: 'WPS表单', type: 'Service' },{ id: 'c22-4', name: 'AI智能写作', type: 'Feature' },{ id: 'c22-5', name: '教育管控平台', type: 'Service' }],
     installPackages: [{ id: 'pkg2-2-1', name: 'WPS 365 Win端', version: 'v12.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 10/11' }]
   },
   {
-    id: 'PROD-PVT-001', name: 'WPS 365 高级版 (私有云)', category: 'WPS365私有云', subCategory: 'WPS365高级版（私有云）', status: 'OnShelf', tags: ['IM', 'AI'],
+    id: 'AB0000005', name: 'WPS 365 高级版 (私有云)', category: 'WPS365私有云', subCategory: 'WPS365高级版（私有云）', status: 'OnShelf', tags: ['IM', 'AI'],
     skus: [{ id: 's5', code: 'S5', name: '标准版', price: 50000, status: 'Active', stock: 100, pricingOptions: [{id:'o5-1', title:'永久授权 (私有云)', price:50000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}},{id:'o5-2', title:'年度订阅 (私有云)', price:15000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}] }],
     composition: [{ id: 'c5-1', name: 'WPS Office 服务端', type: 'Component' },{ id: 'c5-2', name: '私有云文档协作引擎', type: 'Component' },{ id: 'c5-3', name: '私有IM服务', type: 'Service' },{ id: 'c5-4', name: '企业会议系统', type: 'Service' },{ id: 'c5-5', name: 'AI写作助手 (私有部署)', type: 'Feature' },{ id: 'c5-6', name: '管理员控制台', type: 'Feature' }],
     installPackages: [{ id: 'pkg5-1', name: '私有云部署包', version: 'v7.0.0', url: '#', platform: 'Linux', cpu: 'x86_64/ARM', os: 'CentOS 7+ / UOS' }]
   },
   {
-    id: 'PROD-PVT-001-2', name: 'WPS 365 基础版 (私有云)', category: 'WPS365私有云', subCategory: 'WPS365高级版（私有云）', status: 'OnShelf', tags: ['IM'],
+    id: 'AB0000006', name: 'WPS 365 基础版 (私有云)', category: 'WPS365私有云', subCategory: 'WPS365高级版（私有云）', status: 'OnShelf', tags: ['IM'],
     skus: [{ id: 's5-2', code: 'S5-2', name: '基础版', price: 20000, status: 'Active', stock: 100, pricingOptions: [{id:'o5-2-1', title:'永久授权 (私有云基础)', price:20000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}},{id:'o5-2-2', title:'年度订阅 (私有云基础)', price:8000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}] }],
     composition: [{ id: 'c52-1', name: 'WPS Office 服务端', type: 'Component' },{ id: 'c52-2', name: '私有云文档存储引擎', type: 'Component' },{ id: 'c52-3', name: '私有IM服务', type: 'Service' },{ id: 'c52-4', name: '管理员控制台', type: 'Feature' }],
     installPackages: [{ id: 'pkg5-2-1', name: '私有云部署包', version: 'v7.0.0', url: '#', platform: 'Linux', cpu: 'x86_64/ARM', os: 'CentOS 7+ / UOS' }]
   },
   {
-    id: 'PROD-ITEM-001', name: 'Web Office 核心组件', category: '私有云单品', subCategory: 'Web Office', status: 'OnShelf', tags: ['生态'],
+    id: 'AB0000007', name: 'Web Office 核心组件', category: '私有云单品', subCategory: 'Web Office', status: 'OnShelf', tags: ['生态'],
     skus: [{ id: 's8', code: 'S8', name: '标准版', price: 20000, status: 'Active', stock: 100, pricingOptions: [{id:'o8-1', title:'永久授权 (WebOffice)', price:20000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}},{id:'o8-2', title:'年度订阅 (WebOffice)', price:6000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}] }],
     composition: [{ id: 'c8-1', name: 'WebOffice 文字引擎', type: 'Component' },{ id: 'c8-2', name: 'WebOffice 表格引擎', type: 'Component' },{ id: 'c8-3', name: 'WebOffice 演示引擎', type: 'Component' },{ id: 'c8-4', name: '协同编辑服务', type: 'Service' }],
     installPackages: [{ id: 'pkg8-1', name: 'WebOffice SDK', version: 'v3.2.1', url: '#', platform: 'Web', cpu: '通用', os: '全平台' }]
   },
   {
-    id: 'PROD-ITEM-001-2', name: 'Web Office 增强组件', category: '私有云单品', subCategory: 'Web Office', status: 'OnShelf', tags: ['生态', 'AI'],
+    id: 'AB0000008', name: 'Web Office 增强组件', category: '私有云单品', subCategory: 'Web Office', status: 'OnShelf', tags: ['生态', 'AI'],
     skus: [{ id: 's8-2', code: 'S8-2', name: '增强版', price: 35000, status: 'Active', stock: 100, pricingOptions: [{id:'o8-2-1', title:'永久授权 (WebOffice增强)', price:35000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}},{id:'o8-2-2', title:'年度订阅 (WebOffice增强)', price:12000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}] }],
     composition: [{ id: 'c82-1', name: 'WebOffice 文字引擎', type: 'Component' },{ id: 'c82-2', name: 'WebOffice 表格引擎', type: 'Component' },{ id: 'c82-3', name: 'WebOffice 演示引擎', type: 'Component' },{ id: 'c82-4', name: 'WebOffice PDF引擎', type: 'Component' },{ id: 'c82-5', name: '协同编辑服务', type: 'Service' },{ id: 'c82-6', name: 'AI文档处理', type: 'Feature' },{ id: 'c82-7', name: '插件扩展框架', type: 'Feature' }],
     installPackages: [{ id: 'pkg8-2-1', name: 'WebOffice SDK', version: 'v3.2.1', url: '#', platform: 'Web', cpu: '通用', os: '全平台' }]
   },
   {
-    id: 'PROD-WIN-001', name: 'WPS Office 2019 专业版', category: 'Win端', subCategory: 'Win2019', status: 'OnShelf', tags: ['生态'],
+    id: 'AB0000009', name: 'WPS Office 2019 专业版', category: 'Win端', subCategory: 'Win2019', status: 'OnShelf', tags: ['生态'],
     skus: [{ id: 's12', code: 'S12', name: '标准版', price: 498, status: 'Active', stock: 100, pricingOptions: [{id:'o12-1', title:'永久授权 (单机版)', price:498, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},{id:'o12-2', title:'年度订阅 (单机版)', price:158, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}] }],
     composition: [{ id: 'c12-1', name: 'WPS 文字', type: 'Component' },{ id: 'c12-2', name: 'WPS 表格', type: 'Component' },{ id: 'c12-3', name: 'WPS 演示', type: 'Component' },{ id: 'c12-4', name: 'WPS PDF', type: 'Component' }],
     installPackages: [{ id: 'pkg12-1', name: 'WPS 2019 安装包', version: 'v11.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 7/10/11' }]
   },
   {
-    id: 'PROD-WIN-001-2', name: 'WPS Office 2019 增强版', category: 'Win端', subCategory: 'Win2019', status: 'OnShelf', tags: ['生态', 'AI'],
+    id: 'AB0000010', name: 'WPS Office 2019 增强版', category: 'Win端', subCategory: 'Win2019', status: 'OnShelf', tags: ['生态', 'AI'],
     skus: [{ id: 's12-2', code: 'S12-2', name: '增强版', price: 698, status: 'Active', stock: 100, pricingOptions: [{id:'o12-2-1', title:'永久授权', price:698, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},{id:'o12-2-2', title:'年度订阅', price:218, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}] }],
     composition: [{ id: 'c122-1', name: 'WPS 文字', type: 'Component' },{ id: 'c122-2', name: 'WPS 表格', type: 'Component' },{ id: 'c122-3', name: 'WPS 演示', type: 'Component' },{ id: 'c122-4', name: 'WPS PDF', type: 'Component' },{ id: 'c122-5', name: 'AI写作助手', type: 'Feature' },{ id: 'c122-6', name: 'WPS稻壳模板', type: 'Service' }],
     installPackages: [{ id: 'pkg12-2-1', name: 'WPS 2019 安装包', version: 'v11.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 7/10/11' }]
   },
   {
-    id: 'PROD-OTH-001', name: 'WPS for Mac 专业版', category: '其他软件', subCategory: 'WPS for Mac', status: 'OnShelf', tags: ['生态'],
+    id: 'AB0000011', name: 'WPS for Mac 专业版', category: '其他软件', subCategory: 'WPS for Mac', status: 'OnShelf', tags: ['生态'],
     skus: [{ id: 's15', code: 'S15', name: '标准版', price: 498, status: 'Active', stock: 100, pricingOptions: [{id:'o15-1', title:'永久授权 (Mac版)', price:498, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},{id:'o15-2', title:'年度订阅 (Mac版)', price:158, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}] }],
     composition: [{ id: 'c15-1', name: 'WPS 文字 (Mac)', type: 'Component' },{ id: 'c15-2', name: 'WPS 表格 (Mac)', type: 'Component' },{ id: 'c15-3', name: 'WPS 演示 (Mac)', type: 'Component' },{ id: 'c15-4', name: 'WPS PDF (Mac)', type: 'Component' }],
     installPackages: [{ id: 'pkg15-1', name: 'WPS Mac 安装包', version: 'v6.0.1', url: '#', platform: 'macOS', cpu: 'Intel/M1/M2', os: 'macOS 11+' }]
   },
   {
-    id: 'PROD-OTH-001-2', name: 'WPS for Mac 个人版', category: '其他软件', subCategory: 'WPS for Mac', status: 'OnShelf', tags: ['生态'],
+    id: 'AB0000012', name: 'WPS for Mac 个人版', category: '其他软件', subCategory: 'WPS for Mac', status: 'OnShelf', tags: ['生态'],
     skus: [{ id: 's15-2', code: 'S15-2', name: '个人版', price: 0, status: 'Active', stock: 100, pricingOptions: [{id:'o15-2-1', title:'免费版 (Mac个人)', price:0, license:{type:'FlatRate', period:1, periodUnit:'Forever', scope:'1 User'}},{id:'o15-2-2', title:'会员订阅 (Mac个人)', price:89, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}}] }],
     composition: [{ id: 'c152-1', name: 'WPS 文字 (Mac)', type: 'Component' },{ id: 'c152-2', name: 'WPS 表格 (Mac)', type: 'Component' },{ id: 'c152-3', name: 'WPS 演示 (Mac)', type: 'Component' }],
     installPackages: [{ id: 'pkg15-2-1', name: 'WPS Mac 安装包', version: 'v6.0.1', url: '#', platform: 'macOS', cpu: 'Intel/M1/M2', os: 'macOS 11+' }]
   },
   {
-    id: 'PROD-OFF-001', name: 'WPS Office 2016 专业版', category: 'Win端', subCategory: 'Win2019', status: 'OffShelf', tags: ['生态'],
+    id: 'AB0000013', name: 'WPS Office 2016 专业版', category: 'Win端', subCategory: 'Win2019', status: 'OffShelf', tags: ['生态'],
     skus: [{ id: 's20', code: 'S20', name: '标准版', price: 398, status: 'Inactive', stock: 0, pricingOptions: [{id:'o20-1', title:'永久授权', price:398, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},{id:'o20-2', title:'年度订阅', price:128, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}] }],
     composition: [{ id: 'c20-1', name: 'WPS 文字', type: 'Component' },{ id: 'c20-2', name: 'WPS 表格', type: 'Component' },{ id: 'c20-3', name: 'WPS 演示', type: 'Component' }],
     installPackages: [{ id: 'pkg20-1', name: 'WPS 2016 安装包', version: 'v10.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows 7/10' }]
   },
   {
-    id: 'PROD-OFF-002', name: 'WPS Office 2013 企业版', category: 'Win端', subCategory: 'Win2019', status: 'OffShelf', tags: ['生态'],
+    id: 'AB0000014', name: 'WPS Office 2013 企业版', category: 'Win端', subCategory: 'Win2019', status: 'OffShelf', tags: ['生态'],
     skus: [{ id: 's21', code: 'S21', name: '企业版', price: 298, status: 'Inactive', stock: 0, pricingOptions: [{id:'o21-1', title:'永久授权', price:298, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}}] }],
     composition: [{ id: 'c21-1', name: 'WPS 文字', type: 'Component' },{ id: 'c21-2', name: 'WPS 表格', type: 'Component' },{ id: 'c21-3', name: 'WPS 演示', type: 'Component' }],
     installPackages: [{ id: 'pkg21-1', name: 'WPS 2013 安装包', version: 'v9.1.0', url: '#', platform: 'Windows', cpu: '通用', os: 'Windows XP/7' }]
   },
   {
-    id: 'PROD-OFF-003', name: 'WPS 365 基础版 (旧版)', category: '云服务产品', subCategory: 'WPS365公有云', status: 'OffShelf', tags: ['生态'],
+    id: 'AB0000015', name: 'WPS 365 基础版 (旧版)', category: '云服务产品', subCategory: 'WPS365公有云', status: 'OffShelf', tags: ['生态'],
     skus: [{ id: 's22', code: 'S22', name: '基础版', price: 99, status: 'Inactive', stock: 0, pricingOptions: [{id:'o22-1', title:'年度订阅', price:99, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}}] }],
     installPackages: []
   },
   {
-    id: 'PROD-OFF-004', name: 'WPS Mac 2019 标准版', category: 'Mac端', subCategory: 'Mac2019', status: 'OffShelf', tags: ['生态'],
+    id: 'AB0000016', name: 'WPS Mac 2019 标准版', category: 'Mac端', subCategory: 'Mac2019', status: 'OffShelf', tags: ['生态'],
     skus: [{ id: 's23', code: 'S23', name: '标准版', price: 338, status: 'Inactive', stock: 0, pricingOptions: [{id:'o23-1', title:'永久授权', price:338, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}},{id:'o23-2', title:'年度订阅', price:108, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 Device'}}] }],
     installPackages: [{ id: 'pkg23-1', name: 'WPS Mac 2019 安装包', version: 'v2.1.0', url: '#', platform: 'Mac', cpu: '通用', os: 'macOS 10.13+' }]
   },
   {
-    id: 'PROD-OFF-005', name: 'WPS 文字处理单品 (旧版)', category: '单品授权', subCategory: '私有云单品', status: 'OffShelf', tags: ['生态'],
+    id: 'AB0000017', name: 'WPS 文字处理单品 (旧版)', category: '单品授权', subCategory: '私有云单品', status: 'OffShelf', tags: ['生态'],
     skus: [{ id: 's24', code: 'S24', name: '标准版', price: 188, status: 'Inactive', stock: 0, pricingOptions: [{id:'o24-1', title:'永久授权', price:188, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 Device'}}] }],
     installPackages: []
+  },
+  {
+    id: 'AB0000041', name: 'WPS Office开发工具包软件V11', category: '信创端', subCategory: 'WPS for Lin开发工具包专用', status: 'OnShelf', tags: ['生态'],
+    skus: [{ id: 's-xc-001', code: 'XC-001', name: 'JK专用', price: 0, status: 'Active', stock: 999, pricingOptions: [{id:'o-xc-001-1', title:'授权', price:0, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}}] }],
+    composition: [],
+    installPackages: [
+      { id: 'AZ0006286', name: 'jk开发工具包', version: 'v11.0.0', url: '#', platform: 'linux', cpu: '飞腾', os: 'UOS', productSpec: 'JK专用' }
+    ]
+  },
+  {
+    id: 'AB0000774', name: 'WPS Office 2023 for Linux流版套装办公软件V12.8', category: '信创端', subCategory: '流版套装2023（Linux）', status: 'OnShelf', tags: ['生态'],
+    skus: [{ id: 's-xc-002', code: 'XC-002', name: '专业版（Lin版）', price: 0, status: 'Active', stock: 999, pricingOptions: [{id:'o-xc-002-1', title:'授权', price:0, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'Platform'}}] }],
+    composition: [],
+    installPackages: [
+      { id: 'AZ0000336', name: 'WPS Office 2023 for Linux流版套装办公软件V12.8', version: 'v12.8.0', url: '#', platform: 'Linux', cpu: 'intel/amd', os: 'Linux', productSpec: '专业版（Lin版）' },
+      { id: 'AZ0000340', name: 'WPS Office 2023 for Linux流版套装办公软件V12.8', version: 'v12.8.0', url: '#', platform: 'Linux', cpu: '海光', os: 'Linux', productSpec: '专业版（Lin版）' },
+      { id: 'AZ0005369', name: '12.8.2.24730-2023流版套装【非金融】通用包x64+中科方德', version: 'v12.8.2', url: '#', platform: 'linux', cpu: '兆芯', os: 'Linux', deliveryItemId: '905875', productSpec: '专业版（Lin版）' },
+      { id: 'AZ0005371', name: 'xc23流版套装非金融', version: 'v12.8.0', url: '#', platform: 'linux', cpu: 'intel/amd', os: 'Linux', productSpec: '专业版（Lin版）' },
+      { id: 'AZ0000337', name: 'WPS Office 2023 for Linux流版套装办公软件V12.8', version: 'v12.8.0', url: '#', platform: 'Linux', cpu: '海光', os: 'Linux', productSpec: '专业版（Lin版）' }
+    ]
   }
 ];
 
 // --- Sales Merchandises ---
 export const initialMerchandises: SalesMerchandise[] = [
-    { id: 'M001', name: 'WPS 365 标准版 (政府)', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 299.0, status: 'Active', items: [{ productId: 'PROD-PUB-001', productName: 'WPS 365 标准版 (政府)', skuId: 's1', skuName: '标准版', quantity: 1 }] },
-    { id: 'M002', name: 'WPS 365 基础版 (政府)', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 199.0, status: 'Active', items: [{ productId: 'PROD-PUB-001-2', productName: 'WPS 365 基础版 (政府)', skuId: 's1-2', skuName: '基础版', quantity: 1 }] },
-    { id: 'M003', name: 'WPS 365 高级版', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 499.0, status: 'Active', items: [{ productId: 'PROD-PUB-002', productName: 'WPS 365 高级版', skuId: 's2', skuName: '标准版', quantity: 1 }] },
-    { id: 'M004', name: 'WPS 365 高级版 (私有云)', salesType: ['Channel', 'Direct'], pricingPolicy: 'Fixed', price: 50000.0, status: 'Active', items: [{ productId: 'PROD-PVT-001', productName: 'WPS 365 高级版 (私有云)', skuId: 's5', skuName: '标准版', quantity: 1 }] },
-    { id: 'M005', name: 'Web Office 核心组件', salesType: ['Direct'], pricingPolicy: 'Negotiable', price: 20000.0, status: 'Active', items: [{ productId: 'PROD-ITEM-001', productName: 'Web Office 核心组件', skuId: 's8', skuName: '标准版', quantity: 1 }] },
+    { id: 'M001', name: 'WPS 365 标准版 (政府)', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 299.0, status: 'Active', items: [{ productId: 'AB0000001', productName: 'WPS 365 标准版 (政府)', skuId: 's1', skuName: '标准版', quantity: 1 }] },
+    { id: 'M002', name: 'WPS 365 基础版 (政府)', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 199.0, status: 'Active', items: [{ productId: 'AB0000002', productName: 'WPS 365 基础版 (政府)', skuId: 's1-2', skuName: '基础版', quantity: 1 }] },
+    { id: 'M003', name: 'WPS 365 高级版', salesType: ['Direct', 'Channel'], pricingPolicy: 'Fixed', price: 499.0, status: 'Active', items: [{ productId: 'AB0000003', productName: 'WPS 365 高级版', skuId: 's2', skuName: '标准版', quantity: 1 }] },
+    { id: 'M004', name: 'WPS 365 高级版 (私有云)', salesType: ['Channel', 'Direct'], pricingPolicy: 'Fixed', price: 50000.0, status: 'Active', items: [{ productId: 'AB0000005', productName: 'WPS 365 高级版 (私有云)', skuId: 's5', skuName: '标准版', quantity: 1 }] },
+    { id: 'M005', name: 'Web Office 核心组件', salesType: ['Direct'], pricingPolicy: 'Negotiable', price: 20000.0, status: 'Active', items: [{ productId: 'AB0000007', productName: 'Web Office 核心组件', skuId: 's8', skuName: '标准版', quantity: 1 }] },
 ];
 
 // --- Departments ---
@@ -279,18 +299,21 @@ export const initialUsers: User[] = [
 
 // --- Channels ---
 export const initialChannels: Channel[] = [
-    { id: 'CH00000001', name: '神州数码', type: 'Distributor', level: 'Tier1', contactName: '刘总', contactPhone: '13888888888', email: 'liu@wps.cn', region: '全国', status: 'Active', agreementDate: '2023-01-01' },
-    { id: 'CH00000002', name: '伟仕佳杰', type: 'Distributor', level: 'Tier1', contactName: '陈总', contactPhone: '13999999999', email: 'chen@wps.cn', region: '全国', status: 'Active', agreementDate: '2023-02-15' },
-    { id: 'CH00000003', name: '中软国际', type: 'Distributor', level: 'Tier1', contactName: '王总', contactPhone: '13777777777', email: 'wang@wps.cn', region: '华东', status: 'Active', agreementDate: '2023-03-10' },
-    { id: 'CH00000004', name: '软通动力', type: 'Distributor', level: 'Tier2', contactName: '李总', contactPhone: '13666666666', email: 'li@wps.cn', region: '华南', status: 'Active', agreementDate: '2023-04-20' },
-    { id: 'CH00000005', name: '东华软件', type: 'Reseller', level: 'Tier2', contactName: '张总', contactPhone: '13555555555', email: 'zhang@wps.cn', region: '华北', status: 'Active', agreementDate: '2023-05-12' },
-    { id: 'CH00000006', name: '太极股份', type: 'Reseller', level: 'Tier2', contactName: '孙总', contactPhone: '13444444444', email: 'sun@wps.cn', region: '华北', status: 'Active', agreementDate: '2023-06-18' },
-    { id: 'CH00000007', name: '汉得信息', type: 'Reseller', level: 'Tier3', contactName: '周总', contactPhone: '13333333333', email: 'zhou@wps.cn', region: '华东', status: 'Active', agreementDate: '2023-07-25' },
-    { id: 'CH00000008', name: '用友网络', type: 'Distributor', level: 'Tier1', contactName: '吴总', contactPhone: '13222222222', email: 'wu@wps.cn', region: '全国', status: 'Active', agreementDate: '2023-08-30' },
-    { id: 'CH00000009', name: '金蝶软件', type: 'Distributor', level: 'Tier1', contactName: '郑总', contactPhone: '13111111111', email: 'zheng@wps.cn', region: '全国', status: 'Active', agreementDate: '2023-09-15' },
-    { id: 'CH00000010', name: '浪潮软件', type: 'Distributor', level: 'Tier1', contactName: '冯总', contactPhone: '13000000000', email: 'feng@wps.cn', region: '华北', status: 'Active', agreementDate: '2023-10-05' },
-    { id: 'CH00000011', name: '北明软件', type: 'Reseller', level: 'Tier2', contactName: '褚总', contactPhone: '18999999999', email: 'chu@wps.cn', region: '华南', status: 'Active', agreementDate: '2023-11-20' },
-    { id: 'CH00000012', name: '诚迈科技', type: 'Reseller', level: 'Tier3', contactName: '卫总', contactPhone: '18888888888', email: 'wei@wps.cn', region: '华东', status: 'Active', agreementDate: '2023-12-10' },
+    { id: 'CH50004729', crmId: 'CH50004729', name: '上海万企明道软件有限公司', type: 'Reseller', level: 'Tier2', contactName: '沈磊', contactPhone: '13812345678', email: 'shen@mingdao.sh.cn', region: '华东', province: '上海市', status: 'Active', contractStatus: '未签约', erpSyncStatus: '未同步', agreementDate: '2024-03-10' },
+    { id: 'CH50004728', crmId: 'CH50004728', name: '武汉思行科技发展有限公司', type: 'Reseller', level: 'Tier2', contactName: '黄磊', contactPhone: '13922345678', email: 'huang@sixing.wh.cn', region: '华中', province: '湖北省', status: 'Active', contractStatus: '已签约', erpSyncStatus: '未同步', agreementDate: '2024-02-28' },
+    { id: 'CH50004727', crmId: 'CH50004727', name: '大连联达科技有限公司', type: 'Distributor', level: 'Tier1', contactName: '陈强', contactPhone: '13611345678', email: 'chen@lianda.dl.cn', region: '东北', province: '辽宁省', status: 'Active', contractStatus: '已签约', erpSyncStatus: '未同步', agreementDate: '2024-01-15' },
+    { id: 'CH50004726', crmId: 'CH50004726', name: '河南帆尊教育科技有限公司', type: 'Reseller', level: 'Tier2', contactName: '张丽', contactPhone: '13733345678', email: 'zhang@fanzun.hn.cn', region: '华中', province: '河南省', status: 'Active', contractStatus: '已签约', erpSyncStatus: '未同步', agreementDate: '2023-12-20' },
+    { id: 'CH50004725', crmId: 'CH50004725', name: '甘肃金诺安电子科技有限公司', type: 'Reseller', level: 'Tier3', contactName: '王建国', contactPhone: '13544345678', email: 'wang@jinnuoan.gs.cn', region: '西北', province: '甘肃省', status: 'Active', contractStatus: '已签约', erpSyncStatus: '已同步', agreementDate: '2023-11-10' },
+    { id: 'CH50004724', crmId: 'CH50004724', name: '深圳市鑫云安开发科技有限公司', type: 'SI', level: 'Tier2', contactName: '刘洋', contactPhone: '13455345678', email: 'liu@xinyunan.sz.cn', region: '华南', province: '广东省', status: 'Active', contractStatus: '未签约', erpSyncStatus: '未同步', agreementDate: '2023-10-05' },
+    { id: 'CH50004723', crmId: 'CH50004723', name: '上海爱数智得科技有限公司', type: 'ISV', level: 'Tier2', contactName: '孙磊', contactPhone: '13366345678', email: 'sun@aishu.sh.cn', region: '华东', province: '上海市', status: 'Active', contractStatus: '未签约', erpSyncStatus: '已同步', agreementDate: '2023-09-18' },
+    { id: 'CH50004722', crmId: 'CH50004722', name: '卫宁健康科技集团股份有限公司', type: 'Distributor', level: 'Tier1', contactName: '陈卫宁', contactPhone: '13277345678', email: 'chen@winning.sh.cn', region: '华东', province: '上海市', status: 'Active', contractStatus: '未签约', erpSyncStatus: '未同步', agreementDate: '2023-08-25' },
+    { id: 'CH50004721', crmId: 'CH50004721', name: '北京龙安天下科技有限公司', type: 'SI', level: 'Tier2', contactName: '赵龙', contactPhone: '13188345678', email: 'zhao@longan.bj.cn', region: '华北', province: '北京市', status: 'Active', contractStatus: '已签约', erpSyncStatus: '已同步', agreementDate: '2023-07-14' },
+    { id: 'CH50004720', crmId: 'CH50004720', name: '成都恒汇软件技术有限公司', type: 'Reseller', level: 'Tier2', contactName: '李恒', contactPhone: '13099345678', email: 'li@henghui.cd.cn', region: '西南', province: '四川省', status: 'Active', contractStatus: '已签约', erpSyncStatus: '未同步', agreementDate: '2023-06-30' },
+    { id: 'CH50004719', crmId: 'CH50004719', name: '南京博远信息科技有限公司', type: 'Reseller', level: 'Tier3', contactName: '吴博', contactPhone: '18911345678', email: 'wu@boyuan.nj.cn', region: '华东', province: '江苏省', status: 'Active', contractStatus: '已签约', erpSyncStatus: '已同步', agreementDate: '2023-05-22' },
+    { id: 'CH50004718', crmId: 'CH50004718', name: '西安奥吉通信技术有限公司', type: 'Distributor', level: 'Tier1', contactName: '杨明', contactPhone: '18822345678', email: 'yang@aoji.xa.cn', region: '西北', province: '陕西省', status: 'Inactive', contractStatus: '已签约', erpSyncStatus: '未同步', agreementDate: '2023-04-10' },
+    { id: 'CH50004717', crmId: 'CH50004717', name: '杭州数梦工场科技有限公司', type: 'ISV', level: 'Tier2', contactName: '钱海涛', contactPhone: '18733345678', email: 'qian@shumeng.hz.cn', region: '华东', province: '浙江省', status: 'Active', contractStatus: '已签约', erpSyncStatus: '已同步', agreementDate: '2023-03-05' },
+    { id: 'CH50004716', crmId: 'CH50004716', name: '广州中鹏天成软件有限公司', type: 'Reseller', level: 'Tier2', contactName: '郑鹏', contactPhone: '18644345678', email: 'zheng@zptech.gz.cn', region: '华南', province: '广东省', status: 'Active', contractStatus: '未签约', erpSyncStatus: '未同步', agreementDate: '2023-02-18' },
+    { id: 'CH50004715', crmId: 'CH50004715', name: '天津飞天云动科技有限公司', type: 'SI', level: 'Tier3', contactName: '冯飞', contactPhone: '18555345678', email: 'feng@ftyd.tj.cn', region: '华北', province: '天津市', status: 'Active', contractStatus: '已签约', erpSyncStatus: '已同步', agreementDate: '2023-01-28' },
 ];
 
 // --- Standalone Enterprises ---

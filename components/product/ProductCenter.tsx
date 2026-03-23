@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, ChevronDown, ChevronRight, Eye, Layers, Package, Tag, X } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, Eye, Layers, Package, Tag, X, FileText, HardDrive } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../../types';
 import { useAppContext } from '../../contexts/AppContext';
+import InstallPackageManager from './InstallPackageManager';
 
 interface CategoryGroup {
   group: string;
@@ -22,6 +23,7 @@ const ProductCenter: React.FC = () => {
   const currentUserRole = roles.find(r => r.id === currentUser.role);
   const permissions = currentUserRole?.permissions || [];
   const hasPermission = (perm: string) => permissions.includes('all') || permissions.includes(perm);
+  const [mainView, setMainView]       = useState<'catalog' | 'packages'>('catalog');
   const [searchTerm, setSearchTerm]   = useState('');
   const [activeTab, setActiveTab]     = useState<'ON_SHELF' | 'OFF_SHELF' | 'ALL'>('ON_SHELF');
   const [selectedLeaf, setSelectedLeaf] = useState<string>(
@@ -101,6 +103,7 @@ const ProductCenter: React.FC = () => {
     return 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-white/5 dark:text-gray-400 dark:border-white/5';
   };
 
+
   if (!hasPermission('product_display_view')) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-gray-400 dark:text-gray-600 gap-4 animate-fade-in">
@@ -118,14 +121,30 @@ const ProductCenter: React.FC = () => {
       {/* ── Top Bar: title + controls (OrderManager style) ─────── */}
       <div className="px-6 pt-6 pb-4 shrink-0 flex items-center justify-between gap-4">
 
-        {/* Title */}
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">产品目录</h1>
+        {/* Title + view switch */}
+        <div className="flex items-center gap-4 shrink-0">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">
+            {mainView === 'catalog' ? '产品目录' : '安装包管理'}
+          </h1>
+          <a href="https://365.kdocs.cn/latest" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline shrink-0"><FileText className="w-3.5 h-3.5" />使用说明</a>
+          {/* View switch */}
+          <div className="relative flex items-center bg-gray-100 dark:bg-white/5 rounded-full p-0.5 border border-gray-200/60 dark:border-white/10">
+            <div className={`absolute top-0.5 bottom-0.5 left-0.5 w-[calc(50%-2px)] rounded-full bg-[#0071E3] dark:bg-[#0A84FF] shadow-sm transition-transform duration-300 ease-in-out ${mainView === 'packages' ? 'translate-x-full' : 'translate-x-0'}`} />
+            {([{ id: 'catalog', label: '产品目录', icon: Package }, { id: 'packages', label: '安装包管理', icon: HardDrive }] as const).map(v => (
+              <button key={v.id} onClick={() => setMainView(v.id)}
+                className={`relative z-10 flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold rounded-full transition-colors duration-300 whitespace-nowrap ${mainView === v.id ? 'text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
+                <v.icon className="w-3.5 h-3.5" />{v.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Right controls */}
         <div className="flex items-center gap-3">
 
-          {/* Search */}
-          <div className="unified-card flex items-stretch h-9 border-gray-200 dark:border-white/10 dark:bg-[#1C1C1E] w-[280px] focus-within:-blue-400 dark:focus-within:-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]">
+          {/* Search - catalog only */}
+          {mainView === 'catalog' && (
+          <div className="unified-card flex items-stretch h-9 border-gray-200 dark:border-white/10 dark:bg-[#1C1C1E] w-[280px] focus-within:border-blue-400 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]">
             <div className="relative flex-1 flex items-center min-w-0">
               <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 pointer-events-none shrink-0" />
               <input
@@ -145,9 +164,10 @@ const ProductCenter: React.FC = () => {
               )}
             </div>
           </div>
+          )}
 
-          {/* Tab Buttons */}
-          <div className="relative flex items-center bg-gray-100 dark:bg-white/5 rounded-full p-0.5 border border-gray-200/60 dark:border-white/10">
+          {/* Tab Buttons - only for catalog view */}
+          {mainView === 'catalog' && <div className="relative flex items-center bg-gray-100 dark:bg-white/5 rounded-full p-0.5 border border-gray-200/60 dark:border-white/10">
             {/* 滑动指示器 */}
             <div
               className={`absolute top-0.5 bottom-0.5 left-0.5 w-[calc(33.333%-2px)] rounded-full bg-[#0071E3] dark:bg-[#0A84FF] shadow-sm transition-transform duration-300 ease-in-out ${
@@ -167,12 +187,18 @@ const ProductCenter: React.FC = () => {
                 {tab === 'ON_SHELF' ? '在架产品' : tab === 'OFF_SHELF' ? '下架产品' : '全部产品'}
               </button>
             ))}
-          </div>
+          </div>}
         </div>
       </div>
 
       {/* ── Body ───────────────────────────────────────────────── */}
-      <div className="unified-card flex-1 flex mx-6 mb-6 border-gray-200/80 dark:border-white/10 dark:bg-[#1C1C1E]">
+      {mainView === 'packages' && (
+        <div className="flex-1 min-h-0">
+          <InstallPackageManager />
+        </div>
+      )}
+
+      {mainView === 'catalog' && <div className="unified-card flex-1 flex mx-6 mb-6 border-gray-200/80 dark:border-white/10 dark:bg-[#1C1C1E]">
 
         {/* ── Left: Collapsible Tree Sidebar ─────────────────── */}
         <div className="unified-card w-[312px] shrink-0 -r border-gray-200/80 dark:border-white/10 overflow-y-auto dark:bg-[#1C1C1E]">
@@ -373,7 +399,7 @@ const ProductCenter: React.FC = () => {
             )}
           </div>
         </div>
-      </div>
+      </div>}
     </div>
 
     {/* 组件气泡弹窗 — fixed 定位，不受父级 overflow 裁剪 */}

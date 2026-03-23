@@ -5,7 +5,7 @@ import type {
     RightPackage, LicenseTypeDefinition, Customer, Opportunity, Order,
     User, Department, RoleDefinition, Channel, Enterprise,
     Contract, Remittance, Invoice, Performance, Authorization, DeliveryInfo,
-    Project,
+    Project, OrderDraft,
 } from '../types';
 
 import {
@@ -29,12 +29,14 @@ import {
 // --- Mode detection: set VITE_API_MODE=true in .env to use backend ---
 const USE_API = import.meta.env.VITE_API_MODE === 'true';
 
-// --- Mock data fallback (computed once) ---
+// --- Mock data fallback (computed once, v2) ---
 const mockCustomers = generateCustomers(initialUsers);
 const mockOpportunities = generateOpportunities(mockCustomers);
+const mockContracts = generateContracts(mockCustomers);
 const mockOrders = generateOrders({
     customers: mockCustomers, products: initialProducts, users: initialUsers,
     merchandises: initialMerchandises, opportunities: mockOpportunities, channels: initialChannels,
+    contracts: mockContracts,
 });
 
 // ---------- Context shape ----------
@@ -61,6 +63,9 @@ interface AppContextType {
 
     orders: Order[];
     setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
+
+    orderDrafts: OrderDraft[];
+    setOrderDrafts: React.Dispatch<React.SetStateAction<OrderDraft[]>>;
 
     users: User[];
     setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -112,6 +117,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // --- Order domain ---
     const [orders, setOrders] = useState(USE_API ? [] as Order[] : mockOrders);
+    const [orderDrafts, setOrderDrafts] = useState<OrderDraft[]>([]);
 
     // --- User & Org domain ---
     const [users, setUsers] = useState(initialUsers);
@@ -124,7 +130,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [standaloneEnterprises] = useState(initialStandaloneEnterprises);
 
     // --- Read-only generated domains ---
-    const [contracts, setContracts] = useState<Contract[]>(() => USE_API ? [] : generateContracts());
+    const [contracts, setContracts] = useState<Contract[]>(() => USE_API ? [] : mockContracts);
     const [remittances, setRemittances] = useState<Remittance[]>(() => USE_API ? [] : generateRemittances());
     const [invoices, setInvoices] = useState<Invoice[]>(() => USE_API ? [] : generateInvoices());
     const [performances] = useState<Performance[]>(() => generatePerformances());
@@ -212,6 +218,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         opportunities, setOpportunities,
 
         orders, setOrders,
+        orderDrafts, setOrderDrafts,
 
         users, setUsers,
         departments, setDepartments,

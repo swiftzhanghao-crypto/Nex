@@ -224,7 +224,7 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
                                               { label: '安装包名称', value: pkg.name },
                                               { label: 'CPU', value: pkg.cpu || '-' },
                                               { label: '操作系统', value: pkg.os || '-' },
-                                              { label: '架构', value: pkg.arch || '-' },
+                                              { label: '发布平台', value: pkg.platform || '-' },
                                               { label: '安装包链接', value: pkg.url || '-', isLink: true },
                                               { label: '安装包备注', value: pkg.remarks || '-' },
                                           ];

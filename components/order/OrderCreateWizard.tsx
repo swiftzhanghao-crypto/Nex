@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Order, OrderStatus, OrderItem, ActivationMethod, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, DeliveryMethod } from '../../types';
-import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Network, Globe, Radio, RefreshCcw, Wallet, Zap, Box, Settings, MapPin } from 'lucide-react';
+import { Order, OrderStatus, OrderItem, ActivationMethod, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, DeliveryMethod, OrderDraft } from '../../types';
+import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Network, Globe, Radio, RefreshCcw, Wallet, Zap, Box, Settings, MapPin, Briefcase, XCircle, Search, Save, ScrollText } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
 
@@ -10,20 +10,30 @@ interface OrderCreateWizardProps {
   isOpen: boolean;
   onClose: () => void;
   renewalOrder?: Order;
+  initialDraft?: OrderDraft;
 }
 
-const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, renewalOrder }) => {
-  const { products, customers, channels, opportunities, users, orders, setOrders, currentUser, standaloneEnterprises } = useAppContext();
+const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, renewalOrder, initialDraft }) => {
+  const { products, customers, channels, opportunities, contracts, users, orders, setOrders, currentUser, standaloneEnterprises, orderDrafts, setOrderDrafts } = useAppContext();
   const navigate = useNavigate();
 
   const [currentStep, setCurrentStep] = useState(1); // 1: Type, 2: Info, 3: Products, 4: Delivery
+  const [currentDraftId, setCurrentDraftId] = useState<string | undefined>(initialDraft?.id);
+  const [draftSavedTip, setDraftSavedTip] = useState(false);
 
   // Step 1: Order Type & Source
   const [buyerType, setBuyerType] = useState<BuyerType | ''>('');
   const [orderSource, setOrderSource] = useState<OrderSource>('Sales');
+  const [orderRemark, setOrderRemark] = useState('');
+  const [linkedContractIds, setLinkedContractIds] = useState<string[]>([]);
+  const [isContractPickerOpen, setIsContractPickerOpen] = useState(false);
+  const [contractPickerSearch, setContractPickerSearch] = useState('');
 
   // Step 2: Customer & Buyer & Opportunity
+  const [hasOpportunity, setHasOpportunity] = useState<'yes' | 'no' | ''>('');
   const [linkedOpportunityId, setLinkedOpportunityId] = useState('');
+  const [isOppPickerOpen, setIsOppPickerOpen] = useState(false);
+  const [oppPickerSearch, setOppPickerSearch] = useState('');
   const [newOrderCustomer, setNewOrderCustomer] = useState('');
   const [selectedChannelId, setSelectedChannelId] = useState('');
   const [businessManagerId, setBusinessManagerId] = useState('');
@@ -33,6 +43,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   
   // Step 3: Merchandise Selection (New Cascading Logic)
   const [newOrderItems, setNewOrderItems] = useState<OrderItem[]>([]);
+  const [tempTopCategory, setTempTopCategory] = useState('');
+  const [tempCategory, setTempCategory] = useState('');
   const [tempProductId, setTempProductId] = useState('');
   const [tempSkuId, setTempSkuId] = useState('');
   const [tempPricingOptionId, setTempPricingOptionId] = useState('');
@@ -40,6 +52,14 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const [tempActivationMethod, setTempActivationMethod] = useState<ActivationMethod>('LicenseKey');
   const [tempLicensePeriod, setTempLicensePeriod] = useState('');
   const [negotiatedPrice, setNegotiatedPrice] = useState<number | null>(null);
+
+  // Per-item enterprise selection (Customer & Channel types)
+  const [tempEnterpriseId, setTempEnterpriseId] = useState('');
+
+  // Install package selection
+  const [tempPkgType, setTempPkgType] = useState<'通用' | '定制' | ''>('');
+  const [tempPkgCpu, setTempPkgCpu] = useState('');
+  const [tempPkgOs, setTempPkgOs] = useState('');
 
   // Computed data for selection cascade
   const selectedProduct = products.find(p => p.id === tempProductId);
@@ -122,8 +142,41 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     }
   };
 
+  // When buyerType changes to Channel, restrict orderSource; reset if invalid
+  useEffect(() => {
+    if (buyerType === 'Customer') {
+      setOrderSource('Sales');
+    } else if (buyerType === 'Channel') {
+      if (orderSource !== 'ChannelPortal' && orderSource !== 'Sales') {
+        setOrderSource('ChannelPortal');
+      }
+    } else if (buyerType === 'RedeemCode') {
+      if (orderSource !== 'APISync' && orderSource !== 'Sales') {
+        setOrderSource('APISync');
+      }
+    } else if (buyerType === 'SelfDeal') {
+      if (orderSource !== 'OnlineStore' && orderSource !== 'APISync' && orderSource !== 'Sales') {
+        setOrderSource('Sales');
+      }
+    }
+  }, [buyerType]);
+
+  // When toggling hasOpportunity, reset related fields
+  useEffect(() => {
+    if (hasOpportunity === 'no') {
+      setLinkedOpportunityId('');
+    }
+    if (hasOpportunity === 'yes') {
+      setNewOrderCustomer('');
+      setOrderEnterpriseId('');
+    }
+  }, [hasOpportunity]);
+
   // Reset downstream selections when upstream changes
-  useEffect(() => { setTempSkuId(''); setTempPricingOptionId(''); setNegotiatedPrice(null); }, [tempProductId]);
+  useEffect(() => { setTempCategory(''); setTempProductId(''); setTempSkuId(''); setTempPricingOptionId(''); setNegotiatedPrice(null); setTempPkgType(''); setTempPkgCpu(''); setTempPkgOs(''); }, [tempTopCategory]);
+  useEffect(() => { setTempProductId(''); setTempSkuId(''); setTempPricingOptionId(''); setNegotiatedPrice(null); setTempPkgType(''); setTempPkgCpu(''); setTempPkgOs(''); }, [tempCategory]);
+  useEffect(() => { setTempSkuId(''); setTempPricingOptionId(''); setNegotiatedPrice(null); setTempPkgType(''); setTempPkgCpu(''); setTempPkgOs(''); }, [tempProductId]);
+  useEffect(() => { setTempPkgCpu(''); setTempPkgOs(''); }, [tempPkgType]);
   useEffect(() => { 
       setTempPricingOptionId(''); 
       setNegotiatedPrice(null); 
@@ -144,19 +197,30 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
   const salesUsers = users.filter(u => u.role === 'Sales' || u.role === 'Admin');
   const resetCreateForm = () => {
+      setCurrentDraftId(undefined);
+      setDraftSavedTip(false);
       setNewOrderCustomer('');
       setOrderEnterpriseId('');
       setLinkedOpportunityId('');
+      setHasOpportunity('');
       setBuyerType(''); 
       setOrderSource('Sales');
+      setOrderRemark('');
+      setLinkedContractIds([]);
       setOriginalOrderId(undefined);
       setSelectedChannelId('');
       setSalesRepId(currentUser.role === 'Sales' ? currentUser.id : '');
       setBusinessManagerId('');
       setCreatorId(currentUser.id);
       setNewOrderItems([]);
+      setTempTopCategory('');
+      setTempCategory('');
       setTempProductId('');
       setTempSkuId('');
+      setTempEnterpriseId('');
+      setTempPkgType('');
+      setTempPkgCpu('');
+      setTempPkgOs('');
       setTempPricingOptionId('');
       setNegotiatedPrice(null);
       setCurrentStep(1);
@@ -172,6 +236,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setAcceptanceType('OneTime');
       setPhaseDrafts([{ name: '第一阶段验收', percentage: 30 }, { name: '最终验收', percentage: 70 }]);
   };
+
+  const handleClose = () => { onClose(); resetCreateForm(); };
 
   const handleOpportunityChange = (oppId: string) => {
       setLinkedOpportunityId(oppId);
@@ -216,10 +282,27 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     }
 
     const capabilitiesSnapshot = selectedProduct.composition?.map(c => c.name) || [];
-    
+
+    // Resolve selected install package
+    const pkgs = selectedProduct.installPackages || [];
+    let resolvedInstallPackageName: string | undefined;
+    if (tempPkgType === '通用') {
+        const universalPkgs = pkgs.filter(p => p.cpu === '通用');
+        const matched = universalPkgs.find(p => !tempPkgOs || p.os === tempPkgOs);
+        resolvedInstallPackageName = matched ? `${matched.name} v${matched.version} (${matched.os})` : undefined;
+    } else if (tempPkgType === '定制') {
+        const customPkgs = pkgs.filter(p => p.cpu !== '通用');
+        const matched = customPkgs.find(p =>
+            (!tempPkgCpu || p.cpu === tempPkgCpu) && (!tempPkgOs || p.os === tempPkgOs)
+        );
+        resolvedInstallPackageName = matched ? `${matched.name} v${matched.version} (${matched.cpu} / ${matched.os})` : undefined;
+    }
+
+    // For Customer/Channel: use per-item tempEnterpriseId; for SelfDeal: use orderEnterpriseId
+    const resolvedEntId = (buyerType === 'Customer' || buyerType === 'Channel') ? tempEnterpriseId : orderEnterpriseId;
     let enterpriseName = undefined;
-    if (orderEnterpriseId && selectedCustomerObj?.enterprises) {
-        const ent = selectedCustomerObj.enterprises.find(e => e.id === orderEnterpriseId);
+    if (resolvedEntId && selectedCustomerObj?.enterprises) {
+        const ent = selectedCustomerObj.enterprises.find(e => e.id === resolvedEntId);
         if (ent) enterpriseName = ent.name;
     }
 
@@ -249,7 +332,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         licenseType: derivedLicenseType,
         licensePeriod: isPermanent ? '永久' : (needsManualPeriod && tempLicensePeriod ? tempLicensePeriod : undefined),
         activationMethod: tempActivationMethod,
-        enterpriseId: orderEnterpriseId || undefined,
+        installPackageName: resolvedInstallPackageName,
+        enterpriseId: resolvedEntId || undefined,
         enterpriseName: enterpriseName,
         capabilitiesSnapshot
     };
@@ -260,10 +344,110 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     setNegotiatedPrice(null);
     setTempSkuId('');
     setTempPricingOptionId('');
+    setTempEnterpriseId('');
+    setTempPkgType('');
+    setTempPkgCpu('');
+    setTempPkgOs('');
   };
 
   const handleRemoveItem = (index: number) => setNewOrderItems(prev => prev.filter((_, i) => i !== index));
   const calculateNewOrderTotal = () => newOrderItems.reduce((acc, item) => acc + (item.priceAtPurchase * item.quantity), 0);
+
+  // --- Save Draft ---
+  const handleSaveDraft = () => {
+    // Generate or reuse order ID
+    const orderId = currentDraftId || (() => {
+      const maxId = orders.reduce((max, o) => {
+        const num = parseInt(o.id.substring(1), 10);
+        return !isNaN(num) && num > max ? num : max;
+      }, 0);
+      return `S${(maxId + 1).toString().padStart(8, '0')}`;
+    })();
+
+    // Write a lightweight DRAFT order entry into orders list
+    const customer = customers.find(c => c.id === newOrderCustomer);
+    const draftOrder: Order = {
+      id: orderId,
+      customerId: newOrderCustomer || orderEnterpriseId || '',
+      customerName: customer?.companyName || (newOrderCustomer ? newOrderCustomer : '（草稿）'),
+      date: new Date().toISOString(),
+      status: OrderStatus.DRAFT,
+      total: calculateNewOrderTotal(),
+      items: newOrderItems,
+      source: orderSource || 'Sales',
+      buyerType: (buyerType as BuyerType) || 'Customer',
+      isPaid: false,
+      isPackageConfirmed: false,
+      isCDBurned: false,
+      approval: { salesApproved: false, businessApproved: false, financeApproved: false },
+      approvalRecords: [],
+      creatorId: currentUser.id,
+      creatorName: currentUser.name,
+      opportunityId: linkedOpportunityId || undefined,
+      orderRemark: orderRemark || undefined,
+    };
+    setOrders(prev => {
+      const idx = prev.findIndex(o => o.id === orderId);
+      if (idx >= 0) { const next = [...prev]; next[idx] = draftOrder; return next; }
+      return [draftOrder, ...prev];
+    });
+
+    // Save full wizard state in orderDrafts
+    const draft: OrderDraft = {
+      id: orderId,
+      savedAt: new Date().toISOString(),
+      currentStep,
+      buyerType, orderSource, orderRemark, linkedContractIds, creatorId, originalOrderId,
+      hasOpportunity, linkedOpportunityId, newOrderCustomer,
+      orderEnterpriseId, selectedChannelId, salesRepId, businessManagerId,
+      newOrderItems, tempCategory,
+      invoiceForm, paymentMethod, paymentTerms,
+      deliveryMethod, receivingParty, receivingCompany, receivingMethod, shippingAddress,
+      acceptanceForm, acceptanceType, phaseDrafts,
+    };
+    setOrderDrafts(prev => {
+      const exists = prev.findIndex(d => d.id === orderId);
+      if (exists >= 0) { const next = [...prev]; next[exists] = draft; return next; }
+      return [draft, ...prev];
+    });
+    setCurrentDraftId(orderId);
+    setDraftSavedTip(true);
+    setTimeout(() => setDraftSavedTip(false), 2500);
+  };
+
+  // --- Restore from draft ---
+  useEffect(() => {
+    if (!initialDraft) return;
+    const d = initialDraft;
+    setCurrentStep(d.currentStep);
+    setBuyerType(d.buyerType);
+    setOrderSource(d.orderSource);
+    setOrderRemark(d.orderRemark || '');
+    setLinkedContractIds(d.linkedContractIds || []);
+    setCreatorId(d.creatorId);
+    setOriginalOrderId(d.originalOrderId);
+    setHasOpportunity(d.hasOpportunity);
+    setLinkedOpportunityId(d.linkedOpportunityId);
+    setNewOrderCustomer(d.newOrderCustomer);
+    setOrderEnterpriseId(d.orderEnterpriseId);
+    setSelectedChannelId(d.selectedChannelId);
+    setSalesRepId(d.salesRepId);
+    setBusinessManagerId(d.businessManagerId);
+    setNewOrderItems(d.newOrderItems);
+    setTempCategory(d.tempCategory);
+    setInvoiceForm(d.invoiceForm);
+    setPaymentMethod(d.paymentMethod);
+    setPaymentTerms(d.paymentTerms);
+    setDeliveryMethod(d.deliveryMethod);
+    setReceivingParty(d.receivingParty);
+    setReceivingCompany(d.receivingCompany);
+    setReceivingMethod(d.receivingMethod);
+    setShippingAddress(d.shippingAddress);
+    setAcceptanceForm(d.acceptanceForm);
+    setAcceptanceType(d.acceptanceType);
+    setPhaseDrafts(d.phaseDrafts);
+    setCurrentDraftId(d.id);
+  }, [initialDraft]);
 
   const handleCreateOrder = () => {
     const selfDealMissingEnterprise = buyerType === 'SelfDeal' && !orderEnterpriseId;
@@ -278,13 +462,15 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     const creatorUser = users.find(u => u.id === creatorId) || currentUser;
     const linkedOpp = opportunities.find(o => o.id === linkedOpportunityId);
 
-    const maxId = orders.reduce((max, o) => {
-        const numStr = o.id.substring(1); 
-        const num = parseInt(numStr, 10);
-        return !isNaN(num) && num > max ? num : max;
-    }, 0);
-    const newId = `S${(maxId + 1).toString().padStart(8, '0')}`;
-    
+    // Reuse draft order ID if available, otherwise generate new
+    const newId = currentDraftId || (() => {
+        const maxId = orders.reduce((max, o) => {
+            const num = parseInt(o.id.substring(1), 10);
+            return !isNaN(num) && num > max ? num : max;
+        }, 0);
+        return `S${(maxId + 1).toString().padStart(8, '0')}`;
+    })();
+
     const totalAmount = calculateNewOrderTotal();
     
     let phases: AcceptancePhase[] = [];
@@ -328,9 +514,19 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         paymentTerms: paymentTerms,
         acceptanceInfo: acceptanceForm,
         acceptanceConfig: { type: acceptanceType, status: 'Pending', phases, setupDate: new Date().toISOString() },
-        opportunityId: linkedOpp?.id, opportunityName: linkedOpp?.name
+        opportunityId: linkedOpp?.id, opportunityName: linkedOpp?.name,
+        orderRemark: orderRemark || undefined,
+        linkedContractIds: linkedContractIds.length > 0 ? linkedContractIds : undefined,
+        linkedContractNames: linkedContractIds.length > 0 ? linkedContractIds.map(id => contracts.find(c => c.id === id)?.name || id) : undefined,
     };
-    setOrders([newOrder, ...orders]); onClose(); resetCreateForm(); navigate(`/orders/${newOrder.id}`);
+    if (currentDraftId) {
+        // Replace the draft order entry with the final order
+        setOrders(prev => prev.map(o => o.id === currentDraftId ? newOrder : o));
+        setOrderDrafts(prev => prev.filter(d => d.id !== currentDraftId));
+    } else {
+        setOrders([newOrder, ...orders]);
+    }
+    onClose(); resetCreateForm(); navigate(`/orders/${newOrder.id}`);
   };
 
   // --- Handle Renewal Initialization ---
@@ -361,10 +557,14 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
   return (
     <>
-      {/* --- Full Create Order Wizard Modal --- */}
+      {/* --- Create Order Drawer (slides in from right) --- */}
         <ModalPortal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[500] p-0 md:p-6 animate-fade-in overflow-hidden">
-          <div className="unified-card dark:bg-[#1C1C1E] md: shadow-2xl w-full h-full md:h-auto md:max-h-[90vh] md:max-w-5xl flex flex-col border-white/10 animate-modal-enter relative">
+        {/* Backdrop */}
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[500] animate-fade-in"
+          onClick={handleClose}
+        />
+        <div className="fixed inset-y-0 right-0 z-[501] w-[calc(100vw-240px)] flex flex-col bg-white dark:bg-[#1C1C1E] shadow-2xl border-l border-gray-200 dark:border-white/10 animate-drawer-enter overflow-hidden">
             
             {/* Wizard Header */}
             <div className="px-8 py-6 border-b border-gray-100 dark:border-white/10 bg-white/50 dark:bg-white/5 backdrop-blur flex justify-between items-center shrink-0">
@@ -379,14 +579,14 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">请按步骤完善订单信息，带 * 号为必填项。</p>
                 </div>
-                <button onClick={() => onClose()} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full text-gray-400 hover:text-gray-600 transition">
+                <button onClick={handleClose} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full text-gray-400 hover:text-gray-600 transition">
                     <X className="w-6 h-6"/>
                 </button>
             </div>
 
             {/* Stepper Header */}
             <div className="px-8 py-4 bg-gray-50/50 dark:bg-white/5 border-b border-gray-100 dark:border-white/10 overflow-x-auto no-scrollbar">
-                <div className="flex justify-between items-center relative min-w-[600px]">
+                <div className="flex justify-between items-center relative">
                     <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-200 dark:bg-white/10 -translate-y-1/2 -z-0 rounded-full">
                         <div 
                             className="h-full bg-[#0071E3] dark:bg-[#FF2D55] transition-all duration-500 ease-out" 
@@ -416,7 +616,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
             <div className="p-8 overflow-y-auto flex-1 custom-scrollbar bg-gray-50/30 dark:bg-black/20">
                 {/* Step 1: Order Type & Source */}
                 {currentStep === 1 && (
-                    <div className="space-y-10 animate-fade-in max-w-4xl mx-auto">
+                    <div className="space-y-10 animate-fade-in">
                         <div>
                             <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2"><Target className="w-5 h-5 text-purple-500"/> 订单类型</h4>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -429,14 +629,14 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     <button
                                         key={type.id}
                                         onClick={() => setBuyerType(type.id as BuyerType)}
-                                        className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all duration-200 ${
+                                        className={`px-4 py-3 rounded-xl border-2 flex items-center gap-3 transition-all duration-200 ${
                                             buyerType === type.id
-                                            ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/30 dark:bg-white/5 ring-4 ring-blue-500/10'
-                                            : 'border-gray-100 dark:border-white/5 bg-white dark:bg-[#2C2C2E] hover:border-gray-300 dark:hover:border-white/20 hover:shadow-lg'
+                                            ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/30 dark:bg-white/5 ring-2 ring-blue-500/10'
+                                            : 'border-gray-100 dark:border-white/5 bg-white dark:bg-[#2C2C2E] hover:border-gray-300 dark:hover:border-white/20 hover:shadow-md'
                                         }`}
                                     >
-                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${type.color}`}>
-                                            <type.icon className="w-6 h-6"/>
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${type.color}`}>
+                                            <type.icon className="w-4 h-4"/>
                                         </div>
                                         <span className={`text-sm font-bold ${buyerType === type.id ? 'text-[#0071E3] dark:text-[#FF2D55]' : 'text-gray-600 dark:text-gray-300'}`}>{type.title}</span>
                                     </button>
@@ -444,7 +644,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             </div>
                         </div>
 
-                        <div>
+                        {buyerType && <div>
                             <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2"><Globe className="w-5 h-5 text-blue-500"/> 订单来源</h4>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {[
@@ -452,24 +652,30 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     { id: 'ChannelPortal', label: '渠道来源', icon: Network, color: 'text-purple-500 bg-purple-50 dark:bg-purple-900/20' },
                                     { id: 'APISync', label: '第三方系统', icon: Radio, color: 'text-teal-500 bg-teal-50 dark:bg-teal-900/20' },
                                     { id: 'Sales', label: '后台下单', icon: UserIcon, color: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' }
-                                ].map(src => (
+                                ].filter(src => {
+                                    if (buyerType === 'Customer') return src.id === 'Sales';
+                                    if (buyerType === 'Channel') return src.id === 'ChannelPortal' || src.id === 'Sales';
+                                    if (buyerType === 'RedeemCode') return src.id === 'APISync' || src.id === 'Sales';
+                                    if (buyerType === 'SelfDeal') return src.id === 'OnlineStore' || src.id === 'APISync' || src.id === 'Sales';
+                                    return true;
+                                }).map(src => (
                                     <button 
                                         key={src.id}
                                         onClick={() => setOrderSource(src.id as OrderSource)}
-                                        className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all duration-200 ${
+                                        className={`px-4 py-3 rounded-xl border-2 flex items-center gap-3 transition-all duration-200 ${
                                             orderSource === src.id 
-                                            ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/30 dark:bg-white/5 ring-4 ring-blue-500/10' 
-                                            : 'border-gray-100 dark:border-white/5 bg-white dark:bg-[#2C2C2E] hover:border-gray-300 dark:hover:border-white/20 hover:shadow-lg'
+                                            ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/30 dark:bg-white/5 ring-2 ring-blue-500/10' 
+                                            : 'border-gray-100 dark:border-white/5 bg-white dark:bg-[#2C2C2E] hover:border-gray-300 dark:hover:border-white/20 hover:shadow-md'
                                         }`}
                                     >
-                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${src.color}`}>
-                                            <src.icon className="w-6 h-6"/>
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${src.color}`}>
+                                            <src.icon className="w-4 h-4"/>
                                         </div>
                                         <span className={`text-sm font-bold ${orderSource === src.id ? 'text-[#0071E3] dark:text-[#FF2D55]' : 'text-gray-600 dark:text-gray-300'}`}>{src.label}</span>
                                     </button>
                                 ))}
                             </div>
-                        </div>
+                        </div>}
 
                         {/* 制单人选择 */}
                         <div>
@@ -517,15 +723,147 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 })()}
                             </div>
                         </div>
+
+                        {/* 订单备注 */}
+                        <div>
+                            <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                                <FileText className="w-5 h-5 text-blue-500"/> 订单备注
+                            </h4>
+                            <textarea
+                                value={orderRemark}
+                                onChange={e => setOrderRemark(e.target.value)}
+                                placeholder="请输入订单备注（选填）..."
+                                rows={3}
+                                className="w-full p-4 bg-white dark:bg-[#2C2C2E] border border-gray-100 dark:border-white/5 rounded-2xl text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0071E3] transition resize-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                            />
+                        </div>
+
+                        {/* 关联合同 */}
+                        <div>
+                            <div className="flex items-center justify-between mb-4">
+                                <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <ScrollText className="w-5 h-5 text-blue-500"/> 关联合同
+                                    {linkedContractIds.length > 0 && (
+                                        <span className="text-sm font-normal text-gray-400 ml-1">({linkedContractIds.length}/5)</span>
+                                    )}
+                                </h4>
+                                {linkedContractIds.length > 0 && linkedContractIds.length < 5 && (
+                                    <button
+                                        onClick={() => setIsContractPickerOpen(true)}
+                                        className="flex items-center gap-1.5 text-sm font-medium text-[#0071E3] hover:text-blue-700 transition"
+                                    >
+                                        <Plus className="w-4 h-4"/> 添加合同
+                                    </button>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                {linkedContractIds.map(cid => {
+                                    const c = contracts.find(ct => ct.id === cid);
+                                    return (
+                                        <div key={cid} className="flex items-center gap-3 p-3.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30 rounded-xl">
+                                            <ScrollText className="w-4 h-4 text-[#0071E3] shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{c?.name || cid}</div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-mono">{c?.code}{c?.contractType ? ` · ${c.contractType}` : ''}</div>
+                                            </div>
+                                            <button
+                                                onClick={() => setLinkedContractIds(prev => prev.filter(id => id !== cid))}
+                                                className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition shrink-0"
+                                            >
+                                                <X className="w-4 h-4"/>
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                                {linkedContractIds.length === 0 && (
+                                    <button
+                                        onClick={() => setIsContractPickerOpen(true)}
+                                        className="w-full p-4 bg-white dark:bg-[#2C2C2E] border-2 border-dashed border-gray-200 dark:border-white/10 rounded-2xl text-sm text-gray-400 dark:text-gray-500 hover:border-[#0071E3] dark:hover:border-[#0A84FF] hover:text-[#0071E3] dark:hover:text-[#0A84FF] transition flex items-center justify-center gap-2"
+                                    >
+                                        <ScrollText className="w-4 h-4"/> 点击选择关联合同（选填，最多 5 个）
+                                    </button>
+                                )}
+                                {linkedContractIds.length === 5 && (
+                                    <p className="text-xs text-amber-500 dark:text-amber-400 flex items-center gap-1 pl-1">
+                                        <span>已达到最多 5 个合同的上限</span>
+                                    </p>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 )}
 
                 {/* Step 2: Basic Info */}
                 {currentStep === 2 && (
-                    <div className="space-y-8 animate-fade-in max-w-4xl mx-auto">
+                    <div className="space-y-8 animate-fade-in">
+
+                        {/* 是否有商机 */}
+                        {buyerType !== 'SelfDeal' && (
                         <div className="bg-white dark:bg-[#2C2C2E] p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-6">
                             <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-4">
-                                <UserIcon className="w-5 h-5 text-indigo-500"/> 客户与商机信息
+                                <Briefcase className="w-5 h-5 text-purple-500"/> 是否有商机？
+                            </h4>
+                            <div className="grid grid-cols-2 gap-4 max-w-md">
+                                {[
+                                    { id: 'yes' as const, label: '有商机', desc: '选择已有商机，自动带入客户信息', icon: CheckCircle, color: 'text-green-500 bg-green-50 dark:bg-green-900/20' },
+                                    { id: 'no' as const, label: '无商机', desc: '手动填写客户信息', icon: XCircle, color: 'text-gray-500 bg-gray-50 dark:bg-gray-800/40' }
+                                ].map(opt => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => setHasOpportunity(opt.id)}
+                                        className={`p-5 rounded-2xl border-2 flex flex-col items-center gap-2.5 transition-all duration-200 ${
+                                            hasOpportunity === opt.id
+                                            ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/30 dark:bg-white/5 ring-4 ring-blue-500/10'
+                                            : 'border-gray-100 dark:border-white/5 bg-white dark:bg-[#2C2C2E] hover:border-gray-300 dark:hover:border-white/20 hover:shadow-lg'
+                                        }`}
+                                    >
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${opt.color}`}>
+                                            <opt.icon className="w-5 h-5"/>
+                                        </div>
+                                        <span className={`text-sm font-bold ${hasOpportunity === opt.id ? 'text-[#0071E3] dark:text-[#FF2D55]' : 'text-gray-600 dark:text-gray-300'}`}>{opt.label}</span>
+                                        <span className="text-[11px] text-gray-400 text-center leading-tight">{opt.desc}</span>
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* 有商机：选择商机 */}
+                            {hasOpportunity === 'yes' && (
+                                <div className="space-y-4 pt-2">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">选择商机 <span className="text-red-500">*</span></label>
+                                        {linkedOpportunityId ? (
+                                            <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30 rounded-xl">
+                                                <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{opportunities.find(o => o.id === linkedOpportunityId)?.name}</div>
+                                                    <div className="text-xs text-gray-500 mt-0.5">{selectedCustomerObj?.companyName} · 已自动带入客户信息</div>
+                                                </div>
+                                                <button
+                                                    onClick={() => { setLinkedOpportunityId(''); setNewOrderCustomer(''); setOrderEnterpriseId(''); }}
+                                                    className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition shrink-0"
+                                                >
+                                                    <X className="w-4 h-4"/>
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => setIsOppPickerOpen(true)}
+                                                className="w-full p-4 bg-gray-50 dark:bg-black border-2 border-dashed border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400 dark:text-gray-500 hover:border-[#0071E3] dark:hover:border-[#FF2D55] hover:text-[#0071E3] dark:hover:text-[#FF2D55] transition flex items-center justify-center gap-2"
+                                            >
+                                                <Briefcase className="w-4 h-4"/> 点击选择商机
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        )}
+
+                        {/* 客户与买方信息 */}
+                        {(buyerType === 'SelfDeal' || hasOpportunity === 'no' || (hasOpportunity === 'yes' && linkedOpportunityId)) && (
+                        <div className="bg-white dark:bg-[#2C2C2E] p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-6">
+                            <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-4">
+                                <UserIcon className="w-5 h-5 text-indigo-500"/> 客户与买方信息
                             </h4>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -573,6 +911,19 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     )}
                                 </div>
                                 </>
+                                ) : hasOpportunity === 'yes' ? (
+                                <>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">客户 (商机带入)</label>
+                                    <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30 rounded-xl">
+                                        <Briefcase className="w-5 h-5 text-blue-500 shrink-0" />
+                                        <div>
+                                            <div className="text-sm font-bold text-gray-900 dark:text-white">{selectedCustomerObj?.companyName || '未关联客户'}</div>
+                                            <div className="text-xs text-gray-500 mt-0.5">来自商机: {opportunities.find(o => o.id === linkedOpportunityId)?.name}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                </>
                                 ) : (
                                 <>
                                 <div className="space-y-2">
@@ -580,20 +931,6 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     <select className="w-full p-4 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition" value={newOrderCustomer} onChange={e => handleCustomerChange(e.target.value)}>
                                         <option value="">-- 请选择客户 --</option>
                                         {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
-                                    </select>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">关联企业 (租户)</label>
-                                    <select 
-                                        className="w-full p-4 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition disabled:opacity-50" 
-                                        value={orderEnterpriseId} 
-                                        onChange={e => setOrderEnterpriseId(e.target.value)}
-                                        disabled={!newOrderCustomer}
-                                    >
-                                        <option value="">-- {newOrderCustomer ? '选择关联企业' : '请先选择客户'} --</option>
-                                        {selectedCustomerObj?.enterprises?.map(ent => (
-                                            <option key={ent.id} value={ent.id}>{ent.name} (ID: {ent.id})</option>
-                                        ))}
                                     </select>
                                 </div>
                                 </>
@@ -608,13 +945,6 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         </select>
                                     </div>
                                 )}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">关联商机</label>
-                                    <select className="w-full p-4 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition" value={linkedOpportunityId} onChange={e => handleOpportunityChange(e.target.value)}>
-                                        <option value="">-- 无商机或选择已有 --</option>
-                                        {opportunities.filter(o => o.customerId === newOrderCustomer || !newOrderCustomer).map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-                                    </select>
-                                </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">销售负责人</label>
                                     <select className="w-full p-4 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition" value={salesRepId} onChange={e => setSalesRepId(e.target.value)}>
@@ -631,12 +961,13 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 </div>
                             </div>
                         </div>
+                        )}
                     </div>
                 )}
 
                 {/* Step 3: Merchandise Selection */}
                 {currentStep === 3 && (
-                    <div className="space-y-8 animate-fade-in max-w-5xl mx-auto">
+                    <div className="space-y-8 animate-fade-in">
                         {orderSource === 'Renewal' && originalOrderId && (
                             <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 p-4 rounded-2xl text-sm text-indigo-700 dark:text-indigo-300 flex items-center gap-3">
                                 <RefreshCcw className="w-5 h-5"/>
@@ -649,29 +980,61 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 <ShoppingBag className="w-5 h-5 text-blue-500"/> 添加产品
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-                                <div className="md:col-span-4 space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">1. 选择产品</label>
+                                <div className="md:col-span-2 space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase">1. 一级分类</label>
+                                    <select
+                                        className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
+                                        value={tempTopCategory}
+                                        onChange={e => setTempTopCategory(e.target.value)}
+                                    >
+                                        <option value="">-- 请选择 --</option>
+                                        {Array.from(new Set(products.filter(p => p.status === 'OnShelf').map(p => p.category))).map(cat => (
+                                            <option key={cat} value={cat}>{cat}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="md:col-span-2 space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase">2. 二级分类</label>
+                                    <select
+                                        className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50"
+                                        value={tempCategory}
+                                        onChange={e => setTempCategory(e.target.value)}
+                                        disabled={!tempTopCategory}
+                                    >
+                                        <option value="">-- {tempTopCategory ? '请选择' : '请先选一级'} --</option>
+                                        {Array.from(new Set(
+                                            products.filter(p => p.status === 'OnShelf' && p.category === tempTopCategory && p.subCategory).map(p => p.subCategory!)
+                                        )).map(sub => (
+                                            <option key={sub} value={sub}>{sub}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="md:col-span-2 space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase">3. 选择产品</label>
                                     <select 
-                                        className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm" 
+                                        className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50" 
                                         value={tempProductId} 
                                         onChange={e => setTempProductId(e.target.value)}
+                                        disabled={!tempCategory}
                                     >
-                                        <option value="">-- 请选择产品 --</option>
-                                        {products.filter(p => p.status === 'OnShelf').map(p => (
+                                        <option value="">-- {tempCategory ? '请选择' : '请先选二级'} --</option>
+                                        {products.filter(p => p.status === 'OnShelf' && p.subCategory === tempCategory).map(p => (
                                             <option key={p.id} value={p.id}>{p.name}</option>
                                         ))}
                                     </select>
                                 </div>
 
-                                <div className="md:col-span-4 space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">2. 选择规格</label>
+                                <div className="md:col-span-2 space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase">4. 选择规格</label>
                                     <select 
                                         className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50" 
                                         value={tempSkuId} 
                                         onChange={e => setTempSkuId(e.target.value)}
                                         disabled={!tempProductId}
                                     >
-                                        <option value="">-- 请选择规格 --</option>
+                                        <option value="">-- {tempProductId ? '请选择规格' : '请先选择产品'} --</option>
                                         {selectedProduct?.skus.filter(s => s.status === 'Active').map(s => (
                                             <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
                                         ))}
@@ -679,8 +1042,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 </div>
                                 
                                 {selectedSku?.pricingOptions && selectedSku.pricingOptions.length > 0 && (
-                                    <div className="md:col-span-4 space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase">3. 选择授权类型</label>
+                                    <div className="md:col-span-2 space-y-2">
+                                        <label className="text-xs font-bold text-gray-500 uppercase">5. 选择授权类型</label>
                                         <select 
                                             className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm" 
                                             value={tempPricingOptionId} 
@@ -727,6 +1090,24 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 </div>
                                 )}
                                 
+                                {(buyerType === 'Customer' || buyerType === 'Channel') && newOrderCustomer && selectedCustomerObj?.enterprises && selectedCustomerObj.enterprises.length > 0 && (
+                                    <div className="md:col-span-3 space-y-2">
+                                        <label className="text-xs font-bold text-indigo-500 uppercase flex items-center gap-1">
+                                            <Briefcase className="w-3 h-3"/> 关联企业 ID
+                                        </label>
+                                        <select
+                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-indigo-200 dark:border-indigo-900/30 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200 transition text-sm text-indigo-700 dark:text-indigo-400"
+                                            value={tempEnterpriseId}
+                                            onChange={e => setTempEnterpriseId(e.target.value)}
+                                        >
+                                            <option value="">-- 不关联企业 --</option>
+                                            {selectedCustomerObj.enterprises.map(ent => (
+                                                <option key={ent.id} value={ent.id}>{ent.name} (ID: {ent.id})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
                                 <div className={`${showLicensePeriod ? 'md:col-span-2' : 'md:col-span-3'} space-y-2`}>
                                     <label className="text-xs font-bold text-orange-500 uppercase flex items-center gap-1"><ArrowUpRight className="w-3 h-3"/> 最终单价 (可议价)</label>
                                     <input 
@@ -739,22 +1120,151 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 </div>
 
                                 <div className={showLicensePeriod ? 'md:col-span-2' : 'md:col-span-3'}>
-                                    <button 
-                                        onClick={handleAddItem} 
-                                        disabled={!tempProductId || !tempSkuId || (selectedSku?.pricingOptions?.length > 0 && !tempPricingOptionId)} 
+                                    <button
+                                        onClick={handleAddItem}
+                                        disabled={!tempProductId || !tempSkuId || (selectedSku?.pricingOptions?.length > 0 && !tempPricingOptionId)}
                                         className="w-full bg-black dark:bg-white text-white dark:text-black py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:opacity-80 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-apple"
                                     >
                                         <Plus className="w-4 h-4"/> 加入清单
                                     </button>
                                 </div>
                             </div>
+
+                            {/* 安装包选择 */}
+                            {(() => {
+                                if (!selectedProduct) return null;
+                                const pkgs = selectedProduct.installPackages || [];
+                                if (pkgs.length === 0) return null;
+
+                                const universalPkgs = pkgs.filter(p => p.cpu === '通用');
+                                const customPkgs = pkgs.filter(p => p.cpu !== '通用');
+                                const hasUniversal = universalPkgs.length > 0;
+                                const hasCustom = customPkgs.length > 0;
+
+                                const universalOsOptions = Array.from(new Set(universalPkgs.map(p => p.os).filter(Boolean)));
+                                const customCpuOptions = Array.from(new Set(customPkgs.map(p => p.cpu).filter(Boolean)));
+                                const customOsOptions = Array.from(new Set(
+                                    customPkgs.filter(p => !tempPkgCpu || p.cpu === tempPkgCpu).map(p => p.os).filter(Boolean)
+                                ));
+
+                                // Resolved package for preview
+                                let previewPkg = null;
+                                if (tempPkgType === '通用' && tempPkgOs) {
+                                    previewPkg = universalPkgs.find(p => p.os === tempPkgOs) || null;
+                                } else if (tempPkgType === '定制' && tempPkgCpu && tempPkgOs) {
+                                    previewPkg = customPkgs.find(p => p.cpu === tempPkgCpu && p.os === tempPkgOs) || null;
+                                } else if (tempPkgType === '通用' && universalOsOptions.length === 1) {
+                                    previewPkg = universalPkgs[0] || null;
+                                }
+
+                                return (
+                                    <div className="mt-6 pt-6 border-t border-gray-100 dark:border-white/10 space-y-4">
+                                        <div className="flex items-center gap-2">
+                                            <Box className="w-4 h-4 text-indigo-500"/>
+                                            <span className="text-sm font-bold text-gray-700 dark:text-gray-200">安装包配置</span>
+                                            <span className="text-xs text-gray-400 ml-1">（可选）</span>
+                                        </div>
+
+                                        {/* 通用 / 定制 切换 */}
+                                        <div className="flex gap-3">
+                                            {hasUniversal && (
+                                                <button
+                                                    onClick={() => setTempPkgType('通用')}
+                                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${
+                                                        tempPkgType === '通用'
+                                                        ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/40 dark:bg-white/5 text-[#0071E3] dark:text-[#FF2D55]'
+                                                        : 'border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-300 dark:hover:border-white/20'
+                                                    }`}
+                                                >
+                                                    <Globe className="w-4 h-4"/> 通用
+                                                </button>
+                                            )}
+                                            {hasCustom && (
+                                                <button
+                                                    onClick={() => setTempPkgType('定制')}
+                                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${
+                                                        tempPkgType === '定制'
+                                                        ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/40 dark:bg-white/5 text-[#0071E3] dark:text-[#FF2D55]'
+                                                        : 'border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-300 dark:hover:border-white/20'
+                                                    }`}
+                                                >
+                                                    <Settings className="w-4 h-4"/> 定制
+                                                </button>
+                                            )}
+                                            {tempPkgType && (
+                                                <button onClick={() => setTempPkgType('')} className="text-xs text-gray-400 hover:text-gray-600 px-2 transition">清除</button>
+                                            )}
+                                        </div>
+
+                                        {/* 通用：选择操作系统 */}
+                                        {tempPkgType === '通用' && universalOsOptions.length > 1 && (
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-bold text-gray-500 uppercase">操作系统</label>
+                                                    <select
+                                                        className="w-full p-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
+                                                        value={tempPkgOs}
+                                                        onChange={e => setTempPkgOs(e.target.value)}
+                                                    >
+                                                        <option value="">-- 请选择系统 --</option>
+                                                        {universalOsOptions.map(os => <option key={os} value={os}>{os}</option>)}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* 定制：先选发布平台，再选 OS */}
+                                        {tempPkgType === '定制' && (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-bold text-gray-500 uppercase">发布平台</label>
+                                                    <select
+                                                        className="w-full p-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
+                                                        value={tempPkgCpu}
+                                                        onChange={e => { setTempPkgCpu(e.target.value); setTempPkgOs(''); }}
+                                                    >
+                                                        <option value="">-- 请选择发布平台 --</option>
+                                                        {customCpuOptions.map(cpu => <option key={cpu} value={cpu}>{cpu}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-bold text-gray-500 uppercase">操作系统</label>
+                                                    <select
+                                                        className="w-full p-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50"
+                                                        value={tempPkgOs}
+                                                        onChange={e => setTempPkgOs(e.target.value)}
+                                                        disabled={!tempPkgCpu}
+                                                    >
+                                                        <option value="">-- {tempPkgCpu ? '请选择系统' : '请先选 CPU'} --</option>
+                                                        {customOsOptions.map(os => <option key={os} value={os}>{os}</option>)}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* 已确认的安装包预览 */}
+                                        {previewPkg && (
+                                            <div className="flex items-center gap-3 p-3.5 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/30 rounded-xl">
+                                                <CheckCircle className="w-4 h-4 text-indigo-500 shrink-0"/>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-bold text-indigo-800 dark:text-indigo-300">{previewPkg.name} <span className="font-mono font-normal text-xs">{previewPkg.version}</span></div>
+                                                    <div className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
+                                                        {[previewPkg.platform, previewPkg.cpu, previewPkg.os].filter(Boolean).join(' · ')}
+                                                    </div>
+                                                </div>
+                                                <span className="text-xs font-mono text-indigo-400 shrink-0">{previewPkg.id}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
                         </div>
 
                         {newOrderItems.length > 0 && (
                             <div className="bg-white dark:bg-[#2C2C2E] rounded-3xl border border-gray-100 dark:border-white/5 overflow-hidden shadow-apple">
                                 <table className="w-full text-left text-sm min-w-[600px]">
                                     <thead className="unified-table-header">
-                                        <tr><th className="p-5 pl-6">产品/规格</th><th className="p-5">授权类型</th><th className="p-5 text-center">数量</th><th className="p-5 text-center">授权/服务期限</th><th className="p-5 text-right">单价</th><th className="p-5 text-right">小计</th><th className="p-5 text-center">操作</th></tr>
+                                        <tr><th className="p-5 pl-6">产品/规格</th><th className="p-5">授权类型</th><th className="p-5 text-center">数量</th><th className="p-5 text-center">授权/服务期限</th><th className="p-5">安装包</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-5">关联企业</th>}<th className="p-5 text-right">单价</th><th className="p-5 text-right">小计</th><th className="p-5 text-center">操作</th></tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                                         {newOrderItems.map((item, idx) => (
@@ -763,13 +1273,24 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                 <td className="p-5"><span className="text-xs bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-lg text-gray-600 dark:text-gray-300 font-medium">{item.pricingOptionName || '默认'}</span></td>
                                                 <td className="p-5 text-center dark:text-white font-medium">{item.quantity}</td>
                                                 <td className="p-5 text-center">{item.licensePeriod && item.licensePeriod !== '永久' ? <span className="inline-flex px-2.5 py-1 text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800 rounded-lg">{item.licensePeriod}</span> : <span className="text-gray-300 dark:text-gray-600">-</span>}</td>
+                                                <td className="p-5 max-w-[160px]">{item.installPackageName ? <span className="text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-lg font-medium">{item.installPackageName}</span> : <span className="text-gray-300 dark:text-gray-600 text-xs">-</span>}</td>
+                                                {(buyerType === 'Customer' || buyerType === 'Channel') && (
+                                                    <td className="p-5 max-w-[140px]">
+                                                        {item.enterpriseName ? (
+                                                            <div>
+                                                                <div className="text-xs font-medium text-indigo-600 dark:text-indigo-400">{item.enterpriseName}</div>
+                                                                <div className="text-[10px] text-gray-400 font-mono mt-0.5">{item.enterpriseId}</div>
+                                                            </div>
+                                                        ) : <span className="text-gray-300 dark:text-gray-600 text-xs">-</span>}
+                                                    </td>
+                                                )}
                                                 <td className="p-5 text-right dark:text-white">¥{item.priceAtPurchase.toLocaleString()}</td>
                                                 <td className="p-5 text-right font-bold text-red-600 dark:text-red-400">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
                                                 <td className="p-5 text-center"><button onClick={() => handleRemoveItem(idx)} className="text-gray-400 hover:text-red-500 p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition"><Trash2 className="w-4 h-4"/></button></td>
                                             </tr>
                                         ))}
                                         <tr className="bg-gray-50/50 dark:bg-white/5">
-                                            <td colSpan={5} className="p-5 text-right font-bold text-gray-500">总计金额:</td>
+                                            <td colSpan={(buyerType === 'Customer' || buyerType === 'Channel') ? 7 : 6} className="p-5 text-right font-bold text-gray-500">总计金额:</td>
                                             <td className="p-5 text-right text-xl font-bold text-red-600 dark:text-red-400">¥{calculateNewOrderTotal().toLocaleString()}</td>
                                             <td></td>
                                         </tr>
@@ -782,7 +1303,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
                 {/* Step 4: Commerce & Delivery */}
                 {currentStep === 4 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-in max-w-5xl mx-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-in">
                         <div className="space-y-8">
                             <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-6">
                                 <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><FileText className="w-5 h-5 text-blue-500"/> 开票配置</h4>
@@ -946,14 +1467,33 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
             </div>
 
             {/* Footer Actions */}
-            <div className="unified-card p-6 dark:bg-[#1C1C1E] border-t border-gray-100 dark:border-white/10 flex justify-end gap-4 shrink-0 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20">
-                <button onClick={() => currentStep > 1 ? setCurrentStep(currentStep - 1) : onClose()} className="px-8 py-3 text-gray-500 dark:text-gray-400 font-bold hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition text-sm">
-                    {currentStep === 1 ? '取消' : '上一步'}
-                </button>
+            <div className="unified-card p-6 dark:bg-[#1C1C1E] border-t border-gray-100 dark:border-white/10 flex justify-between items-center shrink-0 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20">
+                <div className="flex items-center gap-3">
+                    <button onClick={() => currentStep > 1 ? setCurrentStep(currentStep - 1) : handleClose()} className="px-8 py-3 text-gray-500 dark:text-gray-400 font-bold hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition text-sm">
+                        {currentStep === 1 ? '取消' : '上一步'}
+                    </button>
+                    <button
+                        onClick={handleSaveDraft}
+                        className="flex items-center gap-2 px-5 py-3 rounded-xl border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition text-sm font-medium"
+                    >
+                        <Save className="w-4 h-4"/>
+                        {draftSavedTip ? '已暂存 ✓' : '暂存'}
+                    </button>
+                    {currentDraftId && !draftSavedTip && (
+                        <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">{currentDraftId}</span>
+                    )}
+                </div>
                 <div className="flex gap-3">
                     {currentStep < 4 ? (
                         <button 
-                            disabled={(currentStep === 1 && !buyerType) || (currentStep === 2 && (buyerType === 'SelfDeal' ? !orderEnterpriseId : !newOrderCustomer)) || (currentStep === 3 && newOrderItems.length === 0)}
+                            disabled={
+                                (currentStep === 1 && !buyerType) ||
+                                (currentStep === 2 && (
+                                    buyerType === 'SelfDeal' ? !orderEnterpriseId
+                                    : !hasOpportunity || (hasOpportunity === 'yes' ? (!linkedOpportunityId || !newOrderCustomer) : !newOrderCustomer)
+                                )) ||
+                                (currentStep === 3 && newOrderItems.length === 0)
+                            }
                             onClick={() => setCurrentStep(currentStep + 1)} 
                             className="bg-[#0071E3] text-white px-10 py-3 rounded-xl font-bold shadow-xl hover:scale-105 hover:shadow-blue-500/30 transition disabled:opacity-50 disabled:hover:scale-100 disabled:shadow-none text-sm"
                         >
@@ -966,9 +1506,247 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                     )}
                 </div>
             </div>
-          </div>
         </div>
         </ModalPortal>
+
+
+        {/* 商机选择器弹窗 */}
+        {isContractPickerOpen && (
+            <ModalPortal>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[600] p-4 animate-fade-in">
+                <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col border-white/10 animate-modal-enter">
+                    <div className="p-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-white/50 dark:bg-white/5 shrink-0">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <ScrollText className="w-5 h-5 text-blue-500"/> 选择关联合同
+                            <span className="text-sm font-normal text-gray-400">（已选 {linkedContractIds.length}/5）</span>
+                        </h3>
+                        <button onClick={() => { setIsContractPickerOpen(false); setContractPickerSearch(''); }} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full text-gray-400 hover:text-gray-600 transition">
+                            <X className="w-5 h-5"/>
+                        </button>
+                    </div>
+                    <div className="p-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center gap-3 shrink-0">
+                        <Search className="w-4 h-4 text-gray-400 shrink-0"/>
+                        <input
+                            type="text"
+                            placeholder="搜索合同名称、编号、甲方或乙方..."
+                            className="bg-transparent border-none outline-none flex-1 text-gray-700 dark:text-gray-200 placeholder-gray-400 text-sm"
+                            value={contractPickerSearch}
+                            onChange={e => setContractPickerSearch(e.target.value)}
+                            autoFocus
+                        />
+                        {contractPickerSearch && (
+                            <button onClick={() => setContractPickerSearch('')} className="text-gray-400 hover:text-gray-600 transition">
+                                <X className="w-4 h-4"/>
+                            </button>
+                        )}
+                    </div>
+                    <div className="overflow-y-auto flex-1 custom-scrollbar">
+                        <table className="w-full text-left text-sm">
+                            <thead className="unified-table-header sticky top-0">
+                                <tr>
+                                    <th className="p-4 pl-5 whitespace-nowrap">合同名称</th>
+                                    <th className="p-4 whitespace-nowrap">合同编号</th>
+                                    <th className="p-4 whitespace-nowrap">合同类型</th>
+                                    <th className="p-4 whitespace-nowrap">甲方</th>
+                                    <th className="p-4 whitespace-nowrap">签署日期</th>
+                                    <th className="p-4 whitespace-nowrap">状态</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                                {(() => {
+                                    const q = contractPickerSearch.toLowerCase();
+                                    const filtered = contracts.filter(c =>
+                                        !q ||
+                                        c.name.toLowerCase().includes(q) ||
+                                        c.code.toLowerCase().includes(q) ||
+                                        (c.partyA || '').toLowerCase().includes(q) ||
+                                        (c.partyB || '').toLowerCase().includes(q)
+                                    );
+                                    if (filtered.length === 0) return (
+                                        <tr>
+                                            <td colSpan={6} className="p-10 text-center text-sm text-gray-400 dark:text-gray-500">
+                                                未找到匹配的合同
+                                            </td>
+                                        </tr>
+                                    );
+                                    const statusLabel: Record<string, string> = {
+                                        PENDING_BUSINESS: '待商务审核', PENDING: '待审核',
+                                        VERIFIED: '已审核', APPROVED: '已批准', REJECTED: '已拒绝',
+                                    };
+                                    const statusColor: Record<string, string> = {
+                                        PENDING_BUSINESS: 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400',
+                                        PENDING: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
+                                        VERIFIED: 'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400',
+                                        APPROVED: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
+                                        REJECTED: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400',
+                                    };
+                                    return filtered.map(c => {
+                                        const isSelected = linkedContractIds.includes(c.id);
+                                        const isDisabled = !isSelected && linkedContractIds.length >= 5;
+                                        return (
+                                            <tr
+                                                key={c.id}
+                                                onClick={() => {
+                                                    if (isDisabled) return;
+                                                    if (isSelected) {
+                                                        setLinkedContractIds(prev => prev.filter(id => id !== c.id));
+                                                    } else {
+                                                        setLinkedContractIds(prev => [...prev, c.id]);
+                                                    }
+                                                }}
+                                                className={`transition-colors ${
+                                                    isDisabled
+                                                        ? 'opacity-40 cursor-not-allowed'
+                                                        : isSelected
+                                                        ? 'bg-blue-50/80 dark:bg-blue-900/20 cursor-pointer'
+                                                        : 'hover:bg-blue-50/60 dark:hover:bg-white/[0.06] cursor-pointer group'
+                                                }`}
+                                            >
+                                                <td className="p-4 pl-5 max-w-[220px]">
+                                                    <div className={`font-medium truncate flex items-center gap-2 ${isSelected ? 'text-[#0071E3] dark:text-[#0A84FF]' : 'text-gray-900 dark:text-white group-hover:text-[#0071E3] dark:group-hover:text-[#0A84FF]'} transition-colors`}>
+                                                        {isSelected && <CheckCircle className="w-3.5 h-3.5 shrink-0" />}
+                                                        {c.name}
+                                                    </div>
+                                                    {c.externalCode && <div className="text-xs text-gray-400 font-mono mt-0.5">{c.externalCode}</div>}
+                                                </td>
+                                                <td className="p-4 text-gray-600 dark:text-gray-300 font-mono whitespace-nowrap">{c.code}</td>
+                                                <td className="p-4 text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.contractType}</td>
+                                                <td className="p-4 text-gray-700 dark:text-gray-300 max-w-[160px]">
+                                                    <div className="truncate">{c.partyA || '-'}</div>
+                                                </td>
+                                                <td className="p-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                                    {c.signDate ? new Date(c.signDate).toLocaleDateString('zh-CN') : '-'}
+                                                </td>
+                                                <td className="p-4 whitespace-nowrap">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${statusColor[c.verifyStatus] || 'bg-gray-100 text-gray-500'}`}>
+                                                        {statusLabel[c.verifyStatus] || c.verifyStatus}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    });
+                                })()}
+                            </tbody>
+                        </table>
+                    </div>
+                    {/* 底部确认栏 */}
+                    <div className="p-4 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center justify-between shrink-0">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                            {linkedContractIds.length === 0 ? '点击行选择合同' : `已选 ${linkedContractIds.length} 个合同`}
+                        </span>
+                        <button
+                            onClick={() => { setIsContractPickerOpen(false); setContractPickerSearch(''); }}
+                            className="unified-button-primary bg-[#0071E3] text-sm"
+                        >
+                            确定
+                        </button>
+                    </div>
+                </div>
+            </div>
+            </ModalPortal>
+        )}
+
+        {isOppPickerOpen && (
+            <ModalPortal>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[600] p-4 animate-fade-in">
+                <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-6xl max-h-[80vh] flex flex-col border-white/10 animate-modal-enter">
+                    <div className="p-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-white/50 dark:bg-white/5 shrink-0">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <Briefcase className="w-5 h-5 text-purple-500"/> 选择商机
+                        </h3>
+                        <button onClick={() => { setIsOppPickerOpen(false); setOppPickerSearch(''); }} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full text-gray-400 hover:text-gray-600 transition">
+                            <X className="w-5 h-5"/>
+                        </button>
+                    </div>
+                    <div className="p-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center gap-3 shrink-0">
+                        <Search className="w-4 h-4 text-gray-400 shrink-0"/>
+                        <input
+                            type="text"
+                            placeholder="搜索商机名称、客户名称或商机编号..."
+                            className="bg-transparent border-none outline-none flex-1 text-gray-700 dark:text-gray-200 placeholder-gray-400 text-sm"
+                            value={oppPickerSearch}
+                            onChange={e => setOppPickerSearch(e.target.value)}
+                            autoFocus
+                        />
+                        {oppPickerSearch && (
+                            <button onClick={() => setOppPickerSearch('')} className="text-gray-400 hover:text-gray-600 transition">
+                                <X className="w-4 h-4"/>
+                            </button>
+                        )}
+                    </div>
+                    <div className="overflow-y-auto flex-1 custom-scrollbar">
+                        <table className="w-full text-left text-sm">
+                            <thead className="unified-table-header sticky top-0">
+                                <tr>
+                                    <th className="p-4 pl-5 whitespace-nowrap">商机编号</th>
+                                    <th className="p-4 whitespace-nowrap">商机名称</th>
+                                    <th className="p-4 whitespace-nowrap">客户名称</th>
+                                    <th className="p-4 whitespace-nowrap">产品名称/授权类型</th>
+                                    <th className="p-4 whitespace-nowrap">所属部门</th>
+                                    <th className="p-4 whitespace-nowrap">商机阶段</th>
+                                    <th className="p-4 whitespace-nowrap">最终成交金额</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                                {opportunities
+                                    .filter(o =>
+                                        !oppPickerSearch ||
+                                        o.name.toLowerCase().includes(oppPickerSearch.toLowerCase()) ||
+                                        o.customerName.toLowerCase().includes(oppPickerSearch.toLowerCase()) ||
+                                        o.id.toLowerCase().includes(oppPickerSearch.toLowerCase())
+                                    )
+                                    .map(o => (
+                                        <tr
+                                            key={o.id}
+                                            onClick={() => {
+                                                handleOpportunityChange(o.id);
+                                                setIsOppPickerOpen(false);
+                                                setOppPickerSearch('');
+                                            }}
+                                            className="cursor-pointer hover:bg-blue-50/60 dark:hover:bg-white/[0.06] transition-colors group"
+                                        >
+                                            <td className="p-4 pl-5 text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap text-xs">{o.id}</td>
+                                            <td className="p-4 max-w-[200px]">
+                                                <div className="font-medium text-gray-900 dark:text-white group-hover:text-[#0071E3] dark:group-hover:text-[#FF2D55] transition-colors line-clamp-2">{o.name}</div>
+                                            </td>
+                                            <td className="p-4 text-gray-700 dark:text-gray-300 whitespace-nowrap">{o.customerName}</td>
+                                            <td className="p-4 text-gray-600 dark:text-gray-400 max-w-[180px]">
+                                                <div className="line-clamp-2 text-xs">{o.productType || '-'}</div>
+                                            </td>
+                                            <td className="p-4 text-gray-600 dark:text-gray-400 whitespace-nowrap text-xs">{o.department || '-'}</td>
+                                            <td className="p-4">
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap ${
+                                                    o.stage === '赢单' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                                    o.stage === '输单' ? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' :
+                                                    o.stage === '需求判断' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                                    o.stage === '确认商机' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' :
+                                                    o.stage === '确认渠道' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                                                    'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                                                }`}>{o.stage}</span>
+                                            </td>
+                                            <td className="p-4 text-gray-900 dark:text-white whitespace-nowrap font-medium">
+                                                {o.finalUserRevenue != null ? `${o.finalUserRevenue.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 元` : o.amount != null ? `${o.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 元` : '-'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                {opportunities.filter(o =>
+                                    !oppPickerSearch ||
+                                    o.name.toLowerCase().includes(oppPickerSearch.toLowerCase()) ||
+                                    o.customerName.toLowerCase().includes(oppPickerSearch.toLowerCase())
+                                ).length === 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="p-10 text-center text-sm text-gray-400 dark:text-gray-500">
+                                            未找到匹配的商机
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            </ModalPortal>
+        )}
     </>
   );
 };
