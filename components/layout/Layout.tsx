@@ -166,7 +166,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       } else {
           setActiveTopNav('ORDER_CENTER');
       }
-    if (/^\/orders\/[^/]+$/.test(location.pathname)) {
+    if (/^\/orders\/[^/]+$/.test(location.pathname) || /^\/customers\/[^/]+$/.test(location.pathname)) {
         setIsCollapsed(true);
     }
   }, [location.pathname]);
@@ -331,7 +331,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </button>
 
                 {isUserMenuOpen && (
-                    <div className="unified-card absolute right-0 top-full mt-3 w-64 /90 dark:bg-[#1C1C1E]/90 backdrop-blur-2xl border-gray-200/50 dark:border-white/10 p-2 z-50 animate-modal-enter origin-top-right">
+                    <div className="unified-card absolute right-0 top-full mt-3 w-64 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-2xl border-gray-200/50 dark:border-white/10 p-2 z-50 animate-modal-enter origin-top-right">
                         <div className="px-3 py-2 border-b border-gray-100 dark:border-white/10 mb-1">
                             <p className="text-sm font-bold text-gray-900 dark:text-white">{currentUser.name}</p>
                         </div>
@@ -385,7 +385,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               flex flex-col gap-1
             `}>
               {/* Sidebar visual container */}
-              <div className="unified-card w-full h-full /60 dark:bg-[#1C1C1E]/60 backdrop-blur-xl border-gray-200/50 dark:border-white/10 flex flex-col">
+              <div className="unified-card w-full h-full bg-white/60 dark:bg-[#1C1C1E]/60 backdrop-blur-xl border-gray-200/50 dark:border-white/10 flex flex-col">
                   
                   {/* Mobile Sidebar Header */}
                   <div className="lg:hidden h-14 flex items-center justify-between px-5 border-b border-gray-100 dark:border-white/5 shrink-0">

@@ -274,7 +274,7 @@ const ContractManager: React.FC = () => {
                 </tr>
               ) : (
                 paginated.map(contract => {
-                  const statusCfg = verifyStatusConfig[contract.verifyStatus];
+                  const statusCfg = verifyStatusConfig[contract.verifyStatus] || { label: contract.verifyStatus || '未知', color: 'text-gray-600', bg: 'bg-gray-50', darkBg: 'dark:bg-gray-800/20', darkColor: 'dark:text-gray-400', dot: 'bg-gray-400', icon: Circle };
                   const isSelected = selectedIds.has(contract.id);
                   return (
                     <tr
@@ -324,8 +324,7 @@ const ContractManager: React.FC = () => {
 
                       {/* 核查状态 */}
                       <td className="px-4 py-3.5">
-                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${statusCfg.bg} ${statusCfg.darkBg} ${statusCfg.color} ${statusCfg.darkColor}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot} shrink-0`} />
+                        <div className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${statusCfg.bg} ${statusCfg.darkBg} ${statusCfg.color} ${statusCfg.darkColor}`}>
                           {statusCfg.label}
                         </div>
                       </td>

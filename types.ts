@@ -332,6 +332,19 @@ export interface Channel {
     email: string;
     region: string;
     province?: string;
+    city?: string;
+    district?: string;
+    country?: string;
+    companyAddress?: string;
+    companyPhone?: string;
+    companyEmail?: string;
+    companyZipCode?: string;
+    relatedParty?: string;
+    rebate?: string;
+    parentChannel?: string;
+    firstLevelChannel?: string;
+    bChannelManager?: string;
+    gChannelManager?: string;
     status: 'Active' | 'Inactive';
     contractStatus?: '已签约' | '未签约';
     erpSyncStatus?: '已同步' | '未同步';
@@ -340,6 +353,12 @@ export interface Channel {
 
 export type OpportunityStage = '需求判断' | '确认商机' | '确认渠道' | '证实方案' | '赢单' | '输单';
 
+export interface OpportunityProduct {
+    productName: string;
+    skuName?: string;
+    licenseType?: string;
+}
+
 export interface Opportunity {
     id: string;
     crmId?: string;
@@ -347,6 +366,7 @@ export interface Opportunity {
     customerId: string;
     customerName: string;
     productType?: string;
+    products?: OpportunityProduct[];
     stage: OpportunityStage;
     probability: number;
     department?: string;
@@ -536,28 +556,9 @@ export interface Order {
 
     linkedContractIds?: string[];
     linkedContractNames?: string[];
-}
 
-export type ProjectStatus = 'Planning' | 'Ongoing' | 'OnHold' | 'Completed' | 'Cancelled';
-
-export interface Project {
-    id: string;
-    name: string;
-    customerId: string;
-    customerName: string;
-    pmId: string;
-    pmName: string;
-    startDate: string;
-    endDate?: string;
-    status: ProjectStatus;
-    progress: number;
-    description?: string;
-}
-
-export interface ContactInfo {
-    name: string;
-    phone: string;
-    email: string;
+    settlementType?: 'once' | 'installment';
+    installmentPlans?: { amount: number; expectedDate: string; actualDate: string; paidAmount: number }[];
 }
 
 // --- Contract (migrated from ContractManager.tsx) ---

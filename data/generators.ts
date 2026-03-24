@@ -86,10 +86,69 @@ export function generateCustomers(users: User[]): Customer[] {
       shippingAddress: `${provinces[i % provinces.length]}高新区科技路 ${100 + i} 号`,
       status: Math.random() > 0.1 ? 'Active' : 'Inactive',
       logo: `https://ui-avatars.com/api/?name=${companyName.substring(0, 2)}&background=random&color=fff`,
-      contacts: [
-        { id: `ct-${i}-1`, name: '陈经理', phone: `1390000${1000 + i}`, email: `${String(10000000 + i * 137).padStart(8, '0')}@qq.com`, position: '采购经理', roles: ['Purchasing'], isPrimary: true, creatorId: owner.id, creatorName: owner.name, createdAt: `2024-${String((i % 9) + 1).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')} ${String((i * 7) % 24).padStart(2, '0')}:${String((i * 11) % 60).padStart(2, '0')}:${String((i * 17) % 60).padStart(2, '0')}` },
-        { id: `ct-${i}-2`, name: '张工', phone: `1380000${1000 + i}`, email: `${String(20000000 + i * 173).padStart(8, '0')}@qq.com`, position: 'IT负责人', roles: ['IT'], isPrimary: false, creatorId: owner.id, creatorName: owner.name, createdAt: `2024-${String((i % 9) + 1).padStart(2, '0')}-${String((i % 28) + 2).padStart(2, '0')} ${String((i * 5) % 24).padStart(2, '0')}:${String((i * 13) % 60).padStart(2, '0')}:${String((i * 19) % 60).padStart(2, '0')}` },
-      ],
+      contacts: (() => {
+        const surnames = [
+          '陈','王','刘','赵','孙','李','周','吴','郑','钱',
+          '冯','褚','卫','蒋','沈','韩','杨','朱','秦','尤',
+          '许','何','吕','施','张','曹','严','华','金','魏',
+          '陶','姜','戚','谢','邹','苏','潘','葛','范','彭',
+          '鲁','韦','昌','马','苗','凤','花','方','俞','任',
+          '袁','柳','唐','罗','薛','雷','贺','倪','汤','殷',
+          '程','阮','蓝','闵','欧阳','司马','上官','诸葛','司徒','慕容',
+        ];
+        const givenP = [
+          '建国','志强','伟','芳','丽','敏','静','秀英','强','磊',
+          '洋','勇','艳','军','杰','娟','涛','明','超','秀兰',
+          '霞','平','刚','桂英','文','云','莉','玲','鑫','宇',
+        ];
+        const givenT = [
+          '鹏','博','昊','翔','晨','睿','辰','阳','宇航','浩然',
+          '子墨','梓轩','俊杰','皓天','一凡','思远','嘉诚','泽宇','文博','天佑',
+          '铭','骏','煜','航','祺','峰','恒','逸','旭','晟',
+        ];
+        const purchasingPositions = ['采购经理','采购主管','采购专员','供应链总监','采购部长','集采负责人','战略采购经理','品类采购主管'];
+        const itPositions = ['IT负责人','系统工程师','运维主管','技术架构师','IT总监','信息中心主任','网络安全工程师','开发经理'];
+
+        const hash = (a: number, b: number) => ((a * 2654435761 + b * 40503) >>> 0);
+        const pickName = (pool: string[], seed: number) => pool[seed % pool.length];
+        const pCount = (i % 3) + 2;
+        const tCount = (i % 3) + 2;
+        const mkDate = (offset: number) => `2024-${String((i % 9) + 1).padStart(2, '0')}-${String(((i + offset) % 28) + 1).padStart(2, '0')} ${String((i * 7 + offset * 3) % 24).padStart(2, '0')}:${String((i * 11 + offset * 7) % 60).padStart(2, '0')}:${String((i * 17 + offset * 13) % 60).padStart(2, '0')}`;
+        const mkPhone = (seed: number) => `1${['30','31','32','33','35','36','37','38','39','50','51','52','53','55','56','57','58','59','70','71','75','76','77','78','80','81','82','83','84','85','86','87','88','89'][seed % 34]}${String(10000000 + (seed >>> 0) % 90000000).slice(0, 8)}`;
+
+        const list: Customer['contacts'] = [];
+        for (let p = 0; p < pCount; p++) {
+          const h = hash(i, p);
+          list.push({
+            id: `ct-${i}-p${p}`,
+            name: pickName(surnames, h) + pickName(givenP, h >>> 8),
+            phone: mkPhone(h >>> 4),
+            email: `pur_c${i}p${p}@${['qq.com','163.com','126.com','outlook.com','company.cn'][(i + p) % 5]}`,
+            position: purchasingPositions[(h >>> 12) % purchasingPositions.length],
+            roles: ['Purchasing'],
+            isPrimary: p === 0,
+            creatorId: owner.id,
+            creatorName: owner.name,
+            createdAt: mkDate(p),
+          });
+        }
+        for (let t = 0; t < tCount; t++) {
+          const h = hash(i, t + 100);
+          list.push({
+            id: `ct-${i}-t${t}`,
+            name: pickName(surnames, h) + pickName(givenT, h >>> 8),
+            phone: mkPhone(h >>> 4),
+            email: `it_c${i}t${t}@${['qq.com','163.com','126.com','outlook.com','company.cn'][(i + t) % 5]}`,
+            position: itPositions[(h >>> 12) % itPositions.length],
+            roles: ['IT'],
+            isPrimary: false,
+            creatorId: owner.id,
+            creatorName: owner.name,
+            createdAt: mkDate(pCount + t),
+          });
+        }
+        return list;
+      })(),
       billingInfo: {
         taxId: `91110108MA00${1000 + i}`,
         title: companyName,
@@ -117,8 +176,12 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       crmId: '-00097796',
       name: '2022-银联商务-文档中台V7-增购',
       customerId: customers[0]?.id,
-      customerName: '银联商务支付股份有限公司',
+      customerName: customers[0]?.companyName || '银联商务支付股份有限公司',
       productType: '文档中台V6/年授权、文档中台V7/服务器年授权',
+      products: [
+        { productName: '文档中台V6', skuName: '年授权', licenseType: '服务器授权' },
+        { productName: '文档中台V7', skuName: '服务器年授权', licenseType: '服务器授权' },
+      ],
       stage: '确认渠道',
       probability: 80,
       department: '上海金融销售组',
@@ -135,8 +198,12 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       crmId: '-00137587',
       name: '2024-建行-文档中台V7-增购',
       customerId: customers[1]?.id,
-      customerName: '中国建设银行股份有限公司',
+      customerName: customers[1]?.companyName || '中国建设银行股份有限公司',
       productType: '私有云单品增值服务包/软件保障、文档中台V7/服务器授权',
+      products: [
+        { productName: '私有云单品增值服务包', skuName: '软件保障', licenseType: '服务器授权' },
+        { productName: '文档中台V7', skuName: '服务器授权', licenseType: '服务器授权' },
+      ],
       stage: '确认渠道',
       probability: 60,
       department: '大客金融销售组',
@@ -153,8 +220,11 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       crmId: '-00145514',
       name: '2024-京东-WPS365高级版-新购',
       customerId: customers[2]?.id,
-      customerName: '北京京东世纪贸易有限公司',
+      customerName: customers[2]?.companyName || '北京京东世纪贸易有限公司',
       productType: 'WPS365高级版/用户订阅许可（含端年场地）',
+      products: [
+        { productName: 'WPS 365 高级版', skuName: '用户订阅许可（含端年场地）', licenseType: '用户订阅' },
+      ],
       stage: '确认商机',
       probability: 40,
       department: '生态支撑组',
@@ -171,8 +241,12 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       crmId: '-00148726',
       name: '2024-大连捷成实业-WPS365高级版-新购',
       customerId: customers[3]?.id,
-      customerName: '大连捷成实业发展有限公司',
+      customerName: customers[3]?.companyName || '大连捷成实业发展有限公司',
       productType: 'WPS365高级版/用户订阅许可（含端年场地）',
+      products: [
+        { productName: 'WPS 365 高级版', skuName: '用户订阅许可（含端年场地）', licenseType: '用户订阅' },
+        { productName: 'WPS AI 助手', skuName: '年度订阅', licenseType: '用户订阅' },
+      ],
       stage: '证实方案',
       probability: 65,
       department: '客户培育组',
@@ -189,8 +263,11 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       crmId: '-00158382',
       name: '2024-深圳技尔通-WPS365协作版-新购',
       customerId: customers[4]?.id,
-      customerName: '深圳市技尔通科技有限公司',
+      customerName: customers[4]?.companyName || '深圳市技尔通科技有限公司',
       productType: 'WPS365协作版/用户订阅许可',
+      products: [
+        { productName: 'WPS 365 协作版', skuName: '用户订阅许可', licenseType: '用户订阅' },
+      ],
       stage: '需求判断',
       probability: 30,
       department: '民企协销',
@@ -209,6 +286,11 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       customerId: customers[5]?.id,
       customerName: customers[5]?.companyName,
       productType: 'WPS365教育版/校园正版化授权',
+      products: [
+        { productName: 'WPS 365 教育版', skuName: '校园正版化授权', licenseType: '场地授权' },
+        { productName: 'WPS AI 助手', skuName: '教育专享年度订阅', licenseType: '用户订阅' },
+        { productName: '金山文档教育版', skuName: '协作空间', licenseType: '场地授权' },
+      ],
       stage: '确认商机',
       probability: 75,
       department: '教育行业组',
@@ -227,6 +309,9 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       customerId: customers[6]?.id,
       customerName: customers[6]?.companyName,
       productType: 'WPS365标准版/用户订阅许可',
+      products: [
+        { productName: 'WPS 365 标准版', skuName: '用户订阅许可', licenseType: '用户订阅' },
+      ],
       stage: '输单',
       probability: 0,
       department: '物流行业组',
@@ -245,6 +330,10 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       customerId: customers[7]?.id,
       customerName: customers[7]?.companyName,
       productType: '文档中台V7/服务器年授权、安全管控组件/年授权',
+      products: [
+        { productName: '文档中台V7', skuName: '服务器年授权', licenseType: '服务器授权' },
+        { productName: '安全管控组件', skuName: '年授权', licenseType: '服务器授权' },
+      ],
       stage: '证实方案',
       probability: 55,
       department: '大客金融销售组',
@@ -263,6 +352,11 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       customerId: customers[8]?.id,
       customerName: customers[8]?.companyName,
       productType: 'WPS365高级版/用户订阅许可、API调用包/年授权',
+      products: [
+        { productName: 'WPS 365 高级版', skuName: '用户订阅许可', licenseType: '用户订阅' },
+        { productName: 'API 调用包', skuName: '年授权', licenseType: 'API授权' },
+        { productName: '文档格式兼容组件', skuName: '企业版', licenseType: '服务器授权' },
+      ],
       stage: '确认渠道',
       probability: 30,
       department: '制造行业组',
@@ -281,6 +375,10 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       customerId: customers[9]?.id,
       customerName: customers[9]?.companyName,
       productType: 'API调用包/年度订阅',
+      products: [
+        { productName: 'API 调用包', skuName: '年度订阅', licenseType: 'API授权' },
+        { productName: 'WPS 365 协作版', skuName: '用户订阅许可', licenseType: '用户订阅' },
+      ],
       stage: '赢单',
       probability: 100,
       department: '生态支撑组',
@@ -316,7 +414,6 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
     const customer = customers[i % customers.length];
     const merchandise = merchandises[i % merchandises.length];
     const quantity = Math.floor(Math.random() * 20) + 1;
-    const total = (merchandise?.price || 500) * quantity;
     const source = sources[i % sources.length];
 
     const date = new Date();
@@ -441,6 +538,7 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
     });
 
     const orderItems: OrderItem[] = [...baseItems, ...extraItems];
+    const total = orderItems.reduce((sum, it) => sum + it.priceAtPurchase * it.quantity, 0);
 
     const salesRep = users.find(u => u.id === customer.ownerId);
     const invoiceInfo: InvoiceInfo | undefined = isPaid

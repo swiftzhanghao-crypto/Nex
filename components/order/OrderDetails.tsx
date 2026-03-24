@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Order, OrderStatus, OrderItem, ApprovalRecord } from '../../types';
 import { 
     ArrowLeft, Box, Printer, Award, X, Lock, CheckCircle, Truck, ClipboardCheck, 
     UploadCloud, AlertOctagon, RefreshCcw, Key, Package, Disc, Receipt, FileText, 
     Briefcase, History, Eye, CheckSquare, CreditCard, ShieldCheck, User as UserIcon, Building,
-    AlertCircle, Clock, MapPin, Target, Users, Paperclip, Scroll, Camera, ScrollText, Copy, Check
+    AlertCircle, Clock, MapPin, Target, Users, Paperclip, Scroll, Camera, ScrollText, Copy, Check, Phone, Mail, Download
 } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
@@ -16,6 +16,7 @@ import OrderContractPreview from './OrderContractPreview';
 import OrderItemDetailsDrawer from './OrderItemDetailsDrawer';
 
 const statusMap: Record<string, string> = {
+    [OrderStatus.DRAFT]: '草稿',
     [OrderStatus.PENDING_APPROVAL]: '待审批',
     [OrderStatus.PENDING_CONFIRM]: '待确认',
     [OrderStatus.PROCESSING_PROD]: '备货中',
@@ -43,8 +44,6 @@ const OrderDetails: React.FC = () => {
     const cards: { id: string; span: number }[] = [];
     if (hasMediumCards) cards.push({ id: 'medium', span: 2 });
     if (hasPermission('order_detail_opportunity')) cards.push({ id: 'opportunity', span: 1 });
-    if (hasPermission('order_detail_invoice')) cards.push({ id: 'invoice', span: 1 });
-    if (hasPermission('order_detail_original')) cards.push({ id: 'original', span: 1 });
 
     let col = 0;
     for (const card of cards) {
@@ -63,7 +62,7 @@ const OrderDetails: React.FC = () => {
     return result;
   })();
 
-  const selectedOrder = orders.find(o => o.id === id);
+  const selectedOrder = useMemo(() => orders.find(o => o.id === id), [orders, id]);
 
   // States
   const [activeStepModal, setActiveStepModal] = useState<string | null>(null);
@@ -96,6 +95,7 @@ const OrderDetails: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'FULFILLMENT' | 'EMAIL'>('MANAGEMENT');
   const [isContractPreviewOpen, setIsContractPreviewOpen] = useState(false);
   const [contractZoom, setContractZoom] = useState(100);
+  const [expandedContractIds, setExpandedContractIds] = useState<Set<string>>(new Set());
   const [selectedDeliveryNo, setSelectedDeliveryNo] = useState<string | null>(null);
 
   // Step specific forms
@@ -244,6 +244,7 @@ const OrderDetails: React.FC = () => {
   };
 
   const handleConfirmPayment = () => {
+      if (!paymentForm.bankName.trim()) { alert('请填写收款银行'); return; }
       const isSelfDeal = selectedOrder.buyerType === 'SelfDeal';
       const paymentRecord = {
           amount: selectedOrder.total,
@@ -507,7 +508,18 @@ const OrderDetails: React.FC = () => {
                                : <Copy className="w-3.5 h-3.5" />}
                        </button>
                    </div>
-                   <span className="text-[11px] text-gray-400 dark:text-gray-500 hidden sm:block mt-0.5">提单时间：<span className="font-mono">{new Date(selectedOrder.date).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</span></span>
+                   <div className="hidden sm:flex items-center gap-2 mt-0.5">
+                       <span className="text-[11px] text-gray-400 dark:text-gray-500">提单时间：<span className="font-mono">{new Date(selectedOrder.date).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</span></span>
+                       {selectedOrder.buyerType === 'Channel'    && <span className="unified-tag-xs unified-tag-indigo">渠道代理</span>}
+                       {selectedOrder.buyerType === 'SelfDeal'   && <span className="unified-tag-xs unified-tag-orange">自主成交</span>}
+                       {selectedOrder.buyerType === 'RedeemCode' && <span className="unified-tag-xs unified-tag-purple">兑换码</span>}
+                       {(selectedOrder.buyerType === 'Customer' || !selectedOrder.buyerType) && <span className="unified-tag-xs unified-tag-blue">客户直签</span>}
+                       {selectedOrder.source === 'Sales'         && <span className="unified-tag-xs unified-tag-blue">后台下单</span>}
+                       {selectedOrder.source === 'ChannelPortal' && <span className="unified-tag-xs unified-tag-indigo">渠道下单</span>}
+                       {selectedOrder.source === 'OnlineStore'   && <span className="unified-tag-xs unified-tag-orange">官网下单</span>}
+                       {selectedOrder.source === 'APISync'       && <span className="unified-tag-xs unified-tag-gray">第三方下单</span>}
+                       {selectedOrder.source === 'Renewal'       && <span className="unified-tag-xs unified-tag-green">客户续费</span>}
+                   </div>
                </div>
 
                {/* Group 2: 状态标签 */}
@@ -656,7 +668,7 @@ const OrderDetails: React.FC = () => {
               {hasPermission('order_workflow_view') && steps.length > 0 && (
               <div className="unified-card dark:bg-[#1C1C1E] px-6 py-4 border-gray-100/50 dark:border-white/10 overflow-x-auto">
              <div className="flex justify-between items-start relative min-w-[700px]">
-                 <div className="absolute top-6 left-0 w-full h-1 bg-gray-100 dark:bg-white/10 -z-0 rounded-full overflow-hidden">
+                 <div className="absolute top-5 h-1 bg-gray-100 dark:bg-white/10 -z-0 rounded-full overflow-hidden" style={{ left: `calc(100% / ${steps.length} / 2)`, right: `calc(100% / ${steps.length} / 2)` }}>
                  </div>
                  {steps.map((step, idx) => (
                     <div 
@@ -668,12 +680,12 @@ const OrderDetails: React.FC = () => {
                             : 'cursor-pointer hover:scale-105'
                         }`}
                     >
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-apple ${
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-apple ${
                             step.status === 'Completed' ? 'bg-green-500 text-white ring-4 ring-green-100 dark:ring-green-900/20' : 
                             step.status === 'Current' ? 'bg-[#0071E3] dark:bg-[#0A84FF] text-white ring-4 ring-blue-100 dark:ring-blue-900/30 shadow-xl scale-110' : 
                             'bg-white dark:bg-[#2C2C2E] border-2 border-gray-200 dark:border-gray-600 text-gray-400'
                         }`}>
-                            {step.status === 'Locked' ? <Lock className="w-5 h-5" /> : <step.icon className="w-6 h-6" />}
+                            {step.status === 'Locked' ? <Lock className="w-4 h-4" /> : <step.icon className="w-5 h-5" />}
                         </div>
                         <div className="text-center">
                             <div className={`text-sm font-bold ${step.status === 'Completed' ? 'text-green-600' : step.status === 'Current' ? 'text-[#0071E3] dark:text-[#0A84FF]' : 'text-gray-400'}`}>{step.label}</div>
@@ -911,6 +923,78 @@ const OrderDetails: React.FC = () => {
               </div>
               )}
 
+              {/* 客户联系人 (小卡片 1/3) */}
+              {hasPermission('order_detail_customer') && (() => {
+                  const cust = customers.find(c => c.id === selectedOrder.customerId);
+                  const purchasing = cust?.contacts.filter(c => c.roles.includes('Purchasing')) || [];
+                  const it = cust?.contacts.filter(c => c.roles.includes('IT')) || [];
+                  if (purchasing.length === 0 && it.length === 0) return null;
+                  return (
+              <div className="md:col-span-1 unified-card dark:bg-[#1C1C1E] p-4 border-gray-100/50 dark:border-white/10 space-y-3 self-start">
+                  <div className="border-b border-gray-100 dark:border-white/10 pb-2">
+                      <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                          <Users className="w-4 h-4 text-teal-500" /> 客户联系人
+                          <span className="text-[10px] text-gray-400 font-mono ml-auto">{purchasing.length + it.length} 人</span>
+                      </h4>
+                  </div>
+                  <div className="space-y-3">
+                      {purchasing.length > 0 && (
+                      <div className="space-y-1.5">
+                          <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">采购</span>
+                              <span className="px-1 py-px text-[9px] font-bold rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">{purchasing.length}</span>
+                          </div>
+                          {purchasing.map(ct => (
+                          <div key={ct.id} className="flex items-center gap-2 px-2.5 py-2 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100/80 dark:border-blue-800/30 rounded-lg">
+                              <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
+                                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">{ct.name.charAt(0)}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1">
+                                      <span className="text-xs font-bold text-gray-900 dark:text-white truncate">{ct.name}</span>
+                                      {ct.isPrimary && <span className="text-[8px] px-1 py-px rounded bg-blue-500 text-white font-bold shrink-0">主</span>}
+                                      {ct.position && <span className="text-[10px] text-gray-400 truncate">· {ct.position}</span>}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                      {ct.phone && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Phone className="w-2.5 h-2.5 shrink-0"/>{ct.phone}</span>}
+                                      {ct.email && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Mail className="w-2.5 h-2.5 shrink-0"/>{ct.email}</span>}
+                                  </div>
+                              </div>
+                          </div>
+                          ))}
+                      </div>
+                      )}
+                      {it.length > 0 && (
+                      <div className="space-y-1.5">
+                          <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">IT</span>
+                              <span className="px-1 py-px text-[9px] font-bold rounded bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">{it.length}</span>
+                          </div>
+                          {it.map(ct => (
+                          <div key={ct.id} className="flex items-center gap-2 px-2.5 py-2 bg-purple-50/50 dark:bg-purple-900/10 border border-purple-100/80 dark:border-purple-800/30 rounded-lg">
+                              <div className="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center shrink-0">
+                                  <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400">{ct.name.charAt(0)}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1">
+                                      <span className="text-xs font-bold text-gray-900 dark:text-white truncate">{ct.name}</span>
+                                      {ct.isPrimary && <span className="text-[8px] px-1 py-px rounded bg-purple-500 text-white font-bold shrink-0">主</span>}
+                                      {ct.position && <span className="text-[10px] text-gray-400 truncate">· {ct.position}</span>}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                      {ct.phone && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Phone className="w-2.5 h-2.5 shrink-0"/>{ct.phone}</span>}
+                                      {ct.email && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Mail className="w-2.5 h-2.5 shrink-0"/>{ct.email}</span>}
+                                  </div>
+                              </div>
+                          </div>
+                          ))}
+                      </div>
+                      )}
+                  </div>
+              </div>
+                  );
+              })()}
+
               {/* Opportunity Information (dynamic) */}
               {hasPermission('order_detail_opportunity') && (
               <div className={`unified-card ${cardSpans.opportunity} dark:bg-[#1C1C1E] p-4 border-gray-100/50 dark:border-white/10 space-y-3`}>
@@ -948,37 +1032,9 @@ const OrderDetails: React.FC = () => {
               </div>
               )}
 
-              {/* Invoice Details (dynamic) */}
-              {hasPermission('order_detail_invoice') && (
-              <div className={`unified-card ${cardSpans.invoice} dark:bg-[#1C1C1E] p-4 border-gray-100/50 dark:border-white/10 space-y-3`}>
-                  <div className="border-b border-gray-100 dark:border-white/10 pb-2.5">
-                      <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Receipt className="w-5 h-5 text-green-500"/> 开票明细</h4>
-                  </div>
-                  {selectedOrder.invoiceInfo ? (
-                      <div className="divide-y divide-gray-50 dark:divide-white/5">
-                          {[
-                              { label: '发票抬头', value: selectedOrder.invoiceInfo.title },
-                              { label: '纳税人识别号', value: selectedOrder.invoiceInfo.taxId },
-                              { label: '发票类型', value: '增值税专用发票' },
-                          ].map((item, idx) => (
-                              <div key={idx} className="flex items-center gap-8 py-3.5">
-                                  <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap whitespace-nowrap">{item.label}</span>
-                                  <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{item.value || '-'}</span>
-                              </div>
-                          ))}
-                      </div>
-                  ) : (
-                      <div className="flex flex-col items-center justify-center py-10 text-gray-400 italic text-xs">
-                          <FileText className="w-8 h-8 mb-2 opacity-20"/>
-                          暂无开票信息
-                      </div>
-                  )}
-              </div>
-              )}
-
-              {/* Original Order Numbers (dynamic) */}
+              {/* Original Order Numbers (small card) */}
               {hasPermission('order_detail_original') && (
-              <div className={`unified-card ${cardSpans.original} dark:bg-[#1C1C1E] p-4 border-gray-100/50 dark:border-white/10 space-y-3`}>
+              <div className="unified-card md:col-span-1 dark:bg-[#1C1C1E] p-4 border-gray-100/50 dark:border-white/10 space-y-3">
                   <div className="border-b border-gray-100 dark:border-white/10 pb-2.5">
                       <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2"><History className="w-5 h-5 text-purple-500"/> 原订单编号</h4>
                   </div>
@@ -1046,8 +1102,8 @@ const OrderDetails: React.FC = () => {
                 </div>
             )}
           {/* 订单备注 & 关联合同 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-1 unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
                   <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                       <FileText className="w-4 h-4 text-blue-500" />
                       <h3 className="text-sm font-bold text-gray-800 dark:text-white">订单备注</h3>
@@ -1060,7 +1116,7 @@ const OrderDetails: React.FC = () => {
                       )}
                   </div>
               </div>
-              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
+              <div className="md:col-span-2 unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
                   <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                           <Scroll className="w-4 h-4 text-blue-500" />
@@ -1069,14 +1125,8 @@ const OrderDetails: React.FC = () => {
                               <span className="text-xs text-gray-400 font-mono">({selectedOrder.linkedContractIds!.length})</span>
                           )}
                       </div>
-                      <button
-                          onClick={() => setIsContractPreviewOpen(true)}
-                          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-[#0A84FF] hover:bg-blue-100 dark:hover:bg-blue-900/40 transition border border-blue-100 dark:border-blue-800/40"
-                      >
-                          <Paperclip className="w-3 h-3" /> 合同预览
-                      </button>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div>
                       {(() => {
                           const ids = selectedOrder.linkedContractIds;
                           if (!ids || ids.length === 0) return (
@@ -1086,25 +1136,145 @@ const OrderDetails: React.FC = () => {
                           if (linkedContracts.length === 0) return (
                               <div className="p-5"><p className="text-sm text-gray-400 dark:text-gray-500 italic">暂未关联合同</p></div>
                           );
+                          const togglePreview = (cid: string) => {
+                              setExpandedContractIds(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(cid)) next.delete(cid); else next.add(cid);
+                                  return next;
+                              });
+                          };
                           return (
-                              <table className="w-full text-left text-sm">
-                                  <thead>
-                                      <tr className="border-b border-gray-100 dark:border-white/10 text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                                          <th className="px-5 py-2.5 font-semibold">合同编号</th>
-                                          <th className="px-5 py-2.5 font-semibold">合同名称</th>
-                                          <th className="px-5 py-2.5 font-semibold text-right">合同金额</th>
-                                      </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-gray-50 dark:divide-white/5">
-                                      {linkedContracts.map(contract => (
-                                          <tr key={contract!.id} className="hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors">
-                                              <td className="px-5 py-3 font-mono text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">{contract!.code}</td>
-                                              <td className="px-5 py-3 text-sm font-medium text-gray-900 dark:text-white">{contract!.name}</td>
-                                              <td className="px-5 py-3 text-sm font-mono font-semibold text-right text-gray-900 dark:text-white whitespace-nowrap">{contract!.amount != null ? `¥${contract!.amount.toLocaleString()}` : '-'}</td>
-                                          </tr>
-                                      ))}
-                                  </tbody>
-                              </table>
+                              <div className="divide-y divide-gray-100 dark:divide-white/10">
+                                  {linkedContracts.map(contract => {
+                                      const c = contract!;
+                                      const isExpanded = expandedContractIds.has(c.id);
+                                      return (
+                                      <div key={c.id}>
+                                          <div className="px-5 py-3.5 flex items-center gap-4 hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors">
+                                              <div className="flex-1 min-w-0 grid grid-cols-3 gap-4 items-center">
+                                                  <div>
+                                                      <div className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">合同编号</div>
+                                                      <div className="font-mono text-xs text-gray-700 dark:text-gray-300">{c.code}</div>
+                                                  </div>
+                                                  <div>
+                                                      <div className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">合同名称</div>
+                                                      <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{c.name}</div>
+                                                  </div>
+                                                  <div className="text-right">
+                                                      <div className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">合同金额</div>
+                                                      <div className="text-sm font-mono font-semibold text-gray-900 dark:text-white">{c.amount != null ? `¥${c.amount.toLocaleString()}` : '-'}</div>
+                                                  </div>
+                                              </div>
+                                              <button
+                                                  onClick={() => togglePreview(c.id)}
+                                                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg transition border shrink-0 ${
+                                                      isExpanded
+                                                          ? 'bg-blue-100 dark:bg-blue-900/30 text-[#0071E3] dark:text-[#0A84FF] border-blue-200 dark:border-blue-700/50'
+                                                          : 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-[#0A84FF] hover:bg-blue-100 dark:hover:bg-blue-900/40 border-blue-100 dark:border-blue-800/40'
+                                                  }`}
+                                              >
+                                                  <Eye className="w-3 h-3" />
+                                                  {isExpanded ? '收起预览' : '合同预览'}
+                                              </button>
+                                          </div>
+                                          {isExpanded && (
+                                          <div className="px-5 pb-5 animate-fade-in">
+                                              <div className="bg-gray-50 dark:bg-black/20 rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden">
+                                                  <div className="px-5 py-3 border-b border-gray-200 dark:border-white/10 flex items-center justify-between bg-white/60 dark:bg-white/5">
+                                                      <div className="flex items-center gap-2">
+                                                          <Scroll className="w-4 h-4 text-[#0071E3]" />
+                                                          <span className="text-xs font-bold text-gray-700 dark:text-gray-300">{c.name}</span>
+                                                          <span className="text-[10px] text-gray-400 font-mono">{c.code}</span>
+                                                      </div>
+                                                      <div className="flex items-center gap-2">
+                                                          <button className="p-1 rounded hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 transition" title="下载合同"><Download className="w-3.5 h-3.5" /></button>
+                                                      </div>
+                                                  </div>
+                                                  <div className="p-6">
+                                                      <div className="bg-white dark:bg-[#2C2C2E] mx-auto shadow rounded-lg border border-gray-200 dark:border-white/10" style={{ padding: '40px 48px' }}>
+                                                          <div className="text-center mb-6">
+                                                              <h1 className="text-lg font-bold text-gray-900 dark:text-white tracking-widest mb-1">软件产品采购合同</h1>
+                                                              <div className="text-xs text-gray-400 font-mono">合同编号：{c.code}</div>
+                                                          </div>
+                                                          <div className="mb-4 text-xs leading-7 text-gray-700 dark:text-gray-300">
+                                                              <p>甲方（买方）：<strong className="text-gray-900 dark:text-white">{c.partyA || selectedOrder.customerName}</strong></p>
+                                                              <p>乙方（卖方）：<strong className="text-gray-900 dark:text-white">{c.partyB || '北京金山办公软件股份有限公司'}</strong></p>
+                                                              <p className="mt-1.5 text-gray-500 dark:text-gray-400 text-[11px] leading-5">
+                                                                  根据《中华人民共和国合同法》及相关法律法规的规定，甲乙双方在平等、自愿、公平、诚实信用的基础上，经友好协商，就甲方购买乙方软件产品事宜，达成如下协议：
+                                                              </p>
+                                                          </div>
+                                                          <div className="w-full h-px bg-gray-200 dark:bg-white/10 my-4" />
+                                                          <div className="mb-4">
+                                                              <h2 className="text-xs font-bold text-gray-900 dark:text-white mb-1.5">第一条　产品信息</h2>
+                                                              <div className="overflow-x-auto">
+                                                                  <table className="w-full text-[11px] border border-gray-200 dark:border-white/10 border-collapse">
+                                                                      <thead>
+                                                                          <tr className="bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400">
+                                                                              <th className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-left font-bold">序号</th>
+                                                                              <th className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-left font-bold">产品名称</th>
+                                                                              <th className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-center font-bold">数量</th>
+                                                                              <th className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right font-bold">单价</th>
+                                                                              <th className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right font-bold">小计</th>
+                                                                          </tr>
+                                                                      </thead>
+                                                                      <tbody>
+                                                                          {selectedOrder.items.map((item, idx) => (
+                                                                              <tr key={idx} className="text-gray-700 dark:text-gray-300">
+                                                                                  <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-center">{idx + 1}</td>
+                                                                                  <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5">{item.productName}</td>
+                                                                                  <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-center">{item.quantity}</td>
+                                                                                  <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right font-mono">¥{item.priceAtPurchase.toLocaleString()}</td>
+                                                                                  <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right font-mono">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
+                                                                              </tr>
+                                                                          ))}
+                                                                          <tr className="bg-orange-50/60 dark:bg-orange-900/10 font-bold text-gray-900 dark:text-white">
+                                                                              <td colSpan={4} className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right">合计</td>
+                                                                              <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right font-mono text-red-600 dark:text-red-400">¥{(c.amount ?? selectedOrder.total).toLocaleString()}</td>
+                                                                          </tr>
+                                                                      </tbody>
+                                                                  </table>
+                                                              </div>
+                                                          </div>
+                                                          <div className="mb-3">
+                                                              <h2 className="text-xs font-bold text-gray-900 dark:text-white mb-1">第二条　付款方式</h2>
+                                                              <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-6">
+                                                                  甲方应于合同签订后 <strong>30</strong> 个工作日内，将合同款项全额汇入乙方指定账户。
+                                                              </p>
+                                                          </div>
+                                                          <div className="mb-3">
+                                                              <h2 className="text-xs font-bold text-gray-900 dark:text-white mb-1">第三条　交付与验收</h2>
+                                                              <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-6">
+                                                                  乙方在收到全额货款后，通过电子方式向甲方交付产品授权码及安装介质，甲方应在 <strong>5</strong> 个工作日内签署验收确认书。
+                                                              </p>
+                                                          </div>
+                                                          <div className="w-full h-px bg-gray-200 dark:bg-white/10 my-4" />
+                                                          <div className="grid grid-cols-2 gap-6 text-[11px] text-gray-600 dark:text-gray-400">
+                                                              <div className="space-y-2">
+                                                                  <p className="font-bold text-gray-800 dark:text-gray-200">甲方（盖章）</p>
+                                                                  <p>{c.partyA || selectedOrder.customerName}</p>
+                                                                  <div className="w-20 h-20 rounded-full border-2 border-red-300 dark:border-red-800/50 flex items-center justify-center mt-1 opacity-50">
+                                                                      <div className="text-[8px] text-red-400 font-bold text-center">合同专用章</div>
+                                                                  </div>
+                                                                  {c.signDate && <p className="text-[10px]">签约：{c.signDate}</p>}
+                                                              </div>
+                                                              <div className="space-y-2">
+                                                                  <p className="font-bold text-gray-800 dark:text-gray-200">乙方（盖章）</p>
+                                                                  <p>{c.partyB || '北京金山办公软件股份有限公司'}</p>
+                                                                  <div className="w-20 h-20 rounded-full border-2 border-red-300 dark:border-red-800/50 flex items-center justify-center mt-1 opacity-50">
+                                                                      <div className="text-[8px] text-red-400 font-bold text-center">合同专用章</div>
+                                                                  </div>
+                                                                  {c.signDate && <p className="text-[10px]">签约：{c.signDate}</p>}
+                                                              </div>
+                                                          </div>
+                                                      </div>
+                                                  </div>
+                                              </div>
+                                          </div>
+                                          )}
+                                      </div>
+                                      );
+                                  })}
+                              </div>
                           );
                       })()}
                   </div>
@@ -1765,7 +1935,7 @@ const OrderDetails: React.FC = () => {
                                           type="number"
                                           className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none font-bold focus:ring-2 focus:ring-red-100 dark:text-white"
                                           value={refundAmount}
-                                          onChange={e => setRefundAmount(Math.min(Number(e.target.value), selectedOrder.total))}
+                                          onChange={e => { const v = Number(e.target.value); setRefundAmount(isNaN(v) ? 0 : Math.min(Math.max(v, 0), selectedOrder.total)); }}
                                       />
                                   </div>
                               </div>

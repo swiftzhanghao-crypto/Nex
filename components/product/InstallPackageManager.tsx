@@ -91,7 +91,7 @@ const InstallPackageManager: React.FC = () => {
   const [appliedCpu, setAppliedCpu] = useState('');
   const [appliedPlatform, setAppliedPlatform] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20);
   const [pageSizeOpen, setPageSizeOpen] = useState(false);
   const [rows, setRows] = useState<PkgRow[]>(ALL_ROWS);
 

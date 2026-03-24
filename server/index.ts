@@ -8,6 +8,8 @@ import orderRoutes from './routes/orders.ts';
 import customerRoutes from './routes/customers.ts';
 import productRoutes from './routes/products.ts';
 import financeRoutes from './routes/finance.ts';
+import channelRoutes from './routes/channels.ts';
+import opportunityRoutes from './routes/opportunities.ts';
 
 const PORT = parseInt(process.env.PORT || '3001');
 const app = express();
@@ -15,42 +17,56 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// Request logging
 app.use((req, _res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
 
-// Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/finance', financeRoutes);
+app.use('/api/channels', channelRoutes);
+app.use('/api/opportunities', opportunityRoutes);
 
-// Initialize database and seed data
+app.use(((err: any, _req: any, res: any, _next: any) => {
+  console.error(`[error] ${err.message}`);
+  if (err.code?.startsWith('SQLITE_')) {
+    const msg = err.code === 'SQLITE_CONSTRAINT_FOREIGNKEY' ? '关联数据不存在，请检查外键引用'
+      : err.code === 'SQLITE_CONSTRAINT_UNIQUE' ? '数据重复，违反唯一约束'
+      : `数据库错误: ${err.message}`;
+    res.status(400).json({ error: msg });
+    return;
+  }
+  res.status(500).json({ error: '服务器内部错误' });
+}) as any);
+
 initSchema();
 seedDatabase();
 
 app.listen(PORT, () => {
-  console.log(`\n  🚀 API Server running at http://localhost:${PORT}`);
-  console.log(`  📖 Endpoints:`);
+  console.log(`\n  API Server running at http://localhost:${PORT}`);
+  console.log(`  Endpoints:`);
   console.log(`     POST   /api/auth/login`);
   console.log(`     GET    /api/auth/me`);
-  console.log(`     GET    /api/users`);
-  console.log(`     GET    /api/orders`);
-  console.log(`     POST   /api/orders`);
-  console.log(`     GET    /api/customers`);
-  console.log(`     POST   /api/customers`);
-  console.log(`     GET    /api/products`);
-  console.log(`     GET    /api/finance/contracts`);
-  console.log(`     GET    /api/finance/remittances`);
-  console.log(`     GET    /api/finance/invoices`);
+  console.log(`     CRUD   /api/users`);
+  console.log(`     CRUD   /api/orders          + POST /:id/approve, POST /:id/submit`);
+  console.log(`     CRUD   /api/customers`);
+  console.log(`     CRUD   /api/products`);
+  console.log(`     CRUD   /api/channels`);
+  console.log(`     CRUD   /api/opportunities`);
+  console.log(`     CRUD   /api/finance/contracts`);
+  console.log(`     CRUD   /api/finance/remittances`);
+  console.log(`     CRUD   /api/finance/invoices`);
+  console.log(`     GET    /api/finance/performances`);
+  console.log(`     GET    /api/finance/authorizations`);
+  console.log(`     GET    /api/finance/delivery-infos`);
+  console.log(`     GET    /api/finance/audit-logs`);
   console.log(`\n  Default login: any user email + password "123456"\n`);
 });

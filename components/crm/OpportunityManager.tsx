@@ -38,7 +38,7 @@ const OpportunityManager: React.FC = () => {
   return (
     <div className="p-4 lg:p-6 max-w-[2400px] mx-auto animate-page-enter pb-2 h-full flex flex-col">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">商机管理</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">商机信息</h1>
             <div className="flex items-center gap-3 w-full md:w-auto justify-end">
                 <div className="flex items-stretch h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] w-full sm:w-[320px] focus-within:border-blue-400 dark:focus-within:border-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)] transition shadow-apple">
                     <div className="relative flex-1 flex items-center min-w-0">
@@ -68,7 +68,7 @@ const OpportunityManager: React.FC = () => {
                             <th className="pl-6 pr-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">商机编号</th>
                             <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">商机名称</th>
                             <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">客户名称</th>
-                            <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">产品类型/授权方式</th>
+                            <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">产品信息</th>
                             <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">商机阶段</th>
                             <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">商机所属部门</th>
                             <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">商机金额</th>
@@ -87,8 +87,25 @@ const OpportunityManager: React.FC = () => {
                                     <div className="font-medium text-gray-900 dark:text-white leading-snug">{opp.name}</div>
                                 </td>
                                 <td className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">{opp.customerName}</td>
-                                <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-[220px]">
-                                    <div className="line-clamp-2">{opp.productType || <span className="text-gray-300 dark:text-gray-600">—</span>}</div>
+                                <td className="px-4 py-3 max-w-[260px]">
+                                    {opp.products && opp.products.length > 0 ? (
+                                    <div className="flex flex-col gap-1.5">
+                                        {opp.products.slice(0, 1).map((p, idx) => (
+                                            <div key={idx} className="flex flex-col">
+                                                <div className="truncate font-medium text-gray-700 dark:text-gray-300" title={p.productName}>{p.productName}</div>
+                                                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                                    {p.skuName && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">{p.skuName}</span>}
+                                                    {p.licenseType && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg">{p.licenseType}</span>}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {opp.products.length > 1 && (
+                                            <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">+{opp.products.length - 1} 个产品</span>
+                                        )}
+                                    </div>
+                                    ) : (
+                                        <span className="text-gray-300 dark:text-gray-600">—</span>
+                                    )}
                                 </td>
                                 <td className="px-4 py-3 whitespace-nowrap">
                                     <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold whitespace-nowrap ${getStageColor(opp.stage)}`}>{opp.stage}</span>

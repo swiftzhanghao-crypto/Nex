@@ -5,7 +5,7 @@ import type {
     RightPackage, LicenseTypeDefinition, Customer, Opportunity, Order,
     User, Department, RoleDefinition, Channel, Enterprise,
     Contract, Remittance, Invoice, Performance, Authorization, DeliveryInfo,
-    Project, OrderDraft,
+    OrderDraft,
 } from '../types';
 
 import {
@@ -87,9 +87,6 @@ interface AppContextType {
     authorizations: Authorization[];
     deliveryInfos: DeliveryInfo[];
 
-    projects: Project[];
-    setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
-
     refreshOrders: () => Promise<void>;
     refreshCustomers: () => Promise<void>;
 }
@@ -137,9 +134,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [authorizations] = useState<Authorization[]>(() => generateAuthorizations());
     const [deliveryInfos] = useState<DeliveryInfo[]>(() => generateDeliveryInfos());
 
-    // --- Project domain ---
-    const [projects, setProjects] = useState<Project[]>([]);
-
     // --- API data fetching ---
     const refreshOrders = useCallback(async () => {
         if (!USE_API) return;
@@ -162,7 +156,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         const token = getToken();
         if (!token) {
-            console.log('[API] No auth token, using mock data as fallback');
+            console.log('[API] No auth token, falling back to mock data');
+            setCustomers(mockCustomers);
+            setOpportunities(mockOpportunities);
+            setContracts(mockContracts);
+            setOrders(mockOrders);
             return;
         }
 
@@ -234,8 +232,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         performances,
         authorizations,
         deliveryInfos,
-
-        projects, setProjects,
 
         refreshOrders,
         refreshCustomers,

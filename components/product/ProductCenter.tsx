@@ -121,22 +121,10 @@ const ProductCenter: React.FC = () => {
       {/* ── Top Bar: title + controls (OrderManager style) ─────── */}
       <div className="px-6 pt-6 pb-4 shrink-0 flex items-center justify-between gap-4">
 
-        {/* Title + view switch */}
+        {/* Title */}
         <div className="flex items-center gap-4 shrink-0">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">
-            {mainView === 'catalog' ? '产品目录' : '安装包管理'}
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">产品目录</h1>
           <a href="https://365.kdocs.cn/latest" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline shrink-0"><FileText className="w-3.5 h-3.5" />使用说明</a>
-          {/* View switch */}
-          <div className="relative flex items-center bg-gray-100 dark:bg-white/5 rounded-full p-0.5 border border-gray-200/60 dark:border-white/10">
-            <div className={`absolute top-0.5 bottom-0.5 left-0.5 w-[calc(50%-2px)] rounded-full bg-[#0071E3] dark:bg-[#0A84FF] shadow-sm transition-transform duration-300 ease-in-out ${mainView === 'packages' ? 'translate-x-full' : 'translate-x-0'}`} />
-            {([{ id: 'catalog', label: '产品目录', icon: Package }, { id: 'packages', label: '安装包管理', icon: HardDrive }] as const).map(v => (
-              <button key={v.id} onClick={() => setMainView(v.id)}
-                className={`relative z-10 flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold rounded-full transition-colors duration-300 whitespace-nowrap ${mainView === v.id ? 'text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
-                <v.icon className="w-3.5 h-3.5" />{v.label}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Right controls */}

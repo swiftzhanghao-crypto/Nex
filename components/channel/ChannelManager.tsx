@@ -53,7 +53,6 @@ const ChannelManager: React.FC = () => {
             <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E] sticky top-0 z-10">
               <tr>
                 <th className="pl-6 pr-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">渠道编号</th>
-                <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E] w-[48px]"></th>
                 <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">渠道名称</th>
                 <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">所在省份</th>
                 <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">最新签约情况</th>
@@ -65,16 +64,15 @@ const ChannelManager: React.FC = () => {
               {currentChannels.map(channel => (
                 <tr
                   key={channel.id}
-                  className="group hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors cursor-pointer"
-                  onClick={() => navigate(`/channels/${channel.id}`)}
+                  className="group hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors"
                 >
-                  <td className="pl-6 pr-4 py-3 text-sm font-mono font-bold text-gray-900 dark:text-white whitespace-nowrap">
-                    {channel.id}
-                  </td>
-                  <td className="px-4 py-3 w-[48px]">
-                    <div className="w-7 h-7 rounded-md bg-gray-100 dark:bg-white/10 flex items-center justify-center text-gray-400 dark:text-gray-500 text-xs font-bold">
-                      {channel.name.charAt(0)}
-                    </div>
+                  <td className="pl-6 pr-4 py-3 text-sm font-mono font-bold whitespace-nowrap">
+                    <button
+                      onClick={() => navigate(`/channels/${channel.id}`)}
+                      className="text-[#0071E3] dark:text-[#0A84FF] hover:underline cursor-pointer"
+                    >
+                      {channel.id}
+                    </button>
                   </td>
                   <td className="px-4 py-3">
                     <span className="font-medium text-gray-900 dark:text-white">{channel.name}</span>

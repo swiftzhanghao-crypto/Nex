@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Activity } from 'lucide-react';
 import { AppProvider } from './contexts/AppContext';
 import Layout from './components/layout/Layout';
 import ProductManager from './components/product/ProductManager';
@@ -30,8 +29,6 @@ import DeliveryInfoManager from './components/order/DeliveryInfoManager';
 import OperationsManager from './components/operations/OperationsManager';
 import OpsEnterpriseManager from './components/operations/OpsEnterpriseManager';
 import OpsDashboard from './components/operations/OpsDashboard';
-import ProjectManager from './components/project/ProjectManager';
-import ProjectDetails from './components/project/ProjectDetails';
 import ProductComponentPoolManager from './components/product/ProductComponentPoolManager';
 import ProductPackageManager from './components/product/ProductPackageManager';
 import ProductLicenseTemplateManager from './components/product/ProductLicenseTemplateManager';
@@ -85,10 +82,6 @@ function AppRoutes() {
         {/* 产品报价子路由 */}
         <Route path="/product-pricing/msrp" element={<ProductMsrpManager />} />
         <Route path="/product-pricing/channel" element={<ProductChannelPriceManager />} />
-
-        {/* 项目管理 */}
-        <Route path="/projects" element={<ProjectManager />} />
-        <Route path="/projects/:id" element={<ProjectDetails />} />
 
         {/* 运营中心 */}
         <Route path="/wps-ops" element={<OperationsManager />} />

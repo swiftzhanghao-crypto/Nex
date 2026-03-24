@@ -100,10 +100,14 @@ export function seedDatabase() {
       o.expectedRevenue, o.finalUserRevenue ?? null, o.closeDate, o.ownerId, o.ownerName, o.createdAt);
   }
 
+  // --- Contracts (generated, needed by orders) ---
+  const contracts = generateContracts(customers);
+
   // --- Orders (generated) ---
   const orders = generateOrders({
     customers, products: initialProducts, users: initialUsers,
     merchandises: initialMerchandises, opportunities, channels: initialChannels,
+    contracts,
   });
   const insertOrder = db.prepare(`
     INSERT INTO orders (id, customer_id, customer_name, customer_type, customer_level, customer_industry, customer_region, date, status, total, items, source, buyer_type, buyer_name, buyer_id, shipping_address, delivery_method, is_paid, payment_date, payment_method, payment_terms, payment_record, approval, approval_records, sales_rep_id, sales_rep_name, biz_manager_id, biz_manager_name, invoice_info, acceptance_info, acceptance_config, opportunity_id, opportunity_name, original_order_id, refund_reason, refund_amount, extra)
@@ -138,8 +142,7 @@ export function seedDatabase() {
       o.refundReason ?? null, o.refundAmount ?? null, extra);
   }
 
-  // --- Contracts ---
-  const contracts = generateContracts(customers);
+  // --- Contracts (insert) ---
   const insertContract = db.prepare(`INSERT INTO contracts (id, code, name, external_code, contract_type, party_a, party_b, verify_status, verify_remark, amount, sign_date, order_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   for (const c of contracts) {
     insertContract.run(c.id, c.code, c.name, c.externalCode ?? null, c.contractType, c.partyA ?? null, c.partyB ?? null, c.verifyStatus, c.verifyRemark ?? null, c.amount ?? null, c.signDate ?? null, c.orderId ?? null, c.createdAt);
@@ -159,5 +162,46 @@ export function seedDatabase() {
     insertInv.run(i.id, i.invoiceTitle, i.amount, i.applyTime, i.applyType, i.status, i.orderId ?? null, i.taxId ?? null, i.remark ?? null);
   }
 
-  console.log(`[seed] Done. Users: ${initialUsers.length}, Customers: ${customers.length}, Orders: ${orders.length}, Products: ${initialProducts.length}`);
+  // --- Performances ---
+  const performances = generatePerformances();
+  const insertPerf = db.prepare(`
+    INSERT INTO performances (id, order_id, acceptance_detail_id, order_status, detail_amount_subtotal, acceptance_ratio, deferral_ratio, post_contract_status, discount, cost_amount, sales_performance, weighted_sales_performance, project_weight_coeff, product_weight_coeff_sub, product_weight_coeff_auth, service_type, owner)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const p of performances) {
+    insertPerf.run(p.id, p.orderId, p.acceptanceDetailId, p.orderStatus,
+      p.detailAmountSubtotal, p.acceptanceRatio, p.deferralRatio,
+      p.postContractStatus, p.discount, p.costAmount,
+      p.salesPerformance, p.weightedSalesPerformance,
+      p.projectWeightCoeff, p.productWeightCoeffSubscription,
+      p.productWeightCoeffAuthorization, p.serviceType, p.owner);
+  }
+
+  // --- Authorizations ---
+  const authorizations = generateAuthorizations();
+  const insertAuth = db.prepare(`
+    INSERT INTO authorizations (id, auth_code, order_id, licensee, customer_name, customer_id, product_name, product_code, auth_start_date, auth_end_date, service_start_date, service_end_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const a of authorizations) {
+    insertAuth.run(a.id, a.authCode, a.orderId, a.licensee, a.customerName, a.customerId,
+      a.productName, a.productCode, a.authStartDate, a.authEndDate,
+      a.serviceStartDate ?? null, a.serviceEndDate ?? null);
+  }
+
+  // --- DeliveryInfos ---
+  const deliveryInfos = generateDeliveryInfos();
+  const insertDI = db.prepare(`
+    INSERT INTO delivery_infos (id, delivery_type, order_id, quantity, auth_type, licensee, customer_name, customer_id, auth_code, auth_duration, auth_start_date, auth_end_date, service_start_date, service_end_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const d of deliveryInfos) {
+    insertDI.run(d.id, d.deliveryType, d.orderId, d.quantity, d.authType,
+      d.licensee, d.customerName, d.customerId,
+      d.authCode ?? null, d.authDuration ?? null,
+      d.authStartDate ?? null, d.authEndDate ?? null,
+      d.serviceStartDate ?? null, d.serviceEndDate ?? null);
+  }
+
+  console.log(`[seed] Done. Users: ${initialUsers.length}, Customers: ${customers.length}, Orders: ${orders.length}, Products: ${initialProducts.length}, Performances: ${performances.length}, Authorizations: ${authorizations.length}, DeliveryInfos: ${deliveryInfos.length}`);
 }

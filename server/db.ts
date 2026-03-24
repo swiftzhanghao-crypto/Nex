@@ -181,6 +181,7 @@ export function initSchema() {
       amount          REAL,
       sign_date       TEXT,
       order_id        TEXT,
+      customer_id     TEXT,
       created_at      TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -210,6 +211,58 @@ export function initSchema() {
       remark        TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS performances (
+      id                        TEXT PRIMARY KEY,
+      order_id                  TEXT NOT NULL,
+      acceptance_detail_id      TEXT NOT NULL,
+      order_status              TEXT NOT NULL,
+      detail_amount_subtotal    REAL NOT NULL DEFAULT 0,
+      acceptance_ratio          REAL NOT NULL DEFAULT 100,
+      deferral_ratio            REAL NOT NULL DEFAULT 0,
+      post_contract_status      TEXT NOT NULL DEFAULT '不适用',
+      discount                  TEXT NOT NULL DEFAULT '-',
+      cost_amount               REAL NOT NULL DEFAULT 0,
+      sales_performance         REAL NOT NULL DEFAULT 0,
+      weighted_sales_performance REAL NOT NULL DEFAULT 0,
+      project_weight_coeff      REAL NOT NULL DEFAULT 1,
+      product_weight_coeff_sub  REAL NOT NULL DEFAULT 1,
+      product_weight_coeff_auth REAL NOT NULL DEFAULT 1,
+      service_type              TEXT NOT NULL DEFAULT '授权',
+      owner                     TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS authorizations (
+      id                  TEXT PRIMARY KEY,
+      auth_code           TEXT NOT NULL,
+      order_id            TEXT NOT NULL,
+      licensee            TEXT NOT NULL,
+      customer_name       TEXT NOT NULL,
+      customer_id         TEXT NOT NULL,
+      product_name        TEXT NOT NULL,
+      product_code        TEXT NOT NULL,
+      auth_start_date     TEXT NOT NULL,
+      auth_end_date       TEXT NOT NULL,
+      service_start_date  TEXT,
+      service_end_date    TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS delivery_infos (
+      id                  TEXT PRIMARY KEY,
+      delivery_type       TEXT NOT NULL,
+      order_id            TEXT NOT NULL,
+      quantity            INTEGER NOT NULL DEFAULT 0,
+      auth_type           TEXT NOT NULL,
+      licensee            TEXT NOT NULL,
+      customer_name       TEXT NOT NULL,
+      customer_id         TEXT NOT NULL,
+      auth_code           TEXT,
+      auth_duration       TEXT,
+      auth_start_date     TEXT,
+      auth_end_date       TEXT,
+      service_start_date  TEXT,
+      service_end_date    TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS audit_logs (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id     TEXT NOT NULL,
@@ -227,5 +280,13 @@ export function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_orders_date     ON orders(date);
     CREATE INDEX IF NOT EXISTS idx_customers_type  ON customers(customer_type);
     CREATE INDEX IF NOT EXISTS idx_audit_resource  ON audit_logs(resource, resource_id);
+    CREATE INDEX IF NOT EXISTS idx_contracts_order  ON contracts(order_id);
+    CREATE INDEX IF NOT EXISTS idx_contracts_status ON contracts(verify_status);
+    CREATE INDEX IF NOT EXISTS idx_opportunities_customer ON opportunities(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_opportunities_stage    ON opportunities(stage);
+    CREATE INDEX IF NOT EXISTS idx_performances_order     ON performances(order_id);
+    CREATE INDEX IF NOT EXISTS idx_authorizations_customer ON authorizations(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_delivery_customer      ON delivery_infos(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_invoices_order         ON invoices(order_id);
   `);
 }

@@ -13,28 +13,17 @@ const CustomerDetails: React.FC = () => {
 
   const customer = customers.find(c => c.id === id);
 
-  if (!customer) {
-    return (
-      <div className="flex flex-col items-center justify-center h-96 space-y-4">
-        <div className="text-gray-400 text-lg">未找到客户信息</div>
-        <button onClick={() => navigate('/customers')} className="text-[#0071E3] hover:underline flex items-center gap-2">
-          <ArrowLeft className="w-4 h-4" /> 返回客户列表
-        </button>
-      </div>
-    );
-  }
-
   const roleLabel = (r: string) =>
       r === 'Purchasing' ? '采购' : r === 'IT' ? 'IT' : r === 'Finance' ? '财务' : r === 'Management' ? '管理' : '其他';
 
-  const [activeTab, setActiveTab] = useState<'info' | 'org' | 'contacts' | 'address' | 'invoice'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'org' | 'contacts' | 'address' | 'invoice' | 'bank'>('info');
 
   interface ShippingAddress {
       id: string; receiver: string; country: string; province: string; city: string;
       detail: string; phone: string; email: string; creator: string;
   }
   const [addresses, setAddresses] = useState<ShippingAddress[]>(() => [
-      { id: 'addr-1', receiver: '陈经理', country: '中国', province: customer.province || '北京市', city: customer.city || customer.region || '北京市', detail: customer.address || '高新区科技路100号', phone: customer.contacts[0]?.phone || '13900001000', email: customer.contacts[0]?.email || '', creator: customer.ownerName || '系统' },
+      { id: 'addr-1', receiver: '陈经理', country: '中国', province: customer?.province || '北京市', city: customer?.city || customer?.region || '北京市', detail: customer?.address || '高新区科技路100号', phone: customer?.contacts[0]?.phone || '13900001000', email: customer?.contacts[0]?.email || '', creator: customer?.ownerName || '系统' },
   ]);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [isEditingAddress, setIsEditingAddress] = useState(false);
@@ -93,7 +82,7 @@ const CustomerDetails: React.FC = () => {
 
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [invoiceFormTouched, setInvoiceFormTouched] = useState(false);
-  const emptyInvoice = { invoiceType: '增值税专用发票' as '增值税普通发票' | '增值税专用发票', title: customer.companyName, taxId: '', registerAddress: '', registerPhone: '', accountNumber: '', bankName: '' };
+  const emptyInvoice = { invoiceType: '增值税专用发票' as '增值税普通发票' | '增值税专用发票', title: customer?.companyName || '', taxId: '', registerAddress: '', registerPhone: '', accountNumber: '', bankName: '' };
   const [invoiceForm, setInvoiceForm] = useState(emptyInvoice);
   const handleSaveInvoice = () => {
       setInvoiceFormTouched(true);
@@ -104,6 +93,48 @@ const CustomerDetails: React.FC = () => {
       setIsInvoiceModalOpen(false);
       setInvoiceFormTouched(false);
   };
+
+  interface BankAccount { id: string; accountName: string; bankName: string; accountNumber: string; }
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(() => {
+    if (!customer) return [];
+    const banks = ['中国工商银行', '中国建设银行', '中国农业银行', '中国银行', '交通银行', '招商银行', '中信银行', '浦发银行', '民生银行', '兴业银行', '光大银行', '平安银行', '华夏银行', '广发银行', '北京银行'];
+    const branches = ['海淀支行', '朝阳支行', '浦东支行', '南山支行', '天河支行', '武侯支行', '江干支行', '鼓楼支行', '雨花台支行', '高新支行', '滨海支行', '金水支行', '洪山支行', '雁塔支行', '城关支行'];
+    const idx = parseInt(customer.id.replace(/\D/g, '')) || 0;
+    const hash = (s: number) => ((s * 2654435761) >>> 0);
+    const count = (idx % 3) + 1;
+    return Array.from({ length: count }).map((_, i) => {
+      const h = hash(idx * 100 + i);
+      const bankIdx = h % banks.length;
+      const branchIdx = (h >>> 8) % branches.length;
+      const acctNum = String(6222000000000000n + BigInt(h % 9000000000) + BigInt(1000000000));
+      return {
+        id: `bank-${idx}-${i}`,
+        accountName: customer.companyName,
+        bankName: `${banks[bankIdx]}${branches[branchIdx]}`,
+        accountNumber: acctNum,
+      };
+    });
+  });
+  const [isBankModalOpen, setIsBankModalOpen] = useState(false);
+  const emptyBank: Omit<BankAccount, 'id'> = { accountName: customer?.companyName || '', bankName: '', accountNumber: '' };
+  const [bankForm, setBankForm] = useState(emptyBank);
+  const [bankFormTouched, setBankFormTouched] = useState(false);
+  const [editingBankId, setEditingBankId] = useState<string | null>(null);
+  const openAddBank = () => { setBankForm({ ...emptyBank }); setBankFormTouched(false); setEditingBankId(null); setIsBankModalOpen(true); };
+  const openEditBank = (b: BankAccount) => { setBankForm({ accountName: b.accountName, bankName: b.bankName, accountNumber: b.accountNumber }); setBankFormTouched(false); setEditingBankId(b.id); setIsBankModalOpen(true); };
+  const handleSaveBank = () => {
+      setBankFormTouched(true);
+      if (!bankForm.bankName || !bankForm.accountNumber) return;
+      if (editingBankId) {
+          setBankAccounts(prev => prev.map(b => b.id === editingBankId ? { ...b, ...bankForm } : b));
+      } else {
+          setBankAccounts(prev => [...prev, { ...bankForm, id: `bank-${Date.now()}` }]);
+      }
+      setIsBankModalOpen(false);
+      setBankFormTouched(false);
+      setEditingBankId(null);
+  };
+  const handleDeleteBank = (bid: string) => { setBankAccounts(prev => prev.filter(b => b.id !== bid)); };
 
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [isEditingContact, setIsEditingContact] = useState(false);
@@ -144,6 +175,17 @@ const CustomerDetails: React.FC = () => {
       setIsContactModalOpen(false);
   };
 
+  if (!customer) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 space-y-4">
+        <div className="text-gray-400 text-lg">未找到客户信息</div>
+        <button onClick={() => navigate('/customers')} className="text-[#0071E3] hover:underline flex items-center gap-2">
+          <ArrowLeft className="w-4 h-4" /> 返回客户列表
+        </button>
+      </div>
+    );
+  }
+
   const ownerUser = users.find(u => u.id === customer.ownerId);
 
   const levelColors: Record<string, string> = {
@@ -179,6 +221,7 @@ const CustomerDetails: React.FC = () => {
                   { id: 'contacts' as const, label: '联系人信息' },
                   { id: 'address' as const, label: '收货地址' },
                   { id: 'invoice' as const, label: '发票信息' },
+                  { id: 'bank' as const, label: '银行账号' },
               ]).map(tab => (
                   <button
                       key={tab.id}
@@ -675,6 +718,110 @@ const CustomerDetails: React.FC = () => {
               )}
           </div>
       </div>
+      )}
+
+      {/* ── Tab: 银行账号 ── */}
+      {activeTab === 'bank' && (
+      <div className="space-y-4">
+          <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-[#0071E3]" />
+                  <span className="text-base font-bold text-gray-800 dark:text-white">银行账号</span>
+              </div>
+              <button
+                  onClick={openAddBank}
+                  className="flex items-center gap-1.5 bg-[#0071E3] text-white text-xs px-3.5 py-2 rounded-xl hover:bg-blue-700 transition"
+              >
+                  <Plus className="w-3.5 h-3.5" /> 添加银行账号
+              </button>
+          </div>
+          {bankAccounts.length === 0 ? (
+              <div className="unified-card dark:bg-[#1C1C1E] p-10 text-center text-sm text-gray-400 dark:text-gray-500">暂无银行账号，点击右上角"添加银行账号"。</div>
+          ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {bankAccounts.map(b => (
+              <div key={b.id} className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden self-start">
+                  <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-[#0071E3]" /> 银行账户
+                      </h4>
+                      <div className="flex items-center gap-2">
+                          <button onClick={() => openEditBank(b)} className="text-xs text-[#0071E3] dark:text-[#0A84FF] hover:underline font-medium">编辑</button>
+                          <button onClick={() => handleDeleteBank(b.id)} className="text-xs text-red-500 hover:underline font-medium">删除</button>
+                      </div>
+                  </div>
+                  <div className="divide-y divide-gray-100/80 dark:divide-white/5">
+                      {[
+                          { label: '账户名称', value: b.accountName },
+                          { label: '开户银行', value: b.bankName },
+                          { label: '银行账号', value: b.accountNumber, mono: true },
+                      ].map((item, idx) => (
+                          <div key={idx} className="px-5 py-3.5">
+                              <div className="text-sm text-gray-400 dark:text-gray-500 mb-1">{item.label}</div>
+                              <div className={`text-sm text-gray-900 dark:text-white ${item.mono ? 'font-mono' : ''}`}>{item.value}</div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+              ))}
+          </div>
+          )}
+      </div>
+      )}
+
+      {/* ── 添加银行账号弹窗 ── */}
+      {isBankModalOpen && (
+          <ModalPortal>
+              <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div className="bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-md animate-modal-enter overflow-hidden">
+                      <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 dark:border-white/10">
+                          <button onClick={() => setIsBankModalOpen(false)} className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 hover:text-gray-600 transition">
+                              <ArrowLeft className="w-4 h-4" />
+                          </button>
+                          <h3 className="text-base font-bold text-gray-900 dark:text-white">{editingBankId ? '编辑银行账号' : '添加银行账号'}</h3>
+                      </div>
+                      <div className="px-5 py-4 space-y-4">
+                          <div>
+                              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">账户名称：</label>
+                              <input
+                                  value={bankForm.accountName}
+                                  readOnly
+                                  className="w-full border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/5 rounded-xl p-2.5 text-sm text-gray-500 dark:text-gray-400 outline-none cursor-not-allowed"
+                              />
+                          </div>
+                          {[
+                              { label: '开户银行', key: 'bankName' as const, placeholder: '请输入开户银行名称' },
+                              { label: '银行账号', key: 'accountNumber' as const, placeholder: '请输入银行账号' },
+                          ].map(f => {
+                              const val = bankForm[f.key];
+                              const invalid = bankFormTouched && !val;
+                              return (
+                                  <div key={f.key}>
+                                      <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">
+                                          <span className="text-red-500 mr-0.5">*</span>{f.label}：
+                                      </label>
+                                      <input
+                                          value={val}
+                                          onChange={e => setBankForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                                          placeholder={f.placeholder}
+                                          className={`w-full border rounded-xl p-2.5 text-sm outline-none transition bg-white dark:bg-white/5 dark:text-white ${invalid ? 'border-red-400 focus:border-red-500' : 'border-gray-200 dark:border-white/10 focus:border-[#0071E3]'}`}
+                                      />
+                                      {invalid && <p className="text-xs text-red-500 mt-1">必填字段</p>}
+                                  </div>
+                              );
+                          })}
+                      </div>
+                      <div className="px-5 py-4 border-t border-gray-100 dark:border-white/10">
+                          <button
+                              onClick={handleSaveBank}
+                              className="w-28 bg-[#0071E3] text-white py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 transition"
+                          >
+                              确定
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </ModalPortal>
       )}
 
       {/* ── 添加发票信息弹窗 ── */}

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db.ts';
-import { authMiddleware } from '../auth.ts';
+import { authMiddleware, requireRole, type AuthRequest } from '../auth.ts';
 
 const router = Router();
 router.use(authMiddleware);
@@ -38,6 +38,27 @@ router.get('/:id', (req, res) => {
   res.json(toProduct(row));
 });
 
+router.post('/', requireRole('Admin', 'ProductManager'), (req: AuthRequest, res) => {
+  const db = getDb();
+  const p = req.body;
+  const id = p.id || `PROD-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+  db.prepare(`
+    INSERT INTO products (id, name, category, sub_category, description, status, tags, skus, composition, install_pkgs, package_id, rights, license_tpl)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, p.name, p.category, p.subCategory ?? null, p.description ?? null,
+    p.status || 'OnShelf', JSON.stringify(p.tags || []), JSON.stringify(p.skus || []),
+    JSON.stringify(p.composition || []), JSON.stringify(p.installPackages || []),
+    p.packageId ?? null, JSON.stringify(p.rights || []),
+    p.licenseTemplate ? JSON.stringify(p.licenseTemplate) : null);
+
+  db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(req.user!.userId, '', 'CREATE', 'Product', id, `创建产品 ${p.name}`);
+
+  const row = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
+  res.status(201).json(toProduct(row));
+});
+
 router.put('/:id', (req, res) => {
   const db = getDb();
   const p = req.body;
@@ -55,7 +76,17 @@ router.put('/:id', (req, res) => {
   res.json(toProduct(row));
 });
 
-// --- Channels ---
+router.delete('/:id', requireRole('Admin', 'ProductManager'), (req: AuthRequest, res) => {
+  const db = getDb();
+  const { changes } = db.prepare('DELETE FROM products WHERE id = ?').run(req.params.id);
+  if (!changes) { res.status(404).json({ error: '产品不存在' }); return; }
+
+  db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(req.user!.userId, '', 'DELETE', 'Product', req.params.id, `删除产品 ${req.params.id}`);
+  res.json({ ok: true });
+});
+
+// --- Legacy meta endpoints (kept for backward compatibility) ---
 router.get('/meta/channels', (_req, res) => {
   const rows = getDb().prepare('SELECT * FROM channels ORDER BY name').all() as any[];
   res.json(rows.map(r => ({
@@ -66,7 +97,6 @@ router.get('/meta/channels', (_req, res) => {
   })));
 });
 
-// --- Opportunities ---
 router.get('/meta/opportunities', (_req, res) => {
   const rows = getDb().prepare('SELECT * FROM opportunities ORDER BY close_date DESC').all() as any[];
   res.json(rows.map(r => ({

@@ -1,11 +1,15 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Order, OrderStatus, OrderItem, User, ApprovalRecord, OrderSource, OrderDraft } from '../../types';
 import { Search, Plus, Trash2, Disc, CheckCircle, FileText, CreditCard, Truck, X, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, FileCheck, CheckSquare, Package, Settings, Filter, ChevronDown, Calendar, Shield, RotateCcw, Save, ChevronRight, Copy, Check } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import OrderCreateWizard from './OrderCreateWizard';
+import StatusFilterCard from './StatusFilterCard';
+import DeleteConfirmModal from './DeleteConfirmModal';
+import ColumnConfigModal from './ColumnConfigModal';
+import UserDetailsDrawer from './UserDetailsDrawer';
 import { useAppContext } from '../../contexts/AppContext';
 
 type FilterMode = '单选' | '多选' | '时间段' | '时间点' | '金额范围';
@@ -319,6 +323,43 @@ const OrderManager: React.FC = () => {
       });
   };
 
+  const [tableCopied, setTableCopied] = useState(false);
+  const handleCopyTable = () => {
+      const cols = allColumns.filter(c => visibleColumns.includes(c.id) && c.id !== 'action');
+      const header = cols.map(c => c.label).join('\t');
+      const statusMap: Record<string, string> = { DRAFT: '草稿', PENDING_CONFIRM: '待确认', CONFIRMED: '已确认', PENDING_SHIPMENT: '待发货', SHIPPED: '已发货', DELIVERED: '已交付', COMPLETED: '已完成', CANCELLED: '已取消', REFUNDED: '已退款', EXCEPTION: '异常' };
+      const buyerTypeMap: Record<string, string> = { Customer: '客户直签', Channel: '渠道代理', SelfDeal: '自主成交', RedeemCode: '兑换码' };
+      const rows = currentOrders.map(o => cols.map(col => {
+          switch (col.id) {
+              case 'id': return o.id;
+              case 'customer': return o.customerName;
+              case 'buyer': return o.buyerName || o.customerName;
+              case 'products': return o.items.map(it => `${it.productName}${it.skuName ? '/' + it.skuName : ''}${it.licenseType ? '/' + it.licenseType : ''} ×${it.quantity}`).join('; ');
+              case 'sales': return o.salesRepName || '-';
+              case 'businessManager': return o.businessManagerName || '-';
+              case 'department': { const u = users.find(uu => uu.id === o.salesRepId); return getDepartmentPath(u?.departmentId); }
+              case 'source': return o.source || '-';
+              case 'buyerType': return buyerTypeMap[o.buyerType || ''] || '客户直签';
+              case 'date': return new Date(o.date).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+              case 'status': return statusMap[o.status] || o.status;
+              case 'paymentStatus': return o.isPaid ? '已付款' : '未付款';
+              case 'stockStatus': return o.status === OrderStatus.SHIPPED || o.status === OrderStatus.DELIVERED ? '已发货' : '待备货';
+              case 'total': return o.total.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              case 'payment': return o.paymentMethod || '-';
+              case 'delivery': return o.deliveryMethod || '-';
+              case 'address': return o.shippingAddress || '-';
+              case 'invoice': return o.invoiceInfo?.title || '-';
+              case 'opportunity': return o.opportunityId || '-';
+              default: return '-';
+          }
+      }).join('\t'));
+      const tsv = [header, ...rows].join('\n');
+      navigator.clipboard.writeText(tsv).then(() => {
+          setTableCopied(true);
+          setTimeout(() => setTableCopied(false), 2000);
+      });
+  };
+
   // --- Handle Renewal Initialization from navigation state ---
   useEffect(() => {
       const state = location.state as { initRenewal?: boolean; originalOrder?: Order } | null;
@@ -329,7 +370,7 @@ const OrderManager: React.FC = () => {
       }
   }, [location.state]);
 
-  const getStatusBadge = (status: OrderStatus) => {
+  const getStatusBadge = useCallback((status: OrderStatus) => {
     const text = statusMap[status] || status;
     let className = '';
     switch (status) {
@@ -346,24 +387,24 @@ const OrderManager: React.FC = () => {
       default: className = 'unified-tag-gray !rounded-full';
     }
     return <span className={className}>{text}</span>;
-  };
+  }, []);
 
-  const getPaymentStatusBadge = (isPaid: boolean) => {
+  const getPaymentStatusBadge = useCallback((isPaid: boolean) => {
     return isPaid
         ? <span className="unified-tag-green !rounded-full">已支付</span>
         : <span className="unified-tag-blue !rounded-full">待支付</span>;
-  };
+  }, []);
 
-  const getStockStatusBadge = (order: Order) => {
+  const getStockStatusBadge = useCallback((order: Order) => {
     if (order.status === OrderStatus.DELIVERED)         return <span className="unified-tag-green !rounded-full">已完成</span>;
     if (order.status === OrderStatus.SHIPPED)           return <span className="unified-tag-indigo !rounded-full">已发货</span>;
     if (order.isShippingConfirmed)                      return <span className="unified-tag-blue !rounded-full">待发货</span>;
     if (order.isAuthConfirmed || order.isPackageConfirmed || order.status === OrderStatus.PROCESSING_PROD)
                                                         return <span className="unified-tag-orange !rounded-full">备货中</span>;
     return <span className="unified-tag-blue !rounded-full">待处理</span>;
-  };
+  }, []);
 
-  const getSourceBadge = (source: OrderSource) => {
+  const getSourceBadge = useCallback((source: OrderSource) => {
       switch(source) {
           case 'Sales':        return <span className="unified-tag-blue">后台下单</span>;
           case 'ChannelPortal':return <span className="unified-tag-indigo">渠道下单</span>;
@@ -372,9 +413,9 @@ const OrderManager: React.FC = () => {
           case 'Renewal':      return <span className="unified-tag-green">客户续费</span>;
           default:             return <span className="unified-tag-gray">{source}</span>;
       }
-  };
+  }, []);
 
-  const filteredOrders = orders.filter(order => {
+  const filteredOrders = useMemo(() => orders.filter(order => {
     let matchesStatus = filterStatus === 'All' || order.status === filterStatus;
     
     // Handle sub-status filtering for PROCESSING_PROD
@@ -492,19 +533,23 @@ const OrderManager: React.FC = () => {
     });
 
     return matchesStatus && matchesSearch && matchesSource && matchesDate && matchesAmount && matchesAdvanced;
-  });
+  }), [orders, filterStatus, searchTerm, searchField, filterSource, filterDateStart, filterDateEnd, filterAmountMin, filterAmountMax, appliedFilters]);
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage) || 1;
   const safePage = Math.min(currentPage, totalPages);
-  const indexOfLastItem = safePage * itemsPerPage;
-  const currentOrders = filteredOrders.slice(indexOfLastItem - itemsPerPage, indexOfLastItem);
+  const currentOrders = useMemo(() => {
+    const indexOfLastItem = safePage * itemsPerPage;
+    return filteredOrders.slice(indexOfLastItem - itemsPerPage, indexOfLastItem);
+  }, [filteredOrders, safePage, itemsPerPage]);
 
-  const toggleSelectOrder = (id: string) => {
-      const newSet = new Set(selectedOrderIds);
-      if (newSet.has(id)) newSet.delete(id);
-      else newSet.add(id);
-      setSelectedOrderIds(newSet);
-  };
+  const toggleSelectOrder = useCallback((id: string) => {
+      setSelectedOrderIds(prev => {
+          const newSet = new Set(prev);
+          if (newSet.has(id)) newSet.delete(id);
+          else newSet.add(id);
+          return newSet;
+      });
+  }, []);
 
   const toggleSelectAll = () => {
       const currentPageIds = currentOrders.map(o => o.id);
@@ -594,11 +639,19 @@ const OrderManager: React.FC = () => {
       setSelectedOrderIds(new Set());
   };
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const handleDeleteDraft = (e: React.MouseEvent, orderId: string) => {
       e.stopPropagation();
-      setOrderDrafts(prev => prev.filter(d => d.id !== orderId));
-      setOrders(prev => prev.filter(o => o.id !== orderId));
+      setConfirmDeleteId(orderId);
   };
+  const confirmDelete = useCallback(() => {
+      setConfirmDeleteId(prev => {
+          if (!prev) return prev;
+          setOrderDrafts(drafts => drafts.filter(d => d.id !== prev));
+          setOrders(ords => ords.filter(o => o.id !== prev));
+          return null;
+      });
+  }, [setOrderDrafts, setOrders]);
 
   const getAction = (order: Order) => {
       const navigateToStep = (step: string) => navigate(`/orders/${order.id}`, { state: { openAction: step } });
@@ -648,48 +701,12 @@ const OrderManager: React.FC = () => {
   const { confirm: confirmCount, ship: shipCount } = getEligibleCounts();
 
   const DEFAULT_VISIBLE = ['id', 'customer', 'buyer', 'products', 'sales', 'businessManager', 'department', 'source', 'buyerType', 'date', 'status', 'paymentStatus', 'stockStatus', 'total', 'action'];
-  const FIXED_COLUMNS = new Set(['id', 'action']);
-  const [tempVisible, setTempVisible] = useState<string[]>(visibleColumns);
-  const [leftSearch, setLeftSearch] = useState('');
-  const [rightSearch, setRightSearch] = useState('');
-  const [leftChecked, setLeftChecked] = useState<Set<string>>(new Set());
-  const [rightChecked, setRightChecked] = useState<Set<string>>(new Set());
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
-
-  const openColumnConfig = () => {
-    setTempVisible([...visibleColumns]);
-    setLeftSearch(''); setRightSearch('');
-    setLeftChecked(new Set()); setRightChecked(new Set());
-    setIsColumnConfigOpen(true);
-  };
-  const availableCols = allColumns.filter(c => !tempVisible.includes(c.id) && !FIXED_COLUMNS.has(c.id));
-  const displayCols = tempVisible.map(id => allColumns.find(c => c.id === id)!).filter(Boolean);
-
-  const filteredAvailable = availableCols.filter(c => !leftSearch || c.label.includes(leftSearch));
-  const filteredDisplay = displayCols.filter(c => !rightSearch || c.label.includes(rightSearch));
-
-  const addToDisplay = () => {
-    if (leftChecked.size === 0) return;
-    setTempVisible(prev => [...prev.filter(id => id !== 'action'), ...Array.from(leftChecked), 'action'].filter((v, i, a) => a.indexOf(v) === i));
-    setLeftChecked(new Set());
-  };
-  const removeFromDisplay = () => {
-    if (rightChecked.size === 0) return;
-    setTempVisible(prev => prev.filter(id => !rightChecked.has(id)));
-    setRightChecked(new Set());
-  };
-  const toggleLeftCheck = (id: string) => setLeftChecked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const toggleRightCheck = (id: string) => { if (FIXED_COLUMNS.has(id)) return; setRightChecked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); };
-  const toggleLeftAll = () => { const ids = filteredAvailable.map(c => c.id); setLeftChecked(prev => prev.size === ids.length ? new Set() : new Set(ids)); };
-  const toggleRightAll = () => { const ids = filteredDisplay.filter(c => !FIXED_COLUMNS.has(c.id)).map(c => c.id); setRightChecked(prev => prev.size === ids.length ? new Set() : new Set(ids)); };
-  const invertLeft = () => { const ids = filteredAvailable.map(c => c.id); setLeftChecked(prev => new Set(ids.filter(id => !prev.has(id)))); };
-  const invertRight = () => { const ids = filteredDisplay.filter(c => !FIXED_COLUMNS.has(c.id)).map(c => c.id); setRightChecked(prev => new Set(ids.filter(id => !prev.has(id)))); };
-  const removeOneFromDisplay = (id: string) => { if (FIXED_COLUMNS.has(id)) return; setTempVisible(prev => prev.filter(x => x !== id)); setRightChecked(prev => { const n = new Set(prev); n.delete(id); return n; }); };
-  const handleDragStart = (idx: number) => setDragIdx(idx);
-  const handleDragOver = (e: React.DragEvent, idx: number) => { e.preventDefault(); if (dragIdx === null || dragIdx === idx) return; const arr = [...tempVisible]; const [item] = arr.splice(dragIdx, 1); arr.splice(idx, 0, item); setTempVisible(arr); setDragIdx(idx); };
-  const handleDragEnd = () => setDragIdx(null);
-  const confirmColumnConfig = () => { setVisibleColumns(tempVisible); setIsColumnConfigOpen(false); };
-  const restoreDefault = () => { setTempVisible([...DEFAULT_VISIBLE]); setLeftChecked(new Set()); setRightChecked(new Set()); };
+  const FIXED_COLUMNS = useMemo(() => new Set(['id', 'action']), []);
+  const openColumnConfig = () => setIsColumnConfigOpen(true);
+  const handleColumnConfigConfirm = useCallback((cols: string[]) => {
+    setVisibleColumns(cols);
+    setIsColumnConfigOpen(false);
+  }, []);
 
   const searchFieldOptions: { value: 'id' | 'customerName' | 'buyerName' | 'productName'; label: string; placeholder: string }[] = [
     { value: 'id',           label: '订单编号', placeholder: '搜索订单编号…' },
@@ -716,6 +733,19 @@ const OrderManager: React.FC = () => {
           <col style={{ width: 52 }} />
       </colgroup>
   );
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const o of orders) {
+      counts[o.status] = (counts[o.status] || 0) + 1;
+    }
+    const proc = orders.filter(o => o.status === OrderStatus.PROCESSING_PROD);
+    counts['STOCK_AUTH'] = proc.filter(o => !o.isAuthConfirmed).length;
+    counts['STOCK_PKG'] = proc.filter(o => o.isAuthConfirmed && !o.isPackageConfirmed).length;
+    counts['STOCK_SHIP'] = proc.filter(o => o.isPackageConfirmed && !o.isShippingConfirmed).length;
+    counts['STOCK_CD'] = proc.filter(o => o.isShippingConfirmed && !o.isCDBurned).length;
+    return counts;
+  }, [orders]);
 
   return (
     <div className="p-4 lg:p-6 max-w-[2400px] mx-auto space-y-4 animate-page-enter pb-2">
@@ -884,105 +914,15 @@ const OrderManager: React.FC = () => {
       <div className="space-y-6">
         {/* Status Cards Grid */}
         <div className="flex overflow-x-auto gap-2 pb-2 custom-scrollbar no-scrollbar scroll-smooth snap-x snap-mandatory">
-            {/* "All" Card */}
             {hasPermission('order_view_all') && (
-                <button 
-                    onClick={() => setFilterStatus('All')}
-                    className={`relative p-2 rounded-xl border transition-all duration-300 text-left group min-w-[100px] flex-shrink-0 snap-start
-                        ${filterStatus === 'All' 
-                            ? 'bg-[#0071E3] border-[#0071E3] text-white shadow-lg shadow-blue-500/20' 
-                            : 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-[#0071E3]/40 dark:hover:border-blue-900'}
-                    `}
-                >
-                    <div className="flex items-center justify-between mb-1.5">
-                        <div className={`p-1 rounded-lg ${filterStatus === 'All' ? 'bg-white/20' : 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3]'}`}>
-                            <Layers className="w-3.5 h-3.5" />
-                        </div>
-                        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${filterStatus === 'All' ? 'bg-white text-[#0071E3]' : 'bg-blue-100 text-[#0071E3] dark:bg-blue-900/40 dark:text-blue-400'}`}>
-                            {orders.length}
-                        </span>
-                    </div>
-                    <div className={`text-[11px] font-bold ${filterStatus === 'All' ? 'text-white' : 'text-gray-900 dark:text-white'}`}>全部订单</div>
-                    {filterStatus === 'All' && (
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-1 bg-white rounded-full"></div>
-                    )}
-                </button>
+                <StatusFilterCard id="All" label="全部订单" icon={Layers} count={orders.length} isActive={filterStatus === 'All'} onClick={() => setFilterStatus('All')} />
             )}
-
-            {pipelineStatuses.filter(step => hasPermission(step.permission)).map((step) => {
-                const isActive = filterStatus === step.id;
-                let count = 0;
-                if (step.id === 'STOCK_AUTH') count = orders.filter(o => o.status === OrderStatus.PROCESSING_PROD && !o.isAuthConfirmed).length;
-                else if (step.id === 'STOCK_PKG') count = orders.filter(o => o.status === OrderStatus.PROCESSING_PROD && o.isAuthConfirmed && !o.isPackageConfirmed).length;
-                else if (step.id === 'STOCK_SHIP') count = orders.filter(o => o.status === OrderStatus.PROCESSING_PROD && o.isPackageConfirmed && !o.isShippingConfirmed).length;
-                else if (step.id === 'STOCK_CD') count = orders.filter(o => o.status === OrderStatus.PROCESSING_PROD && o.isShippingConfirmed && !o.isCDBurned).length;
-                else count = orders.filter(o => o.status === step.id).length;
-
-                return (
-                    <button
-                        key={step.id}
-                        onClick={() => setFilterStatus(step.id)}
-                        className={`relative p-2 rounded-xl border transition-all duration-300 text-left group min-w-[100px] flex-shrink-0 snap-start
-                            ${isActive 
-                                ? 'bg-[#0071E3] border-[#0071E3] text-white shadow-lg shadow-blue-500/20' 
-                                : 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-[#0071E3]/40 dark:hover:border-blue-900'}
-                        `}
-                    >
-                        <div className="flex items-center justify-between mb-1.5">
-                            <div className={`p-1 rounded-lg ${isActive ? 'bg-white/20' : 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3]'}`}>
-                                <step.icon className="w-3.5 h-3.5" />
-                            </div>
-                            {count > 0 && (
-                                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isActive ? 'bg-white text-[#0071E3]' : 'bg-blue-100 text-[#0071E3] dark:bg-blue-900/40 dark:text-blue-400'}`}>
-                                    {count}
-                                </span>
-                            )}
-                        </div>
-                        <div className={`text-[11px] font-bold ${isActive ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{step.label}</div>
-                        {isActive && (
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-1 bg-white rounded-full"></div>
-                        )}
-                    </button>
-                );
-            })}
-
-            {exceptionStatuses.filter(step => hasPermission(step.permission)).map((step) => {
-                const isActive = filterStatus === step.id;
-                const count = orders.filter(o => o.status === step.id).length;
-                const isCancelled = step.id === OrderStatus.CANCELLED;
-                return (
-                    <button
-                        key={step.id}
-                        onClick={() => setFilterStatus(step.id)}
-                        className={`relative p-2 rounded-xl border transition-all duration-300 text-left group min-w-[100px] flex-shrink-0 snap-start
-                            ${isActive 
-                                ? isCancelled
-                                    ? 'bg-gray-500 border-gray-500 text-white shadow-lg shadow-gray-400/20'
-                                    : 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-500/20'
-                                : isCancelled
-                                    ? 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-gray-400 dark:hover:border-gray-600'
-                                    : 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-red-300 dark:hover:border-red-900'}
-                        `}
-                    >
-                        <div className="flex items-center justify-between mb-1.5">
-                            <div className={`p-1 rounded-lg ${isActive ? 'bg-white/20' : isCancelled ? 'bg-gray-100 dark:bg-white/10 text-gray-500' : 'bg-red-50 dark:bg-red-900/20 text-red-600'}`}>
-                                <step.icon className="w-3.5 h-3.5" />
-                            </div>
-                            {count > 0 && (
-                                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isActive
-                                    ? isCancelled ? 'bg-white text-gray-600' : 'bg-white text-red-600'
-                                    : isCancelled ? 'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400' : 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'}`}>
-                                    {count}
-                                </span>
-                            )}
-                        </div>
-                        <div className={`text-[11px] font-bold ${isActive ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{step.label}</div>
-                        {isActive && (
-                            <div className={`absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-1 ${isCancelled ? 'bg-white' : 'bg-white'} rounded-full`}></div>
-                        )}
-                    </button>
-                );
-            })}
+            {pipelineStatuses.filter(step => hasPermission(step.permission)).map((step) => (
+                <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} onClick={() => setFilterStatus(step.id)} />
+            ))}
+            {exceptionStatuses.filter(step => hasPermission(step.permission)).map((step) => (
+                <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} variant={step.id === OrderStatus.CANCELLED ? 'muted' : 'danger'} onClick={() => setFilterStatus(step.id)} />
+            ))}
         </div>
 
         <div className="unified-card overflow-hidden">
@@ -1255,11 +1195,11 @@ const OrderManager: React.FC = () => {
                       </td>
                   )}
                   {visibleColumns.includes('action') && (
-                      <td className={`px-4 py-3 text-right whitespace-nowrap sticky right-[52px] z-20 ${stickyBg} shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors`}>
+                      <td className={`px-4 py-3 text-right whitespace-nowrap sticky right-[52px] z-20 ${stickyBg} shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors overflow-visible`}>
                           {getAction(order)}
                       </td>
                   )}
-                  <td className={`px-4 py-3 sticky right-0 z-20 w-[52px] min-w-[52px] ${stickyBg} transition-colors`} />
+                  <td className={`px-4 py-3 sticky right-0 z-10 w-[52px] min-w-[52px] ${stickyBg} transition-colors`} />
                 </tr>
                 );
               })}
@@ -1269,7 +1209,21 @@ const OrderManager: React.FC = () => {
         </div>
         
         <div className="flex justify-between items-center px-5 py-3.5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5">
-            <span className="text-xs text-gray-500 dark:text-gray-400">共 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF]">{filteredOrders.length}</span> 条</span>
+            <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-500 dark:text-gray-400">共 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF]">{filteredOrders.length}</span> 条</span>
+                <button
+                    onClick={handleCopyTable}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition ${
+                        tableCopied
+                            ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
+                            : 'bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/10'
+                    }`}
+                    title="复制当前页表格数据（可粘贴到 Excel）"
+                >
+                    {tableCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                    {tableCopied ? '已复制' : '复制表格'}
+                </button>
+            </div>
             <div className="flex items-center gap-3">
                 {/* 每页条数下拉 */}
                 <div className="flex items-center gap-1.5">
@@ -1658,190 +1612,23 @@ const OrderManager: React.FC = () => {
         initialDraft={resumeDraft}
       />
 
-      {/* User Details Drawer */}
       {isDrawerOpen && detailsUser && (
-        <ModalPortal>
-        <div className="fixed inset-0 z-[500] flex justify-end">
-          <div className={`absolute inset-0 bg-black/40 backdrop-blur-sm ${isDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={closeDrawer}></div>
-          <div className={`relative w-full max-w-md bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col h-full border-l border-white/10 ${isDrawerClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
-            <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">用户详情</h3>
-                <button onClick={closeDrawer} className="p-2 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full text-gray-400 transition">
-                    <X className="w-5 h-5"/>
-                </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
-                <div className="flex flex-col items-center text-center space-y-4">
-                    <div className="relative group">
-                        <img 
-                            src={detailsUser.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${detailsUser.name}`} 
-                            className="w-24 h-24 rounded-full object-cover bg-gray-100 border-4 border-white dark:border-[#2C2C2E] shadow-xl" 
-                            alt={detailsUser.name}
-                            onError={(e) => {
-                                const target = e.currentTarget;
-                                target.style.display = 'none';
-                                const fallback = target.nextElementSibling as HTMLElement;
-                                if (fallback) fallback.style.display = 'flex';
-                            }}
-                        />
-                        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 items-center justify-center text-white text-2xl font-bold border-4 border-white dark:border-[#2C2C2E] shadow-xl" style={{ display: 'none' }}>
-                            {detailsUser.name.replace(/\s*\(.*\)\s*$/, '').slice(0, 1)}
-                        </div>
-                        {detailsUser.monthBadge && (
-                            <span className="absolute bottom-1 right-1 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-pink-500 rounded-full shadow ring-2 ring-white dark:ring-[#2C2C2E]">{detailsUser.monthBadge}</span>
-                        )}
-                        <div className={`absolute bottom-1 right-1 w-5 h-5 rounded-full border-2 border-white dark:border-[#1C1C1E] ${detailsUser.status === 'Active' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                    </div>
-                    <div>
-                        <h4 className="text-xl font-bold text-gray-900 dark:text-white">{detailsUser.name}</h4>
-                    </div>
-                    <div className="flex gap-2">
-                        <span className="px-3 py-1 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 rounded-full text-xs font-bold border border-gray-200 dark:border-white/20">{detailsUser.userType}</span>
-                    </div>
-                </div>
-
-                <div className="space-y-6 pt-6 border-t border-gray-100 dark:border-white/10">
-                    <div className="grid grid-cols-2 gap-6">
-                        <div className="space-y-1">
-                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">账号 ID</div>
-                            <div className="text-sm font-mono text-gray-900 dark:text-white">{detailsUser.accountId}</div>
-                        </div>
-                        <div className="space-y-1">
-                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">当前状态</div>
-                            <div className={`text-sm font-bold ${detailsUser.status === 'Active' ? 'text-green-600' : 'text-gray-400'}`}>{detailsUser.status}</div>
-                        </div>
-                        <div className="space-y-1 col-span-2">
-                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">所属部门</div>
-                            <div className="text-sm text-gray-900 dark:text-white">{getDepartmentPath(detailsUser.departmentId)}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="space-y-4 pt-6 border-t border-gray-100 dark:border-white/10">
-                    <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                        <Shield className="w-3.5 h-3.5"/> 权限概览
-                    </h5>
-                    <div className="p-4 bg-gray-50 dark:bg-black/20 rounded-2xl border border-gray-100 dark:border-white/5">
-                        <p className="text-xs text-gray-500 leading-relaxed">
-                            该用户拥有 <span className="text-blue-600 font-bold">{detailsUser.role}</span> 角色对应的功能权限。
-                            数据权限受限于所属部门 <span className="text-gray-900 dark:text-white font-medium">{getDepartmentPath(detailsUser.departmentId)}</span> 及其下属机构。
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <div className="p-6 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 flex gap-3">
-                <button onClick={closeDrawer} className="flex-1 py-3 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold hover:bg-gray-50 transition">关闭</button>
-                <button 
-                  onClick={() => {
-                    closeDrawer();
-                    navigate('/users', { state: { search: detailsUser.accountId } });
-                  }}
-                  className="flex-1 py-3 bg-black dark:bg-white text-white dark:text-black rounded-xl text-sm font-bold hover:opacity-80 transition flex items-center justify-center gap-2"
-                >
-                  <Settings className="w-4 h-4"/> 管理账号
-                </button>
-            </div>
-          </div>
-        </div>
-        </ModalPortal>
+        <UserDetailsDrawer user={detailsUser} isClosing={isDrawerClosing} getDepartmentPath={getDepartmentPath} onClose={closeDrawer} />
       )}
 
-      {/* Column Config Modal */}
       {isColumnConfigOpen && (
-        <ModalPortal>
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[500] p-4 animate-fade-in" onClick={() => setIsColumnConfigOpen(false)}>
-            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-2xl w-full max-w-[720px] flex flex-col animate-modal-enter border border-gray-200/50 dark:border-white/10" onClick={e => e.stopPropagation()}>
-              {/* Header */}
-              <div className="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
-                <h3 className="text-base font-bold text-gray-900 dark:text-white">请选择列字段</h3>
-                <button onClick={() => setIsColumnConfigOpen(false)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition"><X className="w-4 h-4"/></button>
-              </div>
+        <ColumnConfigModal
+          allColumns={allColumns}
+          initialVisible={visibleColumns}
+          defaultVisible={DEFAULT_VISIBLE}
+          fixedColumns={FIXED_COLUMNS}
+          onClose={() => setIsColumnConfigOpen(false)}
+          onConfirm={handleColumnConfigConfirm}
+        />
+      )}
 
-              {/* Body: two panels */}
-              <div className="flex items-stretch p-5 gap-4" style={{ minHeight: 380 }}>
-                {/* Left: Available */}
-                <div className="flex-1 flex flex-col border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden">
-                  <div className="px-3 py-2.5 border-b border-gray-100 dark:border-white/10 flex items-center justify-between bg-gray-50 dark:bg-white/5 shrink-0">
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" checked={leftChecked.size > 0 && leftChecked.size === filteredAvailable.length} onChange={toggleLeftAll} className="w-3.5 h-3.5 rounded border-gray-300 text-[#0071E3]"/>
-                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">可用字段</span>
-                    </div>
-                    <button onClick={invertLeft} className="text-[11px] text-[#0071E3] dark:text-[#0A84FF] font-medium hover:underline">反选</button>
-                  </div>
-                  <div className="px-3 py-2 border-b border-gray-50 dark:border-white/5 shrink-0">
-                    <input type="text" value={leftSearch} onChange={e => setLeftSearch(e.target.value)} placeholder="请输入搜索内容" className="w-full text-xs px-2.5 py-1.5 border border-gray-200 dark:border-white/10 rounded-lg bg-white dark:bg-black outline-none text-gray-700 dark:text-gray-200 placeholder:text-gray-400 focus:border-blue-300"/>
-                  </div>
-                  <div className="flex-1 overflow-y-auto custom-scrollbar px-1 py-1">
-                    {filteredAvailable.length > 0 ? filteredAvailable.map(col => (
-                      <label key={col.id} className="flex items-center gap-2 px-2.5 py-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg cursor-pointer transition">
-                        <input type="checkbox" checked={leftChecked.has(col.id)} onChange={() => toggleLeftCheck(col.id)} className="w-3.5 h-3.5 rounded border-gray-300 text-[#0071E3]"/>
-                        <span className="text-sm text-gray-700 dark:text-gray-300">{col.label}</span>
-                      </label>
-                    )) : (
-                      <div className="text-xs text-gray-400 text-center py-6">无可用字段</div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Middle: Arrows */}
-                <div className="flex flex-col items-center justify-center gap-2 shrink-0">
-                  <button onClick={addToDisplay} disabled={leftChecked.size === 0} className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition whitespace-nowrap">
-                    添加 →
-                  </button>
-                  <button onClick={removeFromDisplay} disabled={rightChecked.size === 0} className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#2C2C2E] text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition whitespace-nowrap">
-                    ← 移除
-                  </button>
-                </div>
-
-                {/* Right: Display */}
-                <div className="flex-1 flex flex-col border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden">
-                  <div className="px-3 py-2.5 border-b border-gray-100 dark:border-white/10 flex items-center justify-between bg-gray-50 dark:bg-white/5 shrink-0">
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" checked={rightChecked.size > 0 && rightChecked.size === filteredDisplay.filter(c => !FIXED_COLUMNS.has(c.id)).length} onChange={toggleRightAll} className="w-3.5 h-3.5 rounded border-gray-300 text-[#0071E3]"/>
-                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">显示字段</span>
-                    </div>
-                    <button onClick={restoreDefault} className="text-[11px] text-[#0071E3] dark:text-[#0A84FF] font-medium hover:underline">恢复默认</button>
-                  </div>
-                  <div className="px-3 py-2 border-b border-gray-50 dark:border-white/5 shrink-0">
-                    <input type="text" value={rightSearch} onChange={e => setRightSearch(e.target.value)} placeholder="请输入搜索内容" className="w-full text-xs px-2.5 py-1.5 border border-gray-200 dark:border-white/10 rounded-lg bg-white dark:bg-black outline-none text-gray-700 dark:text-gray-200 placeholder:text-gray-400 focus:border-blue-300"/>
-                  </div>
-                  <div className="flex-1 overflow-y-auto custom-scrollbar px-1 py-1">
-                    {filteredDisplay.length > 0 ? filteredDisplay.map((col, idx) => {
-                      const isFixed = FIXED_COLUMNS.has(col.id);
-                      return (
-                        <div
-                          key={col.id}
-                          draggable={!isFixed}
-                          onDragStart={() => handleDragStart(tempVisible.indexOf(col.id))}
-                          onDragOver={e => handleDragOver(e, tempVisible.indexOf(col.id))}
-                          onDragEnd={handleDragEnd}
-                          className={`flex items-center gap-2 px-2.5 py-2 rounded-lg transition group ${dragIdx === tempVisible.indexOf(col.id) ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-white/5'}`}
-                        >
-                          <span className={`cursor-grab text-gray-300 dark:text-gray-600 ${isFixed ? 'invisible' : ''}`}>☰</span>
-                          <input type="checkbox" checked={rightChecked.has(col.id)} onChange={() => toggleRightCheck(col.id)} disabled={isFixed} className="w-3.5 h-3.5 rounded border-gray-300 text-[#0071E3] disabled:opacity-40"/>
-                          <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">{col.label}</span>
-                          {isFixed ? (
-                            <span className="text-[10px] text-orange-500 font-medium">(系统字段)</span>
-                          ) : (
-                            <button onClick={() => removeOneFromDisplay(col.id)} className="text-[11px] text-red-400 hover:text-red-600 dark:hover:text-red-300 opacity-0 group-hover:opacity-100 transition font-medium">移除</button>
-                          )}
-                        </div>
-                      );
-                    }) : (
-                      <div className="text-xs text-gray-400 text-center py-6">无显示字段</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="px-6 py-4 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
-                <button onClick={() => setIsColumnConfigOpen(false)} className="px-5 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/10 transition">取 消</button>
-                <button onClick={confirmColumnConfig} className="px-5 py-2 rounded-xl text-sm font-bold text-white bg-[#0071E3] hover:bg-[#0060C0] dark:bg-[#0A84FF] dark:hover:bg-[#007AEB] transition">确 定</button>
-              </div>
-            </div>
-          </div>
-        </ModalPortal>
+      {confirmDeleteId && (
+        <DeleteConfirmModal orderId={confirmDeleteId} onCancel={() => setConfirmDeleteId(null)} onConfirm={confirmDelete} />
       )}
     </div>
   );

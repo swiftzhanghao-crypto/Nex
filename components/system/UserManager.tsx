@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, UserType, RoleDefinition, PermissionDimension, RowPermissionRule, ColumnPermissionRule, PermissionResource } from '../../types';
-import { Search, Plus, Shield, User as UserIcon, Briefcase, Truck, Edit, Building2, X, Mail, Phone, CheckCircle, Calendar, Hash, Lock, CheckSquare, Settings, Save, Trash2, Database, Check, ChevronDown, ChevronRight, Columns } from 'lucide-react';
+import { Search, Plus, Shield, User as UserIcon, Briefcase, Truck, Edit, Building2, X, Mail, Phone, CheckCircle, Calendar, Hash, Lock, CheckSquare, Settings, Save, Trash2, Database, Check, ChevronDown, ChevronRight, Columns, Copy } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
 import { columnConfig, permissionTree, permissionModules, resourceConfig, PermSubgroup, PermGroup } from './permissionConfig';
@@ -256,6 +256,23 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       }
   };
 
+  const handleCopyRole = (role: RoleDefinition) => {
+      const newId = `role-${Date.now()}`;
+      const copiedRole: RoleDefinition = {
+          id: newId,
+          name: `${role.name} (副本)`,
+          description: role.description,
+          permissions: [...role.permissions],
+          isSystem: false,
+          rowPermissions: role.rowPermissions?.map(r => ({ ...r, id: `rule-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` })) || [],
+          columnPermissions: role.columnPermissions?.map(r => ({ ...r })) || [],
+      };
+      setRoles(prev => [...prev, copiedRole]);
+      setSelectedRoleId(newId);
+      setRoleForm({ ...copiedRole });
+      setIsEditingRole(true);
+  };
+
   const getDependentPermIds = (parentPermId: string): string[] => {
       return permissionTree.flatMap(g =>
           g.subgroups
@@ -470,8 +487,15 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                               className={`p-3 rounded-lg cursor-pointer transition flex justify-between items-center group ${selectedRoleId === role.id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 ring-1 ring-blue-200 dark:ring-blue-800' : 'hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300'}`}
                           >
                               <div className="font-medium text-sm">{role.name}</div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
                                   {role.isSystem && <Shield className="w-3 h-3 opacity-50"/>}
+                                  <button 
+                                      onClick={(e) => { e.stopPropagation(); handleCopyRole(role); }}
+                                      className="p-1 text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      title="复制角色"
+                                  >
+                                      <Copy className="w-3.5 h-3.5" />
+                                  </button>
                                   {!role.isSystem && (
                                       <button 
                                           onClick={(e) => { e.stopPropagation(); handleDeleteRole(role.id); }}
@@ -854,6 +878,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                       {!roleForm.isSystem && (
                                           <button onClick={() => handleDeleteRole(selectedRoleId)} className="px-3 py-1.5 border border-red-200 dark:border-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition flex items-center gap-1"><Trash2 className="w-4 h-4"/> 删除</button>
                                       )}
+                                      <button onClick={() => { const r = roles.find(r => r.id === selectedRoleId); if (r) handleCopyRole(r); }} className="px-3 py-1.5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition flex items-center gap-1"><Copy className="w-4 h-4"/> 复制</button>
                                       <button onClick={() => setIsEditingRole(true)} className="px-4 py-1.5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition flex items-center gap-1"><Edit className="w-4 h-4"/> 编辑角色</button>
                                   </div>
                               </div>
