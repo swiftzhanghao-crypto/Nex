@@ -717,12 +717,12 @@ const OrderManager: React.FC = () => {
   const currentSearchOption = searchFieldOptions.find(o => o.value === searchField)!;
 
   const colWidthMap: Record<string, number> = {
-      id: 190, customer: 150, buyer: 140, products: 240,
-      sales: 130, businessManager: 130, department: 200,
-      source: 110, buyerType: 110, date: 165, status: 100,
-      paymentStatus: 105, stockStatus: 100, total: 120,
-      payment: 110, delivery: 110, address: 180, invoice: 160,
-      opportunity: 160, action: 90,
+      id: 200, customer: 175, buyer: 165, products: 285,
+      sales: 120, businessManager: 120, department: 190,
+      source: 100, buyerType: 100, date: 150, status: 90,
+      paymentStatus: 95, stockStatus: 90, total: 125,
+      payment: 100, delivery: 100, address: 160, invoice: 140,
+      opportunity: 140, action: 85,
   };
   const tableColGroup = (
       <colgroup>
@@ -873,7 +873,7 @@ const OrderManager: React.FC = () => {
                                     {orderDrafts.map(draft => (
                                         <div key={draft.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-white/5 transition group/item border-b border-gray-50 dark:border-white/5 last:border-0">
                                             <div className="flex-1 min-w-0">
-                                                <div className="text-xs font-mono text-gray-500 dark:text-gray-400">{draft.id}</div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400" style={{fontVariantNumeric:'tabular-nums'}}>{draft.id}</div>
                                                 <div className="text-xs text-gray-400 mt-0.5">
                                                     第 {draft.currentStep} 步 · {draft.buyerType || '未选类型'}
                                                     {draft.newOrderItems.length > 0 && ` · ${draft.newOrderItems.length} 个产品`}
@@ -936,7 +936,7 @@ const OrderManager: React.FC = () => {
                 {tableColGroup}
                 <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E]">
                   <tr>
-                    <th className="pl-6 pr-2 py-3 sticky left-0 z-10 bg-gray-50 dark:bg-[#1C1C1E] border-b border-gray-200/50 dark:border-white/10 w-[52px] min-w-[52px] align-middle">
+                    <th className="pl-6 pr-2 py-2.5 sticky left-0 z-10 bg-gray-50 dark:bg-[#1C1C1E] border-b border-gray-200/50 dark:border-white/10 w-[52px] min-w-[52px] align-middle">
                         <input 
                             type="checkbox" 
                             className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 align-middle"
@@ -945,7 +945,7 @@ const OrderManager: React.FC = () => {
                         />
                     </th>
                     {allColumns.map(col => visibleColumns.includes(col.id) && (
-                        <th key={col.id} className={`px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E] ${
+                        <th key={col.id} className={`px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E] ${
                             col.id === 'id'
                                 ? 'sticky left-[52px] z-10 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.08)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.3)]'
                                 : col.id === 'action'
@@ -953,7 +953,7 @@ const OrderManager: React.FC = () => {
                                 : ''
                         }`}>{col.label}</th>
                     ))}
-                    <th className="px-4 py-3 sticky right-0 z-10 bg-gray-50 dark:bg-[#1C1C1E] border-b border-gray-200/50 dark:border-white/10 w-[52px] min-w-[52px]"></th>
+                    <th className="px-3 py-2.5 sticky right-0 z-10 bg-gray-50 dark:bg-[#1C1C1E] border-b border-gray-200/50 dark:border-white/10 w-[52px] min-w-[52px]"></th>
                   </tr>
                 </thead>
               </table>
@@ -974,7 +974,7 @@ const OrderManager: React.FC = () => {
                     : 'bg-white dark:bg-[#1C1C1E] group-hover:bg-gray-50 dark:group-hover:bg-white/[0.03]';
                 return (
                 <tr key={order.id} className={`group hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors border-b border-gray-100/50 dark:border-white/5 last:border-0 ${isSelected ? '!bg-blue-50/50 dark:!bg-blue-900/10' : ''}`}>
-                  <td className={`pl-6 pr-2 py-3 sticky left-0 z-20 ${stickyBg} transition-colors align-middle`}>
+                  <td className={`pl-6 pr-2 py-2.5 sticky left-0 z-20 ${stickyBg} transition-colors align-middle`}>
                       <input 
                           type="checkbox" 
                           className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 align-middle"
@@ -983,10 +983,11 @@ const OrderManager: React.FC = () => {
                       />
                   </td>
                   {visibleColumns.includes('id') && (
-                      <td className={`px-4 py-3 whitespace-nowrap sticky left-[52px] z-20 ${stickyBg} shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors`}>
-                          <div className="flex items-center gap-1.5">
+                      <td className={`px-3 py-2.5 whitespace-nowrap sticky left-[52px] z-20 ${stickyBg} shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors align-middle`}>
+                          <div className="relative">
                               <span
-                                  className={`font-mono font-bold cursor-pointer hover:underline ${order.status === OrderStatus.DRAFT ? 'text-amber-500 dark:text-amber-400' : 'text-[#0071E3] dark:text-[#FF2D55]'}`}
+                                  className={`text-sm font-semibold cursor-pointer hover:underline ${order.status === OrderStatus.DRAFT ? 'text-amber-500 dark:text-amber-400' : 'text-[#0071E3] dark:text-[#FF2D55]'}`}
+                                  style={{fontVariantNumeric:'tabular-nums'}}
                                   onClick={() => {
                                       if (order.status === OrderStatus.DRAFT) {
                                           const draft = orderDrafts.find(d => d.id === order.id);
@@ -1000,7 +1001,7 @@ const OrderManager: React.FC = () => {
                               </span>
                               <button
                                   onClick={(e) => handleCopyOrderId(e, order.id)}
-                                  className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-white/10 text-gray-300 hover:text-gray-500 dark:hover:text-gray-300 transition-all shrink-0"
+                                  className="absolute left-0 top-full mt-px opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-white/10 text-gray-300 hover:text-gray-500 dark:hover:text-gray-300 transition-all"
                                   title="复制订单编号"
                               >
                                   {copiedOrderId === order.id
@@ -1011,7 +1012,7 @@ const OrderManager: React.FC = () => {
                       </td>
                   )}
                   {visibleColumns.includes('customer') && (
-                      <td className="px-4 py-3 max-w-[180px]">
+                      <td className="px-3 py-2.5 max-w-[180px]">
                         <div 
                             className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline transition-colors break-words cursor-pointer"
                             onClick={(e) => {
@@ -1024,7 +1025,7 @@ const OrderManager: React.FC = () => {
                       </td>
                   )}
                   {visibleColumns.includes('buyer') && (
-                      <td className="px-4 py-3 max-w-[180px]">
+                      <td className="px-3 py-2.5 max-w-[180px]">
                         {order.buyerType === 'Channel' ? (
                             <div 
                                 className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer break-words"
@@ -1044,13 +1045,18 @@ const OrderManager: React.FC = () => {
                       </td>
                   )}
                   {visibleColumns.includes('products') && (
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2.5">
                           <div className="flex flex-col gap-1 max-w-[220px]">
                               {/* 只展示第一个产品 */}
                               {order.items.slice(0, 1).map((item, idx) => (
                                   <div key={idx} className="flex flex-col">
                                       <div className="flex items-center justify-between gap-2">
-                                          <div className="truncate font-medium text-gray-700 dark:text-gray-300" title={item.productName}>{item.productName}</div>
+                                          <div className="relative group/pname min-w-0 flex-1">
+                                              <div className="truncate font-medium text-gray-700 dark:text-gray-300">{item.productName}</div>
+                                              <div className="absolute left-0 top-full mt-1.5 z-[9999] hidden group-hover/pname:block pointer-events-none">
+                                                  <div className="px-3 py-2 bg-gray-900/95 dark:bg-gray-100/95 text-white dark:text-gray-900 text-xs leading-relaxed rounded-lg shadow-lg max-w-xs whitespace-normal break-words animate-[tooltipIn_0.15s_ease-out]">{item.productName}</div>
+                                              </div>
+                                          </div>
                                           <span className="text-gray-400 shrink-0">×{item.quantity}</span>
                                       </div>
                                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -1088,7 +1094,7 @@ const OrderManager: React.FC = () => {
                       </td>
                   )}
                   {visibleColumns.includes('sales') && (
-                      <td className="px-4 py-3 whitespace-nowrap" style={{ minWidth: '120px' }}>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
                           {(() => {
                               const user = users.find(u => u.id === order.salesRepId);
                               const rawName = order.salesRepName || '未分配';
@@ -1109,7 +1115,7 @@ const OrderManager: React.FC = () => {
                       </td>
                   )}
                   {visibleColumns.includes('businessManager') && (
-                      <td className="px-4 py-3 whitespace-nowrap" style={{ minWidth: '120px' }}>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
                           {(() => {
                               const user = users.find(u => u.id === order.businessManagerId);
                               const rawName = order.businessManagerName || '未分配';
@@ -1130,7 +1136,7 @@ const OrderManager: React.FC = () => {
                       </td>
                   )}
                   {visibleColumns.includes('department') && (
-                      <td className="px-4 py-3" style={{ minWidth: '240px', maxWidth: '300px' }}>
+                      <td className="px-3 py-2.5">
                           {(() => {
                               const user = users.find(u => u.id === order.salesRepId);
                               const fullPath = getDepartmentPath(user?.departmentId);
@@ -1149,9 +1155,9 @@ const OrderManager: React.FC = () => {
                           })()}
                       </td>
                   )}
-                  {visibleColumns.includes('source') && <td className="px-4 py-3 whitespace-nowrap">{getSourceBadge(order.source)}</td>}
+                  {visibleColumns.includes('source') && <td className="px-3 py-2.5 whitespace-nowrap">{getSourceBadge(order.source)}</td>}
                   {visibleColumns.includes('buyerType') && (
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-3 py-2.5 whitespace-nowrap">
                           {order.buyerType === 'Channel'    && <span className="unified-tag-indigo">{buyerTypeMap['Channel']}</span>}
                           {order.buyerType === 'SelfDeal'   && <span className="unified-tag-orange">{buyerTypeMap['SelfDeal']}</span>}
                           {order.buyerType === 'RedeemCode' && <span className="unified-tag-purple">{buyerTypeMap['RedeemCode']}</span>}
@@ -1159,18 +1165,18 @@ const OrderManager: React.FC = () => {
                           {!order.buyerType                 && <span className="unified-tag-gray">{buyerTypeMap['Customer']}</span>}
                       </td>
                   )}
-                  {visibleColumns.includes('date') && <td className="px-4 py-3 text-gray-400 dark:text-gray-500 font-mono text-[11px] whitespace-nowrap">{new Date(order.date).toLocaleString('zh-CN', { hour12: false })}</td>}
-                  {visibleColumns.includes('status') && <td className="px-4 py-3 whitespace-nowrap">{getStatusBadge(order.status)}</td>}
-                  {visibleColumns.includes('paymentStatus') && <td className="px-4 py-3 whitespace-nowrap">{getPaymentStatusBadge(order.isPaid)}</td>}
-                  {visibleColumns.includes('stockStatus') && <td className="px-4 py-3 whitespace-nowrap">{getStockStatusBadge(order)}</td>}
-                  {visibleColumns.includes('total') && <td className="px-4 py-3 text-right font-bold text-red-600 dark:text-red-400 whitespace-nowrap font-mono">¥{order.total.toLocaleString()}</td>}
+                  {visibleColumns.includes('date') && <td className="px-3 py-2.5 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap" style={{fontVariantNumeric:'tabular-nums'}}>{new Date(order.date).toLocaleString('zh-CN', { hour12: false })}</td>}
+                  {visibleColumns.includes('status') && <td className="px-3 py-2.5 whitespace-nowrap">{getStatusBadge(order.status)}</td>}
+                  {visibleColumns.includes('paymentStatus') && <td className="px-3 py-2.5 whitespace-nowrap">{getPaymentStatusBadge(order.isPaid)}</td>}
+                  {visibleColumns.includes('stockStatus') && <td className="px-3 py-2.5 whitespace-nowrap">{getStockStatusBadge(order)}</td>}
+                  {visibleColumns.includes('total') && <td className="px-3 py-2.5 text-right font-bold text-red-600 dark:text-red-400 whitespace-nowrap" style={{fontVariantNumeric:'tabular-nums'}}>¥{order.total.toLocaleString()}</td>}
                   {visibleColumns.includes('payment') && (
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                      <td className="px-3 py-2.5 text-gray-600 dark:text-gray-300">
                           {order.paymentMethod ? paymentMethodMap[order.paymentMethod] : '-'}
                       </td>
                   )}
                   {visibleColumns.includes('delivery') && (
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2.5">
                           {order.deliveryMethod ? (
                               <span className={`unified-tag ${
                                   order.deliveryMethod === 'Online'  ? 'unified-tag-blue' :
@@ -1180,26 +1186,26 @@ const OrderManager: React.FC = () => {
                       </td>
                   )}
                   {visibleColumns.includes('address') && (
-                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 max-w-[180px] truncate" title={order.shippingAddress}>
+                      <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 max-w-[180px] truncate" title={order.shippingAddress}>
                           {order.shippingAddress || '-'}
                       </td>
                   )}
                   {visibleColumns.includes('invoice') && (
-                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 max-w-[150px] truncate" title={order.invoiceInfo?.title}>
+                      <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 max-w-[150px] truncate" title={order.invoiceInfo?.title}>
                           {order.invoiceInfo?.title || '-'}
                       </td>
                   )}
                   {visibleColumns.includes('opportunity') && (
-                      <td className="px-4 py-3 text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer max-w-[150px] truncate" title={order.opportunityName} onClick={(e) => { e.stopPropagation(); if (order.opportunityId) navigate(`/opportunities/${order.opportunityId}`); }}>
+                      <td className="px-3 py-2.5 text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer max-w-[150px] truncate" title={order.opportunityName} onClick={(e) => { e.stopPropagation(); if (order.opportunityId) navigate(`/opportunities/${order.opportunityId}`); }}>
                           {order.opportunityName || '-'}
                       </td>
                   )}
                   {visibleColumns.includes('action') && (
-                      <td className={`px-4 py-3 text-right whitespace-nowrap sticky right-[52px] z-20 ${stickyBg} shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors overflow-visible`}>
+                      <td className={`px-3 py-2.5 text-right whitespace-nowrap sticky right-[52px] z-20 ${stickyBg} shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors overflow-visible`}>
                           {getAction(order)}
                       </td>
                   )}
-                  <td className={`px-4 py-3 sticky right-0 z-10 w-[52px] min-w-[52px] ${stickyBg} transition-colors`} />
+                  <td className={`px-3 py-2.5 sticky right-0 z-10 w-[52px] min-w-[52px] ${stickyBg} transition-colors`} />
                 </tr>
                 );
               })}

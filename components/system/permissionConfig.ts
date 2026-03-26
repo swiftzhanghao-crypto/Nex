@@ -21,6 +21,16 @@ export const columnConfig = [
               { id: 'billingInfo', label: '开票信息' },
               { id: 'level', label: '客户等级' }
           ]
+      },
+      {
+          id: 'Product' as PermissionResource,
+          label: '产品数据',
+          columns: [
+              { id: 'price', label: '产品价格' },
+              { id: 'skus', label: '规格列表' },
+              { id: 'composition', label: '组件构成' },
+              { id: 'installPackages', label: '安装包信息' },
+          ]
       }
   ];
 
@@ -212,10 +222,6 @@ const permissionTree = [
                   permissions: [
                       { id: 'product_tab_spu',      label: '产品列表',   desc: '查看产品列表（SPU）Tab' },
                       { id: 'product_tab_sku',      label: '规格列表',   desc: '查看规格列表（SKU）Tab' },
-                      { id: 'product_tab_license',  label: '授权类型',   desc: '查看授权类型 Tab' },
-                      { id: 'product_tab_rights',   label: '权益定义',   desc: '查看权益定义 Tab' },
-                      { id: 'product_tab_packages', label: '权益包',     desc: '查看权益包 Tab' },
-                      { id: 'product_tab_atomic',   label: '原子能力',   desc: '查看原子能力 Tab' },
                   ]
               },
               {
@@ -282,6 +288,12 @@ const permissionTree = [
                       { id: 'org_manage',  label: '组织架构管理', desc: '维护部门层级结构' },
                   ]
               },
+              {
+                  id: 's_biz_rules', label: '业务规则配置',
+                  permissions: [
+                      { id: 'license_type_view', label: '查看授权类型管理', desc: '查看授权类型管理列表及字段配置' },
+                  ]
+              },
           ]
       },
       {
@@ -312,17 +324,30 @@ export const resourceConfig = [
           label: '订单数据',
           dimensions: [
               { id: 'departmentId' as PermissionDimension, label: '部门' },
-              { id: 'productId' as PermissionDimension, label: '产品' },
-              { id: 'channelId' as PermissionDimension, label: '渠道' },
-              { id: 'buyerType' as PermissionDimension, label: '销售模式' }
+              { id: 'industryLine' as PermissionDimension, label: '行业推广类' },
+              { id: 'directChannelId' as PermissionDimension, label: '直接下级渠道' },
+              { id: 'province' as PermissionDimension, label: '省份' },
+              { id: 'orderType' as PermissionDimension, label: '订单类型' },
           ]
       },
       {
           id: 'Customer' as PermissionResource,
           label: '客户数据',
           dimensions: [
-              { id: 'customerIndustry' as PermissionDimension, label: '客户行业' },
-              { id: 'customerLevel' as PermissionDimension, label: '客户等级' }
+              { id: 'departmentId' as PermissionDimension, label: '部门' },
+              { id: 'industryLine' as PermissionDimension, label: '行业推广类' },
+              { id: 'directChannelId' as PermissionDimension, label: '直接下级渠道' },
+              { id: 'province' as PermissionDimension, label: '省份' },
+          ]
+      },
+      {
+          id: 'Product' as PermissionResource,
+          label: '产品数据',
+          dimensions: [
+              { id: 'departmentId' as PermissionDimension, label: '部门' },
+              { id: 'industryLine' as PermissionDimension, label: '行业推广类' },
+              { id: 'directChannelId' as PermissionDimension, label: '直接下级渠道' },
+              { id: 'province' as PermissionDimension, label: '省份' },
           ]
       }
   ];

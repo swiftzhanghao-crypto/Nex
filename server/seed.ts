@@ -1,7 +1,7 @@
 import { getDb, initSchema } from './db.ts';
 import {
   initialProducts, initialMerchandises, initialAtomicCapabilities,
-  initialProductRights, initialRightPackages, initialLicenseDefs,
+  initialAuthTypes,
   initialDepartments, initialRoles, initialUsers, initialChannels,
   initialStandaloneEnterprises,
 } from '../data/staticData.ts';
@@ -54,14 +54,13 @@ export function seedDatabase() {
 
   // --- Products ---
   const insertProduct = db.prepare(`
-    INSERT INTO products (id, name, category, sub_category, description, status, tags, skus, composition, install_pkgs, package_id, rights, license_tpl)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO products (id, name, category, sub_category, description, status, tags, skus, composition, install_pkgs, license_tpl)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   for (const p of initialProducts) {
     insertProduct.run(p.id, p.name, p.category, p.subCategory ?? null, p.description ?? null,
       p.status, JSON.stringify(p.tags ?? []), JSON.stringify(p.skus),
       JSON.stringify(p.composition ?? []), JSON.stringify(p.installPackages ?? []),
-      p.packageId ?? null, JSON.stringify(p.rights ?? []),
       p.licenseTemplate ? JSON.stringify(p.licenseTemplate) : null);
   }
 

@@ -2,15 +2,12 @@
 export type LicenseType = 'Subscription' | 'Perpetual' | 'FlatRate' | 'PerUser';
 export type LicenseUnit = 'Year' | 'Month' | 'Day' | 'Forever';
 
-export interface LicenseTypeDefinition {
+export interface AuthTypeData {
     id: string;
-    name: string; // e.g. "Commercial Annual"
-    code: string;
-    type: LicenseType;
-    period: number;
-    periodUnit: LicenseUnit;
-    scope: string; // e.g. "1 User"
-    description?: string;
+    name: string;
+    period: string;
+    nccBiz: string;
+    nccIncome: string;
 }
 
 export type ActivationMethod = 'LicenseKey' | 'Online' | 'Dongle';
@@ -34,6 +31,8 @@ export interface OrderItem extends MerchandiseItem {
     priceAtPurchase: number;
     
     installPackageName?: string;
+    installPackageType?: '通用' | '定制';
+    installPackageLink?: string;
     activationMethod: ActivationMethod;
     deliveredContent?: string[];
 
@@ -83,38 +82,20 @@ export interface OrderItem extends MerchandiseItem {
     afterSaleWarrantyPeriod?: string;
 }
 
-export type CapabilityType = 'Component' | 'Feature' | 'Rights' | 'Service';
+export type CapabilityType = 'Component' | 'Feature' | 'Service';
+export type ComponentNature = '自有' | '第三方采购' | '第三方授权';
 
 export interface AtomicCapability {
     id: string;
     name: string;
     type: CapabilityType;
     description?: string;
-}
-
-export type RightDataType = 'Number' | 'Boolean' | 'Text';
-
-export interface ProductRightDefinition {
-    id: string;
-    name: string;
-    code: string;
-    dataType: RightDataType;
-    unit?: string;
-    description?: string;
-}
-
-export interface RightValue {
-    definitionId: string;
-    name: string;
-    value: number | boolean | string;
-    unit?: string;
-}
-
-export interface RightPackage {
-    id: string;
-    name: string;
-    description?: string;
-    rights: RightValue[];
+    componentNo?: number;
+    version?: string;
+    nature?: ComponentNature;
+    generateSerial?: boolean;
+    referencedByProduct?: boolean;
+    enabled?: boolean;
 }
 
 export interface ProductLicenseConfig {
@@ -143,8 +124,6 @@ export interface ProductSku {
     pricingOptions?: SkuPricingOption[];
     parentId?: string;
     parentName?: string;
-    packageId?: string;
-    packageName?: string;
 }
 
 export interface InstallPackage {
@@ -162,6 +141,7 @@ export interface InstallPackage {
     productSpec?: string;
     enabled?: boolean;
     packageType?: 'public' | 'private';
+    source?: string;
 }
 
 export interface Product {
@@ -175,12 +155,24 @@ export interface Product {
     skus: ProductSku[];
     composition?: AtomicCapability[];
     installPackages?: InstallPackage[];
-    packageId?: string;
-    rights?: RightValue[];
     licenseTemplate?: {
         showLicensePeriod: boolean;
         showLicenseScope: boolean;
     };
+    productType?: string;
+    onlineDelivery?: string;
+    productClass?: string;
+    productClassification?: string;
+    productSeries?: string;
+    productCategory?: string;
+    productLine?: string;
+    productClassFinance?: string;
+    productLineFinance?: string;
+    productSeriesFinance?: string;
+    maintenanceContent?: string;
+    maintenanceStandard?: string;
+    hasUpgradeWarranty?: boolean;
+    hasAfterSalesService?: boolean;
 }
 
 export type SalesType = 'Direct' | 'Channel';
@@ -272,13 +264,16 @@ export interface Customer {
 export type UserRole = 'Admin' | 'Sales' | 'Business' | 'Technical' | 'Logistics' | string; // Updated to allow dynamic strings
 export type UserType = 'Internal' | 'External';
 
-export type PermissionResource = 'Order' | 'Customer' | 'Opportunity';
-export type PermissionDimension = 'departmentId' | 'productId' | 'customerIndustry' | 'customerLevel' | 'channelId' | 'buyerType';
+export type PermissionResource = 'Order' | 'Customer' | 'Opportunity' | 'Product';
+export type PermissionDimension = 'departmentId' | 'productId' | 'customerIndustry' | 'customerLevel' | 'channelId' | 'buyerType' | 'industryLine' | 'province' | 'directChannelId' | 'orderType';
+
+export type PermissionOperator = 'equals' | 'contains';
 
 export interface RowPermissionRule {
     id: string;
     resource: PermissionResource;
     dimension: PermissionDimension;
+    operator: PermissionOperator;
     values: string[];
 }
 
@@ -288,12 +283,15 @@ export interface ColumnPermissionRule {
     allowedColumns: string[];
 }
 
+export type BaseRowPermission = 'self' | 'department' | 'all';
+
 export interface RoleDefinition {
     id: string;
     name: string;
     description: string;
     permissions: string[];
-    isSystem?: boolean; // System roles cannot be deleted
+    isSystem?: boolean;
+    baseRowPermission?: BaseRowPermission;
     rowPermissions?: RowPermissionRule[];
     columnPermissions?: ColumnPermissionRule[];
 }

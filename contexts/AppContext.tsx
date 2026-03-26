@@ -1,8 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type {
-    Product, SalesMerchandise, AtomicCapability, ProductRightDefinition,
-    RightPackage, LicenseTypeDefinition, Customer, Opportunity, Order,
+    Product, SalesMerchandise, AtomicCapability,
+    AuthTypeData, Customer, Opportunity, Order,
     User, Department, RoleDefinition, Channel, Enterprise,
     Contract, Remittance, Invoice, Performance, Authorization, DeliveryInfo,
     OrderDraft,
@@ -10,7 +10,7 @@ import type {
 
 import {
     initialProducts, initialMerchandises, initialAtomicCapabilities,
-    initialProductRights, initialRightPackages, initialLicenseDefs,
+    initialAuthTypes,
     initialDepartments, initialRoles, initialUsers, initialChannels,
     initialStandaloneEnterprises,
 } from '../data/staticData';
@@ -49,12 +49,8 @@ interface AppContextType {
     setMerchandises: React.Dispatch<React.SetStateAction<SalesMerchandise[]>>;
     atomicCapabilities: AtomicCapability[];
     setAtomicCapabilities: React.Dispatch<React.SetStateAction<AtomicCapability[]>>;
-    productRights: ProductRightDefinition[];
-    setProductRights: React.Dispatch<React.SetStateAction<ProductRightDefinition[]>>;
-    rightPackages: RightPackage[];
-    setRightPackages: React.Dispatch<React.SetStateAction<RightPackage[]>>;
-    licenseDefs: LicenseTypeDefinition[];
-    setLicenseDefs: React.Dispatch<React.SetStateAction<LicenseTypeDefinition[]>>;
+    authTypes: AuthTypeData[];
+    setAuthTypes: React.Dispatch<React.SetStateAction<AuthTypeData[]>>;
 
     customers: Customer[];
     setCustomers: React.Dispatch<React.SetStateAction<Customer[]>>;
@@ -104,9 +100,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [products, setProducts] = useState(initialProducts);
     const [merchandises, setMerchandises] = useState(initialMerchandises);
     const [atomicCapabilities, setAtomicCapabilities] = useState(initialAtomicCapabilities);
-    const [productRights, setProductRights] = useState(initialProductRights);
-    const [rightPackages, setRightPackages] = useState(initialRightPackages);
-    const [licenseDefs, setLicenseDefs] = useState(initialLicenseDefs);
+    const [authTypes, setAuthTypes] = useState(initialAuthTypes);
 
     // --- CRM domain ---
     const [customers, setCustomers] = useState(USE_API ? [] as Customer[] : mockCustomers);
@@ -208,9 +202,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         products, setProducts,
         merchandises, setMerchandises,
         atomicCapabilities, setAtomicCapabilities,
-        productRights, setProductRights,
-        rightPackages, setRightPackages,
-        licenseDefs, setLicenseDefs,
+        authTypes, setAuthTypes,
 
         customers, setCustomers,
         opportunities, setOpportunities,

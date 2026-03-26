@@ -13,7 +13,6 @@ const sectionNavItems = [
   { label: '授权类型', id: 'license-section' },
   { label: '资料',     id: 'docs-section' },
   { label: '售卖范围', id: 'scope-section' },
-  { label: '产品权益', id: 'rights-section' },
   { label: '交付物', id: 'delivery-section' },
 ];
 
@@ -237,9 +236,7 @@ const ProductPreview: React.FC = () => {
                       >
                         <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-gray-100 dark:border-white/5">
                           <h3 className="text-base font-bold text-[#2B5AED]">
-                            {option.license.type === 'Subscription' ? '用户订阅许可' :
-                             option.license.type === 'Perpetual'    ? '永久授权'     :
-                             option.license.type === 'FlatRate'     ? '固定价授权'   : '数量授权'}
+                            {option.title}
                           </h3>
                           <span className="unified-tag-blue">已启用</span>
                         </div>
@@ -256,8 +253,8 @@ const ProductPreview: React.FC = () => {
                           ))}
                         </div>
                         <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
-                          <span className={option.license.type === 'Subscription' ? 'unified-tag-green' : 'unified-tag-orange'}>
-                            {option.license.type === 'Subscription' ? '标准在售' : '非标在售'}
+                          <span className={option.license.periodUnit !== 'Forever' ? 'unified-tag-green' : 'unified-tag-orange'}>
+                            {option.license.periodUnit !== 'Forever' ? '周期性' : '非周期性'}
                           </span>
                           <span className="text-base font-bold text-[#2B5AED]">¥ {option.price.toLocaleString()}</span>
                         </div>
@@ -337,39 +334,6 @@ const ProductPreview: React.FC = () => {
                       </div>
                     </div>
                   ))}
-                </div>
-              </section>
-
-              {/* 产品权益 */}
-              <section id="rights-section" className="scroll-mt-20">
-                <h2 className="text-base font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-[#2B5AED]" /> 产品权益
-                </h2>
-                <div className="bg-white dark:bg-[#1E1E1E] p-4 rounded-xl shadow-apple border border-gray-100 dark:border-gray-800">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                    {[
-                      { name: 'WPS Office 专业版', value: '端侧软件 · Win端' },
-                      { name: 'WPS 365 公有云办公平台', value: '公有云服务' },
-                      { name: 'WPS 365 政务版办公平台', value: '私有云服务' },
-                    ].map((right, idx) => (
-                      <div key={idx} className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700 hover:border-[#2B5AED]/30 transition-colors">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-bold text-gray-900 dark:text-white leading-snug">{right.name}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{right.value}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-start justify-between gap-6">
-                    <p className="text-xs text-gray-400 flex items-start gap-2 italic flex-1">
-                      <Info className="w-3.5 h-3.5 text-[#2B5AED] shrink-0 mt-0.5" />
-                      公有云权益随发货自动下发至企业账号下！
-                    </p>
-                    <p className="text-xs text-gray-400 flex items-start gap-2 italic flex-1">
-                      <Info className="w-3.5 h-3.5 text-[#2B5AED] shrink-0 mt-0.5" />
-                      私有云授权管控请在OA完成申请lic文件，在客户部署环境下完成激活！
-                    </p>
-                  </div>
                 </div>
               </section>
 

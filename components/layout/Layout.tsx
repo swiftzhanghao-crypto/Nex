@@ -70,12 +70,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       '/merchandises': '商品管理',
       '/product-pricing/msrp': '建议售价',
       '/product-pricing/channel': '渠道价格',
+      '/system/license-types': '授权类型管理',
     };
     if (staticMap[pathname]) return staticMap[pathname];
     const m = pathname.match(/^\/orders\/(.+)$/);
     if (m) return `订单 ${m[1]}`;
     const c = pathname.match(/^\/customers\/(.+)$/);
     if (c) return `客户详情`;
+    const p = pathname.match(/^\/products\/(.+)$/);
+    if (p) return `产品详情`;
     const ch = pathname.match(/^\/channels\/(.+)$/);
     if (ch) return `渠道详情`;
     return '页面';
@@ -106,6 +109,28 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       }
     }
   };
+  const closeOtherTabs = (tabId: string) => {
+    const keep = tabs.filter(t => t.id === tabId);
+    setTabs(keep);
+    if (activeTabId !== tabId && keep.length > 0) {
+      navigate(keep[0].path);
+    }
+  };
+
+  const closeAllTabs = () => {
+    setTabs([]);
+    navigate('/');
+  };
+
+  const [ctxMenu, setCtxMenu] = useState<{x: number; y: number; tabId: string} | null>(null);
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const close = () => setCtxMenu(null);
+    document.addEventListener('click', close);
+    document.addEventListener('contextmenu', close);
+    return () => { document.removeEventListener('click', close); document.removeEventListener('contextmenu', close); };
+  }, [ctxMenu]);
+
   // ── End Tab Bar ────────────────────────────────────────────
 
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
@@ -157,7 +182,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         setActiveTopNav('CHANNEL_CENTER');
     } else if (location.pathname.startsWith('/customers') || location.pathname.startsWith('/opportunities') || location.pathname.startsWith('/contracts') || location.pathname.startsWith('/remittances') || location.pathname.startsWith('/invoices') || location.pathname.startsWith('/authorizations') || location.pathname.startsWith('/delivery-info')) {
         setActiveTopNav('ORDER_CENTER');
-    } else if (location.pathname.startsWith('/organization') || location.pathname.startsWith('/users') || location.pathname.startsWith('/roles')) {
+    } else if (location.pathname.startsWith('/organization') || location.pathname.startsWith('/users') || location.pathname.startsWith('/roles') || location.pathname.startsWith('/system/')) {
           setActiveTopNav('SYSTEM_CONFIG');
       } else if (location.pathname.startsWith('/products') || location.pathname.startsWith('/merchandises') || location.pathname.startsWith('/catalog') || location.pathname.startsWith('/product-center') || location.pathname.startsWith('/product-pricing') || location.pathname.startsWith('/product-manage')) {
           setActiveTopNav('PRODUCT_CENTER');
@@ -212,7 +237,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       { id: 'CHANNEL_CENTER', label: '渠道中心', path: '/channels', permissions: ['channel_view'] },
       { id: 'LEADS_CENTER', label: '线索中心', path: '/leads', permissions: ['leads_view'] },
       { id: 'OPERATIONS_CENTER', label: '运营中心', path: '/wps-ops', permissions: ['wps_ops_view'] },
-      { id: 'SYSTEM_CONFIG', label: '系统配置', path: '/organization', permissions: ['admin_view', 'user_manage', 'role_manage', 'org_manage'] }
+      { id: 'SYSTEM_CONFIG', label: '系统配置', path: '/organization', permissions: ['admin_view', 'user_manage', 'role_manage', 'org_manage', 'license_type_view'] }
   ].filter(item => item.permissions.some(p => hasPermission(p)));
 
   const toggleFullScreen = () => {
@@ -553,6 +578,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             <NavItem to="/roles" icon={Shield} label="角色管理" />
                           </>
                         )}
+                        {renderSectionGroup('system_biz_rules', '业务规则配置',
+                          <>
+                            <NavItem to="/system/license-types" icon={KeyRound} label="授权类型管理" permission="license_type_view" />
+                          </>
+                        )}
                       </>
                     )}
 
@@ -566,19 +596,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Tab Bar */}
             {tabs.length > 0 && (
-              <div className="shrink-0 flex items-end bg-[#F0F0F2] dark:bg-[#111] border-b border-gray-200 dark:border-white/10 px-2 overflow-x-auto no-scrollbar" style={{ height: 36 }}>
+              <div className="shrink-0 flex items-end bg-[#F0F0F2] dark:bg-[#111] border-b border-gray-200 dark:border-white/10 px-2 overflow-x-auto no-scrollbar relative" style={{ height: 36 }}>
                 {tabs.map(tab => {
                   const isActive = activeTabId === tab.id;
                   return (
                     <div
                       key={tab.id}
                       onClick={() => navigate(tab.path)}
+                      onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, tabId: tab.id }); }}
                       className={`group relative flex items-center gap-1.5 px-3 cursor-pointer shrink-0 select-none transition-colors duration-150 rounded-t-lg mr-0.5 ${
                         isActive
                           ? 'bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white shadow-[0_-1px_0_0_#e5e7eb] dark:shadow-[0_-1px_0_0_rgba(255,255,255,0.1)]'
                           : 'bg-transparent text-gray-500 dark:text-gray-400 hover:bg-white/70 dark:hover:bg-white/8 hover:text-gray-800 dark:hover:text-gray-200'
                       }`}
                       style={{ height: 34, maxWidth: 160 }}
+                      title={tab.title}
                     >
                       <span className="text-xs font-medium truncate max-w-[110px] whitespace-nowrap">{tab.title}</span>
                       <button
@@ -595,6 +627,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </div>
                   );
                 })}
+
+                {/* Tab context menu */}
+                {ctxMenu && (
+                  <div className="tab-ctx-menu fixed bg-white dark:bg-[#2C2C2E] rounded-lg shadow-2xl border border-gray-200 dark:border-white/10 py-1 z-[999] min-w-[140px]" style={{ left: ctxMenu.x, top: ctxMenu.y }}>
+                    <button onClick={(e) => { e.stopPropagation(); closeTab(e as any, ctxMenu.tabId); setCtxMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">关闭标签页</button>
+                    <button onClick={() => { closeOtherTabs(ctxMenu.tabId); setCtxMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">关闭其他标签页</button>
+                    <div className="h-px bg-gray-100 dark:bg-white/10 my-1"></div>
+                    <button onClick={() => { closeAllTabs(); setCtxMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">关闭所有标签页</button>
+                  </div>
+                )}
               </div>
             )}
             <main className="flex-1 overflow-auto scroll-smooth relative custom-scrollbar p-0 lg:p-0">

@@ -21,6 +21,9 @@ data/*.db-shm
 # Environment
 .env
 
+# Playwright MCP screenshots
+.playwright-mcp/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

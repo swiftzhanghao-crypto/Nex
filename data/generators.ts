@@ -486,11 +486,11 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
     };
 
     const extraProductPool = [
-      { productId: 'AB0000003', productName: 'WPS 365 高级版', skuId: 's2', skuName: '标准版', price: 499 },
-      { productId: 'AB0000002', productName: 'WPS 365 基础版 (政府)', skuId: 's1-2', skuName: '基础版', price: 199 },
-      { productId: 'AB0000005', productName: 'WPS 365 高级版 (私有云)', skuId: 's5', skuName: '标准版', price: 50000 },
-      { productId: 'AB0000007', productName: 'Web Office 核心组件', skuId: 's8', skuName: '标准版', price: 20000 },
-      { productId: 'AB0000001', productName: 'WPS 365 标准版 (政府)', skuId: 's1', skuName: '标准版', price: 299 },
+      { productId: 'AB0000841', productName: 'WPS 365协作办公旗舰平台V12', skuId: 'SKU0013541', skuName: '旗舰版', price: 499 },
+      { productId: 'AB0002742', productName: 'WPS 365数字政务标准版', skuId: 'SKU0018227', skuName: '标准版', price: 199 },
+      { productId: 'AB0002815', productName: 'WPS 365专业办公高级平台V7', skuId: 'SKU0018314', skuName: '定制版（保险保障基金）', price: 150000 },
+      { productId: 'AB0001841', productName: 'WPS在线预览系统V1', skuId: 'SKU0017542', skuName: '在线预览（API生态基础版）', price: 15000 },
+      { productId: 'AB0000765', productName: 'WPS Office 2023专业版办公软件V12.8', skuId: 'SKU0013394', skuName: '专业版', price: 698 },
     ];
 
     const makeItem = (mItem: { productId: string; productName: string; skuId: string; skuName: string; quantity?: number }, unitPrice: number, idxOffset: number): OrderItem => {
@@ -859,10 +859,10 @@ export function generateAuthorizations(): Authorization[] {
   const products = [
     { name: 'WPS PDF专业版软件V12', code: 'AB0001879' },
     { name: 'WPS Office 2023 for Linux专业版办公软件V12.8', code: 'AB0000772' },
-    { name: 'WPS Office 2023 专业版V12', code: 'AB0002156' },
-    { name: 'WPS 365 企业版', code: 'AB0003210' },
-    { name: 'WPS AI 企业版', code: 'AB0004001' },
-    { name: 'WPS 数据库专业版V3.0', code: 'AB0002789' },
+    { name: 'WPS 365协作办公旗舰平台V12', code: 'AB0000841' },
+    { name: 'WPS 365专业办公高级平台V7', code: 'AB0002815' },
+    { name: 'WPS黑马校对软件V31', code: 'AB0001721' },
+    { name: 'WPS Office 2023专业版办公软件V12.8', code: 'AB0000765' },
   ];
   return Array.from({ length: 50 }, (_, i) => {
     const comp = companies[i % companies.length];

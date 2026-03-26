@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, UserType, RoleDefinition, PermissionDimension, RowPermissionRule, ColumnPermissionRule, PermissionResource } from '../../types';
+import { User, UserType, RoleDefinition, PermissionDimension, RowPermissionRule, ColumnPermissionRule, PermissionResource, BaseRowPermission } from '../../types';
 import { Search, Plus, Shield, User as UserIcon, Briefcase, Truck, Edit, Building2, X, Mail, Phone, CheckCircle, Calendar, Hash, Lock, CheckSquare, Settings, Save, Trash2, Database, Check, ChevronDown, ChevronRight, Columns, Copy } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
@@ -38,6 +38,8 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   const [selectedResource, setSelectedResource] = useState<PermissionResource>('Order');
   const [roleConfigTab, setRoleConfigTab] = useState<'FUNCTIONAL' | 'ROW' | 'COLUMN'>('FUNCTIONAL');
   const [selectedColumnResource, setSelectedColumnResource] = useState<PermissionResource>('Order');
+  const [roleDetailTab, setRoleDetailTab] = useState<'MEMBERS' | 'PERMISSIONS'>('MEMBERS');
+  const [openDimDropdown, setOpenDimDropdown] = useState<string | null>(null);
 
   const toggleColumn = (colId: string) => {
       const currentRules = roleForm.columnPermissions || [];
@@ -81,6 +83,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
               id: `rule-${Date.now()}`,
               resource: selectedResource,
               dimension: dim,
+              operator: 'equals',
               values: []
           };
           setRoleForm(prev => ({
@@ -350,20 +353,69 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       });
   };
 
+  const updateRuleOperator = (ruleId: string, operator: 'equals' | 'contains') => {
+      setRoleForm(prev => ({
+          ...prev,
+          rowPermissions: (prev.rowPermissions || []).map(r =>
+              r.id === ruleId ? { ...r, operator } : r
+          )
+      }));
+  };
+
+  const getDepartmentPath = (deptId: string): string => {
+      const dept = departments.find(d => d.id === deptId);
+      if (!dept) return deptId;
+      if (dept.parentId) {
+          const parentPath = getDepartmentPath(dept.parentId);
+          return `${parentPath} / ${dept.name}`;
+      }
+      return dept.name;
+  };
+
   const getDimensionOptions = (dim: PermissionDimension) => {
+      if (dim === 'departmentId') {
+          return departments.map(d => ({ value: d.id, label: getDepartmentPath(d.id) }));
+      }
+      if (dim === 'industryLine') {
+          const lines = [
+              '政务特种', '大客民企', '政务区域党政', '企业区域金融', '企业区域民企',
+              '区域新闻出版传媒', '部委党政', '部委医疗', '部委新闻出版传媒', '其他',
+              '大客央国企', '大客特种', '渠道和生态', '国内SaaS', '大客金融',
+              '教育业务', '企业区域国企', '医疗行业',
+          ];
+          return lines.map(l => ({ value: l, label: l }));
+      }
+      if (dim === 'directChannelId') {
+          return channels.map(c => ({ value: c.id, label: c.name }));
+      }
+      if (dim === 'province') {
+          const provinces = [
+              '北京市', '天津市', '上海市', '重庆市',
+              '河北省', '山西省', '辽宁省', '吉林省', '黑龙江省',
+              '江苏省', '浙江省', '安徽省', '福建省', '江西省', '山东省',
+              '河南省', '湖北省', '湖南省', '广东省', '海南省',
+              '四川省', '贵州省', '云南省', '陕西省', '甘肃省', '青海省',
+              '台湾省', '内蒙古自治区', '广西壮族自治区', '西藏自治区',
+              '宁夏回族自治区', '新疆维吾尔自治区',
+              '香港特别行政区', '澳门特别行政区',
+          ];
+          return provinces.map(p => ({ value: p, label: p }));
+      }
+      if (dim === 'orderType') {
+          return ['新购订单', '续费订单', '增购订单', '降配订单', '退款订单'].map(t => ({ value: t, label: t }));
+      }
       if (dim === 'buyerType') return [
           { value: 'Customer', label: '客户直签' },
           { value: 'Channel', label: '渠道代理' },
-          { value: 'SelfDeal', label: '自主成交' }
+          { value: 'SelfDeal', label: '自主成交' },
       ];
       if (dim === 'channelId') return channels.map(c => ({ value: c.id, label: c.name }));
       if (dim === 'customerIndustry') return ['互联网', '金融', '教育', '制造', '政府', '医疗', '零售'].map(i => ({ value: i, label: i }));
-      if (dim === 'departmentId') return departments.map(d => ({ value: d.id, label: d.name }));
       if (dim === 'productId') return [
           { value: 'wps-office', label: 'WPS Office' },
           { value: 'wps-365', label: 'WPS 365' },
-          { value: 'wps-ai', label: 'WPS AI' }
-      ]; // Mock products for now, ideally passed in props
+          { value: 'wps-ai', label: 'WPS AI' },
+      ];
       if (dim === 'customerLevel') return ['KA', 'SMB', 'Enterprise'].map(l => ({ value: l, label: l }));
       return [];
   };
@@ -734,77 +786,144 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                           ))}
                                       </div>
 
-                                      {/* Dimensions Selection */}
+                                      {/* Base Row Permission */}
+                                      <div>
+                                          <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">基础行权限</div>
+                                          <div className="flex gap-3">
+                                              {([
+                                                  { value: 'self' as BaseRowPermission, label: '本人', desc: '仅可见与本人关联的数据', icon: '👤' },
+                                                  { value: 'department' as BaseRowPermission, label: '本部门', desc: '可见本部门所有成员的数据', icon: '🏢' },
+                                                  { value: 'all' as BaseRowPermission, label: '全部数据', desc: '可见所有数据，无范围限制', icon: '🌐' },
+                                              ]).map(opt => {
+                                                  const isSelected = (roleForm.baseRowPermission || 'all') === opt.value;
+                                                  return (
+                                                      <button
+                                                          key={opt.value}
+                                                          onClick={() => setRoleForm(prev => ({ ...prev, baseRowPermission: opt.value }))}
+                                                          className={`flex-1 p-3 rounded-xl border-2 text-left transition-all ${isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400 shadow-sm' : 'border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20'}`}
+                                                      >
+                                                          <div className="flex items-center gap-2 mb-1">
+                                                              <span className="text-base">{opt.icon}</span>
+                                                              <span className={`text-sm font-bold ${isSelected ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}>{opt.label}</span>
+                                                              {isSelected && <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 ml-auto"/>}
+                                                          </div>
+                                                          <div className="text-xs text-gray-500 dark:text-gray-400">{opt.desc}</div>
+                                                      </button>
+                                                  );
+                                              })}
+                                          </div>
+                                      </div>
+
+                                      {/* OR divider */}
+                                      <div className="flex items-center gap-3">
+                                          <div className="flex-1 border-t border-dashed border-gray-300 dark:border-white/15"></div>
+                                          <span className="px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 text-xs font-bold border border-amber-200 dark:border-amber-700/30">或 OR</span>
+                                          <div className="flex-1 border-t border-dashed border-gray-300 dark:border-white/15"></div>
+                                      </div>
+
+                                      {/* Dimension Rows: Left(dim) - Middle(operator) - Right(values) */}
+                                      <div>
+                                          <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">自定义维度过滤</div>
+                                      </div>
                                       {resourceConfig.find(r => r.id === selectedResource) && (
-                                          <div className="space-y-6">
-                                              <div className="flex items-center gap-4">
-                                                  <span className="text-sm font-bold text-gray-700 dark:text-gray-300 w-20">权限维度</span>
-                                                  <div className="flex gap-4 flex-wrap">
-                                                      {resourceConfig.find(r => r.id === selectedResource)?.dimensions.map(dim => {
-                                                          const isChecked = roleForm.rowPermissions?.some(r => r.resource === selectedResource && r.dimension === dim.id);
-                                                          return (
-                                                              <label key={dim.id} className="flex items-center gap-2 cursor-pointer group">
-                                                                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isChecked ? 'bg-blue-600 border-blue-600' : 'border-gray-300 bg-white dark:bg-transparent dark:border-gray-600 group-hover:border-blue-400'}`}>
-                                                                      {isChecked && <Check className="w-3 h-3 text-white"/>}
-                                                                  </div>
-                                                                  <input 
-                                                                      type="checkbox" 
-                                                                      className="hidden" 
-                                                                      checked={!!isChecked} 
-                                                                      onChange={() => toggleDimension(dim.id)} 
-                                                                  />
-                                                                  <span className="text-sm text-gray-700 dark:text-gray-300">{dim.label}</span>
-                                                              </label>
-                                                          );
-                                                      })}
-                                                  </div>
-                                              </div>
+                                          <div className="space-y-3">
+                                              {resourceConfig.find(r => r.id === selectedResource)?.dimensions.map(dim => {
+                                                  const rule = roleForm.rowPermissions?.find(r => r.resource === selectedResource && r.dimension === dim.id);
+                                                  const isEnabled = !!rule;
+                                                  const allOptions = getDimensionOptions(dim.id);
+                                                  const availableOptions = allOptions.filter(opt => !rule?.values.includes(opt.value));
 
-                                              {/* Dimension Values Configuration */}
-                                              <div className="space-y-4">
-                                                  {resourceConfig.find(r => r.id === selectedResource)?.dimensions.map(dim => {
-                                                      const rule = roleForm.rowPermissions?.find(r => r.resource === selectedResource && r.dimension === dim.id);
-                                                      if (!rule) return null;
-
-                                                      const availableOptions = getDimensionOptions(dim.id).filter(opt => !rule.values.includes(opt.value));
-
-                                                      return (
-                                                          <div key={dim.id} className="flex items-start gap-4 border-t border-gray-200 dark:border-white/10 pt-4">
-                                                              <span className="text-sm font-bold text-gray-700 dark:text-gray-300 w-20 pt-2">{dim.label}</span>
-                                                              <div className="flex-1 space-y-3">
-                                                                  <div className="flex flex-wrap gap-2">
-                                                                      {rule.values.map(v => (
-                                                                          <span key={v} className="px-3 py-1 bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                                                                              {getReadableValue(dim.id, v)}
-                                                                              <button onClick={() => updateRuleValues(rule.id, v)} className="text-gray-400 hover:text-red-500"><X className="w-3 h-3"/></button>
-                                                                          </span>
-                                                                      ))}
+                                                  return (
+                                                      <div key={dim.id} className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E]">
+                                                          <div className="flex items-stretch gap-0">
+                                                              {/* Left: Dimension toggle + label */}
+                                                              <div
+                                                                  onClick={() => toggleDimension(dim.id)}
+                                                                  className={`flex items-center gap-2.5 w-[160px] min-w-[160px] px-4 py-3 cursor-pointer select-none border-r border-gray-200 dark:border-white/10 transition-colors rounded-l-xl ${isEnabled ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                                              >
+                                                                  <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${isEnabled ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-600'}`}>
+                                                                      {isEnabled && <Check className="w-3 h-3 text-white"/>}
                                                                   </div>
-                                                                  
-                                                                  <div className="flex flex-wrap gap-2">
-                                                                      {availableOptions.map(opt => (
-                                                                          <button 
-                                                                              key={opt.value} 
-                                                                              onClick={() => updateRuleValues(rule.id, opt.value)}
-                                                                              className="px-3 py-1 rounded-lg text-sm font-medium border border-dashed border-gray-300 dark:border-white/20 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition flex items-center gap-1"
-                                                                          >
-                                                                              <Plus className="w-3 h-3"/> {opt.label}
-                                                                          </button>
-                                                                      ))}
-                                                                      {availableOptions.length === 0 && (
-                                                                          <span className="text-xs text-gray-400 italic py-1">已选择所有可用项</span>
-                                                                      )}
-                                                                  </div>
+                                                                  <span className={`text-sm font-bold whitespace-nowrap ${isEnabled ? 'text-blue-700 dark:text-blue-300' : 'text-gray-500 dark:text-gray-400'}`}>{dim.label}</span>
+                                                              </div>
+
+                                                              {/* Middle: Operator selector */}
+                                                              <div className="flex items-center px-3 border-r border-gray-200 dark:border-white/10 min-w-[90px]">
+                                                                  {isEnabled ? (
+                                                                      <select
+                                                                          value={rule?.operator || 'equals'}
+                                                                          onChange={e => updateRuleOperator(rule!.id, e.target.value as 'equals' | 'contains')}
+                                                                          className="text-xs font-bold text-center bg-transparent border-none outline-none cursor-pointer text-blue-600 dark:text-blue-400 py-1"
+                                                                      >
+                                                                          <option value="equals">等于</option>
+                                                                          <option value="contains">包含</option>
+                                                                      </select>
+                                                                  ) : (
+                                                                      <span className="text-xs text-gray-300 dark:text-gray-600 font-medium">—</span>
+                                                                  )}
+                                                              </div>
+
+                                                              {/* Right: Value chips + add button */}
+                                                              <div className="flex-1 px-4 py-2.5 min-h-[44px] flex items-center">
+                                                                  {isEnabled ? (
+                                                                      <div className="flex flex-wrap gap-1.5 items-center">
+                                                                          {rule!.values.map(v => (
+                                                                              <span key={v} className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700/50 rounded-md text-xs font-medium text-blue-700 dark:text-blue-300">
+                                                                                  {getReadableValue(dim.id, v)}
+                                                                                  <button onClick={() => updateRuleValues(rule!.id, v)} className="text-blue-400 hover:text-red-500 transition-colors"><X className="w-3 h-3"/></button>
+                                                                              </span>
+                                                                          ))}
+                                                                          {availableOptions.length > 0 && (
+                                                                              <button
+                                                                                  onClick={() => setOpenDimDropdown(openDimDropdown === dim.id ? null : dim.id)}
+                                                                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border border-dashed transition-colors ${openDimDropdown === dim.id ? 'border-blue-400 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-white/20 text-gray-500 dark:text-gray-400 hover:text-blue-600 hover:border-blue-400 dark:hover:text-blue-400'}`}
+                                                                              >
+                                                                                  <Plus className="w-3 h-3"/> 添加
+                                                                              </button>
+                                                                          )}
+                                                                          {rule!.values.length === 0 && availableOptions.length > 0 && openDimDropdown !== dim.id && (
+                                                                              <span className="text-xs text-gray-400 italic">点击添加以选择值</span>
+                                                                          )}
+                                                                          {availableOptions.length === 0 && rule!.values.length > 0 && (
+                                                                              <span className="text-xs text-gray-400 italic ml-1">已全选</span>
+                                                                          )}
+                                                                      </div>
+                                                                  ) : (
+                                                                      <span className="text-xs text-gray-300 dark:text-gray-600 italic">未启用</span>
+                                                                  )}
                                                               </div>
                                                           </div>
-                                                      );
-                                                  })}
-                                                  {(!roleForm.rowPermissions || !roleForm.rowPermissions.some(r => r.resource === selectedResource)) && (
-                                                      <div className="text-center py-8 text-gray-400 text-sm italic border-t border-gray-200 dark:border-white/10">
-                                                          请先勾选上方的权限维度，以配置具体的数据访问范围。若不勾选，则默认可见所有{resourceConfig.find(r => r.id === selectedResource)?.label}。
+
+                                                          {/* Expandable options panel */}
+                                                          {isEnabled && openDimDropdown === dim.id && availableOptions.length > 0 && (
+                                                              <div className="border-t border-gray-200 dark:border-white/10 px-4 py-3 bg-gray-50/80 dark:bg-black/20 rounded-b-xl">
+                                                                  <div className="flex flex-wrap gap-1.5">
+                                                                      {availableOptions.map(opt => (
+                                                                          <button
+                                                                              key={opt.value}
+                                                                              onClick={() => {
+                                                                                  updateRuleValues(rule!.id, opt.value);
+                                                                                  const remaining = availableOptions.filter(o => o.value !== opt.value);
+                                                                                  if (remaining.length === 0) setOpenDimDropdown(null);
+                                                                              }}
+                                                                              className="px-2.5 py-1 rounded-md text-xs font-medium bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 transition-colors"
+                                                                          >
+                                                                              {opt.label}
+                                                                          </button>
+                                                                      ))}
+                                                                  </div>
+                                                              </div>
+                                                          )}
                                                       </div>
-                                                  )}
-                                              </div>
+                                                  );
+                                              })}
+
+                                              {/* Empty state */}
+                                              {(!roleForm.rowPermissions || !roleForm.rowPermissions.some(r => r.resource === selectedResource)) && (
+                                                  <div className="text-center py-6 text-gray-400 text-sm italic mt-2">
+                                                      请勾选左侧维度以配置数据访问范围。未勾选维度默认可见所有{resourceConfig.find(r => r.id === selectedResource)?.label}。
+                                                  </div>
+                                              )}
                                           </div>
                                       )}
                                   </div>
@@ -883,9 +1002,28 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                   </div>
                               </div>
                               
+                              {/* Tab 切换 */}
+                              <div className="flex border-b border-gray-100 dark:border-white/10 px-6">
+                                  <button
+                                      onClick={() => setRoleDetailTab('MEMBERS')}
+                                      className={`px-4 py-3 text-sm font-bold transition-colors relative ${roleDetailTab === 'MEMBERS' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                                  >
+                                      <div className="flex items-center gap-2"><UserIcon className="w-4 h-4"/> 角色成员 <span className="text-xs font-normal text-gray-400">({users.filter(u => u.role === selectedRoleId).length})</span></div>
+                                      {roleDetailTab === 'MEMBERS' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-t-full" />}
+                                  </button>
+                                  <button
+                                      onClick={() => setRoleDetailTab('PERMISSIONS')}
+                                      className={`px-4 py-3 text-sm font-bold transition-colors relative ${roleDetailTab === 'PERMISSIONS' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                                  >
+                                      <div className="flex items-center gap-2"><Shield className="w-4 h-4"/> 权限配置 <span className="text-xs font-normal text-gray-400">({(roleForm.permissions || []).length})</span></div>
+                                      {roleDetailTab === 'PERMISSIONS' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-t-full" />}
+                                  </button>
+                              </div>
+
                               <div className="flex-1 overflow-auto p-6 space-y-6">
-                                  {/* 角色成员 */}
-                                  <div>
+                                  {/* ===== 角色成员 Tab ===== */}
+                                  {roleDetailTab === 'MEMBERS' && (
+                                  <div className="animate-fade-in">
                                       <div className="flex justify-between items-center mb-3">
                                           <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2"><UserIcon className="w-4 h-4"/> 角色成员</h3>
                                           <button onClick={() => setIsAddUserModalOpen(true)} className="px-3 py-1.5 bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-lg text-sm hover:bg-blue-100 dark:hover:bg-blue-900/40 transition flex items-center gap-1"><Plus className="w-4 h-4"/> 添加成员</button>
@@ -916,47 +1054,162 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                           )}
                                       </div>
                                   </div>
+                                  )}
 
-                                  {/* 功能权限概览（只读） */}
-                                  <div>
-                                      <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 mb-3">
-                                          <CheckSquare className="w-4 h-4"/> 功能权限
-                                          <span className="text-xs font-normal text-gray-400 ml-1">
-                                              ({(roleForm.permissions || []).length} 个权限点)
-                                          </span>
-                                      </h3>
-                                      <div className="space-y-1">
-                                          {permissionTree.map(group => {
-                                              const current    = roleForm.permissions || [];
-                                              const groupPerms = allPermsInGroup(group);
-                                              const groupState = getCheckState(groupPerms, current);
-                                              if (groupState === 'none') return null;
-                                              return (
-                                                  <div key={group.id} className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
-                                                      <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-50/60 dark:bg-blue-900/10">
-                                                          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${groupState === 'all' ? 'bg-blue-600 border-blue-600' : 'bg-blue-400/60 border-blue-400'}`}>
-                                                              <Check className="w-2.5 h-2.5 text-white"/>
-                                                          </div>
-                                                          <span className="font-bold text-sm text-gray-800 dark:text-gray-100">{group.label}</span>
-                                                          <span className="text-xs text-blue-500 dark:text-blue-400 ml-auto">
-                                                              {groupPerms.filter(id => current.includes(id)).length}/{groupPerms.length}
-                                                          </span>
-                                                      </div>
-                                                      <div className="px-4 py-2.5 bg-white dark:bg-[#1C1C1E] flex flex-wrap gap-2">
-                                                          {group.subgroups.flatMap(sg => sg.permissions).filter(p => current.includes(p.id)).map(p => (
-                                                              <span key={p.id} className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-xs font-medium border border-blue-100 dark:border-blue-800/30">
-                                                                  {p.label}
+                                  {/* ===== 权限配置 Tab ===== */}
+                                  {roleDetailTab === 'PERMISSIONS' && (
+                                  <div className="animate-fade-in space-y-6">
+                                      {/* 功能权限 */}
+                                      <div>
+                                          <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 mb-3">
+                                              <CheckSquare className="w-4 h-4"/> 功能权限
+                                              <span className="text-xs font-normal text-gray-400 ml-1">
+                                                  ({(roleForm.permissions || []).length} 个权限点)
+                                              </span>
+                                          </h3>
+                                          <div className="space-y-1">
+                                              {permissionTree.map(group => {
+                                                  const current    = roleForm.permissions || [];
+                                                  const groupPerms = allPermsInGroup(group);
+                                                  const groupState = getCheckState(groupPerms, current);
+                                                  if (groupState === 'none') return null;
+                                                  return (
+                                                      <div key={group.id} className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
+                                                          <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-50/60 dark:bg-blue-900/10">
+                                                              <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${groupState === 'all' ? 'bg-blue-600 border-blue-600' : 'bg-blue-400/60 border-blue-400'}`}>
+                                                                  <Check className="w-2.5 h-2.5 text-white"/>
+                                                              </div>
+                                                              <span className="font-bold text-sm text-gray-800 dark:text-gray-100">{group.label}</span>
+                                                              <span className="text-xs text-blue-500 dark:text-blue-400 ml-auto">
+                                                                  {groupPerms.filter(id => current.includes(id)).length}/{groupPerms.length}
                                                               </span>
-                                                          ))}
+                                                          </div>
+                                                          <div className="px-4 py-2.5 bg-white dark:bg-[#1C1C1E] flex flex-wrap gap-2">
+                                                              {group.subgroups.flatMap(sg => sg.permissions).filter(p => current.includes(p.id)).map(p => (
+                                                                  <span key={p.id} className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-xs font-medium border border-blue-100 dark:border-blue-800/30">
+                                                                      {p.label}
+                                                                  </span>
+                                                              ))}
+                                                          </div>
                                                       </div>
+                                                  );
+                                              })}
+                                              {(roleForm.permissions || []).length === 0 && (
+                                                  <div className="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-lg">暂未配置任何功能权限</div>
+                                              )}
+                                          </div>
+                                      </div>
+
+                                      {/* 数据行权限 */}
+                                      <div>
+                                          <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 mb-3">
+                                              <Database className="w-4 h-4"/> 数据行权限
+                                          </h3>
+                                          {/* 基础行权限展示 */}
+                                          <div className="mb-3 flex items-center gap-2">
+                                              <span className="text-xs font-bold text-gray-500 dark:text-gray-400">基础范围：</span>
+                                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${
+                                                  roleForm.baseRowPermission === 'self' ? 'bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-700/30' :
+                                                  roleForm.baseRowPermission === 'department' ? 'bg-teal-50 text-teal-700 border border-teal-200 dark:bg-teal-900/20 dark:text-teal-300 dark:border-teal-700/30' :
+                                                  'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-700/30'
+                                              }`}>
+                                                  {roleForm.baseRowPermission === 'self' ? '👤 本人' : roleForm.baseRowPermission === 'department' ? '🏢 本部门' : '🌐 全部数据'}
+                                              </span>
+                                              <span className="text-xs text-gray-400">
+                                                  {roleForm.baseRowPermission === 'self' ? '仅可见与本人关联的数据' : roleForm.baseRowPermission === 'department' ? '可见本部门所有成员的数据' : '可见所有数据'}
+                                              </span>
+                                          </div>
+                                          {(roleForm.rowPermissions && roleForm.rowPermissions.length > 0) ? (
+                                              <div className="space-y-2">
+                                                  <div className="flex items-center gap-2 py-1">
+                                                      <div className="flex-1 border-t border-dashed border-gray-200 dark:border-white/10"></div>
+                                                      <span className="text-[10px] font-bold text-amber-500 dark:text-amber-400">或 OR</span>
+                                                      <div className="flex-1 border-t border-dashed border-gray-200 dark:border-white/10"></div>
                                                   </div>
-                                              );
-                                          })}
-                                          {(roleForm.permissions || []).length === 0 && (
-                                              <div className="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-lg">暂未配置任何权限</div>
+                                                  {resourceConfig.map(res => {
+                                                      const rules = roleForm.rowPermissions?.filter(r => r.resource === res.id) || [];
+                                                      if (rules.length === 0) return null;
+                                                      return (
+                                                          <div key={res.id} className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
+                                                              <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50/60 dark:bg-amber-900/10">
+                                                                  <Database className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400"/>
+                                                                  <span className="font-bold text-sm text-gray-800 dark:text-gray-100">{res.label}</span>
+                                                                  <span className="text-xs text-amber-500 dark:text-amber-400 ml-auto">{rules.length} 条规则</span>
+                                                              </div>
+                                                              <div className="px-4 py-3 bg-white dark:bg-[#1C1C1E] space-y-2">
+                                                                  {rules.map((rule, idx) => {
+                                                                      const dimLabel = res.dimensions.find(d => d.id === rule.dimension)?.label || rule.dimension;
+                                                                      const opLabel = rule.operator === 'contains' ? '包含' : '等于';
+                                                                      return (
+                                                                          <div key={idx} className="flex items-center gap-3">
+                                                                              <span className="text-xs font-bold text-gray-500 dark:text-gray-400 min-w-[64px]">{dimLabel}</span>
+                                                                              <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded">{opLabel}</span>
+                                                                              <div className="flex flex-wrap gap-1.5">
+                                                                                  {rule.values.length > 0 ? rule.values.map(v => (
+                                                                                      <span key={v} className="px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 text-xs font-medium border border-amber-100 dark:border-amber-800/30">
+                                                                                          {getReadableValue(rule.dimension, v)}
+                                                                                      </span>
+                                                                                  )) : (
+                                                                                      <span className="text-xs text-gray-400 italic">未指定具体值</span>
+                                                                                  )}
+                                                                              </div>
+                                                                          </div>
+                                                                      );
+                                                                  })}
+                                                              </div>
+                                                          </div>
+                                                      );
+                                                  })}
+                                              </div>
+                                          ) : (
+                                              <div className="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-lg">
+                                                  未配置数据行权限，默认可见所有数据行
+                                              </div>
+                                          )}
+                                      </div>
+
+                                      {/* 数据列权限 */}
+                                      <div>
+                                          <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 mb-3">
+                                              <Columns className="w-4 h-4"/> 数据列权限
+                                          </h3>
+                                          {(roleForm.columnPermissions && roleForm.columnPermissions.length > 0) ? (
+                                              <div className="space-y-2">
+                                                  {roleForm.columnPermissions.map((rule, idx) => {
+                                                      const resConfig = columnConfig.find(r => r.id === rule.resource);
+                                                      if (!resConfig) return null;
+                                                      return (
+                                                          <div key={idx} className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
+                                                              <div className="flex items-center gap-2 px-4 py-2.5 bg-purple-50/60 dark:bg-purple-900/10">
+                                                                  <Columns className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400"/>
+                                                                  <span className="font-bold text-sm text-gray-800 dark:text-gray-100">{resConfig.label}</span>
+                                                                  <span className="text-xs text-purple-500 dark:text-purple-400 ml-auto">{rule.allowedColumns.length}/{resConfig.columns.length} 列可见</span>
+                                                              </div>
+                                                              <div className="px-4 py-3 bg-white dark:bg-[#1C1C1E] flex flex-wrap gap-1.5">
+                                                                  {resConfig.columns.map(col => {
+                                                                      const allowed = rule.allowedColumns.includes(col.id);
+                                                                      return (
+                                                                          <span key={col.id} className={`px-2 py-0.5 rounded-full text-xs font-medium border ${allowed
+                                                                              ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-800/30'
+                                                                              : 'bg-gray-50 dark:bg-white/5 text-gray-400 dark:text-gray-500 border-gray-100 dark:border-white/10 line-through'
+                                                                          }`}>
+                                                                              {col.label}
+                                                                          </span>
+                                                                      );
+                                                                  })}
+                                                              </div>
+                                                          </div>
+                                                      );
+                                                  })}
+                                              </div>
+                                          ) : (
+                                              <div className="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-lg">
+                                                  未配置数据列权限，默认可见所有基础列
+                                              </div>
                                           )}
                                       </div>
                                   </div>
+                                  )}
                               </div>
                           </>
                       )
@@ -1140,13 +1393,35 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                 
                                 <div className="p-4 bg-gray-50 dark:bg-black/20 border-t border-gray-100 dark:border-white/10">
                                     <div className="text-[10px] text-gray-400 uppercase font-bold mb-3 flex items-center gap-1"><Database className="w-3 h-3"/> 数据行权限</div>
+                                    {(() => {
+                                        const userRole = roles.find(r => r.id === detailsUser.role);
+                                        const base = userRole?.baseRowPermission || 'all';
+                                        return (
+                                            <div className="mb-2 flex items-center gap-1.5">
+                                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${base === 'self' ? 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400' : base === 'department' ? 'bg-teal-50 text-teal-600 dark:bg-teal-900/20 dark:text-teal-400' : 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'}`}>
+                                                    {base === 'self' ? '本人' : base === 'department' ? '本部门' : '全部'}
+                                                </span>
+                                            </div>
+                                        );
+                                    })()}
+                                    {(roles.find(r => r.id === detailsUser.role)?.rowPermissions?.length ?? 0) > 0 && (
+                                        <div className="flex items-center gap-1.5 mb-2">
+                                            <div className="flex-1 border-t border-dashed border-gray-200 dark:border-white/10"></div>
+                                            <span className="text-[9px] font-bold text-amber-500 dark:text-amber-400">或</span>
+                                            <div className="flex-1 border-t border-dashed border-gray-200 dark:border-white/10"></div>
+                                        </div>
+                                    )}
                                     <div className="space-y-2">
                                         {roles.find(r => r.id === detailsUser.role)?.rowPermissions?.map((rule, idx) => {
                                             const resLabel = resourceConfig.find(res => res.id === rule.resource)?.label || rule.resource;
                                             const dimLabel = resourceConfig.find(res => res.id === rule.resource)?.dimensions.find(d => d.id === rule.dimension)?.label || rule.dimension;
+                                            const opLabel = rule.operator === 'contains' ? '包含' : '等于';
                                             return (
                                                 <div key={idx} className="p-2 bg-white dark:bg-[#2C2C2E] rounded border border-gray-200 dark:border-white/10 text-xs">
-                                                    <div className="font-bold text-gray-700 dark:text-gray-300 mb-1">{resLabel} - {dimLabel}</div>
+                                                    <div className="font-bold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1.5">
+                                                        {resLabel} - {dimLabel}
+                                                        <span className="font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">{opLabel}</span>
+                                                    </div>
                                                     <div className="flex flex-wrap gap-1">
                                                         {rule.values.map(v => (
                                                             <span key={v} className="px-1.5 py-0.5 bg-gray-100 dark:bg-white/10 rounded text-gray-600 dark:text-gray-400">{getReadableValue(rule.dimension, v)}</span>

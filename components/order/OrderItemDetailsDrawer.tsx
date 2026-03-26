@@ -209,7 +209,32 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
                                       {(() => {
                                           const product = products.find(p => p.id === selectedItemForDetails.productId);
                                           const pkg = product?.installPackages?.[0];
-                                          if (!pkg) {
+                                          const itemPkgType = selectedItemForDetails.installPackageType;
+                                          const itemPkgLink = selectedItemForDetails.installPackageLink;
+
+                                          const rows: { label: string; value: string; isLink?: boolean }[] = [];
+
+                                          if (itemPkgType) {
+                                              rows.push({ label: '安装包类型', value: itemPkgType });
+                                          }
+
+                                          if (pkg) {
+                                              rows.push(
+                                                  { label: '安装包编号', value: pkg.id },
+                                                  { label: '安装包名称', value: pkg.name },
+                                                  { label: 'CPU', value: pkg.cpu || '-' },
+                                                  { label: '操作系统', value: pkg.os || '-' },
+                                                  { label: '发布平台', value: pkg.platform || '-' },
+                                                  { label: '安装包链接', value: pkg.url || '-', isLink: true },
+                                                  { label: '安装包备注', value: pkg.remarks || '-' },
+                                              );
+                                          }
+
+                                          if (itemPkgLink) {
+                                              rows.push({ label: '定制安装包链接', value: itemPkgLink, isLink: true });
+                                          }
+
+                                          if (rows.length === 0) {
                                               return (
                                                   <div className="flex flex-col items-center justify-center py-10 text-center space-y-3">
                                                       <div className="w-12 h-12 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center">
@@ -219,15 +244,7 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
                                                   </div>
                                               );
                                           }
-                                          const rows: { label: string; value: string; isLink?: boolean }[] = [
-                                              { label: '安装包编号', value: pkg.id },
-                                              { label: '安装包名称', value: pkg.name },
-                                              { label: 'CPU', value: pkg.cpu || '-' },
-                                              { label: '操作系统', value: pkg.os || '-' },
-                                              { label: '发布平台', value: pkg.platform || '-' },
-                                              { label: '安装包链接', value: pkg.url || '-', isLink: true },
-                                              { label: '安装包备注', value: pkg.remarks || '-' },
-                                          ];
+
                                           return (
                                               <div className="divide-y divide-gray-50 dark:divide-white/5">
                                                   {rows.map((row, i) => (
@@ -235,6 +252,8 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
                                                           <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap">{row.label}</span>
                                                           {row.isLink && row.value !== '-' ? (
                                                               <a href={row.value} target="_blank" rel="noreferrer" className="text-sm font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline flex-1 truncate">{row.value}</a>
+                                                          ) : row.label === '安装包类型' ? (
+                                                              <span className={`text-xs px-2 py-0.5 rounded font-medium ${row.value === '通用' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'}`}>{row.value}</span>
                                                           ) : (
                                                               <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{row.value}</span>
                                                           )}

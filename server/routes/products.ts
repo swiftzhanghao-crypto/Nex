@@ -13,7 +13,6 @@ function toProduct(row: any) {
     skus: JSON.parse(row.skus || '[]'),
     composition: JSON.parse(row.composition || '[]'),
     installPackages: JSON.parse(row.install_pkgs || '[]'),
-    packageId: row.package_id, rights: JSON.parse(row.rights || '[]'),
     licenseTemplate: row.license_tpl ? JSON.parse(row.license_tpl) : undefined,
   };
 }
@@ -44,12 +43,11 @@ router.post('/', requireRole('Admin', 'ProductManager'), (req: AuthRequest, res)
   const id = p.id || `PROD-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
   db.prepare(`
-    INSERT INTO products (id, name, category, sub_category, description, status, tags, skus, composition, install_pkgs, package_id, rights, license_tpl)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO products (id, name, category, sub_category, description, status, tags, skus, composition, install_pkgs, license_tpl)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, p.name, p.category, p.subCategory ?? null, p.description ?? null,
     p.status || 'OnShelf', JSON.stringify(p.tags || []), JSON.stringify(p.skus || []),
     JSON.stringify(p.composition || []), JSON.stringify(p.installPackages || []),
-    p.packageId ?? null, JSON.stringify(p.rights || []),
     p.licenseTemplate ? JSON.stringify(p.licenseTemplate) : null);
 
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
@@ -64,12 +62,11 @@ router.put('/:id', (req, res) => {
   const p = req.body;
   db.prepare(`
     UPDATE products SET name=?, category=?, sub_category=?, description=?, status=?,
-    tags=?, skus=?, composition=?, install_pkgs=?, package_id=?, rights=?, license_tpl=?
+    tags=?, skus=?, composition=?, install_pkgs=?, license_tpl=?
     WHERE id=?
   `).run(p.name, p.category, p.subCategory ?? null, p.description ?? null, p.status,
     JSON.stringify(p.tags || []), JSON.stringify(p.skus || []),
     JSON.stringify(p.composition || []), JSON.stringify(p.installPackages || []),
-    p.packageId ?? null, JSON.stringify(p.rights || []),
     p.licenseTemplate ? JSON.stringify(p.licenseTemplate) : null, req.params.id);
 
   const row = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);

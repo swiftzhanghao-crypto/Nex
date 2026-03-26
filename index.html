@@ -12,6 +12,8 @@
           extend: {
             fontFamily: {
               sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Text', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+              serif: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Text', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+              mono: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Text', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
             },
             colors: {
               primary: '#0071E3',
@@ -37,6 +39,10 @@
       body {
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+      }
+
+      .font-mono {
+        font-variant-numeric: tabular-nums;
       }
 
       /* Clean Scrollbar */
@@ -130,6 +136,112 @@
       .mask-stamp {
         mask-image: radial-gradient(circle, rgba(0,0,0,1) 40%, rgba(0,0,0,0.5) 100%);
         -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,1) 40%, rgba(0,0,0,0.5) 100%);
+      }
+
+      /* Table row stagger animation on page load */
+      @keyframes rowFadeIn {
+        from { opacity: 0; transform: translateY(4px); }
+        to   { opacity: 1; transform: none; }
+      }
+      .animate-row-enter {
+        animation: rowFadeIn 0.25s ease-out both;
+      }
+
+      /* Tooltip via CSS */
+      [data-tip] {
+        position: relative;
+      }
+      [data-tip]:hover::after {
+        content: attr(data-tip);
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 6px);
+        transform: translateX(-50%);
+        padding: 6px 12px;
+        background: rgba(30, 30, 30, 0.92);
+        color: #fff;
+        font-size: 12px;
+        line-height: 1.5;
+        border-radius: 8px;
+        white-space: normal;
+        word-break: break-word;
+        max-width: 360px;
+        pointer-events: none;
+        z-index: 9999;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        animation: tooltipIn 0.15s ease-out;
+      }
+      [data-tip]:hover::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 2px);
+        transform: translateX(-50%);
+        border: 4px solid transparent;
+        border-top-color: rgba(30, 30, 30, 0.92);
+        pointer-events: none;
+        z-index: 9999;
+        animation: tooltipIn 0.15s ease-out;
+      }
+      [data-tip-pos="bottom"]:hover::after {
+        bottom: auto;
+        top: calc(100% + 6px);
+      }
+      [data-tip-pos="bottom"]:hover::before {
+        bottom: auto;
+        top: calc(100% + 2px);
+        border-top-color: transparent;
+        border-bottom-color: rgba(30, 30, 30, 0.92);
+      }
+      @keyframes tooltipIn {
+        from { opacity: 0; transform: translateX(-50%) translateY(2px); }
+        to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+      }
+
+      /* Sticky table columns */
+      .sticky-col-left {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        background: inherit;
+      }
+      .sticky-col-right {
+        position: sticky;
+        right: 0;
+        z-index: 2;
+        background: inherit;
+      }
+      .sticky-col-left::after,
+      .sticky-col-right::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 8px;
+        pointer-events: none;
+      }
+      .sticky-col-left::after {
+        right: -8px;
+        background: linear-gradient(to right, rgba(0,0,0,0.03), transparent);
+      }
+      .dark .sticky-col-left::after {
+        background: linear-gradient(to right, rgba(0,0,0,0.15), transparent);
+      }
+      .sticky-col-right::before {
+        left: -8px;
+        background: linear-gradient(to left, rgba(0,0,0,0.03), transparent);
+      }
+      .dark .sticky-col-right::before {
+        background: linear-gradient(to left, rgba(0,0,0,0.15), transparent);
+      }
+
+      /* Tab context menu */
+      .tab-ctx-menu {
+        animation: ctxPop 0.12s ease-out;
+      }
+      @keyframes ctxPop {
+        from { opacity: 0; transform: scale(0.95); }
+        to   { opacity: 1; transform: none; }
       }
     </style>
     <style type="text/tailwindcss">

@@ -1,15 +1,15 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Product, ProductSku, SkuPricingOption, LicenseType, LicenseUnit } from '../../types';
-import { ArrowLeft, Package, ShieldCheck, Edit3, Plus, Trash2, List, Check, Box, Zap, User as UserIcon, Shield, Layers, Clock, Calendar, ToggleLeft, ToggleRight, Key, Sliders, Tag, PackageOpen, ChevronRight, Home, CreditCard, Save, X, Download } from 'lucide-react';
+import { Product, ProductSku, SkuPricingOption, InstallPackage } from '../../types';
+import { ArrowLeft, Package, ShieldCheck, Edit3, Plus, Trash2, List, Check, Box, Zap, User as UserIcon, Shield, Clock, Calendar, ToggleLeft, ToggleRight, Key, Sliders, Tag, PackageOpen, ChevronRight, Home, CreditCard, Save, X, Download, Copy } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
 
 type ViewLevel = 'PRODUCT_DETAIL' | 'SKU_DETAIL' | 'LICENSE_DETAIL';
 
 const ProductDetails: React.FC = () => {
-  const { products, setProducts, rightPackages, licenseDefs } = useAppContext();
+  const { products, setProducts, authTypes } = useAppContext();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const product = products.find(p => p.id === id);
@@ -31,9 +31,37 @@ const ProductDetails: React.FC = () => {
   const [selectedLicenseDefId, setSelectedLicenseDefId] = useState('');
   const [newLicensePrice, setNewLicensePrice] = useState<number>(0);
 
+  // Product Detail Tabs
+  const [detailTab, setDetailTab] = useState<'info' | 'packages'>('info');
+  const [copiedId, setCopiedId] = useState(false);
+
+  // Install Package States
+  const [pkgTab, setPkgTab] = useState<'public' | 'private'>('public');
+  const [pkgPage, setPkgPage] = useState(1);
+  const pkgPageSize = 10;
+  const [isAddPkgModalOpen, setIsAddPkgModalOpen] = useState(false);
+  const [pkgForm, setPkgForm] = useState<Partial<InstallPackage>>({
+    name: '', deliveryItemId: '', deliveryItemName: '', platform: '', source: '', cpu: '', os: '', url: '', packageType: 'public'
+  });
+
   useEffect(() => { if (product) setProductForm(product); }, [product]);
 
+  const filteredPkgs = useMemo(() => {
+    const all = productForm?.installPackages || [];
+    return all.filter(p => (p.packageType || 'public') === pkgTab);
+  }, [productForm?.installPackages, pkgTab]);
+
+  const pkgTotalPages = Math.max(1, Math.ceil(filteredPkgs.length / pkgPageSize));
+  const pagedPkgs = filteredPkgs.slice((pkgPage - 1) * pkgPageSize, pkgPage * pkgPageSize);
+
   if (!product || !productForm) return <div className="p-10 text-center">Product Not Found</div>;
+
+  const handleCopyId = () => {
+    const text = currentView === 'PRODUCT_DETAIL' ? productForm.id : currentView === 'SKU_DETAIL' ? selectedSku?.code : selectedLicense?.id;
+    if (text) navigator.clipboard.writeText(text);
+    setCopiedId(true);
+    setTimeout(() => setCopiedId(false), 1500);
+  };
 
   // --- Navigation Helpers ---
   const goToProduct = () => {
@@ -78,8 +106,6 @@ const ProductDetails: React.FC = () => {
           stock: 0,
           status: 'Active',
           pricingOptions: [],
-          packageId: productForm.packageId, // Inherit SPU package by default
-          packageName: rightPackages.find(p => p.id === productForm.packageId)?.name
       };
       const updatedProduct = { ...productForm, skus: [...productForm.skus, newSku] };
       setProductForm(updatedProduct);
@@ -117,18 +143,19 @@ const ProductDetails: React.FC = () => {
 
   const handleAddLicenseFromDef = () => {
       if (!selectedSku || !selectedLicenseDefId) return;
-      const def = licenseDefs.find(d => d.id === selectedLicenseDefId);
-      if (!def) return;
+      const authType = authTypes.find(a => a.id === selectedLicenseDefId);
+      if (!authType) return;
 
+      const isPeriodic = authType.period === '周期性';
       const newLicense: SkuPricingOption = {
           id: `opt-${Date.now()}`,
-          title: def.name,
+          title: authType.name,
           price: newLicensePrice,
           license: { 
-              type: def.type, 
-              period: def.period, 
-              periodUnit: def.periodUnit, 
-              scope: def.scope 
+              type: isPeriodic ? 'Subscription' : 'Perpetual', 
+              period: 1, 
+              periodUnit: isPeriodic ? 'Year' : 'Forever', 
+              scope: authType.name.includes('用户') ? '1 User' : authType.name.includes('服务器') ? 'Platform' : authType.name.includes('场地') ? '100 Devices' : 'Standard'
           }
       };
       
@@ -179,145 +206,277 @@ const ProductDetails: React.FC = () => {
       setCurrentView('SKU_DETAIL');
   };
 
+  // --- Install Package Handlers ---
+  const handleOpenAddPkg = () => {
+    setPkgForm({ name: '', deliveryItemId: '', deliveryItemName: '', platform: '', source: '', cpu: '', os: '', url: '', packageType: pkgTab });
+    setIsAddPkgModalOpen(true);
+  };
+
+  const handleSavePkg = () => {
+    if (!pkgForm.name || !productForm) return;
+    const newPkg: InstallPackage = {
+      id: `PKG-${Date.now().toString().slice(-8)}`,
+      name: pkgForm.name || '',
+      version: '1.0',
+      url: pkgForm.url || '',
+      platform: pkgForm.platform,
+      cpu: pkgForm.cpu,
+      os: pkgForm.os,
+      source: pkgForm.source,
+      deliveryItemId: pkgForm.deliveryItemId,
+      deliveryItemName: pkgForm.deliveryItemName,
+      packageType: pkgForm.packageType || pkgTab,
+      enabled: true,
+    };
+    const updated = { ...productForm, installPackages: [...(productForm.installPackages || []), newPkg] };
+    setProductForm(updated);
+    setProducts(prev => prev.map(p => p.id === product!.id ? updated : p));
+    setIsAddPkgModalOpen(false);
+  };
+
+  const handleDeletePkg = (pkgId: string) => {
+    if (!productForm || !confirm('确定删除此安装包？')) return;
+    const updated = { ...productForm, installPackages: (productForm.installPackages || []).filter(p => p.id !== pkgId) };
+    setProductForm(updated);
+    setProducts(prev => prev.map(p => p.id === product!.id ? updated : p));
+  };
+
   // --- RENDER ---
   return (
     <div className="flex flex-col min-h-screen bg-[#F5F5F7] dark:bg-black">
-      {/* Header */}
-      <div className="sticky top-0 z-20 bg-white/80 dark:bg-[#1C1C1E]/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-white/10 px-4 md:px-6 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <button onClick={() => {
-              if(currentView === 'LICENSE_DETAIL') setCurrentView('SKU_DETAIL');
-              else if(currentView === 'SKU_DETAIL') goToProduct();
-              else navigate('/products');
-          }} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition text-gray-500 dark:text-gray-400 shrink-0">
-             <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="flex flex-col min-w-0 flex-1">
-              <div className="flex items-center gap-2 md:gap-3 flex-wrap">
-                  <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white tracking-tight truncate">
-                      {currentView === 'PRODUCT_DETAIL' ? productForm.name : 
-                       currentView === 'SKU_DETAIL' ? `Spec: ${selectedSku?.name}` : 
-                       `License: ${selectedLicense?.title}`}
-                  </h1>
-                  {currentView === 'PRODUCT_DETAIL' && (
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${productForm.status === 'OnShelf' ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400'}`}>
-                          {productForm.status === 'OnShelf' ? '已上架' : '已下架'}
+      {/* Sticky Header — modeled after OrderDetails */}
+      <div className="sticky top-0 z-20 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-white/10 px-4 md:px-6 pt-4 flex flex-col">
+          <div className="flex items-center gap-4 pb-3">
+              <button onClick={() => {
+                  if(currentView === 'LICENSE_DETAIL') setCurrentView('SKU_DETAIL');
+                  else if(currentView === 'SKU_DETAIL') goToProduct();
+                  else navigate('/products');
+              }} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition text-gray-500 dark:text-gray-400 shrink-0">
+                 <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div className="shrink-0">
+                  <div className="flex items-center gap-2">
+                      <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
+                          {currentView === 'PRODUCT_DETAIL' ? productForm.name :
+                           currentView === 'SKU_DETAIL' ? `规格: ${selectedSku?.name}` :
+                           `授权: ${selectedLicense?.title}`}
+                      </h1>
+                      <button
+                          onClick={handleCopyId}
+                          className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-all"
+                          title="复制编号"
+                      >
+                          {copiedId ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-2 mt-0.5">
+                      <span className="text-[11px] text-gray-400 dark:text-gray-500 font-mono">
+                          {currentView === 'PRODUCT_DETAIL' ? productForm.id : currentView === 'SKU_DETAIL' ? selectedSku?.code : selectedLicense?.id}
                       </span>
+                      {currentView === 'PRODUCT_DETAIL' && (
+                          <span className={`!rounded-full ${productForm.status === 'OnShelf' ? 'unified-tag-green' : 'unified-tag-gray'}`}>
+                              {productForm.status === 'OnShelf' ? '已上架' : '已下架'}
+                          </span>
+                      )}
+                      {currentView === 'PRODUCT_DETAIL' && productForm.productCategory && (
+                          <span className="unified-tag-xs unified-tag-blue">{productForm.productCategory}</span>
+                      )}
+                      {currentView === 'PRODUCT_DETAIL' && productForm.productLine && (
+                          <span className="unified-tag-xs unified-tag-indigo">{productForm.productLine}</span>
+                      )}
+                  </div>
+              </div>
+
+              {currentView === 'PRODUCT_DETAIL' && (
+                  <div className="hidden md:flex items-center gap-2.5 border-l border-gray-200/60 dark:border-white/10 pl-4 shrink-0">
+                      {([
+                          { label: '产品系列', value: productForm.productSeries },
+                          { label: '产品类型', value: productForm.productType },
+                          { label: '规格数', value: `${productForm.skus?.length || 0}` },
+                      ] as const).map((item, idx) => (
+                          <div key={idx} className="flex flex-col items-center gap-1">
+                              <span className="text-[10px] text-gray-400 dark:text-gray-500 leading-none">{item.label}</span>
+                              <span className="text-xs font-semibold text-gray-900 dark:text-white leading-none">{item.value || '—'}</span>
+                          </div>
+                      ))}
+                  </div>
+              )}
+
+              <div className="flex-1"></div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                  {currentView === 'PRODUCT_DETAIL' && (
+                      <button
+                          onClick={isEditingProduct ? handleSaveProduct : () => setIsEditingProduct(true)}
+                          className={`unified-button-secondary whitespace-nowrap shrink-0 ${isEditingProduct ? '!bg-[#0071E3] dark:!bg-[#FF2D55] !text-white !border-transparent' : ''}`}
+                      >
+                          {isEditingProduct ? <Save className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
+                          {isEditingProduct ? '保存' : '编辑'}
+                      </button>
+                  )}
+                  {currentView === 'SKU_DETAIL' && (
+                      <button
+                          onClick={isEditingSku ? handleSaveSku : () => setIsEditingSku(true)}
+                          className={`unified-button-secondary whitespace-nowrap shrink-0 ${isEditingSku ? '!bg-[#0071E3] dark:!bg-[#FF2D55] !text-white !border-transparent' : ''}`}
+                      >
+                          {isEditingSku ? <Save className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
+                          {isEditingSku ? '保存规格' : '编辑规格'}
+                      </button>
+                  )}
+                  {currentView === 'LICENSE_DETAIL' && (
+                      <button
+                          onClick={isEditingLicense ? handleSaveLicense : () => setIsEditingLicense(true)}
+                          className={`unified-button-secondary whitespace-nowrap shrink-0 ${isEditingLicense ? '!bg-[#0071E3] dark:!bg-[#FF2D55] !text-white !border-transparent' : ''}`}
+                      >
+                          {isEditingLicense ? <Save className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
+                          {isEditingLicense ? '保存授权' : '编辑授权'}
+                      </button>
                   )}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-2 truncate">
-                  <span className="font-mono">ID: {currentView === 'PRODUCT_DETAIL' ? productForm.id : currentView === 'SKU_DETAIL' ? selectedSku?.code : selectedLicense?.id}</span>
-              </div>
           </div>
-        </div>
-        
-        {currentView === 'PRODUCT_DETAIL' && (
-            <button 
-                onClick={isEditingProduct ? handleSaveProduct : () => setIsEditingProduct(true)}
-                className={`w-full md:w-auto px-5 py-2 text-xs font-semibold rounded-full transition shadow-apple flex items-center justify-center gap-2
-                ${isEditingProduct ? 'bg-[#0071E3] dark:bg-[#FF2D55] text-white' : 'bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white'}`}
-            >
-                {isEditingProduct ? <Save className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
-                {isEditingProduct ? '保存商品' : '编辑商品'}
-            </button>
-        )}
-        
-        {currentView === 'SKU_DETAIL' && (
-            <button 
-                onClick={isEditingSku ? handleSaveSku : () => setIsEditingSku(true)}
-                className={`w-full md:w-auto px-5 py-2 text-xs font-semibold rounded-full transition shadow-apple flex items-center justify-center gap-2
-                ${isEditingSku ? 'bg-[#0071E3] dark:bg-[#FF2D55] text-white' : 'bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white'}`}
-            >
-                {isEditingSku ? <Save className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
-                {isEditingSku ? '保存规格' : '编辑规格'}
-            </button>
-        )}
 
-        {currentView === 'LICENSE_DETAIL' && (
-            <button 
-                onClick={isEditingLicense ? handleSaveLicense : () => setIsEditingLicense(true)}
-                className={`w-full md:w-auto px-5 py-2 text-xs font-semibold rounded-full transition shadow-apple flex items-center justify-center gap-2
-                ${isEditingLicense ? 'bg-[#0071E3] dark:bg-[#FF2D55] text-white' : 'bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white'}`}
-            >
-                {isEditingLicense ? <Save className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
-                {isEditingLicense ? '保存授权' : '编辑授权'}
-            </button>
-        )}
+          {currentView === 'PRODUCT_DETAIL' && (
+              <div className="flex gap-1 overflow-x-auto no-scrollbar pt-2 border-b border-gray-200 dark:border-white/10">
+                  {([['info', '产品信息'], ['packages', '安装包']] as const).map(([key, label]) => (
+                      <button
+                          key={key}
+                          onClick={() => setDetailTab(key)}
+                          className={`relative px-5 py-2 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                              detailTab === key
+                                  ? 'text-[#0071E3] dark:text-[#0A84FF] border-[#0071E3] dark:border-[#0A84FF]'
+                                  : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-200'
+                          }`}
+                      >
+                          {label}
+                          {key === 'packages' && (productForm.installPackages?.length || 0) > 0 && (
+                              <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400">{productForm.installPackages?.length}</span>
+                          )}
+                      </button>
+                  ))}
+              </div>
+          )}
       </div>
 
-      <div className="p-4 lg:p-10 max-w-7xl mx-auto w-full space-y-8 animate-page-enter">
-          {currentView === 'PRODUCT_DETAIL' && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Left: Product Info */}
-                  <div className="lg:col-span-1 space-y-6">
-                      <div className="unified-card dark:bg-[#1C1C1E] p-6 border-gray-100/50 dark:border-white/10">
-                          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">基本信息</h3>
-                          {isEditingProduct ? (
-                              <div className="space-y-4">
-                                  <div><label className="text-xs text-gray-500 mb-1 block">商品名称</label><input value={productForm.name} onChange={e=>setProductForm({...productForm, name:e.target.value})} className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"/></div>
-                                  <div><label className="text-xs text-gray-500 mb-1 block">类别</label><input value={productForm.category} onChange={e=>setProductForm({...productForm, category:e.target.value})} className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"/></div>
-                                  <div><label className="text-xs text-gray-500 mb-1 block">描述</label><textarea value={productForm.description} onChange={e=>setProductForm({...productForm, description:e.target.value})} className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10" rows={3}/></div>
-                              </div>
-                          ) : (
-                              <div className="space-y-4">
-                                  <div><div className="text-xs text-gray-500 mb-1">类别</div><div className="text-sm font-medium text-gray-900 dark:text-white">{productForm.category}</div></div>
-                                  <div><div className="text-xs text-gray-500 mb-1">描述</div><div className="text-sm text-gray-600 dark:text-gray-300">{productForm.description}</div></div>
-                                  <div className="flex flex-wrap gap-2 pt-2">
-                                      {productForm.tags?.map(t => <span key={t} className="text-xs bg-gray-100 dark:bg-white/10 px-2 py-1 rounded text-gray-600 dark:text-gray-300">{t}</span>)}
-                                  </div>
-                              </div>
-                          )}
-                      </div>
-                      
-                      <div className="unified-card dark:bg-[#1C1C1E] p-6 border-gray-100/50 dark:border-white/10">
-                          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">能力组成</h3>
-                          <div className="space-y-2">
-                              {productForm.composition?.map((c, i) => (
-                                  <div key={i} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-white/5 rounded-lg border border-gray-100 dark:border-white/5">
-                                      <Layers className="w-4 h-4 text-blue-500"/>
-                                      <span className="text-sm dark:text-gray-300">{c.name}</span>
-                                  </div>
-                              ))}
+      <div className="p-4 lg:p-6 max-w-[2400px] mx-auto w-full space-y-4 animate-page-enter pb-20">
+          {currentView === 'PRODUCT_DETAIL' && (<>
+
+              {detailTab === 'info' && (<>
+              {/* Basic Info - Full Width */}
+              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
+                <div className="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white">基本信息</h3>
+                  {isEditingProduct && <span className="text-xs text-gray-400">编辑模式</span>}
+                </div>
+                {isEditingProduct ? (
+                  <div className="divide-y divide-gray-100 dark:divide-white/5">
+                    {[
+                      [
+                        { label: '产品名称', key: 'name' },
+                        { label: '产品类别', key: 'productCategory' },
+                        { label: '产品条线', key: 'productLine' },
+                      ],
+                      [
+                        { label: '产品类型', key: 'productType' },
+                        { label: '产品类', key: 'productClass' },
+                        { label: '产品分类', key: 'productClassification' },
+                      ],
+                      [
+                        { label: '产品系列', key: 'productSeries' },
+                        { label: '产品类-财务口径', key: 'productClassFinance' },
+                        { label: '产品条线-财务口径', key: 'productLineFinance' },
+                      ],
+                      [
+                        { label: '产品系列-财务口径', key: 'productSeriesFinance' },
+                      ],
+                      [
+                        { label: '运维包服务内容', key: 'maintenanceContent' },
+                      ],
+                      [
+                        { label: '运维包服务标准', key: 'maintenanceStandard' },
+                      ],
+                    ].map((row, ri) => (
+                      <div key={ri} className="grid grid-cols-1 md:grid-cols-3">
+                        {row.map(f => (
+                          <div key={f.key} className="px-6 py-3">
+                            <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{f.label}</label>
+                            <input
+                              value={(productForm as any)[f.key] || ''}
+                              onChange={e => setProductForm({ ...productForm, [f.key]: e.target.value })}
+                              className="w-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 p-2 rounded text-sm dark:text-white outline-none"
+                            />
                           </div>
+                        ))}
                       </div>
-
-                      {/* Install Packages Section */}
-                      <div className="unified-card dark:bg-[#1C1C1E] p-6 border-gray-100/50 dark:border-white/10">
-                          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">安装包信息</h3>
-                          {productForm.installPackages && productForm.installPackages.length > 0 ? (
-                              <div className="space-y-3">
-                                  {productForm.installPackages.map((pkg) => (
-                                      <div key={pkg.id} className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
-                                          <div className="flex justify-between items-center px-4 py-3 bg-gray-50 dark:bg-white/5 border-b border-gray-100 dark:border-white/5">
-                                              <div className="font-semibold text-sm text-gray-900 dark:text-white">{pkg.name}</div>
-                                              <a href={pkg.url} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 p-1 bg-blue-50 dark:bg-blue-900/20 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/40 transition">
-                                                  <Download className="w-3.5 h-3.5" />
-                                              </a>
-                                          </div>
-                                          <div className="divide-y divide-gray-50 dark:divide-white/5 px-4">
-                                              {[
-                                                  { label: '编号', value: pkg.id, mono: true },
-                                                  { label: '发布平台', value: pkg.platform || '-' },
-                                                  { label: '操作系统', value: pkg.os || '-' },
-                                                  { label: 'CPU', value: pkg.cpu || '-' },
-                                              ].map((row, i) => (
-                                                  <div key={i} className="flex items-center gap-3 py-2">
-                                                      <span className="text-xs text-gray-400 dark:text-gray-500 text-right w-16 shrink-0">{row.label}</span>
-                                                      <span className={`text-xs font-medium text-gray-900 dark:text-white flex-1 ${row.mono ? 'font-mono text-blue-600 dark:text-blue-400' : ''}`}>{row.value}</span>
-                                                  </div>
-                                              ))}
-                                          </div>
-                                      </div>
-                                  ))}
-                              </div>
-                          ) : (
-                              <div className="text-sm text-gray-400 italic">暂无安装包信息</div>
-                          )}
+                    ))}
+                    <div className="grid grid-cols-1 md:grid-cols-3">
+                      <div className="px-6 py-3">
+                        <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">是否含升级保障期限</label>
+                        <select
+                          value={productForm.hasUpgradeWarranty ? '是' : '否'}
+                          onChange={e => setProductForm({ ...productForm, hasUpgradeWarranty: e.target.value === '是' })}
+                          className="w-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 p-2 rounded text-sm dark:text-white outline-none"
+                        >
+                          <option value="否">否</option>
+                          <option value="是">是</option>
+                        </select>
                       </div>
+                      <div className="px-6 py-3">
+                        <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">是否包含售后服务期限</label>
+                        <select
+                          value={productForm.hasAfterSalesService ? '是' : '否'}
+                          onChange={e => setProductForm({ ...productForm, hasAfterSalesService: e.target.value === '是' })}
+                          className="w-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 p-2 rounded text-sm dark:text-white outline-none"
+                        >
+                          <option value="否">否</option>
+                          <option value="是">是</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
+                ) : (
+                  <div className="px-6 py-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-5">
+                      {([
+                        { label: '产品名称', value: productForm.name },
+                        { label: '产品类别', value: productForm.productCategory || productForm.category },
+                        { label: '产品条线', value: productForm.productLine },
+                        { label: '产品类型', value: productForm.productType },
+                        { label: '产品类', value: productForm.productClass },
+                        { label: '产品分类', value: productForm.productClassification },
+                        { label: '产品系列', value: productForm.productSeries },
+                        { label: '产品类-财务口径', value: productForm.productClassFinance },
+                        { label: '产品条线-财务口径', value: productForm.productLineFinance },
+                        { label: '产品系列-财务口径', value: productForm.productSeriesFinance },
+                        { label: '是否含升级保障期限', value: productForm.hasUpgradeWarranty ? '是' : '否' },
+                        { label: '是否包含售后服务期限', value: productForm.hasAfterSalesService ? '是' : '否' },
+                      ] as { label: string; value: string | undefined }[]).map((f, i) => (
+                        <div key={i}>
+                          <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1 leading-none">{f.label}</div>
+                          {f.value && f.value !== '/' ? (
+                            <div className="text-sm font-medium text-gray-900 dark:text-white leading-snug">{f.value}</div>
+                          ) : (
+                            <div className="text-sm text-gray-300 dark:text-gray-600">—</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-5 pt-5 border-t border-gray-100 dark:border-white/5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                      <div>
+                        <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1 leading-none">运维包服务内容</div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white leading-relaxed">{productForm.maintenanceContent && productForm.maintenanceContent !== '/' ? productForm.maintenanceContent : '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1 leading-none">运维包服务标准</div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white leading-relaxed">{productForm.maintenanceStandard && productForm.maintenanceStandard !== '/' ? productForm.maintenanceStandard : '—'}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
-                  {/* Right: SKU List */}
-                  <div className="lg:col-span-2 space-y-6">
+              <div className="space-y-8">
+                  {/* SKU List */}
+                  <div>
                       <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
                           <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center">
                               <h3 className="text-lg font-bold text-gray-900 dark:text-white">规格列表 (Specifications)</h3>
@@ -335,7 +494,6 @@ const ProductDetails: React.FC = () => {
                                           </div>
                                           <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                               包含 {sku.pricingOptions?.length || 0} 种授权方案 · 库存 {sku.stock}
-                                              {sku.packageName && <span className="ml-2 px-1.5 py-0.5 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded text-xs">套餐: {sku.packageName}</span>}
                                           </div>
                                       </div>
                                       <div className="flex items-center gap-4">
@@ -354,7 +512,117 @@ const ProductDetails: React.FC = () => {
                       </div>
                   </div>
               </div>
-          )}
+              </>)}
+
+              {/* Install Package Management */}
+              {detailTab === 'packages' && (
+              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
+                <div className="border-b border-gray-200 dark:border-white/10">
+                  <div className="flex items-center justify-between px-6 pt-4">
+                    <div className="flex gap-0">
+                      {(['public', 'private'] as const).map(tab => (
+                        <button
+                          key={tab}
+                          onClick={() => { setPkgTab(tab); setPkgPage(1); }}
+                          className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                            pkgTab === tab
+                              ? 'text-[#0071E3] dark:text-[#64D2FF] border-[#0071E3] dark:border-[#64D2FF]'
+                              : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-800 dark:hover:text-gray-200'
+                          }`}
+                        >
+                          {tab === 'public' ? '端安装包' : '私有云安装包'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="px-6 py-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white">安装包</h3>
+                    <button onClick={handleOpenAddPkg} className="px-4 py-2 bg-[#0071E3] dark:bg-[#FF2D55] text-white text-xs font-medium rounded-lg hover:opacity-80 transition shadow-apple flex items-center gap-1.5">
+                      <Plus className="w-3.5 h-3.5" /> 新增安装包
+                    </button>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left min-w-[900px]">
+                      <thead>
+                        <tr className="border-b border-gray-200 dark:border-white/10">
+                          <th className="py-3 pr-4 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">安装包编号</th>
+                          <th className="py-3 pr-4 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">交付物编号</th>
+                          <th className="py-3 pr-4 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">交付物名称</th>
+                          <th className="py-3 pr-4 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">发布平台</th>
+                          <th className="py-3 pr-4 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">安装包来源</th>
+                          <th className="py-3 pr-4 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">cpu</th>
+                          <th className="py-3 pr-4 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">操作系统</th>
+                          <th className="py-3 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">安装包</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                        {pagedPkgs.length > 0 ? pagedPkgs.map(pkg => (
+                          <tr key={pkg.id} className="group hover:bg-blue-50/40 dark:hover:bg-blue-900/10 transition-colors duration-150">
+                            <td className="py-3 pr-4 text-xs font-mono text-gray-600 dark:text-gray-400">{pkg.id}</td>
+                            <td className="py-3 pr-4 text-xs font-mono text-gray-600 dark:text-gray-400">{pkg.deliveryItemId || <span className="text-gray-300 dark:text-gray-600">—</span>}</td>
+                            <td className="py-3 pr-4 text-xs text-gray-700 dark:text-gray-300">{pkg.deliveryItemName || pkg.name}</td>
+                            <td className="py-3 pr-4 text-xs text-gray-600 dark:text-gray-400">{pkg.platform || <span className="text-gray-300 dark:text-gray-600">—</span>}</td>
+                            <td className="py-3 pr-4 text-xs text-gray-600 dark:text-gray-400">{pkg.source || <span className="text-gray-300 dark:text-gray-600">—</span>}</td>
+                            <td className="py-3 pr-4 text-xs text-gray-600 dark:text-gray-400">{pkg.cpu || <span className="text-gray-300 dark:text-gray-600">—</span>}</td>
+                            <td className="py-3 pr-4 text-xs text-gray-600 dark:text-gray-400">{pkg.os || <span className="text-gray-300 dark:text-gray-600">—</span>}</td>
+                            <td className="py-3 text-xs">
+                              <div className="flex items-center gap-2">
+                                {pkg.url ? (
+                                  <a href={pkg.url} target="_blank" rel="noreferrer" className="text-[#0071E3] dark:text-[#64D2FF] hover:underline truncate max-w-[140px] block">{pkg.name || '下载'}</a>
+                                ) : (
+                                  <span className="text-gray-300 dark:text-gray-600">—</span>
+                                )}
+                                <button onClick={() => handleDeletePkg(pkg.id)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition" title="删除">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )) : (
+                          <tr>
+                            <td colSpan={8} className="py-8 text-center">
+                              <div className="flex flex-col items-center gap-2">
+                                <Package className="w-8 h-8 text-gray-200 dark:text-gray-700" />
+                                <span className="text-sm text-gray-400 dark:text-gray-500">暂无{pkgTab === 'public' ? '端' : '私有云'}安装包</span>
+                                <button onClick={handleOpenAddPkg} className="text-xs text-[#0071E3] dark:text-[#64D2FF] hover:underline mt-1">点击新增</button>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {filteredPkgs.length > 0 && (
+                  <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-white/10 mt-2">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">共 <span className="font-medium text-gray-700 dark:text-gray-300">{filteredPkgs.length}</span> 条</span>
+                    {pkgTotalPages > 1 && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-gray-500 dark:text-gray-400">{pkgPageSize}条/页</span>
+                      <button onClick={() => setPkgPage(p => Math.max(1, p - 1))} disabled={pkgPage <= 1} className="px-2 py-1 border border-gray-200 dark:border-white/10 rounded hover:bg-gray-50 dark:hover:bg-white/5 disabled:opacity-40 transition">&lt;</button>
+                      <span className="px-2.5 py-1 bg-[#0071E3] dark:bg-[#FF2D55] text-white rounded text-xs font-medium">{pkgPage}</span>
+                      <button onClick={() => setPkgPage(p => Math.min(pkgTotalPages, p + 1))} disabled={pkgPage >= pkgTotalPages} className="px-2 py-1 border border-gray-200 dark:border-white/10 rounded hover:bg-gray-50 dark:hover:bg-white/5 disabled:opacity-40 transition">&gt;</button>
+                      <span className="text-gray-500 dark:text-gray-400 ml-1">前往</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={pkgTotalPages}
+                        className="w-12 px-1.5 py-1 border border-gray-200 dark:border-white/10 rounded text-center text-xs bg-white dark:bg-black dark:text-white outline-none"
+                        onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt((e.target as HTMLInputElement).value); if (v >= 1 && v <= pkgTotalPages) setPkgPage(v); } }}
+                      />
+                      <span className="text-gray-500 dark:text-gray-400">页</span>
+                    </div>
+                    )}
+                  </div>
+                  )}
+                </div>
+              </div>
+              )}
+          </>)}
 
           {currentView === 'SKU_DETAIL' && skuForm && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -367,22 +635,6 @@ const ProductDetails: React.FC = () => {
                                   <div><label className="text-xs text-gray-500 mb-1 block">编码 (Code)</label><input value={skuForm.code} onChange={e=>setSkuForm({...skuForm, code:e.target.value})} className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"/></div>
                                   <div><label className="text-xs text-gray-500 mb-1 block">基准价格</label><input type="number" value={skuForm.price} onChange={e=>setSkuForm({...skuForm, price:parseFloat(e.target.value)})} className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"/></div>
                                   <div><label className="text-xs text-gray-500 mb-1 block">库存</label><input type="number" value={skuForm.stock} onChange={e=>setSkuForm({...skuForm, stock:parseInt(e.target.value)})} className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"/></div>
-                                  <div>
-                                      <label className="text-xs text-gray-500 mb-1 block">权益套餐</label>
-                                      <select 
-                                          value={skuForm.packageId || ''} 
-                                          onChange={e => {
-                                              const pkg = rightPackages?.find(p => p.id === e.target.value);
-                                              setSkuForm({ ...skuForm, packageId: e.target.value, packageName: pkg?.name });
-                                          }} 
-                                          className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"
-                                      >
-                                          <option value="">-- 继承商品默认或无 --</option>
-                                          {rightPackages?.map(p => (
-                                              <option key={p.id} value={p.id}>{p.name}</option>
-                                          ))}
-                                      </select>
-                                  </div>
                               </div>
                           ) : (
                               <div className="space-y-4">
@@ -390,7 +642,6 @@ const ProductDetails: React.FC = () => {
                                   <div><div className="text-xs text-gray-500 mb-1">编码</div><div className="text-sm font-mono dark:text-gray-300">{skuForm.code}</div></div>
                                   <div><div className="text-xs text-gray-500 mb-1">基准价格</div><div className="text-lg font-bold dark:text-white">¥{skuForm.price.toLocaleString()}</div></div>
                                   <div><div className="text-xs text-gray-500 mb-1">库存</div><div className="text-sm dark:text-gray-300">{skuForm.stock}</div></div>
-                                  <div><div className="text-xs text-gray-500 mb-1">权益套餐</div><div className="text-sm dark:text-gray-300">{skuForm.packageName || '默认/无'}</div></div>
                               </div>
                           )}
                           <div className="pt-6 mt-6 border-t border-gray-100 dark:border-white/10">
@@ -439,56 +690,39 @@ const ProductDetails: React.FC = () => {
                       <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">授权方案详情</h3>
                       {isEditingLicense ? (
                           <div className="space-y-4">
-                              <div><label className="text-xs text-gray-500 mb-1 block">方案标题</label><input value={licenseForm.title} onChange={e=>setLicenseForm({...licenseForm, title:e.target.value})} className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"/></div>
-                              <div><label className="text-xs text-gray-500 mb-1 block">价格 (¥)</label><input type="number" value={licenseForm.price} onChange={e=>setLicenseForm({...licenseForm, price:parseFloat(e.target.value)})} className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"/></div>
-                              
-                              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100 dark:border-white/10">
-                                  <div>
-                                      <label className="text-xs text-gray-500 mb-1 block">授权类型</label>
-                                      <select 
-                                        value={licenseForm.license?.type} 
-                                        onChange={e=>setLicenseForm({...licenseForm, license: {...licenseForm.license, type: e.target.value as LicenseType} as SkuPricingOption['license']})} 
-                                        className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"
-                                      >
-                                          <option value="PerUser">PerUser</option>
-                                          <option value="FlatRate">FlatRate</option>
-                                          <option value="Subscription">Subscription</option>
-                                          <option value="Perpetual">Perpetual</option>
-                                      </select>
-                                  </div>
-                                  <div>
-                                      <label className="text-xs text-gray-500 mb-1 block">单位 (Period Unit)</label>
-                                      <select 
-                                        value={licenseForm.license?.periodUnit} 
-                                        onChange={e=>setLicenseForm({...licenseForm, license: {...licenseForm.license, periodUnit: e.target.value as LicenseUnit} as SkuPricingOption['license']})} 
-                                        className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"
-                                      >
-                                          <option value="Day">Day</option>
-                                          <option value="Month">Month</option>
-                                          <option value="Year">Year</option>
-                                          <option value="Forever">Forever</option>
-                                      </select>
-                                  </div>
-                                  <div>
-                                      <label className="text-xs text-gray-500 mb-1 block">期限值 (Period)</label>
-                                      <input type="number" value={licenseForm.license?.period} onChange={e=>setLicenseForm({...licenseForm, license: {...licenseForm.license, period: parseInt(e.target.value)} as SkuPricingOption['license']})} className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"/>
-                                  </div>
-                                  <div>
-                                      <label className="text-xs text-gray-500 mb-1 block">适用范围 (Scope)</label>
-                                      <input value={licenseForm.license?.scope} onChange={e=>setLicenseForm({...licenseForm, license: {...licenseForm.license, scope: e.target.value} as SkuPricingOption['license']})} className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"/>
-                                  </div>
+                              <div>
+                                  <label className="text-xs text-gray-500 mb-1 block">授权类型 <span className="text-[10px] text-gray-400">（来自系统配置）</span></label>
+                                  <select 
+                                    value={authTypes.find(a => a.name === licenseForm.title)?.id || ''} 
+                                    onChange={e => {
+                                        const at = authTypes.find(a => a.id === e.target.value);
+                                        if (at) {
+                                            const isPeriodic = at.period === '周期性';
+                                            setLicenseForm({...licenseForm, title: at.name, license: {
+                                                type: isPeriodic ? 'Subscription' : 'Perpetual',
+                                                period: licenseForm.license?.period || 1,
+                                                periodUnit: isPeriodic ? 'Year' : 'Forever',
+                                                scope: at.name.includes('用户') ? '1 User' : at.name.includes('服务器') ? 'Platform' : at.name.includes('场地') ? '100 Devices' : 'Standard'
+                                            }});
+                                        }
+                                    }} 
+                                    className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"
+                                  >
+                                      <option value="">-- 选择授权类型 --</option>
+                                      {authTypes.map(at => <option key={at.id} value={at.id}>{at.name}（{at.period}）</option>)}
+                                  </select>
                               </div>
+                              <div><label className="text-xs text-gray-500 mb-1 block">价格 (¥)</label><input type="number" value={licenseForm.price} onChange={e=>setLicenseForm({...licenseForm, price:parseFloat(e.target.value)})} className="w-full bg-gray-50 dark:bg-black border p-2 rounded text-sm dark:text-white dark:border-white/10"/></div>
                           </div>
                       ) : (
                           <div className="space-y-6">
                               <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-white/5 rounded-2xl">
-                                  <div><div className="text-xs text-gray-500">方案标题</div><div className="font-bold dark:text-white">{licenseForm.title}</div></div>
+                                  <div><div className="text-xs text-gray-500">授权类型</div><div className="font-bold dark:text-white">{licenseForm.title}</div></div>
                                   <div className="text-right"><div className="text-xs text-gray-500">价格</div><div className="font-bold text-xl text-blue-600 dark:text-[#FF2D55]">¥{licenseForm.price?.toLocaleString()}</div></div>
                               </div>
                               <div className="grid grid-cols-2 gap-4">
-                                  <div><div className="text-xs text-gray-500">授权类型</div><div className="font-medium dark:text-white">{licenseForm.license?.type}</div></div>
-                                  <div><div className="text-xs text-gray-500">期限</div><div className="font-medium dark:text-white">{licenseForm.license?.period} {licenseForm.license?.periodUnit}</div></div>
-                                  <div><div className="text-xs text-gray-500">适用范围</div><div className="font-medium dark:text-white">{licenseForm.license?.scope}</div></div>
+                                  <div><div className="text-xs text-gray-500">定价周期</div><div className="font-medium dark:text-white">{licenseForm.license?.periodUnit === 'Forever' ? '非周期性' : '周期性'}</div></div>
+                                  <div><div className="text-xs text-gray-500">NCC 业务类型</div><div className="font-medium dark:text-white">{authTypes.find(a => a.name === licenseForm.title)?.nccBiz || '-'}</div></div>
                               </div>
                           </div>
                       )}
@@ -501,24 +735,121 @@ const ProductDetails: React.FC = () => {
           )}
       </div>
 
+      {/* Add Install Package Modal */}
+      {isAddPkgModalOpen && (
+          <ModalPortal>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[500] animate-fade-in p-4">
+              <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-lg p-6 border-white/10">
+                  <div className="flex items-center justify-between mb-5">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">新增安装包</h3>
+                      <button onClick={() => setIsAddPkgModalOpen(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition"><X className="w-4 h-4 text-gray-400"/></button>
+                  </div>
+                  <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">安装包类型</label>
+                              <select value={pkgForm.packageType} onChange={e => setPkgForm({...pkgForm, packageType: e.target.value as 'public' | 'private'})} className="w-full border border-gray-200 dark:border-white/10 rounded-lg p-2.5 bg-white dark:bg-black text-sm dark:text-white outline-none">
+                                  <option value="public">端安装包</option>
+                                  <option value="private">私有云安装包</option>
+                              </select>
+                          </div>
+                          <div>
+                              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">交付物名称 *</label>
+                              <input value={pkgForm.name} onChange={e => setPkgForm({...pkgForm, name: e.target.value})} className="w-full border border-gray-200 dark:border-white/10 rounded-lg p-2.5 bg-white dark:bg-black text-sm dark:text-white outline-none" placeholder="安装包名称" />
+                          </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">交付物编号</label>
+                              <input value={pkgForm.deliveryItemId} onChange={e => setPkgForm({...pkgForm, deliveryItemId: e.target.value})} className="w-full border border-gray-200 dark:border-white/10 rounded-lg p-2.5 bg-white dark:bg-black text-sm dark:text-white outline-none" placeholder="如 DLV-001" />
+                          </div>
+                          <div>
+                              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">交付物名称</label>
+                              <input value={pkgForm.deliveryItemName} onChange={e => setPkgForm({...pkgForm, deliveryItemName: e.target.value})} className="w-full border border-gray-200 dark:border-white/10 rounded-lg p-2.5 bg-white dark:bg-black text-sm dark:text-white outline-none" placeholder="交付物描述" />
+                          </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">发布平台</label>
+                              <select value={pkgForm.platform} onChange={e => setPkgForm({...pkgForm, platform: e.target.value})} className="w-full border border-gray-200 dark:border-white/10 rounded-lg p-2.5 bg-white dark:bg-black text-sm dark:text-white outline-none">
+                                  <option value="">请选择</option>
+                                  <option value="Windows">Windows</option>
+                                  <option value="Linux">Linux</option>
+                                  <option value="macOS">macOS</option>
+                                  <option value="Android">Android</option>
+                                  <option value="iOS">iOS</option>
+                                  <option value="通用">通用</option>
+                              </select>
+                          </div>
+                          <div>
+                              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">安装包来源</label>
+                              <select value={pkgForm.source} onChange={e => setPkgForm({...pkgForm, source: e.target.value})} className="w-full border border-gray-200 dark:border-white/10 rounded-lg p-2.5 bg-white dark:bg-black text-sm dark:text-white outline-none">
+                                  <option value="">请选择</option>
+                                  <option value="自研">自研</option>
+                                  <option value="第三方">第三方</option>
+                                  <option value="OEM">OEM</option>
+                              </select>
+                          </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">CPU</label>
+                              <select value={pkgForm.cpu} onChange={e => setPkgForm({...pkgForm, cpu: e.target.value})} className="w-full border border-gray-200 dark:border-white/10 rounded-lg p-2.5 bg-white dark:bg-black text-sm dark:text-white outline-none">
+                                  <option value="">请选择</option>
+                                  <option value="x86_64">x86_64</option>
+                                  <option value="ARM64">ARM64</option>
+                                  <option value="MIPS64">MIPS64</option>
+                                  <option value="LoongArch">LoongArch</option>
+                                  <option value="通用">通用</option>
+                              </select>
+                          </div>
+                          <div>
+                              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">操作系统</label>
+                              <select value={pkgForm.os} onChange={e => setPkgForm({...pkgForm, os: e.target.value})} className="w-full border border-gray-200 dark:border-white/10 rounded-lg p-2.5 bg-white dark:bg-black text-sm dark:text-white outline-none">
+                                  <option value="">请选择</option>
+                                  <option value="Windows">Windows</option>
+                                  <option value="CentOS">CentOS</option>
+                                  <option value="Ubuntu">Ubuntu</option>
+                                  <option value="UOS">UOS</option>
+                                  <option value="Kylin">Kylin</option>
+                                  <option value="macOS">macOS</option>
+                                  <option value="Android">Android</option>
+                                  <option value="iOS">iOS</option>
+                              </select>
+                          </div>
+                      </div>
+                      <div>
+                          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">安装包链接</label>
+                          <input value={pkgForm.url} onChange={e => setPkgForm({...pkgForm, url: e.target.value})} className="w-full border border-gray-200 dark:border-white/10 rounded-lg p-2.5 bg-white dark:bg-black text-sm dark:text-white outline-none" placeholder="https://..." />
+                      </div>
+                  </div>
+                  <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100 dark:border-white/10">
+                      <button onClick={() => setIsAddPkgModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition text-sm">取消</button>
+                      <button onClick={handleSavePkg} disabled={!pkgForm.name} className="px-5 py-2 bg-[#0071E3] dark:bg-[#FF2D55] text-white text-sm font-medium rounded-lg hover:opacity-80 transition shadow-apple disabled:opacity-50">确认新增</button>
+                  </div>
+              </div>
+          </div>
+          </ModalPortal>
+      )}
+
       {/* Add License Modal */}
       {isAddLicenseModalOpen && (
 
           <ModalPortal>
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[500] animate-fade-in p-4">
               <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-md p-6 border-white/10">
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">关联授权类型</h3>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">关联授权类型 <span className="text-xs font-normal text-gray-400">（来自系统配置）</span></h3>
                   <div className="space-y-4">
                       <div>
-                          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">选择授权模式</label>
+                          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">选择授权类型</label>
                           <select 
                               className="w-full border border-gray-200 dark:border-white/10 rounded-lg p-2.5 bg-white dark:bg-black text-sm dark:text-white outline-none"
                               value={selectedLicenseDefId}
                               onChange={e => setSelectedLicenseDefId(e.target.value)}
                           >
                               <option value="">-- 请选择 --</option>
-                              {licenseDefs.map(def => (
-                                  <option key={def.id} value={def.id}>{def.name}</option>
+                              {authTypes.map(at => (
+                                  <option key={at.id} value={at.id}>{at.name}（{at.period}）</option>
                               ))}
                           </select>
                       </div>
@@ -535,12 +866,13 @@ const ProductDetails: React.FC = () => {
                       {selectedLicenseDefId && (
                           <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-xs text-blue-700 dark:text-blue-300">
                               {(() => {
-                                  const def = licenseDefs.find(d => d.id === selectedLicenseDefId);
-                                  return def ? (
+                                  const at = authTypes.find(a => a.id === selectedLicenseDefId);
+                                  return at ? (
                                       <div>
-                                          <div>类型: {def.type}</div>
-                                          <div>范围: {def.scope}</div>
-                                          <div>期限: {def.period} {def.periodUnit}</div>
+                                          <div>授权类型: {at.name}</div>
+                                          <div>定价周期: {at.period}</div>
+                                          {at.nccBiz && <div>NCC 业务类型: {at.nccBiz}</div>}
+                                          {at.nccIncome && <div>NCC 收入类型: {at.nccIncome}</div>}
                                       </div>
                                   ) : null;
                               })()}

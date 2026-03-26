@@ -63,20 +63,15 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const [tempPkgType, setTempPkgType] = useState<'通用' | '定制' | ''>('');
   const [tempPkgCpu, setTempPkgCpu] = useState('');
   const [tempPkgOs, setTempPkgOs] = useState('');
+  const [tempPkgLink, setTempPkgLink] = useState('');
 
   // Computed data for selection cascade
   const selectedProduct = products.find(p => p.id === tempProductId);
   const selectedSku = selectedProduct?.skus.find(s => s.id === tempSkuId);
   const selectedOption = selectedSku?.pricingOptions?.find(o => o.id === tempPricingOptionId);
-  const selectedLicenseType = (() => {
-    if (!selectedOption) return undefined;
-    const { type, scope } = selectedOption.license;
-    if (type === 'FlatRate') return '服务器授权';
-    if (type === 'Perpetual') return scope === 'Platform' ? '服务器授权' : '数量授权';
-    if (type === 'Subscription') return scope === '1 User' ? '用户订阅许可' : '年授权';
-    return '数量授权';
-  })();
-  const showLicensePeriod = selectedLicenseType === '用户订阅许可' || selectedLicenseType === '年授权';
+  const selectedLicenseType = selectedOption?.title || undefined;
+  const selectedLicensePeriodType = selectedOption ? selectedOption.license.periodUnit : undefined;
+  const showLicensePeriod = selectedLicensePeriodType !== 'Forever' && selectedLicensePeriodType !== undefined;
 
   const [originalOrderId, setOriginalOrderId] = useState<string | undefined>(undefined);
 
@@ -179,10 +174,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   }, [hasOpportunity]);
 
   // Reset downstream selections when upstream changes
-  useEffect(() => { setTempCategory(''); setTempProductId(''); setTempSkuId(''); setTempPricingOptionId(''); setNegotiatedPrice(null); setTempPkgType(''); setTempPkgCpu(''); setTempPkgOs(''); }, [tempTopCategory]);
-  useEffect(() => { setTempProductId(''); setTempSkuId(''); setTempPricingOptionId(''); setNegotiatedPrice(null); setTempPkgType(''); setTempPkgCpu(''); setTempPkgOs(''); }, [tempCategory]);
-  useEffect(() => { setTempSkuId(''); setTempPricingOptionId(''); setNegotiatedPrice(null); setTempPkgType(''); setTempPkgCpu(''); setTempPkgOs(''); }, [tempProductId]);
-  useEffect(() => { setTempPkgCpu(''); setTempPkgOs(''); }, [tempPkgType]);
+  useEffect(() => { setTempCategory(''); setTempProductId(''); setTempSkuId(''); setTempPricingOptionId(''); setNegotiatedPrice(null); setTempPkgType(''); setTempPkgCpu(''); setTempPkgOs(''); setTempPkgLink(''); }, [tempTopCategory]);
+  useEffect(() => { setTempProductId(''); setTempSkuId(''); setTempPricingOptionId(''); setNegotiatedPrice(null); setTempPkgType(''); setTempPkgCpu(''); setTempPkgOs(''); setTempPkgLink(''); }, [tempCategory]);
+  useEffect(() => { setTempSkuId(''); setTempPricingOptionId(''); setNegotiatedPrice(null); setTempPkgType(''); setTempPkgCpu(''); setTempPkgOs(''); setTempPkgLink(''); }, [tempProductId]);
+  useEffect(() => { setTempPkgCpu(''); setTempPkgOs(''); setTempPkgLink(''); }, [tempPkgType]);
   useEffect(() => { 
       setTempPricingOptionId(''); 
       setNegotiatedPrice(null); 
@@ -227,6 +222,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setTempPkgType('');
       setTempPkgCpu('');
       setTempPkgOs('');
+      setTempPkgLink('');
       setTempPricingOptionId('');
       setNegotiatedPrice(null);
       setCurrentStep(1);
@@ -319,16 +315,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
     const finalPrice = negotiatedPrice !== null ? negotiatedPrice : (selectedOption ? selectedOption.price : selectedSku.price);
 
-    const derivedLicenseType = (() => {
-        if (!selectedOption) return undefined;
-        const { type, scope } = selectedOption.license;
-        if (type === 'FlatRate') return '服务器授权';
-        if (type === 'Perpetual') return scope === 'Platform' ? '服务器授权' : '数量授权';
-        if (type === 'Subscription') return scope === '1 User' ? '用户订阅许可' : '年授权';
-        return '数量授权';
-    })();
-    const needsManualPeriod = derivedLicenseType === '用户订阅许可' || derivedLicenseType === '年授权';
-    const isPermanent = derivedLicenseType === '数量授权' || derivedLicenseType === '服务器授权';
+    const derivedLicenseType = selectedOption?.title || undefined;
+    const isPermanent = selectedOption ? selectedOption.license.periodUnit === 'Forever' : true;
+    const needsManualPeriod = !isPermanent;
 
     const newItem: OrderItem = {
         productId: selectedProduct.id,
@@ -344,6 +333,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         licensePeriod: isPermanent ? '永久' : (needsManualPeriod && tempLicensePeriod ? tempLicensePeriod : undefined),
         activationMethod: tempActivationMethod,
         installPackageName: resolvedInstallPackageName,
+        installPackageType: tempPkgType || undefined,
+        installPackageLink: tempPkgType === '定制' && tempPkgLink ? tempPkgLink : undefined,
         enterpriseId: resolvedEntId || undefined,
         enterpriseName: enterpriseName,
         capabilitiesSnapshot
@@ -359,6 +350,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     setTempPkgType('');
     setTempPkgCpu('');
     setTempPkgOs('');
+    setTempPkgLink('');
   };
 
   const handleRemoveItem = (index: number) => setNewOrderItems(prev => prev.filter((_, i) => i !== index));
@@ -1114,15 +1106,11 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             onChange={e => setTempPricingOptionId(e.target.value)}
                                         >
                                             <option value="">-- 请选择授权 --</option>
-                                            {selectedSku.pricingOptions.map(opt => {
-                                                const { type, scope } = opt.license;
-                                                const label = type === 'FlatRate' ? '服务器授权' : type === 'Perpetual' ? (scope === 'Platform' ? '服务器授权' : '数量授权') : type === 'Subscription' ? (scope === '1 User' ? '用户订阅许可' : '年授权') : '数量授权';
-                                                return (
+                                            {selectedSku.pricingOptions.map(opt => (
                                                 <option key={opt.id} value={opt.id}>
-                                                    {opt.title} - ¥{opt.price.toLocaleString()} ({label})
+                                                    {opt.title} - ¥{opt.price.toLocaleString()}
                                                 </option>
-                                                );
-                                            })}
+                                            ))}
                                         </select>
                                         {selectedLicenseType && (
                                             <div className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
@@ -1198,12 +1186,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             {(() => {
                                 if (!selectedProduct) return null;
                                 const pkgs = selectedProduct.installPackages || [];
-                                if (pkgs.length === 0) return null;
 
                                 const universalPkgs = pkgs.filter(p => p.cpu === '通用');
                                 const customPkgs = pkgs.filter(p => p.cpu !== '通用');
-                                const hasUniversal = universalPkgs.length > 0;
-                                const hasCustom = customPkgs.length > 0;
 
                                 const universalOsOptions = Array.from(new Set(universalPkgs.map(p => p.os).filter(Boolean)));
                                 const customCpuOptions = Array.from(new Set(customPkgs.map(p => p.cpu).filter(Boolean)));
@@ -1211,7 +1196,6 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     customPkgs.filter(p => !tempPkgCpu || p.cpu === tempPkgCpu).map(p => p.os).filter(Boolean)
                                 ));
 
-                                // Resolved package for preview
                                 let previewPkg = null;
                                 if (tempPkgType === '通用' && tempPkgOs) {
                                     previewPkg = universalPkgs.find(p => p.os === tempPkgOs) || null;
@@ -1226,41 +1210,36 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         <div className="flex items-center gap-2">
                                             <Box className="w-4 h-4 text-indigo-500"/>
                                             <span className="text-sm font-bold text-gray-700 dark:text-gray-200">安装包配置</span>
-                                            <span className="text-xs text-gray-400 ml-1">（可选）</span>
                                         </div>
 
                                         {/* 通用 / 定制 切换 */}
                                         <div className="flex gap-3">
-                                            {hasUniversal && (
-                                                <button
-                                                    onClick={() => setTempPkgType('通用')}
-                                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${
-                                                        tempPkgType === '通用'
-                                                        ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/40 dark:bg-white/5 text-[#0071E3] dark:text-[#FF2D55]'
-                                                        : 'border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-300 dark:hover:border-white/20'
-                                                    }`}
-                                                >
-                                                    <Globe className="w-4 h-4"/> 通用
-                                                </button>
-                                            )}
-                                            {hasCustom && (
-                                                <button
-                                                    onClick={() => setTempPkgType('定制')}
-                                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${
-                                                        tempPkgType === '定制'
-                                                        ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/40 dark:bg-white/5 text-[#0071E3] dark:text-[#FF2D55]'
-                                                        : 'border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-300 dark:hover:border-white/20'
-                                                    }`}
-                                                >
-                                                    <Settings className="w-4 h-4"/> 定制
-                                                </button>
-                                            )}
+                                            <button
+                                                onClick={() => setTempPkgType('通用')}
+                                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${
+                                                    tempPkgType === '通用'
+                                                    ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/40 dark:bg-white/5 text-[#0071E3] dark:text-[#FF2D55]'
+                                                    : 'border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-300 dark:hover:border-white/20'
+                                                }`}
+                                            >
+                                                <Globe className="w-4 h-4"/> 通用
+                                            </button>
+                                            <button
+                                                onClick={() => setTempPkgType('定制')}
+                                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${
+                                                    tempPkgType === '定制'
+                                                    ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/40 dark:bg-white/5 text-[#0071E3] dark:text-[#FF2D55]'
+                                                    : 'border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-300 dark:hover:border-white/20'
+                                                }`}
+                                            >
+                                                <Settings className="w-4 h-4"/> 定制
+                                            </button>
                                             {tempPkgType && (
                                                 <button onClick={() => setTempPkgType('')} className="text-xs text-gray-400 hover:text-gray-600 px-2 transition">清除</button>
                                             )}
                                         </div>
 
-                                        {/* 通用：选择操作系统 */}
+                                        {/* 通用：选择操作系统（仅在有通用安装包数据时显示） */}
                                         {tempPkgType === '通用' && universalOsOptions.length > 1 && (
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                                 <div className="space-y-1.5">
@@ -1277,31 +1256,56 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             </div>
                                         )}
 
-                                        {/* 定制：先选发布平台，再选 OS */}
+                                        {/* 定制：先选发布平台/OS（如有定制安装包数据），再填安装包链接 */}
                                         {tempPkgType === '定制' && (
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-4">
+                                                {customCpuOptions.length > 0 && (
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-xs font-bold text-gray-500 uppercase">发布平台</label>
+                                                            <select
+                                                                className="w-full p-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
+                                                                value={tempPkgCpu}
+                                                                onChange={e => { setTempPkgCpu(e.target.value); setTempPkgOs(''); }}
+                                                            >
+                                                                <option value="">-- 请选择发布平台 --</option>
+                                                                {customCpuOptions.map(cpu => <option key={cpu} value={cpu}>{cpu}</option>)}
+                                                            </select>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-xs font-bold text-gray-500 uppercase">操作系统</label>
+                                                            <select
+                                                                className="w-full p-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50"
+                                                                value={tempPkgOs}
+                                                                onChange={e => setTempPkgOs(e.target.value)}
+                                                                disabled={!tempPkgCpu}
+                                                            >
+                                                                <option value="">-- {tempPkgCpu ? '请选择系统' : '请先选 CPU'} --</option>
+                                                                {customOsOptions.map(os => <option key={os} value={os}>{os}</option>)}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 <div className="space-y-1.5">
-                                                    <label className="text-xs font-bold text-gray-500 uppercase">发布平台</label>
-                                                    <select
-                                                        className="w-full p-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
-                                                        value={tempPkgCpu}
-                                                        onChange={e => { setTempPkgCpu(e.target.value); setTempPkgOs(''); }}
-                                                    >
-                                                        <option value="">-- 请选择发布平台 --</option>
-                                                        {customCpuOptions.map(cpu => <option key={cpu} value={cpu}>{cpu}</option>)}
-                                                    </select>
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <label className="text-xs font-bold text-gray-500 uppercase">操作系统</label>
-                                                    <select
-                                                        className="w-full p-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50"
-                                                        value={tempPkgOs}
-                                                        onChange={e => setTempPkgOs(e.target.value)}
-                                                        disabled={!tempPkgCpu}
-                                                    >
-                                                        <option value="">-- {tempPkgCpu ? '请选择系统' : '请先选 CPU'} --</option>
-                                                        {customOsOptions.map(os => <option key={os} value={os}>{os}</option>)}
-                                                    </select>
+                                                    <label className="text-xs font-bold text-gray-500 uppercase">安装包链接 <span className="text-red-400 text-[10px] normal-case font-normal ml-1">定制安装包请粘贴链接</span></label>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="url"
+                                                            value={tempPkgLink}
+                                                            onChange={e => setTempPkgLink(e.target.value)}
+                                                            placeholder="请粘贴定制安装包下载链接"
+                                                            className="flex-1 p-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm text-gray-800 dark:text-white placeholder:text-gray-400"
+                                                        />
+                                                        {tempPkgLink && (
+                                                            <button onClick={() => setTempPkgLink('')} className="px-3 text-xs text-gray-400 hover:text-gray-600 border border-gray-200 dark:border-white/10 rounded-xl transition">清除</button>
+                                                        )}
+                                                    </div>
+                                                    {tempPkgLink && (
+                                                        <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 mt-1">
+                                                            <CheckCircle className="w-3 h-3"/>
+                                                            <span>已填写安装包链接</span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
@@ -1337,7 +1341,16 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                 <td className="p-5"><span className="text-xs bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-lg text-gray-600 dark:text-gray-300 font-medium">{item.pricingOptionName || '默认'}</span></td>
                                                 <td className="p-5 text-center dark:text-white font-medium">{item.quantity}</td>
                                                 <td className="p-5 text-center">{item.licensePeriod && item.licensePeriod !== '永久' ? <span className="inline-flex px-2.5 py-1 text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800 rounded-lg">{item.licensePeriod}</span> : <span className="text-gray-300 dark:text-gray-600">-</span>}</td>
-                                                <td className="p-5 max-w-[160px]">{item.installPackageName ? <span className="text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-lg font-medium">{item.installPackageName}</span> : <span className="text-gray-300 dark:text-gray-600 text-xs">-</span>}</td>
+                                                <td className="p-5 max-w-[180px]">
+                                                    <div className="space-y-1">
+                                                        {item.installPackageType && (
+                                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${item.installPackageType === '通用' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'}`}>{item.installPackageType}</span>
+                                                        )}
+                                                        {item.installPackageName && <div className="text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-lg font-medium">{item.installPackageName}</div>}
+                                                        {item.installPackageLink && <a href={item.installPackageLink} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:underline truncate block" title={item.installPackageLink}>🔗 定制安装包链接</a>}
+                                                        {!item.installPackageType && !item.installPackageName && <span className="text-gray-300 dark:text-gray-600 text-xs">-</span>}
+                                                    </div>
+                                                </td>
                                                 {(buyerType === 'Customer' || buyerType === 'Channel') && (
                                                     <td className="p-5 max-w-[140px]">
                                                         {item.enterpriseName ? (
