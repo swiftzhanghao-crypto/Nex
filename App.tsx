@@ -34,6 +34,8 @@ import ProductPackageManager from './components/product/ProductPackageManager';
 import ProductLicenseTemplateManager from './components/product/ProductLicenseTemplateManager';
 import ProductAttrConfigManager from './components/product/ProductAttrConfigManager';
 import LicenseTypeManager from './components/product/LicenseTypeManager';
+import DeliveryMethodConfig from './components/system/DeliveryMethodConfig';
+import SalesOrgConfig from './components/system/SalesOrgConfig';
 import ProductMsrpManager from './components/product/ProductMsrpManager';
 import ProductChannelPriceManager from './components/product/ProductChannelPriceManager';
 
@@ -59,6 +61,8 @@ function AppRoutes() {
         <Route path="/roles" element={<UserManager defaultTab="ROLES" />} />
         <Route path="/organization" element={<OrganizationManager />} />
         <Route path="/system/license-types" element={<LicenseTypeManager />} />
+        <Route path="/system/delivery-methods" element={<DeliveryMethodConfig />} />
+        <Route path="/system/sales-org" element={<SalesOrgConfig />} />
 
         <Route path="/channels" element={<ChannelManager />} />
         <Route path="/channels/:id" element={<ChannelDetails />} />

@@ -173,6 +173,10 @@ export interface Product {
     maintenanceStandard?: string;
     hasUpgradeWarranty?: boolean;
     hasAfterSalesService?: boolean;
+    salesOrgId?: string;
+    salesOrgName?: string;
+    businessDeliveryName?: string;
+    taxRefundType?: string;
 }
 
 export type SalesType = 'Direct' | 'Channel';
@@ -265,7 +269,7 @@ export type UserRole = 'Admin' | 'Sales' | 'Business' | 'Technical' | 'Logistics
 export type UserType = 'Internal' | 'External';
 
 export type PermissionResource = 'Order' | 'Customer' | 'Opportunity' | 'Product';
-export type PermissionDimension = 'departmentId' | 'productId' | 'customerIndustry' | 'customerLevel' | 'channelId' | 'buyerType' | 'industryLine' | 'province' | 'directChannelId' | 'orderType';
+export type PermissionDimension = 'departmentId' | 'productId' | 'customerIndustry' | 'customerLevel' | 'channelId' | 'buyerType' | 'industryLine' | 'province' | 'directChannelId' | 'orderType' | 'salesRep' | 'businessManager' | 'creator';
 
 export type PermissionOperator = 'equals' | 'contains';
 
@@ -283,7 +287,7 @@ export interface ColumnPermissionRule {
     allowedColumns: string[];
 }
 
-export type BaseRowPermission = 'self' | 'department' | 'all';
+export type BaseRowPermission = 'all' | 'custom';
 
 export interface RoleDefinition {
     id: string;
@@ -552,6 +556,9 @@ export interface Order {
 
     orderRemark?: string;
 
+    purchasingContactId?: string;
+    itContactId?: string;
+
     linkedContractIds?: string[];
     linkedContractNames?: string[];
 
@@ -694,4 +701,6 @@ export interface OrderDraft {
     phaseDrafts: { name: string; percentage: number }[];
     orderRemark: string;
     linkedContractIds: string[];
+    purchasingContactId: string;
+    itContactId: string;
 }

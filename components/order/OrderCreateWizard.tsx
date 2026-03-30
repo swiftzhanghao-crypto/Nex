@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Order, OrderStatus, OrderItem, ActivationMethod, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, DeliveryMethod, OrderDraft } from '../../types';
-import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Network, Globe, Radio, RefreshCcw, Wallet, Zap, Box, Settings, MapPin, Briefcase, XCircle, Search, Save, ScrollText, Phone, Mail, Users, Banknote, Calendar } from 'lucide-react';
+import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Network, Globe, Radio, RefreshCcw, Wallet, Zap, Box, Settings, MapPin, Briefcase, XCircle, Search, Save, ScrollText, Phone, Mail, Users, Banknote, Calendar, Check } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
 
@@ -20,6 +20,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const [currentStep, setCurrentStep] = useState(1); // 1: Type, 2: Info, 3: Products, 4: Delivery
   const [currentDraftId, setCurrentDraftId] = useState<string | undefined>(initialDraft?.id);
   const [draftSavedTip, setDraftSavedTip] = useState(false);
+  const isRestoringDraftRef = useRef(false);
 
   // Step 1: Order Type & Source
   const [buyerType, setBuyerType] = useState<BuyerType | ''>('');
@@ -40,9 +41,11 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const [salesRepId, setSalesRepId] = useState('');
   const [creatorId, setCreatorId] = useState(currentUser.id);
   const [orderEnterpriseId, setOrderEnterpriseId] = useState('');
-  // 自动带出的联系人
+  // 可选联系人列表 & 选中的联系人 ID
   const [purchasingContacts, setPurchasingContacts] = useState<typeof customers[0]['contacts']>([]);
   const [itContacts, setItContacts] = useState<typeof customers[0]['contacts']>([]);
+  const [selectedPurchasingContactId, setSelectedPurchasingContactId] = useState('');
+  const [selectedItContactId, setSelectedItContactId] = useState('');
   
   // Step 3: Merchandise Selection (New Cascading Logic)
   const [newOrderItems, setNewOrderItems] = useState<OrderItem[]>([]);
@@ -145,6 +148,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
   // When buyerType changes to Channel, restrict orderSource; reset if invalid
   useEffect(() => {
+    if (isRestoringDraftRef.current) return;
     if (buyerType === 'Customer') {
       setOrderSource('Sales');
     } else if (buyerType === 'Channel') {
@@ -164,6 +168,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
   // When toggling hasOpportunity, reset related fields
   useEffect(() => {
+    if (isRestoringDraftRef.current) return;
     if (hasOpportunity === 'no') {
       setLinkedOpportunityId('');
     }
@@ -237,6 +242,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setAcceptanceForm({ contactName: '', contactPhone: '', method: 'Remote', email: '' });
       setAcceptanceType('OneTime');
       setPhaseDrafts([{ name: '第一阶段验收', percentage: 30 }, { name: '最终验收', percentage: 70 }]);
+      setPurchasingContacts([]);
+      setItContacts([]);
+      setSelectedPurchasingContactId('');
+      setSelectedItContactId('');
   };
 
   const handleClose = () => { onClose(); resetCreateForm(); };
@@ -252,10 +261,11 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setOrderEnterpriseId(''); // Reset enterprise selection
       setPurchasingContacts([]);
       setItContacts([]);
+      setSelectedPurchasingContactId('');
+      setSelectedItContactId('');
       const customer = customers.find(c => c.id === customerId);
       if (customer) {
           if (customer.ownerId) setSalesRepId(customer.ownerId);
-          // Auto-fill Invoice
           setInvoiceForm(prev => ({
               ...prev,
               title: customer.billingInfo?.title || customer.companyName,
@@ -274,9 +284,23 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                   email: primaryContact.email
               }));
           }
-          // 自动带出采购 & IT 联系人
-          setPurchasingContacts(customer.contacts.filter(c => c.roles.includes('Purchasing')));
-          setItContacts(customer.contacts.filter(c => c.roles.includes('IT')));
+          const pContacts = customer.contacts.filter(c => c.roles.includes('Purchasing'));
+          const iContacts = customer.contacts.filter(c => c.roles.includes('IT'));
+          setPurchasingContacts(pContacts);
+          setItContacts(iContacts);
+          // 自动选中：唯一一个则直接选中，否则优先选主要联系人
+          if (pContacts.length === 1) {
+              setSelectedPurchasingContactId(pContacts[0].id);
+          } else if (pContacts.length > 1) {
+              const primary = pContacts.find(c => c.isPrimary);
+              if (primary) setSelectedPurchasingContactId(primary.id);
+          }
+          if (iContacts.length === 1) {
+              setSelectedItContactId(iContacts[0].id);
+          } else if (iContacts.length > 1) {
+              const primary = iContacts.find(c => c.isPrimary);
+              if (primary) setSelectedItContactId(primary.id);
+          }
       }
   };
 
@@ -401,6 +425,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       invoiceForm, paymentMethod, paymentTerms,
       deliveryMethod, receivingParty, receivingCompany, receivingMethod, shippingAddress,
       acceptanceForm, acceptanceType, phaseDrafts,
+      purchasingContactId: selectedPurchasingContactId,
+      itContactId: selectedItContactId,
     };
     setOrderDrafts(prev => {
       const exists = prev.findIndex(d => d.id === orderId);
@@ -415,6 +441,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   // --- Restore from draft ---
   useEffect(() => {
     if (!initialDraft) return;
+    isRestoringDraftRef.current = true;
     const d = initialDraft;
     setCurrentStep(d.currentStep);
     setBuyerType(d.buyerType);
@@ -444,6 +471,17 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     setAcceptanceType(d.acceptanceType);
     setPhaseDrafts(d.phaseDrafts);
     setCurrentDraftId(d.id);
+    setSelectedPurchasingContactId(d.purchasingContactId || '');
+    setSelectedItContactId(d.itContactId || '');
+    // 恢复可选联系人列表
+    const cust = customers.find(c => c.id === d.newOrderCustomer);
+    if (cust) {
+      setPurchasingContacts(cust.contacts.filter(c => c.roles.includes('Purchasing')));
+      setItContacts(cust.contacts.filter(c => c.roles.includes('IT')));
+    }
+    // Allow cascading effects to see the flag during the same commit,
+    // then clear it after React has flushed all synchronous effects.
+    requestAnimationFrame(() => { isRestoringDraftRef.current = false; });
   }, [initialDraft]);
 
   const handleCreateOrder = () => {
@@ -451,7 +489,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     const otherMissingCustomer = buyerType !== 'SelfDeal' && !newOrderCustomer;
     const channelMissingChannel = buyerType === 'Channel' && !selectedChannelId;
     if (selfDealMissingEnterprise || otherMissingCustomer || channelMissingChannel || newOrderItems.length === 0 || !buyerType) {
-        alert(channelMissingChannel ? '渠道代理订单请选择关联渠道。' : selfDealMissingEnterprise ? '请选择企业 ID。' : '请完善订单信息：客户、产品或订单类型未填写。');
+        alert(channelMissingChannel ? '渠道订单请选择关联渠道。' : selfDealMissingEnterprise ? '请选择企业 ID。' : '请完善订单信息：客户、产品或订单类型未填写。');
         return;
     }
     const customer = customers.find(c => c.id === newOrderCustomer);
@@ -508,6 +546,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         acceptanceConfig: { type: acceptanceType, status: 'Pending', phases, setupDate: new Date().toISOString() },
         opportunityId: linkedOpp?.id, opportunityName: linkedOpp?.name,
         orderRemark: orderRemark || undefined,
+        purchasingContactId: selectedPurchasingContactId || undefined,
+        itContactId: selectedItContactId || undefined,
         linkedContractIds: linkedContractIds.length > 0 ? linkedContractIds : undefined,
         linkedContractNames: linkedContractIds.length > 0 ? linkedContractIds.map(id => contracts.find(c => c.id === id)?.name || id) : undefined,
         settlementType,
@@ -614,10 +654,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2"><Target className="w-5 h-5 text-purple-500"/> 订单类型</h4>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {[
-                                    { id: 'Customer', title: '客户直签', icon: Target, color: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' },
-                                    { id: 'Channel', title: '渠道代理', icon: Network, color: 'text-purple-500 bg-purple-50 dark:bg-purple-900/20' },
-                                    { id: 'SelfDeal', title: '自主成交', icon: MousePointer2, color: 'text-orange-500 bg-orange-50 dark:bg-orange-900/20' },
-                                    { id: 'RedeemCode', title: '兑换码', icon: Zap, color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/20' }
+                                    { id: 'Customer', title: '直签订单', icon: Target, color: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' },
+                                    { id: 'Channel', title: '渠道订单', icon: Network, color: 'text-purple-500 bg-purple-50 dark:bg-purple-900/20' },
+                                    { id: 'SelfDeal', title: '自成交订单', icon: MousePointer2, color: 'text-orange-500 bg-orange-50 dark:bg-orange-900/20' },
+                                    { id: 'RedeemCode', title: '兑换码订单', icon: Zap, color: 'text-amber-500 bg-amber-50 dark:bg-amber-900/20' }
                                 ].map(type => (
                                     <button
                                         key={type.id}
@@ -654,7 +694,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 }).map(src => (
                                     <button 
                                         key={src.id}
-                                        onClick={() => setOrderSource(src.id as OrderSource)}
+                                        onClick={() => {
+                                            setOrderSource(src.id as OrderSource);
+                                            if (src.id === 'OnlineStore') setLinkedContractIds([]);
+                                        }}
                                         className={`px-4 py-3 rounded-xl border-2 flex items-center gap-3 transition-all duration-200 ${
                                             orderSource === src.id 
                                             ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/30 dark:bg-white/5 ring-2 ring-blue-500/10' 
@@ -773,21 +816,37 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             {hasOpportunity === 'yes' && (
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-gray-700 dark:text-gray-300">选择商机 <span className="text-red-500">*</span></label>
-                                    {linkedOpportunityId ? (
-                                        <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30 rounded-xl">
-                                            <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{opportunities.find(o => o.id === linkedOpportunityId)?.name}</div>
-                                                <div className="text-xs text-gray-500 mt-0.5">{selectedCustomerObj?.companyName} · 已自动带入客户信息</div>
+                                    {linkedOpportunityId ? (() => {
+                                        const linkedOppObj = opportunities.find(o => o.id === linkedOpportunityId);
+                                        return (
+                                        <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30 rounded-xl space-y-2">
+                                            <div className="flex items-center gap-3">
+                                                <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{linkedOppObj?.name}</div>
+                                                    <div className="text-xs text-gray-500 mt-0.5">{selectedCustomerObj?.companyName} · 已自动带入客户信息</div>
+                                                </div>
+                                                <button
+                                                    onClick={() => { setLinkedOpportunityId(''); setNewOrderCustomer(''); setOrderEnterpriseId(''); }}
+                                                    className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition shrink-0"
+                                                >
+                                                    <X className="w-3.5 h-3.5"/>
+                                                </button>
                                             </div>
-                                            <button
-                                                onClick={() => { setLinkedOpportunityId(''); setNewOrderCustomer(''); setOrderEnterpriseId(''); }}
-                                                className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition shrink-0"
-                                            >
-                                                <X className="w-3.5 h-3.5"/>
-                                            </button>
+                                            {linkedOppObj?.products && linkedOppObj.products.length > 0 && (
+                                                <div className="ml-7 flex flex-wrap gap-1.5">
+                                                    {linkedOppObj.products.map((p, pi) => (
+                                                        <span key={pi} className="inline-flex items-center gap-1 px-2 py-1 bg-white/70 dark:bg-black/20 border border-green-200/60 dark:border-green-700/30 rounded-lg text-xs">
+                                                            <span className="font-medium text-gray-800 dark:text-gray-200">{p.productName}</span>
+                                                            {p.skuName && <span className="text-gray-400 dark:text-gray-500">/ {p.skuName}</span>}
+                                                            {p.licenseType && <span className="text-green-600 dark:text-green-400 text-[10px]">({p.licenseType})</span>}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
-                                    ) : (
+                                        );
+                                    })() : (
                                         <button
                                             onClick={() => setIsOppPickerOpen(true)}
                                             className="w-full p-3 bg-gray-50 dark:bg-black border-2 border-dashed border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400 dark:text-gray-500 hover:border-[#0071E3] dark:hover:border-[#FF2D55] hover:text-[#0071E3] dark:hover:text-[#FF2D55] transition flex items-center justify-center gap-2"
@@ -886,6 +945,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         </select>
                                     </div>
                                 )}
+                                {buyerType !== 'SelfDeal' && (
+                                <>
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">销售负责人</label>
                                     <select className="w-full p-4 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition" value={salesRepId} onChange={e => setSalesRepId(e.target.value)}>
@@ -900,74 +961,102 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         {users.filter(u => u.role === 'Business' || u.role === 'Admin').map(u => <option key={u.id} value={u.id}>{u.name.replace(/\s*\(.*?\)/g, '')}</option>)}
                                     </select>
                                 </div>
+                                </>
+                                )}
                             </div>
                         </div>
                         )}
 
-                        {/* 联系人带出 */}
-                        {(purchasingContacts.length > 0 || itContacts.length > 0) && (
+                        {/* 订单联系人选择 */}
+                        {newOrderCustomer && (
                         <div className="bg-white dark:bg-[#2C2C2E] p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-5">
                             <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-4">
-                                <Users className="w-5 h-5 text-teal-500"/> 客户联系人
+                                <Users className="w-5 h-5 text-teal-500"/> 订单联系人
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* 采购联系人 */}
                                 <div className="space-y-3">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">采购联系人</span>
-                                        <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">{purchasingContacts.length}</span>
-                                    </div>
-                                    {purchasingContacts.length > 0 ? purchasingContacts.map(c => (
-                                        <div key={c.id} className="flex items-center gap-3 p-3.5 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/30 rounded-2xl">
-                                            <img src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${c.name}`} className="w-9 h-9 rounded-full bg-white border border-gray-200 dark:border-white/10 shrink-0" alt={c.name} />
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-sm font-bold text-gray-900 dark:text-white truncate">{c.name}</span>
-                                                    {c.isPrimary && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500 text-white font-bold shrink-0">主要</span>}
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">采购联系人</label>
+                                    {purchasingContacts.length > 0 ? (
+                                        <>
+                                        <div className="space-y-2">
+                                            {purchasingContacts.map(c => {
+                                                const isSelected = selectedPurchasingContactId === c.id;
+                                                return (
+                                                <div
+                                                    key={c.id}
+                                                    onClick={() => setSelectedPurchasingContactId(isSelected ? '' : c.id)}
+                                                    className={`flex items-center gap-3 p-3.5 rounded-2xl cursor-pointer transition-all ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-400 dark:border-blue-500 shadow-sm' : 'bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:border-blue-300 dark:hover:border-blue-700'}`}
+                                                >
+                                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300 dark:border-gray-600'}`}>
+                                                        {isSelected && <Check className="w-3 h-3 text-white"/>}
+                                                    </div>
+                                                    <img src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${c.name}`} className="w-9 h-9 rounded-full bg-white border border-gray-200 dark:border-white/10 shrink-0" alt={c.name} />
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-sm font-bold text-gray-900 dark:text-white truncate">{c.name}</span>
+                                                            {c.isPrimary && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500 text-white font-bold shrink-0">主要</span>}
+                                                        </div>
+                                                        {c.position && <div className="text-xs text-gray-400 truncate">{c.position}</div>}
+                                                        <div className="flex items-center gap-3 mt-1">
+                                                            {c.phone && <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1"><Phone className="w-3 h-3"/>{c.phone}</span>}
+                                                            {c.email && <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1"><Mail className="w-3 h-3"/>{c.email}</span>}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                {c.position && <div className="text-xs text-gray-400 truncate">{c.position}</div>}
-                                                <div className="flex items-center gap-3 mt-1">
-                                                    {c.phone && <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1"><Phone className="w-3 h-3"/>{c.phone}</span>}
-                                                    {c.email && <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1"><Mail className="w-3 h-3"/>{c.email}</span>}
-                                                </div>
-                                            </div>
+                                                );
+                                            })}
                                         </div>
-                                    )) : (
-                                        <div className="p-3.5 bg-gray-50 dark:bg-white/5 border border-dashed border-gray-200 dark:border-white/10 rounded-2xl text-xs text-gray-400 text-center">暂无采购联系人</div>
+                                        </>
+                                    ) : (
+                                        <div className="p-3.5 bg-gray-50 dark:bg-white/5 border border-dashed border-gray-200 dark:border-white/10 rounded-2xl text-xs text-gray-400 text-center">该客户暂无采购联系人</div>
                                     )}
                                 </div>
 
                                 {/* IT 联系人 */}
                                 <div className="space-y-3">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">IT 联系人</span>
-                                        <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">{itContacts.length}</span>
-                                    </div>
-                                    {itContacts.length > 0 ? itContacts.map(c => (
-                                        <div key={c.id} className="flex items-center gap-3 p-3.5 bg-purple-50/50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-800/30 rounded-2xl">
-                                            <img src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${c.name}`} className="w-9 h-9 rounded-full bg-white border border-gray-200 dark:border-white/10 shrink-0" alt={c.name} />
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-sm font-bold text-gray-900 dark:text-white truncate">{c.name}</span>
-                                                    {c.isPrimary && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500 text-white font-bold shrink-0">主要</span>}
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">IT 联系人</label>
+                                    {itContacts.length > 0 ? (
+                                        <>
+                                        <div className="space-y-2">
+                                            {itContacts.map(c => {
+                                                const isSelected = selectedItContactId === c.id;
+                                                return (
+                                                <div
+                                                    key={c.id}
+                                                    onClick={() => setSelectedItContactId(isSelected ? '' : c.id)}
+                                                    className={`flex items-center gap-3 p-3.5 rounded-2xl cursor-pointer transition-all ${isSelected ? 'bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-400 dark:border-purple-500 shadow-sm' : 'bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:border-purple-300 dark:hover:border-purple-700'}`}
+                                                >
+                                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${isSelected ? 'border-purple-500 bg-purple-500' : 'border-gray-300 dark:border-gray-600'}`}>
+                                                        {isSelected && <Check className="w-3 h-3 text-white"/>}
+                                                    </div>
+                                                    <img src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${c.name}`} className="w-9 h-9 rounded-full bg-white border border-gray-200 dark:border-white/10 shrink-0" alt={c.name} />
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-sm font-bold text-gray-900 dark:text-white truncate">{c.name}</span>
+                                                            {c.isPrimary && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500 text-white font-bold shrink-0">主要</span>}
+                                                        </div>
+                                                        {c.position && <div className="text-xs text-gray-400 truncate">{c.position}</div>}
+                                                        <div className="flex items-center gap-3 mt-1">
+                                                            {c.phone && <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1"><Phone className="w-3 h-3"/>{c.phone}</span>}
+                                                            {c.email && <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1"><Mail className="w-3 h-3"/>{c.email}</span>}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                {c.position && <div className="text-xs text-gray-400 truncate">{c.position}</div>}
-                                                <div className="flex items-center gap-3 mt-1">
-                                                    {c.phone && <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1"><Phone className="w-3 h-3"/>{c.phone}</span>}
-                                                    {c.email && <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1"><Mail className="w-3 h-3"/>{c.email}</span>}
-                                                </div>
-                                            </div>
+                                                );
+                                            })}
                                         </div>
-                                    )) : (
-                                        <div className="p-3.5 bg-gray-50 dark:bg-white/5 border border-dashed border-gray-200 dark:border-white/10 rounded-2xl text-xs text-gray-400 text-center">暂无 IT 联系人</div>
+                                        </>
+                                    ) : (
+                                        <div className="p-3.5 bg-gray-50 dark:bg-white/5 border border-dashed border-gray-200 dark:border-white/10 rounded-2xl text-xs text-gray-400 text-center">该客户暂无 IT 联系人</div>
                                     )}
                                 </div>
                             </div>
                         </div>
                         )}
 
-                        {/* 关联合同 */}
-                        <div>
+                        {/* 关联合同 - 官网订单不需要选择合同 */}
+                        {orderSource !== 'OnlineStore' && <div>
                             <div className="flex items-center justify-between mb-4">
                                 <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                     <ScrollText className="w-5 h-5 text-blue-500"/> 关联合同
@@ -1017,7 +1106,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     </p>
                                 )}
                             </div>
-                        </div>
+                        </div>}
                     </div>
                 )}
 
@@ -1659,7 +1748,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         {isContractPickerOpen && (
             <ModalPortal>
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[600] p-4 animate-fade-in">
-                <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col border-white/10 animate-modal-enter">
+                <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-6xl max-h-[85vh] flex flex-col border-white/10 animate-modal-enter">
                     <div className="p-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-white/50 dark:bg-white/5 shrink-0">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                             <ScrollText className="w-5 h-5 text-blue-500"/> 选择关联合同
@@ -1693,6 +1782,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     <th className="p-4 whitespace-nowrap">合同编号</th>
                                     <th className="p-4 whitespace-nowrap">合同类型</th>
                                     <th className="p-4 whitespace-nowrap">甲方</th>
+                                    <th className="p-4 whitespace-nowrap text-right">签约金额</th>
                                     <th className="p-4 whitespace-nowrap">签署日期</th>
                                     <th className="p-4 whitespace-nowrap">状态</th>
                                 </tr>
@@ -1709,7 +1799,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     );
                                     if (filtered.length === 0) return (
                                         <tr>
-                                            <td colSpan={6} className="p-10 text-center text-sm text-gray-400 dark:text-gray-500">
+                                            <td colSpan={7} className="p-10 text-center text-sm text-gray-400 dark:text-gray-500">
                                                 未找到匹配的合同
                                             </td>
                                         </tr>
@@ -1758,6 +1848,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                 <td className="p-4 text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.contractType}</td>
                                                 <td className="p-4 text-gray-700 dark:text-gray-300 max-w-[160px]">
                                                     <div className="truncate">{c.partyA || '-'}</div>
+                                                </td>
+                                                <td className="p-4 text-right whitespace-nowrap font-mono text-gray-700 dark:text-gray-300">
+                                                    {c.amount != null ? `¥${c.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                                 </td>
                                                 <td className="p-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">
                                                     {c.signDate ? new Date(c.signDate).toLocaleDateString('zh-CN') : '-'}
@@ -1855,8 +1948,19 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                 <div className="font-medium text-gray-900 dark:text-white group-hover:text-[#0071E3] dark:group-hover:text-[#FF2D55] transition-colors line-clamp-2">{o.name}</div>
                                             </td>
                                             <td className="p-4 text-gray-700 dark:text-gray-300 whitespace-nowrap">{o.customerName}</td>
-                                            <td className="p-4 text-gray-600 dark:text-gray-400 max-w-[180px]">
-                                                <div className="line-clamp-2 text-xs">{o.productType || '-'}</div>
+                                            <td className="p-4 text-gray-600 dark:text-gray-400 max-w-[240px]">
+                                                {o.products && o.products.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {o.products.map((p, pi) => (
+                                                            <span key={pi} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 dark:bg-white/10 rounded text-[11px] leading-tight">
+                                                                <span className="font-medium text-gray-700 dark:text-gray-300">{p.productName}</span>
+                                                                {p.skuName && <span className="text-gray-400">/{p.skuName}</span>}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-xs">{o.productType || '-'}</div>
+                                                )}
                                             </td>
                                             <td className="p-4 text-gray-600 dark:text-gray-400 whitespace-nowrap text-xs">{o.department || '-'}</td>
                                             <td className="p-4">
@@ -1880,7 +1984,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     o.customerName.toLowerCase().includes(oppPickerSearch.toLowerCase())
                                 ).length === 0 && (
                                     <tr>
-                                        <td colSpan={5} className="p-10 text-center text-sm text-gray-400 dark:text-gray-500">
+                                        <td colSpan={7} className="p-10 text-center text-sm text-gray-400 dark:text-gray-500">
                                             未找到匹配的商机
                                         </td>
                                     </tr>

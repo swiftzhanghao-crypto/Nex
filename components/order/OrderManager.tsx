@@ -56,10 +56,10 @@ const statusMap: Record<string, string> = {
 };
 
 const buyerTypeMap: Record<string, string> = {
-    'Customer': '客户直签',
-    'Channel': '渠道代理',
-    'SelfDeal': '自主成交',
-    'RedeemCode': '兑换码',
+    'Customer': '直签订单',
+    'Channel': '渠道订单',
+    'SelfDeal': '自成交订单',
+    'RedeemCode': '兑换码订单',
 };
 
 const deliveryMethodMap: Record<string, string> = {
@@ -328,7 +328,7 @@ const OrderManager: React.FC = () => {
       const cols = allColumns.filter(c => visibleColumns.includes(c.id) && c.id !== 'action');
       const header = cols.map(c => c.label).join('\t');
       const statusMap: Record<string, string> = { DRAFT: '草稿', PENDING_CONFIRM: '待确认', CONFIRMED: '已确认', PENDING_SHIPMENT: '待发货', SHIPPED: '已发货', DELIVERED: '已交付', COMPLETED: '已完成', CANCELLED: '已取消', REFUNDED: '已退款', EXCEPTION: '异常' };
-      const buyerTypeMap: Record<string, string> = { Customer: '客户直签', Channel: '渠道代理', SelfDeal: '自主成交', RedeemCode: '兑换码' };
+      const buyerTypeMap: Record<string, string> = { Customer: '直签订单', Channel: '渠道订单', SelfDeal: '自成交订单', RedeemCode: '兑换码订单' };
       const rows = currentOrders.map(o => cols.map(col => {
           switch (col.id) {
               case 'id': return o.id;
@@ -339,7 +339,7 @@ const OrderManager: React.FC = () => {
               case 'businessManager': return o.businessManagerName || '-';
               case 'department': { const u = users.find(uu => uu.id === o.salesRepId); return getDepartmentPath(u?.departmentId); }
               case 'source': return o.source || '-';
-              case 'buyerType': return buyerTypeMap[o.buyerType || ''] || '客户直签';
+              case 'buyerType': return buyerTypeMap[o.buyerType || ''] || '直签订单';
               case 'date': return new Date(o.date).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
               case 'status': return statusMap[o.status] || o.status;
               case 'paymentStatus': return o.isPaid ? '已付款' : '未付款';
@@ -415,7 +415,103 @@ const OrderManager: React.FC = () => {
       }
   }, []);
 
-  const filteredOrders = useMemo(() => orders.filter(order => {
+  const getDescendantDeptIds = useCallback((deptId: string): string[] => {
+      const result: string[] = [deptId];
+      const children = departments.filter(d => d.parentId === deptId);
+      for (const child of children) {
+          result.push(...getDescendantDeptIds(child.id));
+      }
+      return result;
+  }, [departments]);
+
+  const rowPermissionOrders = useMemo(() => {
+      if (!currentUserRole) return orders;
+      if (permissions.includes('all')) return orders;
+      if ((currentUserRole.baseRowPermission || 'all') === 'all') {
+          const hasOrderRules = (currentUserRole.rowPermissions || []).some(r => r.resource === 'Order' && r.values.length > 0);
+          if (!hasOrderRules) return orders;
+      }
+      const orderRules = (currentUserRole.rowPermissions || []).filter(r => r.resource === 'Order' && r.values.length > 0);
+      if (orderRules.length === 0) return orders;
+
+      const userDeptId = currentUser.departmentId;
+      const userDeptAndChildrenIds = userDeptId ? getDescendantDeptIds(userDeptId) : [];
+
+      return orders.filter(order => {
+          return orderRules.every(rule => {
+              const vals = rule.values;
+
+              switch (rule.dimension) {
+                  case 'salesRep': {
+                      return vals.some(v => {
+                          if (v === 'self') return order.salesRepId === currentUser.id;
+                          if (v === 'department') {
+                              if (!userDeptId) return false;
+                              const salesUser = users.find(u => u.id === order.salesRepId);
+                              return salesUser?.departmentId === userDeptId;
+                          }
+                          if (v === 'departmentAndChildren') {
+                              if (!userDeptId) return false;
+                              const salesUser = users.find(u => u.id === order.salesRepId);
+                              return salesUser?.departmentId ? userDeptAndChildrenIds.includes(salesUser.departmentId) : false;
+                          }
+                          return false;
+                      });
+                  }
+                  case 'businessManager': {
+                      return vals.some(v => {
+                          if (v === 'self') return order.businessManagerId === currentUser.id;
+                          if (v === 'department') {
+                              if (!userDeptId) return false;
+                              const bmUser = users.find(u => u.id === order.businessManagerId);
+                              return bmUser?.departmentId === userDeptId;
+                          }
+                          if (v === 'departmentAndChildren') {
+                              if (!userDeptId) return false;
+                              const bmUser = users.find(u => u.id === order.businessManagerId);
+                              return bmUser?.departmentId ? userDeptAndChildrenIds.includes(bmUser.departmentId) : false;
+                          }
+                          return false;
+                      });
+                  }
+                  case 'creator': {
+                      return vals.some(v => {
+                          if (v === 'self') return order.creatorId === currentUser.id;
+                          if (v === 'department') {
+                              if (!userDeptId) return false;
+                              const creatorUser = users.find(u => u.id === order.creatorId);
+                              return creatorUser?.departmentId === userDeptId;
+                          }
+                          if (v === 'departmentAndChildren') {
+                              if (!userDeptId) return false;
+                              const creatorUser = users.find(u => u.id === order.creatorId);
+                              return creatorUser?.departmentId ? userDeptAndChildrenIds.includes(creatorUser.departmentId) : false;
+                          }
+                          return false;
+                      });
+                  }
+                  case 'departmentId': {
+                      const salesUser = users.find(u => u.id === order.salesRepId);
+                      return salesUser?.departmentId ? vals.includes(salesUser.departmentId) : false;
+                  }
+                  case 'orderType':
+                      return vals.includes(order.buyerType || 'Customer');
+                  case 'industryLine':
+                      return order.industryLine ? vals.includes(order.industryLine) : false;
+                  case 'province':
+                      return order.province ? vals.includes(order.province) : false;
+                  case 'directChannelId': {
+                      const directChannelId = order.buyerId && order.buyerType === 'Channel' ? order.buyerId : undefined;
+                      return directChannelId ? vals.includes(directChannelId) : false;
+                  }
+                  default:
+                      return true;
+              }
+          });
+      });
+  }, [orders, currentUserRole, currentUser, users, departments, getDescendantDeptIds]);
+
+  const filteredOrders = useMemo(() => rowPermissionOrders.filter(order => {
     let matchesStatus = filterStatus === 'All' || order.status === filterStatus;
     
     // Handle sub-status filtering for PROCESSING_PROD
@@ -533,7 +629,7 @@ const OrderManager: React.FC = () => {
     });
 
     return matchesStatus && matchesSearch && matchesSource && matchesDate && matchesAmount && matchesAdvanced;
-  }), [orders, filterStatus, searchTerm, searchField, filterSource, filterDateStart, filterDateEnd, filterAmountMin, filterAmountMax, appliedFilters]);
+  }), [rowPermissionOrders, filterStatus, searchTerm, searchField, filterSource, filterDateStart, filterDateEnd, filterAmountMin, filterAmountMax, appliedFilters]);
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage) || 1;
   const safePage = Math.min(currentPage, totalPages);

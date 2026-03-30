@@ -155,10 +155,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC
 .default-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(79,110,247,.08)}
 .default-hint{font-size:10px;color:var(--g400);line-height:1.3}
 
-.validate-ctrl{display:flex;flex-direction:column;gap:5px}
-.validate-row{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--g600);white-space:nowrap}
-.validate-row input{padding:2px 5px;border:1px solid var(--g200);border-radius:3px;font-size:11px;color:var(--g700);background:#fff;width:68px;text-align:center}
-.validate-row input:focus{outline:none;border-color:var(--primary)}
 
 .value-logic{display:flex;flex-direction:column;gap:6px}
 .value-logic-row{display:flex;align-items:center;gap:6px;flex-wrap:nowrap}
@@ -201,12 +197,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC
     </button>
     <h1 id="pageTitle">下单页面字段展示配置</h1>
   </div>
-  <div class="header-actions" id="headerActions">
-    <button class="btn" onclick="exportConfig()">
-      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-      导出配置
-    </button>
-  </div>
+  <div class="header-actions" id="headerActions"></div>
 </header>
 
 <!-- ===== LIST VIEW ===== -->
@@ -237,9 +228,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC
           <th class="th-center" style="width:10%">周期性</th>
           <th class="th-center" style="width:16%">NCC业务类型</th>
           <th class="th-center" style="width:16%">NCC收入类型</th>
-          <th class="th-center" style="width:10%">已配置字段</th>
-          <th class="th-center" style="width:8%">状态</th>
-          <th class="th-center" style="width:10%">操作</th>
+          <th class="th-center" style="width:10%">状态</th>
+          <th class="th-center" style="width:12%">操作</th>
         </tr>
       </thead>
       <tbody id="listBody"></tbody>
@@ -345,42 +335,32 @@ const AUTH_TYPES_DATA = [
 
 const FIELD_GROUPS = [
   { title:"基础信息", fields:[
-    {key:"quantity",name:"数量",dt:"fixed",desc:"允许限制不可编辑，默认指定"},
-    {key:"unitPrice",name:"单价",dt:"fixed",desc:"所有授权方式均展示"},
-    {key:"pricingQty",name:"计价数量",dt:"configurable",desc:"可配置，部分视为1"},
-    {key:"pricingPrice",name:"计价单价",dt:"configurable",desc:"可配置"},
-    {key:"subtotal",name:"金额小计",dt:"fixed",desc:"自动计算"},
+    {key:"pricingQty",name:"计价数量",dt:"configurable",type:"数字",desc:"可配置，部分视为1"},
   ]},
   { title:"日期与期限", fields:[
-    {key:"startDateCalc",name:"授权开始日期计算",dt:"fixed",desc:"支持选项自定义",enumDefs:["发货后5个自然日开始计算","按上一授权截止日期开始计算","按申请日期开始","权益生效后计算"]},
-    {key:"prevEndDate",name:"上一授权截止日期",dt:"conditional",desc:"和授权开始计算日期联动",cond:"授权开始日期计算='从上一期截止日期开始'"},
-    {key:"applyStart",name:"申请服务开始时间",dt:"conditional",desc:"和授权开始计算日期联动",cond:"授权开始日期计算='按已申请日期填写'"},
-    {key:"expectEnd",name:"预计服务结束时间",dt:"conditional",desc:"和授权开始计算日期联动"},
-    {key:"orderByPeriod",name:"按期限下单/按截止时间下单",dt:"fixed",desc:"支持选项自定义",enumDefs:["按期限下单","按截止时间下单"]},
-    {key:"authPeriod",name:"授权或服务期限（年/月/日）",dt:"configurable",desc:"支持单位自定义",enumDefs:["年","月","日"]},
-    {key:"authStartDate",name:"授权开始日期",dt:"configurable",desc:"可配置是否展示"},
-    {key:"authEndDate",name:"授权截止日期",dt:"conditional",desc:"和【按期限/截止时间下单】联动"},
+    {key:"startDateCalc",name:"授权开始日期计算",dt:"fixed",type:"枚举",desc:"支持选项自定义",enumDefs:["发货后5个自然日开始计算","按上一授权截止日期开始计算","按申请日期开始","权益生效后计算"]},
+    {key:"prevEndDate",name:"上一授权截止日期",dt:"conditional",type:"日期",desc:"和授权开始计算日期联动",cond:"授权开始日期计算='从上一期截止日期开始'"},
+    {key:"applyStart",name:"申请服务开始时间",dt:"conditional",type:"日期",desc:"和授权开始计算日期联动",cond:"授权开始日期计算='按已申请日期填写'"},
+    {key:"expectEnd",name:"预计服务结束时间",dt:"conditional",type:"日期",desc:"和授权开始计算日期联动"},
+    {key:"orderByPeriod",name:"按期限下单/按截止时间下单",dt:"fixed",type:"枚举",desc:"支持选项自定义",enumDefs:["按期限下单","按截止时间下单"]},
+    {key:"authStartDate",name:"授权开始日期",dt:"configurable",type:"日期",desc:"可配置是否展示"},
+    {key:"authEndDate",name:"授权截止日期",dt:"conditional",type:"日期",desc:"和【按期限/截止时间下单】联动"},
   ]},
   { title:"升级保障", fields:[
-    {key:"upgradePeriod",name:"升级保障期限",dt:"configurable",desc:"默认值=授权期限，允许编辑"},
-    {key:"upgradeStart",name:"升级保障开始日期",dt:"configurable",desc:"可配置"},
-    {key:"upgradeEnd",name:"升级保障截止日期",dt:"configurable",desc:"可配置"},
+    {key:"upgradePeriod",name:"升级保障期限",dt:"configurable",type:"数字",desc:"默认值=授权期限，允许编辑"},
+    {key:"upgradeStart",name:"升级保障开始日期",dt:"configurable",type:"日期",desc:"可配置"},
+    {key:"upgradeEnd",name:"升级保障截止日期",dt:"configurable",type:"日期",desc:"可配置"},
   ]},
   { title:"交付与服务", fields:[
-    {key:"delivery",name:"交付方式",dt:"configurable",desc:"选项：一次性交付/分期交付"},
-    {key:"expiredQty",name:"到期后授权数量",dt:"configurable",desc:"可配置是否展示"},
-    {key:"serialDelay",name:"支持序列号失效延长时间",dt:"configurable",desc:"可配置/条件展示"},
-  ]},
-  { title:"WPS+云服务", fields:[
-    {key:"cloudPkg",name:"云服务套餐",dt:"conditional",desc:"按线上发货对接配置决定",cond:"产品配置选择WPS+"},
-    {key:"cloudYears",name:"云服务年限",dt:"conditional",desc:"按线上发货对接配置决定",cond:"产品配置选择WPS+"},
-    {key:"cloudUsers",name:"云服务用户数",dt:"conditional",desc:"按线上发货对接配置决定",cond:"产品配置选择WPS+"},
+    {key:"delivery",name:"交付方式",dt:"configurable",type:"枚举",desc:"选项：一次性交付/分期交付"},
+    {key:"expiredQty",name:"到期后授权数量",dt:"configurable",type:"数字",desc:"可配置是否展示"},
+    {key:"serialDelay",name:"支持序列号失效延长时间",dt:"configurable",type:"数字",desc:"可配置/条件展示"},
   ]},
   { title:"授权范围与主体", fields:[
-    {key:"licensee",name:"被授权方",dt:"configurable",desc:"支持置入默认值"},
-    {key:"authScope",name:"授权范围",dt:"configurable",desc:"支持默认值，校验是否含xx"},
-    {key:"siteUsers",name:"端年场地授权覆盖的用户数量",dt:"configurable",desc:"可配置"},
-    {key:"subUnit",name:"按下级单位分开提供授权",dt:"conditional",desc:"仅新购时展示",cond:"仅新购"},
+    {key:"licensee",name:"被授权方",dt:"configurable",type:"文本",desc:"支持置入默认值"},
+    {key:"authScope",name:"授权范围",dt:"configurable",type:"文本",desc:"支持默认值，校验是否含xx"},
+    {key:"siteUsers",name:"端年场地授权覆盖的用户数量",dt:"configurable",type:"数字",desc:"可配置"},
+    {key:"subUnit",name:"按下级单位分开提供授权",dt:"conditional",type:"枚举",desc:"仅新购时展示",cond:"仅新购"},
   ]},
 ];
 
@@ -395,15 +375,14 @@ function initFieldCfg(f) {
     valueMode: 'manual',
     autoSource: '',
     allowManualEdit: false,
-    required: ['quantity','authPeriod','subtotal'].includes(f.key),
+    required: false,
     defaultType: '',
     defaultValue: '',
     restrictType: '',
     restrictDetail: '',
+    maxLength: '',
     enumSelected: [],
     fieldHint: '',
-    validateField: '',
-    validateKeyword: '',
   };
 }
 
@@ -474,7 +453,6 @@ function renderList() {
     const nccIncomeBadge = at.nccIncome
       ? `<span class="badge badge-gray">${at.nccIncome}</span>`
       : '<span style="color:var(--g400)">—</span>';
-    const cfgCount = countConfigured(at);
     return `<tr onclick="openDetail('${at.id}')">
       <td class="td-center">
         <div class="order-cell">
@@ -487,7 +465,6 @@ function renderList() {
       <td class="td-center">${periodBadge}</td>
       <td class="td-center">${nccBizBadge}</td>
       <td class="td-center">${nccIncomeBadge}</td>
-      <td class="td-center"><span class="config-count">${cfgCount}/29</span></td>
       <td class="td-center">
         <label class="toggle" onclick="event.stopPropagation()">
           <input type="checkbox" ${at.enabled?'checked':''}
@@ -503,9 +480,6 @@ function renderList() {
   }).join('');
 }
 
-function countConfigured(at) {
-  return Object.values(at.fieldCfg).filter(f=>f.displayMode!=='hide').length;
-}
 
 function toggleEnabled(id, val) {
   const at = state.authTypes.find(a=>a.id===id);
@@ -532,7 +506,7 @@ function openDetail(id) {
   document.getElementById('listView').classList.remove('active');
   document.getElementById('detailView').classList.add('active');
   document.getElementById('backBtn').style.display = 'block';
-  document.getElementById('pageTitle').textContent = at.name + ' — 字段配置';
+  document.getElementById('pageTitle').textContent = at.name + ' — 下单字段配置';
   document.getElementById('headerActions').innerHTML = `
     <button class="btn" onclick="resetDetail('${id}')">
       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 1 2.63 6.37"/><path d="M3 3v9h9"/></svg>
@@ -548,6 +522,7 @@ function openDetail(id) {
 
 function buildRestrictHtml(atId, fKey, fc, disabled, fieldDef) {
   if (disabled) return '<span style="color:var(--g400);font-size:12px">—</span>';
+  const isText = fieldDef && fieldDef.type === '文本';
   const hasEnumDefs = fieldDef && fieldDef.enumDefs && fieldDef.enumDefs.length > 0;
   const selNone = fc.restrictType === '' ? 'selected' : '';
   const selNum = fc.restrictType === 'numeric' ? 'selected' : '';
@@ -569,6 +544,12 @@ function buildRestrictHtml(atId, fKey, fc, disabled, fieldDef) {
       const checked = selected.includes(v) ? 'checked' : '';
       return `<label><input type="checkbox" ${checked} onchange="toggleEnumOption('${atId}','${fKey}','${v.replace(/'/g,"\\'")}',this.checked)">${v}</label>`;
     }).join('')}</div>`;
+  }
+  if (isText) {
+    h += `<div style="display:flex;align-items:center;gap:4px;margin-top:5px;font-size:11px;color:var(--g600)">
+      字数限制 <input type="number" min="1" style="width:56px;padding:2px 5px;border:1px solid var(--g200);border-radius:4px;font-size:11px;text-align:center"
+        value="${fc.maxLength||''}" placeholder="不限"
+        onchange="updateCfg('${atId}','${fKey}','maxLength',this.value?Number(this.value):'')"> 字</div>`;
   }
   h += `</div>`;
   return h;
@@ -600,14 +581,14 @@ function renderDetail(at) {
       <div class="field-group-title">${group.title}</div>
       <div class="cfg-table"><table>
         <thead><tr>
-          <th style="width:9%">字段名称</th>
+          <th style="width:10%">字段名称</th>
+          <th style="width:6%">字段类型</th>
           <th style="width:14%">展示控制</th>
           <th style="width:16%">赋值逻辑</th>
           <th style="width:4%">必填</th>
-          <th style="width:12%">默认值</th>
-          <th style="width:13%">填写限制</th>
-          <th style="width:12%">字段说明</th>
-          <th style="width:20%">下单校验</th>
+          <th style="width:13%">默认值</th>
+          <th style="width:14%">填写限制</th>
+          <th style="width:13%">字段说明</th>
         </tr></thead><tbody>`;
 
     group.fields.forEach(f => {
@@ -658,6 +639,12 @@ function renderDetail(at) {
           <label><input type="checkbox" ${fc.allowManualEdit?'checked':''} ${disabled?'disabled':''}
             onchange="updateCfg('${at.id}','${f.key}','allowManualEdit',this.checked)"> 支持人工编辑</label>
         </div>`;
+      } else if (fc.valueMode === 'default') {
+        valueLogicHtml += `</div>
+        <div class="auto-sub">
+          <label><input type="checkbox" ${fc.allowManualEdit?'checked':''} ${disabled?'disabled':''}
+            onchange="updateCfg('${at.id}','${f.key}','allowManualEdit',this.checked)"> 支持人工编辑</label>
+        </div>`;
       } else {
         valueLogicHtml += `</div>`;
       }
@@ -694,6 +681,7 @@ function renderDetail(at) {
 
       html += `<tr class="${isHidden?'row-disabled':''}">
         <td style="font-weight:500;color:${isHidden?'var(--g400)':'var(--g800)'}">${f.name}<div style="font-size:10px;font-weight:400;color:var(--g400);margin-top:2px">${f.key}</div></td>
+        <td style="text-align:center"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;background:${f.type==='数字'?'#dbeafe':f.type==='日期'?'#fef3c7':f.type==='枚举'?'#f3e8ff':'#f3f4f6'};color:${f.type==='数字'?'#1d4ed8':f.type==='日期'?'#92400e':f.type==='枚举'?'#7c3aed':'#4b5563'}">${f.type||'文本'}</span></td>
         <td>${displayCtrlHtml}</td>
         <td>${valueLogicHtml}</td>
         <td><label class="toggle"><input type="checkbox" ${fc.required?'checked':''} ${disabled?'disabled':''}
@@ -704,11 +692,6 @@ function renderDetail(at) {
           ? '<span style="color:var(--g400);font-size:12px">—</span>'
           : `<input class="cfg-input" style="max-width:140px" type="text" value="${fc.fieldHint||''}" placeholder="提示文案" maxlength="30"
               onchange="updateCfg('${at.id}','${f.key}','fieldHint',this.value)">`}</td>
-        <td>${disabled
-          ? '<span style="color:var(--g400);font-size:12px">—</span>'
-          : `<div class="validate-ctrl"><div class="validate-row">若字段【<input type="text" value="${fc.validateField||''}" placeholder="字段名"
-              onchange="updateCfg('${at.id}','${f.key}','validateField',this.value)">】</div><div class="validate-row">包含【<input type="text" value="${fc.validateKeyword||''}" placeholder="关键词"
-              onchange="updateCfg('${at.id}','${f.key}','validateKeyword',this.value)">】</div><div style="font-size:10px;color:var(--danger);margin-top:2px">不允许提交订单</div></div>`}</td>
       </tr>`;
     });
     html += `</tbody></table></div></div>`;
@@ -739,19 +722,22 @@ function updateCfg(atId, fieldKey, prop, val) {
       at.fieldCfg[fieldKey].defaultValue = '';
       at.fieldCfg[fieldKey].restrictType = '';
       at.fieldCfg[fieldKey].restrictDetail = '';
+      at.fieldCfg[fieldKey].maxLength = '';
       at.fieldCfg[fieldKey].enumSelected = [];
       at.fieldCfg[fieldKey].fieldHint = '';
-      at.fieldCfg[fieldKey].validateField = '';
-      at.fieldCfg[fieldKey].validateKeyword = '';
     }
     if (val !== 'conditional') {
       at.fieldCfg[fieldKey].condField = '';
       at.fieldCfg[fieldKey].condValue = '';
     }
   }
-  if (prop === 'valueMode' && (val === 'manual' || val === 'default')) {
-    at.fieldCfg[fieldKey].autoSource = '';
-    at.fieldCfg[fieldKey].allowManualEdit = false;
+  if (prop === 'valueMode') {
+    if (val === 'manual') {
+      at.fieldCfg[fieldKey].autoSource = '';
+      at.fieldCfg[fieldKey].allowManualEdit = false;
+    } else if (val === 'default') {
+      at.fieldCfg[fieldKey].autoSource = '';
+    }
   }
   if (prop === 'defaultType') {
     at.fieldCfg[fieldKey].defaultValue = '';
@@ -832,11 +818,7 @@ function goBack() {
   document.getElementById('listView').classList.add('active');
   document.getElementById('backBtn').style.display = 'none';
   document.getElementById('pageTitle').textContent = '下单页面字段展示配置';
-  document.getElementById('headerActions').innerHTML = `
-    <button class="btn" onclick="exportConfig()">
-      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-      导出配置
-    </button>`;
+  document.getElementById('headerActions').innerHTML = '';
   renderList();
 }
 
@@ -940,20 +922,6 @@ function confirmCopy() {
   showToast('已复制「' + src.name + '」为「' + name + '」');
 }
 
-function exportConfig() {
-  const out = state.authTypes.map(at => ({
-    name: at.name, period: at.period, order: at.order,
-    enabled: at.enabled, nccBiz: at.nccBiz, nccIncome: at.nccIncome,
-    fields: at.fieldCfg,
-  }));
-  const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'order-field-config.json';
-  a.click();
-  URL.revokeObjectURL(a.href);
-  showToast('配置已导出');
-}
 
 function showToast(msg) {
   const el = document.getElementById('toast');

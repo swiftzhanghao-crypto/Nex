@@ -322,7 +322,11 @@ export const resourceConfig = [
       {
           id: 'Order' as PermissionResource,
           label: '订单数据',
+          description: '包含订单列表、订单详情、订单明细列表与订单明细详情',
           dimensions: [
+              { id: 'salesRep' as PermissionDimension, label: '销售' },
+              { id: 'businessManager' as PermissionDimension, label: '商务' },
+              { id: 'creator' as PermissionDimension, label: '制单人' },
               { id: 'departmentId' as PermissionDimension, label: '部门' },
               { id: 'industryLine' as PermissionDimension, label: '行业推广类' },
               { id: 'directChannelId' as PermissionDimension, label: '直接下级渠道' },

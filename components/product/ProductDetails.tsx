@@ -5,6 +5,20 @@ import { Product, ProductSku, SkuPricingOption, InstallPackage } from '../../typ
 import { ArrowLeft, Package, ShieldCheck, Edit3, Plus, Trash2, List, Check, Box, Zap, User as UserIcon, Shield, Clock, Calendar, ToggleLeft, ToggleRight, Key, Sliders, Tag, PackageOpen, ChevronRight, Home, CreditCard, Save, X, Download, Copy } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
+import { Building2 } from 'lucide-react';
+
+const SALES_ORG_OPTIONS = [
+  '珠海金山办公软件有限公司', '北京金山办公软件股份有限公司', '武汉金山办公软件有限公司',
+  '长沙金山办公软件有限公司', '上海金山办公软件有限公司', '西安金山办公软件有限公司',
+  '成都金山办公软件有限公司', '苏州金山办公软件有限公司', '贵州金山办公软件有限公司',
+  '北京数科网维技术有限责任公司', '广州数科网维技术有限公司', '深圳数科信创技术有限责任公司',
+  '天津数科网维技术有限公司', '湖北数科网维技术有限公司', '江西数科网维信息技术服务有限公司',
+  '福建数科网维技术有限公司', '安徽数科网维技术有限公司', '四川数科网维技术有限公司',
+  '重庆数科网维技术有限公司', '辽宁数科网维技术有限公司', '浙江数科网维技术有限公司',
+  '陕西数科网维技术有限公司', '贵州数科网维技术有限公司', '山东数科信创技术有限责任公司',
+];
+
+const TAX_REFUND_OPTIONS = ['非退税', '退税', '即征即退', '先征后退'];
 
 type ViewLevel = 'PRODUCT_DETAIL' | 'SKU_DETAIL' | 'LICENSE_DETAIL';
 
@@ -32,7 +46,7 @@ const ProductDetails: React.FC = () => {
   const [newLicensePrice, setNewLicensePrice] = useState<number>(0);
 
   // Product Detail Tabs
-  const [detailTab, setDetailTab] = useState<'info' | 'packages'>('info');
+  const [detailTab, setDetailTab] = useState<'info' | 'attributes' | 'packages'>('info');
   const [copiedId, setCopiedId] = useState(false);
 
   // Install Package States
@@ -337,7 +351,7 @@ const ProductDetails: React.FC = () => {
 
           {currentView === 'PRODUCT_DETAIL' && (
               <div className="flex gap-1 overflow-x-auto no-scrollbar pt-2 border-b border-gray-200 dark:border-white/10">
-                  {([['info', '产品信息'], ['packages', '安装包']] as const).map(([key, label]) => (
+                  {([['info', '产品信息'], ['attributes', '产品属性'], ['packages', '安装包']] as const).map(([key, label]) => (
                       <button
                           key={key}
                           onClick={() => setDetailTab(key)}
@@ -513,6 +527,104 @@ const ProductDetails: React.FC = () => {
                   </div>
               </div>
               </>)}
+
+              {/* 产品属性配置 */}
+              {detailTab === 'attributes' && (
+              <div className="space-y-4">
+                <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
+                  <div className="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-blue-500" /> 基础信息
+                    </h3>
+                    {isEditingProduct && <span className="text-xs text-gray-400">编辑模式</span>}
+                  </div>
+                  {isEditingProduct ? (
+                    <div className="px-6 py-5">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
+                        <div>
+                          <label className="text-xs text-gray-500 dark:text-gray-400 mb-1.5 block font-medium">销售组织</label>
+                          <select
+                            value={productForm.salesOrgName || ''}
+                            onChange={e => setProductForm({ ...productForm, salesOrgName: e.target.value })}
+                            className="w-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 p-2.5 rounded-lg text-sm dark:text-white outline-none focus:border-blue-400 transition"
+                          >
+                            <option value="">请选择销售组织</option>
+                            {SALES_ORG_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 dark:text-gray-400 mb-1.5 block font-medium">退税类型</label>
+                          <select
+                            value={productForm.taxRefundType || ''}
+                            onChange={e => setProductForm({ ...productForm, taxRefundType: e.target.value })}
+                            className="w-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 p-2.5 rounded-lg text-sm dark:text-white outline-none focus:border-blue-400 transition"
+                          >
+                            <option value="">请选择退税类型</option>
+                            {TAX_REFUND_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="text-xs text-gray-500 dark:text-gray-400 mb-1.5 block font-medium">商务发货名称</label>
+                          <input
+                            value={productForm.businessDeliveryName || ''}
+                            onChange={e => setProductForm({ ...productForm, businessDeliveryName: e.target.value })}
+                            className="w-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 p-2.5 rounded-lg text-sm dark:text-white outline-none focus:border-blue-400 transition"
+                            placeholder="请输入商务发货名称"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="px-6 py-5">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-6">
+                        <div>
+                          <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1 leading-none">产品编号</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white font-mono">{productForm.id}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1 leading-none">产品名称</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{productForm.name}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1 leading-none">销售组织</div>
+                          {productForm.salesOrgName ? (
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">{productForm.salesOrgName}</div>
+                          ) : (
+                            <div className="text-sm text-gray-300 dark:text-gray-600">—</div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1 leading-none">退税类型</div>
+                          {productForm.taxRefundType ? (
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                productForm.taxRefundType === '非退税'
+                                  ? 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400'
+                                  : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                              }`}>
+                                {productForm.taxRefundType}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-300 dark:text-gray-600">—</div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-5 pt-5 border-t border-gray-100 dark:border-white/5">
+                        <div>
+                          <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1 leading-none">商务发货名称</div>
+                          {productForm.businessDeliveryName ? (
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">{productForm.businessDeliveryName}</div>
+                          ) : (
+                            <div className="text-sm text-gray-300 dark:text-gray-600">—</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              )}
 
               {/* Install Package Management */}
               {detailTab === 'packages' && (

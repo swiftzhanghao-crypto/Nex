@@ -510,10 +510,10 @@ const OrderDetails: React.FC = () => {
                    </div>
                    <div className="hidden sm:flex items-center gap-2 mt-0.5">
                        <span className="text-[11px] text-gray-400 dark:text-gray-500">提单时间：<span className="font-mono">{new Date(selectedOrder.date).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</span></span>
-                       {selectedOrder.buyerType === 'Channel'    && <span className="unified-tag-xs unified-tag-indigo">渠道代理</span>}
-                       {selectedOrder.buyerType === 'SelfDeal'   && <span className="unified-tag-xs unified-tag-orange">自主成交</span>}
-                       {selectedOrder.buyerType === 'RedeemCode' && <span className="unified-tag-xs unified-tag-purple">兑换码</span>}
-                       {(selectedOrder.buyerType === 'Customer' || !selectedOrder.buyerType) && <span className="unified-tag-xs unified-tag-blue">客户直签</span>}
+                       {selectedOrder.buyerType === 'Channel'    && <span className="unified-tag-xs unified-tag-indigo">渠道订单</span>}
+                       {selectedOrder.buyerType === 'SelfDeal'   && <span className="unified-tag-xs unified-tag-orange">自成交订单</span>}
+                       {selectedOrder.buyerType === 'RedeemCode' && <span className="unified-tag-xs unified-tag-purple">兑换码订单</span>}
+                       {(selectedOrder.buyerType === 'Customer' || !selectedOrder.buyerType) && <span className="unified-tag-xs unified-tag-blue">直签订单</span>}
                        {selectedOrder.source === 'Sales'         && <span className="unified-tag-xs unified-tag-blue">后台下单</span>}
                        {selectedOrder.source === 'ChannelPortal' && <span className="unified-tag-xs unified-tag-indigo">渠道下单</span>}
                        {selectedOrder.source === 'OnlineStore'   && <span className="unified-tag-xs unified-tag-orange">官网下单</span>}
@@ -923,71 +923,62 @@ const OrderDetails: React.FC = () => {
               </div>
               )}
 
-              {/* 客户联系人 (小卡片 1/3) */}
+              {/* 订单联系人 (小卡片 1/3) */}
               {hasPermission('order_detail_customer') && (() => {
                   const cust = customers.find(c => c.id === selectedOrder.customerId);
-                  const purchasing = cust?.contacts.filter(c => c.roles.includes('Purchasing')) || [];
-                  const it = cust?.contacts.filter(c => c.roles.includes('IT')) || [];
-                  if (purchasing.length === 0 && it.length === 0) return null;
+                  const pct = selectedOrder.purchasingContactId ? cust?.contacts.find(c => c.id === selectedOrder.purchasingContactId) : undefined;
+                  const ict = selectedOrder.itContactId ? cust?.contacts.find(c => c.id === selectedOrder.itContactId) : undefined;
+                  if (!pct && !ict) return null;
                   return (
               <div className="md:col-span-1 unified-card dark:bg-[#1C1C1E] p-4 border-gray-100/50 dark:border-white/10 space-y-3 self-start">
                   <div className="border-b border-gray-100 dark:border-white/10 pb-2">
                       <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                          <Users className="w-4 h-4 text-teal-500" /> 客户联系人
-                          <span className="text-[10px] text-gray-400 font-mono ml-auto">{purchasing.length + it.length} 人</span>
+                          <Users className="w-4 h-4 text-teal-500" /> 订单联系人
                       </h4>
                   </div>
                   <div className="space-y-3">
-                      {purchasing.length > 0 && (
+                      {pct && (
                       <div className="space-y-1.5">
                           <div className="flex items-center gap-1.5">
                               <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">采购</span>
-                              <span className="px-1 py-px text-[9px] font-bold rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">{purchasing.length}</span>
                           </div>
-                          {purchasing.map(ct => (
-                          <div key={ct.id} className="flex items-center gap-2 px-2.5 py-2 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100/80 dark:border-blue-800/30 rounded-lg">
+                          <div className="flex items-center gap-2 px-2.5 py-2 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100/80 dark:border-blue-800/30 rounded-lg">
                               <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
-                                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">{ct.name.charAt(0)}</span>
+                                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">{pct.name.charAt(0)}</span>
                               </div>
                               <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1">
-                                      <span className="text-xs font-bold text-gray-900 dark:text-white truncate">{ct.name}</span>
-                                      {ct.isPrimary && <span className="text-[8px] px-1 py-px rounded bg-blue-500 text-white font-bold shrink-0">主</span>}
-                                      {ct.position && <span className="text-[10px] text-gray-400 truncate">· {ct.position}</span>}
+                                      <span className="text-xs font-bold text-gray-900 dark:text-white truncate">{pct.name}</span>
+                                      {pct.position && <span className="text-[10px] text-gray-400 truncate">· {pct.position}</span>}
                                   </div>
                                   <div className="flex items-center gap-2 mt-0.5">
-                                      {ct.phone && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Phone className="w-2.5 h-2.5 shrink-0"/>{ct.phone}</span>}
-                                      {ct.email && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Mail className="w-2.5 h-2.5 shrink-0"/>{ct.email}</span>}
+                                      {pct.phone && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Phone className="w-2.5 h-2.5 shrink-0"/>{pct.phone}</span>}
+                                      {pct.email && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Mail className="w-2.5 h-2.5 shrink-0"/>{pct.email}</span>}
                                   </div>
                               </div>
                           </div>
-                          ))}
                       </div>
                       )}
-                      {it.length > 0 && (
+                      {ict && (
                       <div className="space-y-1.5">
                           <div className="flex items-center gap-1.5">
                               <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">IT</span>
-                              <span className="px-1 py-px text-[9px] font-bold rounded bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">{it.length}</span>
                           </div>
-                          {it.map(ct => (
-                          <div key={ct.id} className="flex items-center gap-2 px-2.5 py-2 bg-purple-50/50 dark:bg-purple-900/10 border border-purple-100/80 dark:border-purple-800/30 rounded-lg">
+                          <div className="flex items-center gap-2 px-2.5 py-2 bg-purple-50/50 dark:bg-purple-900/10 border border-purple-100/80 dark:border-purple-800/30 rounded-lg">
                               <div className="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center shrink-0">
-                                  <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400">{ct.name.charAt(0)}</span>
+                                  <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400">{ict.name.charAt(0)}</span>
                               </div>
                               <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1">
-                                      <span className="text-xs font-bold text-gray-900 dark:text-white truncate">{ct.name}</span>
-                                      {ct.isPrimary && <span className="text-[8px] px-1 py-px rounded bg-purple-500 text-white font-bold shrink-0">主</span>}
-                                      {ct.position && <span className="text-[10px] text-gray-400 truncate">· {ct.position}</span>}
+                                      <span className="text-xs font-bold text-gray-900 dark:text-white truncate">{ict.name}</span>
+                                      {ict.position && <span className="text-[10px] text-gray-400 truncate">· {ict.position}</span>}
                                   </div>
                                   <div className="flex items-center gap-2 mt-0.5">
-                                      {ct.phone && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Phone className="w-2.5 h-2.5 shrink-0"/>{ct.phone}</span>}
-                                      {ct.email && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Mail className="w-2.5 h-2.5 shrink-0"/>{ct.email}</span>}
+                                      {ict.phone && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Phone className="w-2.5 h-2.5 shrink-0"/>{ict.phone}</span>}
+                                      {ict.email && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Mail className="w-2.5 h-2.5 shrink-0"/>{ict.email}</span>}
                                   </div>
                               </div>
                           </div>
-                          ))}
                       </div>
                       )}
                   </div>
@@ -1015,8 +1006,6 @@ const OrderDetails: React.FC = () => {
                                   { label: '商机名称', value: opp.name },
                                   { label: '商机编号', value: opp.id },
                                   { label: '商机客户名称', value: selectedOrder.customerName },
-                                  { label: '商机产品名称', value: selectedOrder.items?.[0]?.productName },
-                                  { label: '商机授权类型', value: selectedOrder.items?.[0]?.licenseType },
                                   { label: '商机阶段', value: opp.stage },
                                   { label: '商机金额', value: `¥${(opp.amount || opp.expectedRevenue).toLocaleString()}` },
                                   { label: '结单日期', value: opp.closeDate },
@@ -1026,6 +1015,27 @@ const OrderDetails: React.FC = () => {
                                       <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{item.value || '-'}</span>
                                   </div>
                               ))}
+                              {/* 商机产品列表 */}
+                              <div className="py-3.5">
+                                  <div className="flex items-start gap-8">
+                                      <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap pt-0.5">商机产品</span>
+                                      <div className="flex-1">
+                                          {opp.products && opp.products.length > 0 ? (
+                                              <div className="space-y-1.5">
+                                                  {opp.products.map((p, pi) => (
+                                                      <div key={pi} className="flex items-center gap-2 px-2.5 py-1.5 bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-lg">
+                                                          <span className="text-sm font-medium text-gray-900 dark:text-white">{p.productName}</span>
+                                                          {p.skuName && <span className="text-xs text-gray-400">/ {p.skuName}</span>}
+                                                          {p.licenseType && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium">{p.licenseType}</span>}
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          ) : (
+                                              <span className="text-sm text-gray-400">-</span>
+                                          )}
+                                      </div>
+                                  </div>
+                              </div>
                           </div>
                       );
                   })()}
