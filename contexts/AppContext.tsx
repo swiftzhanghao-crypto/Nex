@@ -29,7 +29,8 @@ import {
 // --- Mode detection: set VITE_API_MODE=true in .env to use backend ---
 const USE_API = import.meta.env.VITE_API_MODE === 'true';
 
-// --- Mock data fallback (computed once, v2) ---
+// --- Mock data fallback (bump version when schema changes to force refresh) ---
+const MOCK_DATA_VERSION = 5;
 const mockCustomers = generateCustomers(initialUsers);
 const mockOpportunities = generateOpportunities(mockCustomers);
 const mockContracts = generateContracts(mockCustomers);
@@ -127,6 +128,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [performances] = useState<Performance[]>(() => generatePerformances());
     const [authorizations] = useState<Authorization[]>(() => generateAuthorizations());
     const [deliveryInfos] = useState<DeliveryInfo[]>(() => generateDeliveryInfos());
+
+    // --- Mock data version check: refresh stale data after HMR ---
+    useEffect(() => {
+        if (USE_API) return;
+        const key = '__mock_data_ver__';
+        const stored = sessionStorage.getItem(key);
+        if (stored !== String(MOCK_DATA_VERSION)) {
+            sessionStorage.setItem(key, String(MOCK_DATA_VERSION));
+            setOrders(mockOrders);
+            setCustomers(mockCustomers);
+            setOpportunities(mockOpportunities);
+            setContracts(mockContracts);
+        }
+    }, []);
 
     // --- API data fetching ---
     const refreshOrders = useCallback(async () => {

@@ -6,7 +6,7 @@ import {
     ArrowLeft, Box, Printer, Award, X, Lock, CheckCircle, Truck, ClipboardCheck, 
     UploadCloud, AlertOctagon, RefreshCcw, Key, Package, Disc, Receipt, FileText, 
     Briefcase, History, Eye, CheckSquare, CreditCard, ShieldCheck, User as UserIcon, Building,
-    AlertCircle, Clock, MapPin, Target, Users, Paperclip, Scroll, Camera, ScrollText, Copy, Check, Phone, Mail, Download
+    AlertCircle, Clock, MapPin, Target, Users, Paperclip, Scroll, Camera, ScrollText, Copy, Check, Phone, Mail, Download, Banknote, Edit3, Wallet
 } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
@@ -37,30 +37,6 @@ const OrderDetails: React.FC = () => {
   const currentUserRole = roles.find(r => r.id === currentUser.role);
   const permissions = currentUserRole?.permissions || [];
   const hasPermission = (perm: string) => permissions.includes('all') || permissions.includes(perm);
-
-  const hasMediumCards = hasPermission('order_detail_customer') || hasPermission('order_detail_trader');
-
-  const cardSpans = (() => {
-    const cards: { id: string; span: number }[] = [];
-    if (hasMediumCards) cards.push({ id: 'medium', span: 2 });
-    if (hasPermission('order_detail_opportunity')) cards.push({ id: 'opportunity', span: 1 });
-
-    let col = 0;
-    for (const card of cards) {
-      if (col + card.span > 3) col = 0;
-      col += card.span;
-    }
-    const remaining = 3 - col;
-    if (cards.length > 0 && remaining > 0 && cards[cards.length - 1].span < 2) {
-      cards[cards.length - 1].span = Math.min(cards[cards.length - 1].span + remaining, 2);
-    }
-
-    const result: Record<string, string> = {};
-    for (const card of cards) {
-      result[card.id] = card.span === 2 ? 'md:col-span-2' : 'md:col-span-1';
-    }
-    return result;
-  })();
 
   const selectedOrder = useMemo(() => orders.find(o => o.id === id), [orders, id]);
 
@@ -96,12 +72,13 @@ const OrderDetails: React.FC = () => {
   const [isContractPreviewOpen, setIsContractPreviewOpen] = useState(false);
   const [contractZoom, setContractZoom] = useState(100);
   const [expandedContractIds, setExpandedContractIds] = useState<Set<string>>(new Set());
+  const [previewContractId, setPreviewContractId] = useState<string | null>(null);
   const [selectedDeliveryNo, setSelectedDeliveryNo] = useState<string | null>(null);
 
   // Step specific forms
   const [shippingCarrier, setShippingCarrier] = useState('');
   const [shippingTracking, setShippingTracking] = useState('');
-  const [paymentForm, setPaymentForm] = useState({ bankName: '', transactionId: '' });
+  const [paymentForm, setPaymentForm] = useState({ bankName: '', transactionId: '', paymentMethod: 'Transfer' as 'WechatPay' | 'Alipay' | 'Transfer' });
   const [approvalComment, setApprovalComment] = useState('');
 
   useEffect(() => {
@@ -244,15 +221,17 @@ const OrderDetails: React.FC = () => {
   };
 
   const handleConfirmPayment = () => {
-      if (!paymentForm.bankName.trim()) { alert('请填写收款银行'); return; }
+      if (paymentForm.paymentMethod === 'Transfer' && !paymentForm.bankName.trim()) { alert('请填写收款银行'); return; }
       const isSelfDeal = selectedOrder.buyerType === 'SelfDeal';
+      const pmLabel = paymentForm.paymentMethod === 'WechatPay' ? '微信支付' : paymentForm.paymentMethod === 'Alipay' ? '支付宝' : '银行转账';
       const paymentRecord = {
           amount: selectedOrder.total,
           paymentDate: new Date().toISOString(),
           bankName: paymentForm.bankName,
           accountNumber: '',
           transactionId: paymentForm.transactionId,
-          payerName: selectedOrder.customerName
+          payerName: selectedOrder.customerName,
+          paymentMethod: pmLabel,
       };
       if (isSelfDeal) {
           const updatedItems = selectedOrder.items.map(item => ({
@@ -263,6 +242,7 @@ const OrderDetails: React.FC = () => {
               ...selectedOrder,
               isPaid: true,
               status: OrderStatus.DELIVERED,
+              paymentMethod: paymentForm.paymentMethod,
               paymentDate: new Date().toISOString(),
               paymentRecord,
               items: updatedItems,
@@ -270,7 +250,7 @@ const OrderDetails: React.FC = () => {
               isAuthConfirmed: true, isPackageConfirmed: true, isCDBurned: true, isShippingConfirmed: true,
               approval: { salesApproved: true, businessApproved: true, financeApproved: true },
               approvalRecords: [
-                  createOperationRecord('支付完成', 'Paid', `流水号: ${paymentForm.transactionId}`),
+                  createOperationRecord('支付完成', 'Paid', `${pmLabel} · 流水号: ${paymentForm.transactionId}`),
                   createOperationRecord('系统交付', 'Completed', '自助订单自动完成交付')
               , ...selectedOrder.approvalRecords]
           });
@@ -279,9 +259,10 @@ const OrderDetails: React.FC = () => {
               ...selectedOrder,
               isPaid: true,
               status: OrderStatus.PENDING_APPROVAL,
+              paymentMethod: paymentForm.paymentMethod,
               paymentDate: new Date().toISOString(),
               paymentRecord,
-              approvalRecords: [createOperationRecord('确认收款', 'Paid', `流水号: ${paymentForm.transactionId}`), ...selectedOrder.approvalRecords]
+              approvalRecords: [createOperationRecord('确认收款', 'Paid', `${pmLabel} · 流水号: ${paymentForm.transactionId}`), ...selectedOrder.approvalRecords]
           });
       }
       handleCloseDrawer();
@@ -612,6 +593,14 @@ const OrderDetails: React.FC = () => {
 
                {/* Group 4: 操作按钮 */}
                <div className="flex items-center gap-2 shrink-0">
+                   {selectedOrder.status === OrderStatus.DRAFT && (
+                   <button 
+                       onClick={() => navigate('/orders', { state: { editDraftId: selectedOrder.id } })}
+                       className="unified-button-primary whitespace-nowrap shrink-0"
+                   >
+                       <Edit3 className="w-3.5 h-3.5"/> 编辑订单
+                   </button>
+                   )}
                    {hasPermission('order_detail_snapshot') && (
                    <button 
                        onClick={handleOpenSnapshot}
@@ -850,197 +839,260 @@ const OrderDetails: React.FC = () => {
           </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Customer Info + Trader Info (Medium) */}
-              {hasMediumCards && (
-              <div className={`${cardSpans.medium} space-y-4`}>
-                  {/* 客户信息卡片 */}
-                  {hasPermission('order_detail_customer') && (
-                  <div className="unified-card dark:bg-[#1C1C1E] p-5 border-gray-100/50 dark:border-white/10 space-y-4">
-                      <div className="border-b border-gray-100 dark:border-white/10 pb-2.5">
-                          <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                              <Building className="w-5 h-5 text-[#0071E3]" /> 客户信息
-                          </h4>
+          {/* Opportunity Information — table format consistent with order product details */}
+          {hasPermission('order_detail_opportunity') && (() => {
+              const opp = selectedOrder.opportunityId ? opportunities.find(o => o.id === selectedOrder.opportunityId) : null;
+              if (!opp) return null;
+              const stageClass = opp.stage === '赢单' ? 'unified-tag-green !rounded-full' : opp.stage === '输单' ? 'unified-tag-gray !rounded-full' : opp.stage === '需求判断' ? 'unified-tag-blue !rounded-full' : opp.stage === '确认商机' ? 'unified-tag-indigo !rounded-full' : opp.stage === '确认渠道' ? 'unified-tag-purple !rounded-full' : 'unified-tag-yellow !rounded-full';
+              return (
+                  <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
+                      <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                          <Target className="w-5 h-5 text-orange-500" />
+                          <h3 className="text-base font-semibold text-gray-900 dark:text-white">商机信息</h3>
                       </div>
-                      {(() => {
-                          const fields = [
-                              { label: '客户名称', value: selectedOrder.customerName, isLink: true, linkTo: `/customers/${selectedOrder.customerId}` },
+                      <div className="overflow-x-auto">
+                          <table className="w-full text-left min-w-[520px]">
+                              <thead className="unified-table-header">
+                                  <tr>
+                                      <th className="px-5 py-4 pl-6 whitespace-nowrap">商机名称</th>
+                                      <th className="px-5 py-4 whitespace-nowrap">商机编号</th>
+                                      <th className="px-5 py-4 whitespace-nowrap">客户名称</th>
+                                      <th className="px-5 py-4 whitespace-nowrap">商机阶段</th>
+                                      <th className="px-5 py-4 whitespace-nowrap">所属部门</th>
+                                      <th className="px-5 py-4 whitespace-nowrap">负责人</th>
+                                      <th className="px-5 py-4 text-right whitespace-nowrap">商机金额</th>
+                                      <th className="px-5 py-4 whitespace-nowrap">结单日期</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                                  <tr className="group text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                      <td className="px-5 py-5 pl-6 font-bold text-gray-900 dark:text-white max-w-[200px] truncate" title={opp.name}>{opp.name}</td>
+                                      <td className="px-5 py-5 font-mono text-xs text-gray-500 dark:text-gray-400">{opp.id}</td>
+                                      <td className="px-5 py-5 text-gray-700 dark:text-gray-300">{opp.customerName}</td>
+                                      <td className="px-5 py-5"><span className={stageClass}>{opp.stage}</span></td>
+                                      <td className="px-5 py-5 text-gray-600 dark:text-gray-400 text-xs">{opp.department || '-'}</td>
+                                      <td className="px-5 py-5 text-gray-600 dark:text-gray-400 text-xs">{opp.ownerName || '-'}</td>
+                                      <td className="px-5 py-5 text-right font-mono font-bold text-gray-900 dark:text-white">¥{(opp.amount || opp.expectedRevenue || 0).toLocaleString()}</td>
+                                      <td className="px-5 py-5 font-mono text-gray-700 dark:text-gray-300 text-xs">{opp.closeDate ? new Date(opp.closeDate).toLocaleDateString('zh-CN') : '-'}</td>
+                                  </tr>
+                              </tbody>
+                          </table>
+                      </div>
+                      {opp.products && opp.products.length > 0 && (
+                          <div className="border-t border-gray-100 dark:border-white/10">
+                              <div className="px-5 pt-3 pb-1">
+                                  <div className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">商机产品明细</div>
+                              </div>
+                              <div className="overflow-x-auto">
+                                  <table className="w-full text-left min-w-[520px]">
+                                      <thead className="unified-table-header">
+                                          <tr>
+                                              <th className="px-5 py-4 pl-6 text-center w-16 whitespace-nowrap">序号</th>
+                                              <th className="px-5 py-4">产品信息</th>
+                                              <th className="px-5 py-4">授权类型</th>
+                                          </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                                          {opp.products.map((p, pi) => (
+                                              <tr key={pi} className="group text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                                  <td className="px-5 py-5 pl-6 text-center">
+                                                      <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800/40 text-xs font-bold font-mono text-orange-600 dark:text-orange-400">{String(pi + 1).padStart(3, '0')}</span>
+                                                  </td>
+                                                  <td className="px-5 py-5">
+                                                      <div className="font-bold text-gray-900 dark:text-white text-sm">{p.productName}</div>
+                                                      {p.skuName && (
+                                                          <div className="flex items-center gap-1.5 mt-1.5">
+                                                              <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">{p.skuName}</span>
+                                                          </div>
+                                                      )}
+                                                  </td>
+                                                  <td className="px-5 py-5">
+                                                      {p.licenseType
+                                                          ? <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg">{p.licenseType}</span>
+                                                          : <span className="text-gray-300 dark:text-gray-600">-</span>
+                                                      }
+                                                  </td>
+                                              </tr>
+                                          ))}
+                                      </tbody>
+                                  </table>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+              );
+          })()}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* 客户信息 (1/3 卡片，含订单联系人) */}
+              {hasPermission('order_detail_customer') && (
+              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden self-start">
+                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                      <Building className="w-5 h-5 text-[#0071E3]" />
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">客户信息</h3>
+                  </div>
+                  <div className="px-4 py-2">
+                      <div className="divide-y divide-gray-50 dark:divide-white/5">
+                          {[
+                              { label: '客户名称', value: selectedOrder.customerName, link: `/customers/${selectedOrder.customerId}` },
                               { label: '客户类型', value: selectedOrder.customerType },
                               { label: '行业条线', value: selectedOrder.industryLine },
                               { label: '所在地区', value: [selectedOrder.province, selectedOrder.city, selectedOrder.district].filter(Boolean).join(' / ') || undefined },
                               { label: '报备标签', value: selectedOrder.reportTag },
-                              { label: '是否授权覆盖客户', value: selectedOrder.customerStatus },
-                          ];
-                          return (
-                              <div className="grid grid-cols-2 gap-x-6">
-                                  {fields.map((item, idx) => (
-                                      <div key={idx} className={`flex items-center gap-8 py-3.5 ${idx < fields.length - 2 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}>
-                                          <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap whitespace-nowrap">{item.label}</span>
-                                          {item.isLink ? (
-                                              <button onClick={() => navigate(item.linkTo!)} className="text-sm font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline text-left flex-1">
-                                                  {item.value || '-'}
-                                              </button>
-                                          ) : (
-                                              <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{item.value || '-'}</span>
-                                          )}
+                              { label: '授权覆盖客户', value: selectedOrder.customerStatus },
+                          ].map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between py-2.5 gap-4">
+                                  <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{item.label}</span>
+                                  {item.link ? (
+                                      <button onClick={() => navigate(item.link!)} className="text-sm font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline truncate text-right" title={item.value || '-'}>
+                                          {item.value || '-'}
+                                      </button>
+                                  ) : (
+                                      <span className="text-sm font-medium text-gray-900 dark:text-white truncate text-right" title={item.value || '-'}>{item.value || '-'}</span>
+                                  )}
+                              </div>
+                          ))}
+                      </div>
+                      {/* 订单联系人（内嵌） */}
+                      {(() => {
+                          const cust = customers.find(c => c.id === selectedOrder.customerId);
+                          const pct = selectedOrder.purchasingContactId ? cust?.contacts.find(c => c.id === selectedOrder.purchasingContactId) : undefined;
+                          const ict = selectedOrder.itContactId ? cust?.contacts.find(c => c.id === selectedOrder.itContactId) : undefined;
+                          if (!pct && !ict) return null;
+                          const renderContact = (contact: typeof pct, label: string, colorClass: { bg: string; ring: string; avatar: string; text: string }) => {
+                              if (!contact) return null;
+                              return (
+                                  <div className={`flex items-center gap-2 px-2.5 py-2 rounded-lg ${colorClass.bg} border ${colorClass.ring}`}>
+                                      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${colorClass.avatar}`}>
+                                          <span className={`text-[10px] font-bold ${colorClass.text}`}>{contact.name.charAt(0)}</span>
                                       </div>
-                                  ))}
+                                      <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-1">
+                                              <span className="text-[12px] font-bold text-gray-400 dark:text-gray-500">{label}</span>
+                                              <span className="text-xs font-bold text-gray-900 dark:text-white truncate">{contact.name}</span>
+                                              {contact.position && <span className="text-[10px] text-gray-400 truncate hidden lg:inline">· {contact.position}</span>}
+                                          </div>
+                                          <div className="flex items-center gap-2 mt-0.5">
+                                              {contact.phone && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Phone className="w-2.5 h-2.5 shrink-0"/>{contact.phone}</span>}
+                                          </div>
+                                      </div>
+                                  </div>
+                              );
+                          };
+                          return (
+                              <div className="mt-2 pt-2 border-t border-gray-100 dark:border-white/10">
+                                  <div className="text-[12px] font-bold text-gray-400 dark:text-gray-500 tracking-wider mb-1.5">订单联系人</div>
+                                  <div className="space-y-1.5">
+                                      {renderContact(pct, '采购', { bg: 'bg-blue-50/60 dark:bg-blue-900/10', ring: 'border-blue-100/80 dark:border-blue-800/30', avatar: 'bg-blue-100 dark:bg-blue-900/40', text: 'text-blue-600 dark:text-blue-400' })}
+                                      {renderContact(ict, 'IT', { bg: 'bg-purple-50/60 dark:bg-purple-900/10', ring: 'border-purple-100/80 dark:border-purple-800/30', avatar: 'bg-purple-100 dark:bg-purple-900/40', text: 'text-purple-600 dark:text-purple-400' })}
+                                  </div>
                               </div>
                           );
                       })()}
                   </div>
-                  )}
+              </div>
+              )}
 
-                  {/* 交易方信息卡片 */}
-                  {hasPermission('order_detail_trader') && (
-                  <div className="unified-card dark:bg-[#1C1C1E] p-5 border-gray-100/50 dark:border-white/10 space-y-4">
-                      <div className="border-b border-gray-100 dark:border-white/10 pb-2.5">
-                          <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                              <Users className="w-5 h-5 text-indigo-500" /> 交易双方信息
-                          </h4>
-                      </div>
-                      {(() => {
-                          const fields = [
+              {/* 交易双方信息 (1/3 卡片) */}
+              {hasPermission('order_detail_trader') && (
+              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden self-start">
+                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                      <Users className="w-5 h-5 text-indigo-500" />
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">交易双方信息</h3>
+                  </div>
+                  <div className="px-4 py-2">
+                      <div className="divide-y divide-gray-50 dark:divide-white/5">
+                          {[
                               { label: '买方名称', value: selectedOrder.buyerName },
                               { label: '卖方名称', value: selectedOrder.sellerName },
                               { label: '直接下级渠道', value: selectedOrder.directChannel },
                               { label: '终端渠道', value: selectedOrder.terminalChannel },
-                              { label: '渠道是否提供服务', value: selectedOrder.channelService },
-                          ];
-                          return (
-                              <div className="grid grid-cols-2 gap-x-6">
-                                  {fields.map((item, idx) => (
-                                      <div key={idx} className={`flex items-center gap-8 py-3.5 ${idx < fields.length - 2 ? 'border-b border-gray-50 dark:border-white/5' : ''}`}>
-                                          <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap whitespace-nowrap">{item.label}</span>
-                                          <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{item.value || '-'}</span>
-                                      </div>
-                                  ))}
+                              { label: '渠道服务', value: selectedOrder.channelService },
+                          ].map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between py-2.5 gap-4">
+                                  <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{item.label}</span>
+                                  <span className="text-sm font-medium text-gray-900 dark:text-white truncate text-right" title={item.value || '-'}>{item.value || '-'}</span>
                               </div>
-                          );
-                      })()}
+                          ))}
+                      </div>
                   </div>
-                  )}
               </div>
               )}
 
-              {/* 订单联系人 (小卡片 1/3) */}
-              {hasPermission('order_detail_customer') && (() => {
-                  const cust = customers.find(c => c.id === selectedOrder.customerId);
-                  const pct = selectedOrder.purchasingContactId ? cust?.contacts.find(c => c.id === selectedOrder.purchasingContactId) : undefined;
-                  const ict = selectedOrder.itContactId ? cust?.contacts.find(c => c.id === selectedOrder.itContactId) : undefined;
-                  if (!pct && !ict) return null;
-                  return (
-              <div className="md:col-span-1 unified-card dark:bg-[#1C1C1E] p-4 border-gray-100/50 dark:border-white/10 space-y-3 self-start">
-                  <div className="border-b border-gray-100 dark:border-white/10 pb-2">
-                      <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                          <Users className="w-4 h-4 text-teal-500" /> 订单联系人
-                      </h4>
+              {/* 订单备注 (1/3 卡片) */}
+              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col">
+                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 shrink-0">
+                      <FileText className="w-4 h-4 text-amber-500" />
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">订单备注</h3>
                   </div>
-                  <div className="space-y-3">
-                      {pct && (
-                      <div className="space-y-1.5">
-                          <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">采购</span>
-                          </div>
-                          <div className="flex items-center gap-2 px-2.5 py-2 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100/80 dark:border-blue-800/30 rounded-lg">
-                              <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
-                                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">{pct.name.charAt(0)}</span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1">
-                                      <span className="text-xs font-bold text-gray-900 dark:text-white truncate">{pct.name}</span>
-                                      {pct.position && <span className="text-[10px] text-gray-400 truncate">· {pct.position}</span>}
-                                  </div>
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                      {pct.phone && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Phone className="w-2.5 h-2.5 shrink-0"/>{pct.phone}</span>}
-                                      {pct.email && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Mail className="w-2.5 h-2.5 shrink-0"/>{pct.email}</span>}
-                                  </div>
-                              </div>
-                          </div>
-                      </div>
-                      )}
-                      {ict && (
-                      <div className="space-y-1.5">
-                          <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">IT</span>
-                          </div>
-                          <div className="flex items-center gap-2 px-2.5 py-2 bg-purple-50/50 dark:bg-purple-900/10 border border-purple-100/80 dark:border-purple-800/30 rounded-lg">
-                              <div className="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center shrink-0">
-                                  <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400">{ict.name.charAt(0)}</span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1">
-                                      <span className="text-xs font-bold text-gray-900 dark:text-white truncate">{ict.name}</span>
-                                      {ict.position && <span className="text-[10px] text-gray-400 truncate">· {ict.position}</span>}
-                                  </div>
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                      {ict.phone && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Phone className="w-2.5 h-2.5 shrink-0"/>{ict.phone}</span>}
-                                      {ict.email && <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5 truncate"><Mail className="w-2.5 h-2.5 shrink-0"/>{ict.email}</span>}
-                                  </div>
-                              </div>
-                          </div>
-                      </div>
+                  <div className="px-4 py-3 flex-1 overflow-y-auto">
+                      {selectedOrder.orderRemark ? (
+                          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap break-words">{selectedOrder.orderRemark}</p>
+                      ) : (
+                          <p className="text-sm text-gray-400 dark:text-gray-500 italic">暂无备注</p>
                       )}
                   </div>
               </div>
-                  );
-              })()}
+          </div>
 
-              {/* Opportunity Information (dynamic) */}
-              {hasPermission('order_detail_opportunity') && (
-              <div className={`unified-card ${cardSpans.opportunity} dark:bg-[#1C1C1E] p-4 border-gray-100/50 dark:border-white/10 space-y-3`}>
-                  <div className="border-b border-gray-100 dark:border-white/10 pb-2.5">
-                      <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Target className="w-5 h-5 text-orange-500"/> 商机信息</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* 合同信息 (moved before original order) */}
+              <div className="unified-card md:col-span-2 dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
+                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                      <Scroll className="w-5 h-5 text-blue-500" />
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">合同信息</h3>
+                      {(selectedOrder.linkedContractIds?.length ?? 0) > 0 && (
+                          <span className="text-xs text-gray-400 font-mono">({selectedOrder.linkedContractIds!.length})</span>
+                      )}
                   </div>
                   {(() => {
-                      const opp = selectedOrder.opportunityId ? opportunities.find(o => o.id === selectedOrder.opportunityId) : null;
-                      if (!opp) return (
-                          <div className="flex flex-col items-center justify-center py-8 text-gray-400 dark:text-gray-600">
-                              <Target className="w-8 h-8 mb-2 opacity-20" />
-                              <span className="text-xs">暂无关联商机信息</span>
-                          </div>
+                      const ids = selectedOrder.linkedContractIds;
+                      if (!ids || ids.length === 0) return (
+                          <div className="p-5"><p className="text-sm text-gray-400 dark:text-gray-500 italic">暂未关联合同</p></div>
+                      );
+                      const linkedContracts = ids.map(cid => contracts.find(c => c.id === cid)).filter(Boolean);
+                      if (linkedContracts.length === 0) return (
+                          <div className="p-5"><p className="text-sm text-gray-400 dark:text-gray-500 italic">暂未关联合同</p></div>
                       );
                       return (
-                          <div className="divide-y divide-gray-50 dark:divide-white/5">
-                              {[
-                                  { label: '商机名称', value: opp.name },
-                                  { label: '商机编号', value: opp.id },
-                                  { label: '商机客户名称', value: selectedOrder.customerName },
-                                  { label: '商机阶段', value: opp.stage },
-                                  { label: '商机金额', value: `¥${(opp.amount || opp.expectedRevenue).toLocaleString()}` },
-                                  { label: '结单日期', value: opp.closeDate },
-                              ].map((item, idx) => (
-                                  <div key={idx} className="flex items-center gap-8 py-3.5">
-                                      <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap">{item.label}</span>
-                                      <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{item.value || '-'}</span>
-                                  </div>
-                              ))}
-                              {/* 商机产品列表 */}
-                              <div className="py-3.5">
-                                  <div className="flex items-start gap-8">
-                                      <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap pt-0.5">商机产品</span>
-                                      <div className="flex-1">
-                                          {opp.products && opp.products.length > 0 ? (
-                                              <div className="space-y-1.5">
-                                                  {opp.products.map((p, pi) => (
-                                                      <div key={pi} className="flex items-center gap-2 px-2.5 py-1.5 bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-lg">
-                                                          <span className="text-sm font-medium text-gray-900 dark:text-white">{p.productName}</span>
-                                                          {p.skuName && <span className="text-xs text-gray-400">/ {p.skuName}</span>}
-                                                          {p.licenseType && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium">{p.licenseType}</span>}
-                                                      </div>
-                                                  ))}
-                                              </div>
-                                          ) : (
-                                              <span className="text-sm text-gray-400">-</span>
-                                          )}
-                                      </div>
-                                  </div>
-                              </div>
+                          <div className="overflow-x-auto">
+                              <table className="w-full text-left text-sm">
+                                  <thead className="unified-table-header">
+                                      <tr>
+                                          <th className="px-5 py-4 pl-6 whitespace-nowrap">合同编号</th>
+                                          <th className="px-5 py-4">合同名称</th>
+                                          <th className="px-5 py-4 whitespace-nowrap">合同类型</th>
+                                          <th className="px-5 py-4 text-right whitespace-nowrap">合同金额</th>
+                                          <th className="px-5 py-4 text-center whitespace-nowrap">操作</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                                      {linkedContracts.map(contract => {
+                                          const c = contract!;
+                                          return (
+                                          <tr key={c.id} className="group text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                              <td className="px-5 py-5 pl-6 font-mono text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">{c.code}</td>
+                                              <td className="px-5 py-5 font-medium text-gray-900 dark:text-white">{c.name}</td>
+                                              <td className="px-5 py-5 text-gray-700 dark:text-gray-300">{c.contractType || '-'}</td>
+                                              <td className="px-5 py-5 text-right font-mono font-bold text-gray-900 dark:text-white">{c.amount != null ? `¥${c.amount.toLocaleString()}` : '-'}</td>
+                                              <td className="px-5 py-5 text-center">
+                                                  <button
+                                                      onClick={() => setPreviewContractId(c.id)}
+                                                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg transition border bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-[#0A84FF] hover:bg-blue-100 dark:hover:bg-blue-900/40 border-blue-100 dark:border-blue-800/40"
+                                                  >
+                                                      <Eye className="w-3 h-3" />
+                                                      预览
+                                                  </button>
+                                              </td>
+                                          </tr>
+                                          );
+                                      })}
+                                  </tbody>
+                              </table>
                           </div>
                       );
                   })()}
               </div>
-              )}
 
               {/* Original Order Numbers (small card) */}
               {hasPermission('order_detail_original') && (
@@ -1054,7 +1106,7 @@ const OrderDetails: React.FC = () => {
                           { label: 'SaaS订单编号', value: selectedOrder.saasOriginalOrderId || 'P20260303195755000001' },
                       ].map((item, idx) => (
                           <div key={idx} className="flex items-center gap-8 py-3.5">
-                              <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap whitespace-nowrap">{item.label}</span>
+                              <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap">{item.label}</span>
                               <span className="text-sm font-medium font-mono text-gray-900 dark:text-white flex-1 break-all">{item.value}</span>
                           </div>
                       ))}
@@ -1062,6 +1114,77 @@ const OrderDetails: React.FC = () => {
               </div>
               )}
             </div>
+
+            {/* Settlement Method */}
+            {selectedOrder.settlementMethod && (
+            <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
+                <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                    <Banknote className="w-5 h-5 text-emerald-500" />
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">结算方式</h3>
+                </div>
+                <div className="px-5 py-4 space-y-4">
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-500 dark:text-gray-400">结算方式：</span>
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                                selectedOrder.settlementMethod === 'credit'
+                                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700/40'
+                                    : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700/40'
+                            }`}>
+                                {selectedOrder.settlementMethod === 'credit' ? '信用额度' : '现结销售'}
+                            </span>
+                        </div>
+                        {selectedOrder.settlementMethod === 'credit' && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-500 dark:text-gray-400">付款方式：</span>
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                                    selectedOrder.settlementType === 'installment'
+                                        ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700/40'
+                                        : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700/40'
+                                }`}>
+                                    {selectedOrder.settlementType === 'installment' ? '分期付款' : '一次性付款'}
+                                </span>
+                            </div>
+                        )}
+                        {selectedOrder.settlementMethod === 'credit' && selectedOrder.settlementType !== 'installment' && selectedOrder.expectedPaymentDate && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-500 dark:text-gray-400">预计付款时间：</span>
+                                <span className="text-sm font-mono font-medium text-gray-800 dark:text-gray-200">{selectedOrder.expectedPaymentDate}</span>
+                            </div>
+                        )}
+                    </div>
+                    {selectedOrder.settlementMethod === 'cash' && (
+                        <div className="text-xs text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-white/5 px-3 py-2 rounded-lg">现结销售：订单全部款项将在发货前一次性结清，无需分期。</div>
+                    )}
+                    {selectedOrder.settlementMethod === 'credit' && selectedOrder.settlementType === 'installment' && selectedOrder.installmentPlans && selectedOrder.installmentPlans.length > 0 && (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="unified-table-header">
+                                    <tr>
+                                        <th className="px-5 py-4 pl-6 whitespace-nowrap">分期计划</th>
+                                        <th className="px-5 py-4 text-right whitespace-nowrap">分期金额</th>
+                                        <th className="px-5 py-4 whitespace-nowrap">预计付款时间</th>
+                                        <th className="px-5 py-4 whitespace-nowrap">实际付款时间</th>
+                                        <th className="px-5 py-4 text-right whitespace-nowrap">付款金额</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                                    {selectedOrder.installmentPlans.map((plan, idx) => (
+                                        <tr key={idx} className="group text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                            <td className="px-5 py-5 pl-6 text-gray-700 dark:text-gray-300 font-medium">第{idx + 1}期</td>
+                                            <td className="px-5 py-5 text-right font-mono font-bold text-gray-900 dark:text-white">¥{plan.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                            <td className="px-5 py-5 font-mono text-gray-700 dark:text-gray-300">{plan.expectedDate || '-'}</td>
+                                            <td className="px-5 py-5 font-mono text-gray-700 dark:text-gray-300">{plan.actualDate || '-'}</td>
+                                            <td className="px-5 py-5 text-right font-mono text-gray-700 dark:text-gray-300">{plan.paidAmount > 0 ? `¥${plan.paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </div>
+            )}
 
             {/* Acceptance Information Table */}
             {hasPermission('order_detail_acceptance') && (
@@ -1111,185 +1234,6 @@ const OrderDetails: React.FC = () => {
                     </div>
                 </div>
             )}
-          {/* 订单备注 & 关联合同 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-1 unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
-                  <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-blue-500" />
-                      <h3 className="text-sm font-bold text-gray-800 dark:text-white">订单备注</h3>
-                  </div>
-                  <div className="p-5">
-                      {selectedOrder.orderRemark ? (
-                          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{selectedOrder.orderRemark}</p>
-                      ) : (
-                          <p className="text-sm text-gray-400 dark:text-gray-500 italic">暂无备注</p>
-                      )}
-                  </div>
-              </div>
-              <div className="md:col-span-2 unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
-                  <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                          <Scroll className="w-4 h-4 text-blue-500" />
-                          <h3 className="text-sm font-bold text-gray-800 dark:text-white">合同信息</h3>
-                          {(selectedOrder.linkedContractIds?.length ?? 0) > 0 && (
-                              <span className="text-xs text-gray-400 font-mono">({selectedOrder.linkedContractIds!.length})</span>
-                          )}
-                      </div>
-                  </div>
-                  <div>
-                      {(() => {
-                          const ids = selectedOrder.linkedContractIds;
-                          if (!ids || ids.length === 0) return (
-                              <div className="p-5"><p className="text-sm text-gray-400 dark:text-gray-500 italic">暂未关联合同</p></div>
-                          );
-                          const linkedContracts = ids.map(cid => contracts.find(c => c.id === cid)).filter(Boolean);
-                          if (linkedContracts.length === 0) return (
-                              <div className="p-5"><p className="text-sm text-gray-400 dark:text-gray-500 italic">暂未关联合同</p></div>
-                          );
-                          const togglePreview = (cid: string) => {
-                              setExpandedContractIds(prev => {
-                                  const next = new Set(prev);
-                                  if (next.has(cid)) next.delete(cid); else next.add(cid);
-                                  return next;
-                              });
-                          };
-                          return (
-                              <div className="divide-y divide-gray-100 dark:divide-white/10">
-                                  {linkedContracts.map(contract => {
-                                      const c = contract!;
-                                      const isExpanded = expandedContractIds.has(c.id);
-                                      return (
-                                      <div key={c.id}>
-                                          <div className="px-5 py-3.5 flex items-center gap-4 hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors">
-                                              <div className="flex-1 min-w-0 grid grid-cols-3 gap-4 items-center">
-                                                  <div>
-                                                      <div className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">合同编号</div>
-                                                      <div className="font-mono text-xs text-gray-700 dark:text-gray-300">{c.code}</div>
-                                                  </div>
-                                                  <div>
-                                                      <div className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">合同名称</div>
-                                                      <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{c.name}</div>
-                                                  </div>
-                                                  <div className="text-right">
-                                                      <div className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">合同金额</div>
-                                                      <div className="text-sm font-mono font-semibold text-gray-900 dark:text-white">{c.amount != null ? `¥${c.amount.toLocaleString()}` : '-'}</div>
-                                                  </div>
-                                              </div>
-                                              <button
-                                                  onClick={() => togglePreview(c.id)}
-                                                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg transition border shrink-0 ${
-                                                      isExpanded
-                                                          ? 'bg-blue-100 dark:bg-blue-900/30 text-[#0071E3] dark:text-[#0A84FF] border-blue-200 dark:border-blue-700/50'
-                                                          : 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-[#0A84FF] hover:bg-blue-100 dark:hover:bg-blue-900/40 border-blue-100 dark:border-blue-800/40'
-                                                  }`}
-                                              >
-                                                  <Eye className="w-3 h-3" />
-                                                  {isExpanded ? '收起预览' : '合同预览'}
-                                              </button>
-                                          </div>
-                                          {isExpanded && (
-                                          <div className="px-5 pb-5 animate-fade-in">
-                                              <div className="bg-gray-50 dark:bg-black/20 rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden">
-                                                  <div className="px-5 py-3 border-b border-gray-200 dark:border-white/10 flex items-center justify-between bg-white/60 dark:bg-white/5">
-                                                      <div className="flex items-center gap-2">
-                                                          <Scroll className="w-4 h-4 text-[#0071E3]" />
-                                                          <span className="text-xs font-bold text-gray-700 dark:text-gray-300">{c.name}</span>
-                                                          <span className="text-[10px] text-gray-400 font-mono">{c.code}</span>
-                                                      </div>
-                                                      <div className="flex items-center gap-2">
-                                                          <button className="p-1 rounded hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 transition" title="下载合同"><Download className="w-3.5 h-3.5" /></button>
-                                                      </div>
-                                                  </div>
-                                                  <div className="p-6">
-                                                      <div className="bg-white dark:bg-[#2C2C2E] mx-auto shadow rounded-lg border border-gray-200 dark:border-white/10" style={{ padding: '40px 48px' }}>
-                                                          <div className="text-center mb-6">
-                                                              <h1 className="text-lg font-bold text-gray-900 dark:text-white tracking-widest mb-1">软件产品采购合同</h1>
-                                                              <div className="text-xs text-gray-400 font-mono">合同编号：{c.code}</div>
-                                                          </div>
-                                                          <div className="mb-4 text-xs leading-7 text-gray-700 dark:text-gray-300">
-                                                              <p>甲方（买方）：<strong className="text-gray-900 dark:text-white">{c.partyA || selectedOrder.customerName}</strong></p>
-                                                              <p>乙方（卖方）：<strong className="text-gray-900 dark:text-white">{c.partyB || '北京金山办公软件股份有限公司'}</strong></p>
-                                                              <p className="mt-1.5 text-gray-500 dark:text-gray-400 text-[11px] leading-5">
-                                                                  根据《中华人民共和国合同法》及相关法律法规的规定，甲乙双方在平等、自愿、公平、诚实信用的基础上，经友好协商，就甲方购买乙方软件产品事宜，达成如下协议：
-                                                              </p>
-                                                          </div>
-                                                          <div className="w-full h-px bg-gray-200 dark:bg-white/10 my-4" />
-                                                          <div className="mb-4">
-                                                              <h2 className="text-xs font-bold text-gray-900 dark:text-white mb-1.5">第一条　产品信息</h2>
-                                                              <div className="overflow-x-auto">
-                                                                  <table className="w-full text-[11px] border border-gray-200 dark:border-white/10 border-collapse">
-                                                                      <thead>
-                                                                          <tr className="bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400">
-                                                                              <th className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-left font-bold">序号</th>
-                                                                              <th className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-left font-bold">产品名称</th>
-                                                                              <th className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-center font-bold">数量</th>
-                                                                              <th className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right font-bold">单价</th>
-                                                                              <th className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right font-bold">小计</th>
-                                                                          </tr>
-                                                                      </thead>
-                                                                      <tbody>
-                                                                          {selectedOrder.items.map((item, idx) => (
-                                                                              <tr key={idx} className="text-gray-700 dark:text-gray-300">
-                                                                                  <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-center">{idx + 1}</td>
-                                                                                  <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5">{item.productName}</td>
-                                                                                  <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-center">{item.quantity}</td>
-                                                                                  <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right font-mono">¥{item.priceAtPurchase.toLocaleString()}</td>
-                                                                                  <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right font-mono">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
-                                                                              </tr>
-                                                                          ))}
-                                                                          <tr className="bg-orange-50/60 dark:bg-orange-900/10 font-bold text-gray-900 dark:text-white">
-                                                                              <td colSpan={4} className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right">合计</td>
-                                                                              <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right font-mono text-red-600 dark:text-red-400">¥{(c.amount ?? selectedOrder.total).toLocaleString()}</td>
-                                                                          </tr>
-                                                                      </tbody>
-                                                                  </table>
-                                                              </div>
-                                                          </div>
-                                                          <div className="mb-3">
-                                                              <h2 className="text-xs font-bold text-gray-900 dark:text-white mb-1">第二条　付款方式</h2>
-                                                              <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-6">
-                                                                  甲方应于合同签订后 <strong>30</strong> 个工作日内，将合同款项全额汇入乙方指定账户。
-                                                              </p>
-                                                          </div>
-                                                          <div className="mb-3">
-                                                              <h2 className="text-xs font-bold text-gray-900 dark:text-white mb-1">第三条　交付与验收</h2>
-                                                              <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-6">
-                                                                  乙方在收到全额货款后，通过电子方式向甲方交付产品授权码及安装介质，甲方应在 <strong>5</strong> 个工作日内签署验收确认书。
-                                                              </p>
-                                                          </div>
-                                                          <div className="w-full h-px bg-gray-200 dark:bg-white/10 my-4" />
-                                                          <div className="grid grid-cols-2 gap-6 text-[11px] text-gray-600 dark:text-gray-400">
-                                                              <div className="space-y-2">
-                                                                  <p className="font-bold text-gray-800 dark:text-gray-200">甲方（盖章）</p>
-                                                                  <p>{c.partyA || selectedOrder.customerName}</p>
-                                                                  <div className="w-20 h-20 rounded-full border-2 border-red-300 dark:border-red-800/50 flex items-center justify-center mt-1 opacity-50">
-                                                                      <div className="text-[8px] text-red-400 font-bold text-center">合同专用章</div>
-                                                                  </div>
-                                                                  {c.signDate && <p className="text-[10px]">签约：{c.signDate}</p>}
-                                                              </div>
-                                                              <div className="space-y-2">
-                                                                  <p className="font-bold text-gray-800 dark:text-gray-200">乙方（盖章）</p>
-                                                                  <p>{c.partyB || '北京金山办公软件股份有限公司'}</p>
-                                                                  <div className="w-20 h-20 rounded-full border-2 border-red-300 dark:border-red-800/50 flex items-center justify-center mt-1 opacity-50">
-                                                                      <div className="text-[8px] text-red-400 font-bold text-center">合同专用章</div>
-                                                                  </div>
-                                                                  {c.signDate && <p className="text-[10px]">签约：{c.signDate}</p>}
-                                                              </div>
-                                                          </div>
-                                                      </div>
-                                                  </div>
-                                              </div>
-                                          </div>
-                                          )}
-                                      </div>
-                                      );
-                                  })}
-                              </div>
-                          );
-                      })()}
-                  </div>
-              </div>
-          </div>
           </>
         )}
 
@@ -1370,7 +1314,7 @@ const OrderDetails: React.FC = () => {
         )}
 
         {activeTab === 'EMAIL' && hasPermission('order_detail_shipping') && (
-          <div className="flex min-h-[600px]">
+          <div className="flex h-[calc(100vh-280px)] min-h-[500px] overflow-hidden">
             {(() => {
               // ── Shared delivery record data ──────────────────────────────────
               const expressList = ['顺丰速运', '中通快递', '圆通速递', 'EMS邮政'];
@@ -1480,7 +1424,6 @@ const OrderDetails: React.FC = () => {
                             {[
                               { label: '收货方', value: rec.receiver },
                               { label: '收货单位名称', value: rec.unitName },
-                              { label: '收货方式', value: rec.method },
                               ...(isOnline
                                 ? [{ label: '收货邮箱', value: rec.email }]
                                 : [{ label: '收货地址', value: rec.address }]
@@ -1501,7 +1444,7 @@ const OrderDetails: React.FC = () => {
                   <div className="w-px bg-gray-200 dark:bg-white/10 mx-6 self-stretch" />
 
                   {/* ── Right: Detail Card ────────────────────────────────── */}
-                  <div className="unified-card flex-1 dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 flex flex-col">
+                  <div className="unified-card flex-1 dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 flex flex-col overflow-hidden">
                     {!active ? (
                       <div className="flex flex-col items-center justify-center flex-1 min-h-[400px] gap-4 text-gray-400 dark:text-gray-600">
                         <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/10 flex items-center justify-center">
@@ -1848,16 +1791,50 @@ const OrderDetails: React.FC = () => {
 
                       {/* Payment, Shipping, Acceptance, Refund Steps... */}
                       {activeStepModal === 'PAYMENT' && (
-                          <div className="space-y-6">
-                              <div className="p-6 bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl text-white shadow-lg text-center">
+                          <div className="space-y-5">
+                              <div className="p-5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl text-white shadow-lg text-center">
                                   <div className="text-xs font-bold uppercase mb-1 opacity-80">应收账款</div>
                                   <div className="text-3xl font-bold font-mono">¥{selectedOrder.total.toLocaleString()}</div>
                               </div>
-                              <div className="space-y-4">
-                                  <input placeholder="收款银行" value={paymentForm.bankName} onChange={e=>setPaymentForm({...paymentForm, bankName:e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-black rounded-xl border border-gray-200 dark:border-white/10 dark:text-white text-sm" />
-                                  <input placeholder="交易流水号" value={paymentForm.transactionId} onChange={e=>setPaymentForm({...paymentForm, transactionId:e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-black rounded-xl border border-gray-200 dark:border-white/10 dark:text-white text-sm font-mono" />
+
+                              <div className="space-y-2">
+                                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">支付方式</label>
+                                  <div className="grid grid-cols-3 gap-3">
+                                      {([
+                                          { id: 'WechatPay' as const, label: '微信支付', icon: Wallet, activeColor: 'text-green-600 bg-green-50 border-green-300 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400' },
+                                          { id: 'Alipay' as const, label: '支付宝', icon: CreditCard, activeColor: 'text-blue-600 bg-blue-50 border-blue-300 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-400' },
+                                          { id: 'Transfer' as const, label: '银行转账', icon: Banknote, activeColor: 'text-purple-600 bg-purple-50 border-purple-300 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-400' },
+                                      ]).map(m => (
+                                          <button
+                                              key={m.id}
+                                              onClick={() => setPaymentForm(prev => ({ ...prev, paymentMethod: m.id }))}
+                                              className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all gap-1.5 ${
+                                                  paymentForm.paymentMethod === m.id
+                                                      ? m.activeColor
+                                                      : 'border-gray-100 dark:border-white/10 text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:border-gray-200'
+                                              }`}
+                                          >
+                                              <m.icon className="w-5 h-5"/>
+                                              <span className="text-xs font-bold">{m.label}</span>
+                                          </button>
+                                      ))}
+                                  </div>
                               </div>
-                              <button onClick={handleConfirmPayment} className="w-full py-4 bg-green-500 text-white rounded-2xl font-bold shadow-lg hover:bg-green-600 transition mt-6">确认到账</button>
+
+                              <div className="space-y-3">
+                                  {paymentForm.paymentMethod === 'Transfer' && (
+                                      <input placeholder="收款银行" value={paymentForm.bankName} onChange={e=>setPaymentForm({...paymentForm, bankName:e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-black rounded-xl border border-gray-200 dark:border-white/10 dark:text-white text-sm" />
+                                  )}
+                                  <input placeholder="交易流水号" value={paymentForm.transactionId} onChange={e=>setPaymentForm({...paymentForm, transactionId:e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-black rounded-xl border border-gray-200 dark:border-white/10 dark:text-white text-sm font-mono" />
+                                  {paymentForm.paymentMethod === 'WechatPay' && (
+                                      <div className="p-3 bg-green-50 dark:bg-green-900/20 text-xs text-green-600 dark:text-green-300 rounded-xl border border-green-100 dark:border-green-900/30 leading-relaxed">确认到账后将记录为微信支付收款。</div>
+                                  )}
+                                  {paymentForm.paymentMethod === 'Alipay' && (
+                                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-xs text-blue-600 dark:text-blue-300 rounded-xl border border-blue-100 dark:border-blue-900/30 leading-relaxed">确认到账后将记录为支付宝收款。</div>
+                                  )}
+                              </div>
+
+                              <button onClick={handleConfirmPayment} className="w-full py-4 bg-green-500 text-white rounded-2xl font-bold shadow-lg hover:bg-green-600 transition">确认到账</button>
                           </div>
                       )}
                       
@@ -2252,6 +2229,109 @@ const OrderDetails: React.FC = () => {
         setZoom={setContractZoom}
         onClose={() => setIsContractPreviewOpen(false)}
       />
+
+      {/* Inline Contract Preview Modal */}
+      {previewContractId && selectedOrder && (() => {
+          const c = contracts.find(ct => ct.id === previewContractId);
+          if (!c) return null;
+          return (
+              <ModalPortal>
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[600] p-4 animate-fade-in" onClick={() => setPreviewContractId(null)}>
+                  <div className="bg-white dark:bg-[#1C1C1E] shadow-2xl rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col border border-gray-200 dark:border-white/10 animate-modal-enter" onClick={e => e.stopPropagation()}>
+                      <div className="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between bg-white/50 dark:bg-white/5 shrink-0 rounded-t-2xl">
+                          <div className="flex items-center gap-2">
+                              <Scroll className="w-5 h-5 text-[#0071E3]" />
+                              <span className="text-sm font-bold text-gray-900 dark:text-white">{c.name}</span>
+                              <span className="text-xs text-gray-400 font-mono">{c.code}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                              <button className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 transition" title="下载合同"><Download className="w-4 h-4" /></button>
+                              <button onClick={() => setPreviewContractId(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-gray-600 transition"><X className="w-4 h-4"/></button>
+                          </div>
+                      </div>
+                      <div className="overflow-y-auto flex-1 custom-scrollbar p-6">
+                          <div className="bg-white dark:bg-[#2C2C2E] mx-auto shadow rounded-lg border border-gray-200 dark:border-white/10" style={{ padding: '40px 48px', maxWidth: '640px' }}>
+                              <div className="text-center mb-6">
+                                  <h1 className="text-lg font-bold text-gray-900 dark:text-white tracking-widest mb-1">软件产品采购合同</h1>
+                                  <div className="text-xs text-gray-400 font-mono">合同编号：{c.code}</div>
+                              </div>
+                              <div className="mb-4 text-xs leading-7 text-gray-700 dark:text-gray-300">
+                                  <p>甲方（买方）：<strong className="text-gray-900 dark:text-white">{c.partyA || selectedOrder.customerName}</strong></p>
+                                  <p>乙方（卖方）：<strong className="text-gray-900 dark:text-white">{c.partyB || '北京金山办公软件股份有限公司'}</strong></p>
+                                  <p className="mt-1.5 text-gray-500 dark:text-gray-400 text-[11px] leading-5">
+                                      根据《中华人民共和国合同法》及相关法律法规的规定，甲乙双方在平等、自愿、公平、诚实信用的基础上，经友好协商，就甲方购买乙方软件产品事宜，达成如下协议：
+                                  </p>
+                              </div>
+                              <div className="w-full h-px bg-gray-200 dark:bg-white/10 my-4" />
+                              <div className="mb-4">
+                                  <h2 className="text-xs font-bold text-gray-900 dark:text-white mb-1.5">第一条　产品信息</h2>
+                                  <div className="overflow-x-auto">
+                                      <table className="w-full text-[11px] border border-gray-200 dark:border-white/10 border-collapse">
+                                          <thead>
+                                              <tr className="bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400">
+                                                  <th className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-left font-bold">序号</th>
+                                                  <th className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-left font-bold">产品名称</th>
+                                                  <th className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-center font-bold">数量</th>
+                                                  <th className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right font-bold">单价</th>
+                                                  <th className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right font-bold">小计</th>
+                                              </tr>
+                                          </thead>
+                                          <tbody>
+                                              {selectedOrder.items.map((item, idx) => (
+                                                  <tr key={idx} className="text-gray-700 dark:text-gray-300">
+                                                      <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-center">{idx + 1}</td>
+                                                      <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5">{item.productName}</td>
+                                                      <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-center">{item.quantity}</td>
+                                                      <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right font-mono">¥{item.priceAtPurchase.toLocaleString()}</td>
+                                                      <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right font-mono">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
+                                                  </tr>
+                                              ))}
+                                              <tr className="bg-orange-50/60 dark:bg-orange-900/10 font-bold text-gray-900 dark:text-white">
+                                                  <td colSpan={4} className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right">合计</td>
+                                                  <td className="border border-gray-200 dark:border-white/10 px-2 py-1.5 text-right font-mono text-red-600 dark:text-red-400">¥{(c.amount ?? selectedOrder.total).toLocaleString()}</td>
+                                              </tr>
+                                          </tbody>
+                                      </table>
+                                  </div>
+                              </div>
+                              <div className="mb-3">
+                                  <h2 className="text-xs font-bold text-gray-900 dark:text-white mb-1">第二条　付款方式</h2>
+                                  <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-6">
+                                      甲方应于合同签订后 <strong>30</strong> 个工作日内，将合同款项全额汇入乙方指定账户。
+                                  </p>
+                              </div>
+                              <div className="mb-3">
+                                  <h2 className="text-xs font-bold text-gray-900 dark:text-white mb-1">第三条　交付与验收</h2>
+                                  <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-6">
+                                      乙方在收到全额货款后，通过电子方式向甲方交付产品授权码及安装介质，甲方应在 <strong>5</strong> 个工作日内签署验收确认书。
+                                  </p>
+                              </div>
+                              <div className="w-full h-px bg-gray-200 dark:bg-white/10 my-4" />
+                              <div className="grid grid-cols-2 gap-6 text-[11px] text-gray-600 dark:text-gray-400">
+                                  <div className="space-y-2">
+                                      <p className="font-bold text-gray-800 dark:text-gray-200">甲方（盖章）</p>
+                                      <p>{c.partyA || selectedOrder.customerName}</p>
+                                      <div className="w-20 h-20 rounded-full border-2 border-red-300 dark:border-red-800/50 flex items-center justify-center mt-1 opacity-50">
+                                          <div className="text-[8px] text-red-400 font-bold text-center">合同专用章</div>
+                                      </div>
+                                      {c.signDate && <p className="text-[10px]">签约：{c.signDate}</p>}
+                                  </div>
+                                  <div className="space-y-2">
+                                      <p className="font-bold text-gray-800 dark:text-gray-200">乙方（盖章）</p>
+                                      <p>{c.partyB || '北京金山办公软件股份有限公司'}</p>
+                                      <div className="w-20 h-20 rounded-full border-2 border-red-300 dark:border-red-800/50 flex items-center justify-center mt-1 opacity-50">
+                                          <div className="text-[8px] text-red-400 font-bold text-center">合同专用章</div>
+                                      </div>
+                                      {c.signDate && <p className="text-[10px]">签约：{c.signDate}</p>}
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+              </ModalPortal>
+          );
+      })()}
 
     </>
   );

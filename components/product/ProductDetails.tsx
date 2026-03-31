@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Product, ProductSku, SkuPricingOption, InstallPackage } from '../../types';
-import { ArrowLeft, Package, ShieldCheck, Edit3, Plus, Trash2, List, Check, Box, Zap, User as UserIcon, Shield, Clock, Calendar, ToggleLeft, ToggleRight, Key, Sliders, Tag, PackageOpen, ChevronRight, Home, CreditCard, Save, X, Download, Copy } from 'lucide-react';
+import { Product, ProductSku, SkuPricingOption, InstallPackage, LinkedService } from '../../types';
+import { ArrowLeft, Package, ShieldCheck, Edit3, Plus, Trash2, List, Check, Box, Zap, User as UserIcon, Shield, Clock, Calendar, ToggleLeft, ToggleRight, Key, Sliders, Tag, PackageOpen, ChevronRight, Home, CreditCard, Save, X, Download, Copy, BookOpen, Link2, Search, Building2 } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
-import { Building2 } from 'lucide-react';
+import { ALL_INSTALL_PKG_ROWS } from '../../data/staticData';
 
 const SALES_ORG_OPTIONS = [
   '珠海金山办公软件有限公司', '北京金山办公软件股份有限公司', '武汉金山办公软件有限公司',
@@ -46,8 +46,29 @@ const ProductDetails: React.FC = () => {
   const [newLicensePrice, setNewLicensePrice] = useState<number>(0);
 
   // Product Detail Tabs
-  const [detailTab, setDetailTab] = useState<'info' | 'attributes' | 'packages'>('info');
+  const [detailTab, setDetailTab] = useState<'info' | 'attributes' | 'packages' | 'linkedServices'>('info');
   const [copiedId, setCopiedId] = useState(false);
+
+  // Linked Services
+  const [isAddLinkedServiceOpen, setIsAddLinkedServiceOpen] = useState(false);
+  const [linkedServiceSearch, setLinkedServiceSearch] = useState('');
+  const [linkedServiceSelectedProductId, setLinkedServiceSelectedProductId] = useState('');
+  const [linkedServiceSelectedSkuId, setLinkedServiceSelectedSkuId] = useState('');
+  const [linkedServiceRequired, setLinkedServiceRequired] = useState(true);
+  const [linkedServiceRemark, setLinkedServiceRemark] = useState('');
+
+  const linkedServiceCandidates = useMemo(() => {
+    if (!productForm) return [];
+    const existingIds = new Set((productForm.linkedServices || []).map(s => s.productId));
+    return products.filter(p =>
+      p.id !== productForm.id &&
+      p.status === 'OnShelf' &&
+      !existingIds.has(p.id) &&
+      (linkedServiceSearch ? p.name.toLowerCase().includes(linkedServiceSearch.toLowerCase()) || p.id.toLowerCase().includes(linkedServiceSearch.toLowerCase()) : true)
+    );
+  }, [products, productForm, linkedServiceSearch]);
+
+  const linkedServiceSelectedProduct = products.find(p => p.id === linkedServiceSelectedProductId);
 
   // Install Package States
   const [pkgTab, setPkgTab] = useState<'public' | 'private'>('public');
@@ -58,7 +79,28 @@ const ProductDetails: React.FC = () => {
     name: '', deliveryItemId: '', deliveryItemName: '', platform: '', source: '', cpu: '', os: '', url: '', packageType: 'public'
   });
 
-  useEffect(() => { if (product) setProductForm(product); }, [product]);
+  useEffect(() => {
+    if (!product) return;
+    const pkgRows = ALL_INSTALL_PKG_ROWS.filter(r => r.productId === product.id);
+    const mappedPkgs: InstallPackage[] = pkgRows.map(r => ({
+      id: r.id,
+      name: r.deliveryItemName,
+      version: r.productSpec || '',
+      url: '',
+      platform: r.platform,
+      cpu: r.cpu,
+      os: r.os,
+      deliveryItemId: r.deliveryItemId !== '-' ? r.deliveryItemId : undefined,
+      deliveryItemName: r.deliveryItemName,
+      productSpec: r.productSpec,
+      enabled: r.enabled,
+      packageType: r.packageType,
+      source: r.productLine,
+    }));
+    const existingPkgs = product.installPackages || [];
+    const mergedPkgs = existingPkgs.length > 0 ? existingPkgs : mappedPkgs;
+    setProductForm({ ...product, installPackages: mergedPkgs });
+  }, [product]);
 
   const filteredPkgs = useMemo(() => {
     const all = productForm?.installPackages || [];
@@ -321,6 +363,15 @@ const ProductDetails: React.FC = () => {
               <div className="flex items-center gap-2 shrink-0">
                   {currentView === 'PRODUCT_DETAIL' && (
                       <button
+                          onClick={() => navigate(`/catalog/${productForm.id}/preview`)}
+                          className="unified-button-secondary whitespace-nowrap shrink-0 flex items-center gap-1.5"
+                      >
+                          <BookOpen className="w-3.5 h-3.5" />
+                          产品目录详情
+                      </button>
+                  )}
+                  {currentView === 'PRODUCT_DETAIL' && (
+                      <button
                           onClick={isEditingProduct ? handleSaveProduct : () => setIsEditingProduct(true)}
                           className={`unified-button-secondary whitespace-nowrap shrink-0 ${isEditingProduct ? '!bg-[#0071E3] dark:!bg-[#FF2D55] !text-white !border-transparent' : ''}`}
                       >
@@ -351,7 +402,7 @@ const ProductDetails: React.FC = () => {
 
           {currentView === 'PRODUCT_DETAIL' && (
               <div className="flex gap-1 overflow-x-auto no-scrollbar pt-2 border-b border-gray-200 dark:border-white/10">
-                  {([['info', '产品信息'], ['attributes', '产品属性'], ['packages', '安装包']] as const).map(([key, label]) => (
+                  {([['info', '产品信息'], ['attributes', '产品属性'], ['linkedServices', '关联服务'], ['packages', '安装包']] as const).map(([key, label]) => (
                       <button
                           key={key}
                           onClick={() => setDetailTab(key)}
@@ -362,6 +413,9 @@ const ProductDetails: React.FC = () => {
                           }`}
                       >
                           {label}
+                          {key === 'linkedServices' && (productForm.linkedServices?.length || 0) > 0 && (
+                              <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">{productForm.linkedServices?.length}</span>
+                          )}
                           {key === 'packages' && (productForm.installPackages?.length || 0) > 0 && (
                               <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400">{productForm.installPackages?.length}</span>
                           )}
@@ -620,6 +674,96 @@ const ProductDetails: React.FC = () => {
                           )}
                         </div>
                       </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              )}
+
+              {/* 关联服务管理 */}
+              {detailTab === 'linkedServices' && (
+              <div className="space-y-4">
+                <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
+                  <div className="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      <Link2 className="w-4 h-4 text-blue-500" /> 关联服务
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setLinkedServiceSearch('');
+                        setLinkedServiceSelectedProductId('');
+                        setLinkedServiceSelectedSkuId('');
+                        setLinkedServiceRequired(true);
+                        setLinkedServiceRemark('');
+                        setIsAddLinkedServiceOpen(true);
+                      }}
+                      className="px-4 py-2 bg-[#0071E3] dark:bg-[#FF2D55] text-white text-xs font-medium rounded-lg hover:opacity-80 transition shadow-apple flex items-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> 添加关联服务
+                    </button>
+                  </div>
+
+                  {(productForm.linkedServices?.length || 0) > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-gray-200 dark:border-white/10">
+                            <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">关联产品编号</th>
+                            <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">关联产品名称</th>
+                            <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">关联规格</th>
+                            <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">是否必选</th>
+                            <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">备注</th>
+                            <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 text-right">操作</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                          {productForm.linkedServices!.map((svc, idx) => (
+                            <tr key={svc.productId} className="group hover:bg-blue-50/40 dark:hover:bg-blue-900/10 transition-colors">
+                              <td className="px-6 py-3.5 text-xs font-mono text-gray-600 dark:text-gray-400">{svc.productId}</td>
+                              <td className="px-6 py-3.5">
+                                <button
+                                  onClick={() => navigate(`/products/${svc.productId}`)}
+                                  className="text-sm font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline text-left"
+                                >
+                                  {svc.productName}
+                                </button>
+                              </td>
+                              <td className="px-6 py-3.5 text-sm text-gray-700 dark:text-gray-300">{svc.skuName || '—'}</td>
+                              <td className="px-6 py-3.5">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  svc.required
+                                    ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'
+                                    : 'bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400'
+                                }`}>
+                                  {svc.required ? '必选' : '可选'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-3.5 text-xs text-gray-500 dark:text-gray-400">{svc.remark || '—'}</td>
+                              <td className="px-6 py-3.5 text-right">
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`确定移除关联服务「${svc.productName}」吗？`)) {
+                                      const updated = { ...productForm, linkedServices: productForm.linkedServices!.filter((_, i) => i !== idx) };
+                                      setProductForm(updated);
+                                      setProducts(prev => prev.map(p => p.id === product!.id ? updated : p));
+                                    }
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition"
+                                  title="移除"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="px-6 py-12 text-center">
+                      <Link2 className="w-10 h-10 text-gray-200 dark:text-gray-700 mx-auto mb-3" />
+                      <div className="text-sm text-gray-400 dark:text-gray-500 mb-2">暂无关联服务</div>
+                      <div className="text-xs text-gray-400 dark:text-gray-500">添加关联服务后，创建订单时选择此产品会自动带出关联的服务产品</div>
                     </div>
                   )}
                 </div>
@@ -999,6 +1143,141 @@ const ProductDetails: React.FC = () => {
           </div>
           </ModalPortal>
 
+      )}
+
+      {/* Add Linked Service Modal */}
+      {isAddLinkedServiceOpen && (
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[500] animate-fade-in p-4">
+            <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-lg p-6 border-white/10">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Link2 className="w-5 h-5 text-blue-500" /> 添加关联服务
+                </h3>
+                <button onClick={() => setIsAddLinkedServiceOpen(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition">
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">搜索产品</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      value={linkedServiceSearch}
+                      onChange={e => { setLinkedServiceSearch(e.target.value); setLinkedServiceSelectedProductId(''); setLinkedServiceSelectedSkuId(''); }}
+                      className="w-full pl-9 pr-3 py-2.5 border border-gray-200 dark:border-white/10 rounded-lg bg-white dark:bg-black text-sm dark:text-white outline-none focus:border-blue-400 transition"
+                      placeholder="输入产品名称或编号搜索..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">选择产品</label>
+                  <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-white/10 rounded-lg divide-y divide-gray-100 dark:divide-white/5">
+                    {linkedServiceCandidates.length > 0 ? linkedServiceCandidates.slice(0, 20).map(p => (
+                      <div
+                        key={p.id}
+                        onClick={() => { setLinkedServiceSelectedProductId(p.id); setLinkedServiceSelectedSkuId(''); }}
+                        className={`px-4 py-2.5 cursor-pointer transition-colors flex items-center justify-between ${
+                          linkedServiceSelectedProductId === p.id
+                            ? 'bg-blue-50 dark:bg-blue-900/20'
+                            : 'hover:bg-gray-50 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{p.name}</div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] font-mono text-gray-400">{p.id}</span>
+                            {p.productCategory && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                p.productCategory === '服务'
+                                  ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400'
+                                  : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                              }`}>{p.productCategory}</span>
+                            )}
+                          </div>
+                        </div>
+                        {linkedServiceSelectedProductId === p.id && (
+                          <Check className="w-4 h-4 text-blue-500 shrink-0" />
+                        )}
+                      </div>
+                    )) : (
+                      <div className="px-4 py-6 text-center text-xs text-gray-400">未找到匹配的产品</div>
+                    )}
+                  </div>
+                </div>
+
+                {linkedServiceSelectedProduct && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">选择规格（可选）</label>
+                    <select
+                      value={linkedServiceSelectedSkuId}
+                      onChange={e => setLinkedServiceSelectedSkuId(e.target.value)}
+                      className="w-full border border-gray-200 dark:border-white/10 rounded-lg p-2.5 bg-white dark:bg-black text-sm dark:text-white outline-none"
+                    >
+                      <option value="">-- 不指定规格（下单时选择）--</option>
+                      {linkedServiceSelectedProduct.skus.filter(s => s.status === 'Active').map(s => (
+                        <option key={s.id} value={s.id}>{s.name} ({s.code}) - ¥{s.price.toLocaleString()}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">关联类型</label>
+                    <select
+                      value={linkedServiceRequired ? 'required' : 'optional'}
+                      onChange={e => setLinkedServiceRequired(e.target.value === 'required')}
+                      className="w-full border border-gray-200 dark:border-white/10 rounded-lg p-2.5 bg-white dark:bg-black text-sm dark:text-white outline-none"
+                    >
+                      <option value="required">必选</option>
+                      <option value="optional">可选</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">备注</label>
+                    <input
+                      value={linkedServiceRemark}
+                      onChange={e => setLinkedServiceRemark(e.target.value)}
+                      className="w-full border border-gray-200 dark:border-white/10 rounded-lg p-2.5 bg-white dark:bg-black text-sm dark:text-white outline-none"
+                      placeholder="如：必选运维服务"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100 dark:border-white/10">
+                <button onClick={() => setIsAddLinkedServiceOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition text-sm">取消</button>
+                <button
+                  disabled={!linkedServiceSelectedProductId}
+                  onClick={() => {
+                    const sp = products.find(p => p.id === linkedServiceSelectedProductId);
+                    if (!sp || !productForm) return;
+                    const sku = sp.skus.find(s => s.id === linkedServiceSelectedSkuId);
+                    const newSvc: LinkedService = {
+                      productId: sp.id,
+                      productName: sp.name,
+                      skuId: sku?.id,
+                      skuName: sku?.name,
+                      required: linkedServiceRequired,
+                      remark: linkedServiceRemark || undefined,
+                    };
+                    const updated = { ...productForm, linkedServices: [...(productForm.linkedServices || []), newSvc] };
+                    setProductForm(updated);
+                    setProducts(prev => prev.map(p => p.id === product!.id ? updated : p));
+                    setIsAddLinkedServiceOpen(false);
+                  }}
+                  className="px-5 py-2 bg-[#0071E3] dark:bg-[#FF2D55] text-white text-sm font-medium rounded-lg hover:opacity-80 transition shadow-apple disabled:opacity-50"
+                >
+                  确认添加
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
       )}
     </div>
   );

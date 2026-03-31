@@ -10,7 +10,7 @@ export interface AuthTypeData {
     nccIncome: string;
 }
 
-export type ActivationMethod = 'LicenseKey' | 'Online' | 'Dongle';
+export type ActivationMethod = 'LicenseKey' | 'Online' | 'Dongle' | 'Account' | 'SerialKey' | 'AccountAndSerialKey';
 
 export interface MerchandiseItem {
     productId: string;
@@ -177,6 +177,16 @@ export interface Product {
     salesOrgName?: string;
     businessDeliveryName?: string;
     taxRefundType?: string;
+    linkedServices?: LinkedService[];
+}
+
+export interface LinkedService {
+    productId: string;
+    productName: string;
+    skuId?: string;
+    skuName?: string;
+    required: boolean;
+    remark?: string;
 }
 
 export type SalesType = 'Direct' | 'Channel';
@@ -281,6 +291,11 @@ export interface RowPermissionRule {
     values: string[];
 }
 
+export interface RowLogicConfig {
+    dimOperators: Record<string, 'AND' | 'OR'>;
+    dimGroups: { id: string; dims: string[] }[];
+}
+
 export interface ColumnPermissionRule {
     id: string;
     resource: PermissionResource;
@@ -297,6 +312,7 @@ export interface RoleDefinition {
     isSystem?: boolean;
     baseRowPermission?: BaseRowPermission;
     rowPermissions?: RowPermissionRule[];
+    rowLogic?: Record<string, RowLogicConfig>;
     columnPermissions?: ColumnPermissionRule[];
 }
 
@@ -397,7 +413,7 @@ export enum OrderStatus {
 export type OrderSource = 'Sales' | 'ChannelPortal' | 'OnlineStore' | 'APISync' | 'Renewal';
 export type BuyerType = 'Customer' | 'Channel' | 'SelfDeal' | 'Direct' | 'RedeemCode';
 export type DeliveryMethod = 'Online' | 'Offline' | 'Hybrid';
-export type PaymentMethod = 'Online' | 'Transfer' | 'COD';
+export type PaymentMethod = 'WechatPay' | 'Alipay' | 'Transfer';
 
 export interface InvoiceInfo {
     type: 'VAT_Special' | 'VAT_Normal';
@@ -487,6 +503,8 @@ export interface Order {
     buyerId?: string; // ID of the Channel or Customer buying the product
     
     shippingAddress?: string;
+    shippingPhone?: string;
+    shippingEmail?: string;
     receivingParty?: string;
     receivingCompany?: string;
     receivingMethod?: string;
@@ -562,7 +580,12 @@ export interface Order {
     linkedContractIds?: string[];
     linkedContractNames?: string[];
 
+    isAgentOrder?: boolean;
+    agentCode?: string;
+
+    settlementMethod?: 'cash' | 'credit' | 'prepaid';
     settlementType?: 'once' | 'installment';
+    expectedPaymentDate?: string;
     installmentPlans?: { amount: number; expectedDate: string; actualDate: string; paidAmount: number }[];
 }
 
@@ -667,6 +690,15 @@ export interface DeliveryInfo {
     serviceEndDate?: string;
 }
 
+export interface ConversionOrder {
+    id: string;
+    amount: number;
+    enterpriseName: string;
+    sourceOrderId: string;
+    createdAt: string;
+    status: 'Available' | 'Used';
+}
+
 export interface OrderDraft {
     id: string;
     savedAt: string;
@@ -682,20 +714,28 @@ export interface OrderDraft {
     newOrderCustomer: string;
     orderEnterpriseId: string;
     selectedChannelId: string;
+    directChannel?: string;
+    terminalChannel?: string;
     salesRepId: string;
     businessManagerId: string;
     // Step 3
     newOrderItems: OrderItem[];
     tempCategory: string;
+    enableConversion?: boolean;
+    selectedConversionIds?: string[];
+    sellerName?: string;
+    sellerContact?: string;
     // Step 4
     invoiceForm: InvoiceInfo;
-    paymentMethod: PaymentMethod;
-    paymentTerms: string;
+    paymentMethod?: PaymentMethod;
+    paymentTerms?: string;
     deliveryMethod: DeliveryMethod;
     receivingParty: string;
     receivingCompany: string;
     receivingMethod: string;
     shippingAddress: string;
+    shippingPhone: string;
+    shippingEmail: string;
     acceptanceForm: AcceptanceInfo;
     acceptanceType: AcceptanceType;
     phaseDrafts: { name: string; percentage: number }[];
@@ -703,4 +743,8 @@ export interface OrderDraft {
     linkedContractIds: string[];
     purchasingContactId: string;
     itContactId: string;
+    isAgentOrder?: boolean;
+    agentCode?: string;
+    settlementMethod?: 'cash' | 'credit' | '';
+    expectedPaymentDate?: string;
 }

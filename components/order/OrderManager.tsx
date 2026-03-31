@@ -69,9 +69,9 @@ const deliveryMethodMap: Record<string, string> = {
 };
 
 const paymentMethodMap: Record<string, string> = {
-    'Online': '在线支付',
+    'WechatPay': '微信支付',
+    'Alipay': '支付宝支付',
     'Transfer': '银行转账',
-    'COD': '货到付款'
 };
 
 const OrderManager: React.FC = () => {
@@ -360,15 +360,22 @@ const OrderManager: React.FC = () => {
       });
   };
 
-  // --- Handle Renewal Initialization from navigation state ---
+  // --- Handle Renewal / Edit-Draft Initialization from navigation state ---
   useEffect(() => {
-      const state = location.state as { initRenewal?: boolean; originalOrder?: Order } | null;
+      const state = location.state as { initRenewal?: boolean; originalOrder?: Order; editDraftId?: string } | null;
       if (state?.initRenewal && state?.originalOrder) {
           setRenewalOrder(state.originalOrder);
           setIsCreateOpen(true);
           window.history.replaceState({}, document.title);
+      } else if (state?.editDraftId) {
+          const draft = orderDrafts.find(d => d.id === state.editDraftId);
+          if (draft) {
+              setResumeDraft(draft);
+              setIsCreateOpen(true);
+          }
+          window.history.replaceState({}, document.title);
       }
-  }, [location.state]);
+  }, [location.state, orderDrafts]);
 
   const getStatusBadge = useCallback((status: OrderStatus) => {
     const text = statusMap[status] || status;
@@ -1084,14 +1091,7 @@ const OrderManager: React.FC = () => {
                               <span
                                   className={`text-sm font-semibold cursor-pointer hover:underline ${order.status === OrderStatus.DRAFT ? 'text-amber-500 dark:text-amber-400' : 'text-[#0071E3] dark:text-[#FF2D55]'}`}
                                   style={{fontVariantNumeric:'tabular-nums'}}
-                                  onClick={() => {
-                                      if (order.status === OrderStatus.DRAFT) {
-                                          const draft = orderDrafts.find(d => d.id === order.id);
-                                          if (draft) { setResumeDraft(draft); setIsCreateOpen(true); }
-                                      } else {
-                                          navigate(`/orders/${order.id}`);
-                                      }
-                                  }}
+                                  onClick={() => navigate(`/orders/${order.id}`)}
                               >
                                   {order.id}
                               </span>

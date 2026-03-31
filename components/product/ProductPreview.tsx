@@ -4,7 +4,7 @@ import {
   Zap, FileText, Download, Tag,
   Monitor, HardDrive, Globe, MemoryStick,
   Key, ChevronRight, ChevronLeft,
-  ArrowLeft, Users, Landmark, Handshake, Info, Package, Eye, FileKey, Building2, LayoutGrid
+  ArrowLeft, Users, Landmark, Handshake, Info, Package, Eye, FileKey, Building2, LayoutGrid, Layers
 } from 'lucide-react';
 import { useAppContext } from '../../contexts/AppContext';
 
@@ -153,6 +153,14 @@ const ProductPreview: React.FC = () => {
               </div>
             </div>
           </div>
+
+          <button
+            onClick={() => navigate(`/products/${product.id}`)}
+            className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-200 dark:border-white/10 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10 transition"
+          >
+            <Layers className="w-4 h-4" />
+            产品详情
+          </button>
         </div>
 
         {/* Tab 导航行 */}

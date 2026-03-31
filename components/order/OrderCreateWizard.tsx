@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Order, OrderStatus, OrderItem, ActivationMethod, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, DeliveryMethod, OrderDraft } from '../../types';
-import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Network, Globe, Radio, RefreshCcw, Wallet, Zap, Box, Settings, MapPin, Briefcase, XCircle, Search, Save, ScrollText, Phone, Mail, Users, Banknote, Calendar, Check } from 'lucide-react';
+import { Order, OrderStatus, OrderItem, ActivationMethod, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, DeliveryMethod, OrderDraft, ConversionOrder } from '../../types';
+import { initialConversionOrders, ALL_INSTALL_PKG_ROWS } from '../../data/staticData';
+import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Network, Globe, Radio, RefreshCcw, Wallet, Zap, Box, Settings, MapPin, Briefcase, XCircle, Search, Save, ScrollText, Phone, Mail, Users, Banknote, Calendar, Check, ChevronRight, ChevronDown, Pencil } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
 
@@ -29,6 +30,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const [linkedContractIds, setLinkedContractIds] = useState<string[]>([]);
   const [isContractPickerOpen, setIsContractPickerOpen] = useState(false);
   const [contractPickerSearch, setContractPickerSearch] = useState('');
+  const [contractPickerPage, setContractPickerPage] = useState(1);
+  const CONTRACT_PAGE_SIZE = 50;
 
   // Step 2: Customer & Buyer & Opportunity
   const [hasOpportunity, setHasOpportunity] = useState<'yes' | 'no' | ''>('');
@@ -37,10 +40,14 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const [oppPickerSearch, setOppPickerSearch] = useState('');
   const [newOrderCustomer, setNewOrderCustomer] = useState('');
   const [selectedChannelId, setSelectedChannelId] = useState('');
+  const [directChannel, setDirectChannel] = useState('');
+  const [terminalChannel, setTerminalChannel] = useState('');
   const [businessManagerId, setBusinessManagerId] = useState('');
   const [salesRepId, setSalesRepId] = useState('');
   const [creatorId, setCreatorId] = useState(currentUser.id);
   const [orderEnterpriseId, setOrderEnterpriseId] = useState('');
+  const [isAgentOrder, setIsAgentOrder] = useState(false);
+  const [agentCode, setAgentCode] = useState('');
   // 可选联系人列表 & 选中的联系人 ID
   const [purchasingContacts, setPurchasingContacts] = useState<typeof customers[0]['contacts']>([]);
   const [itContacts, setItContacts] = useState<typeof customers[0]['contacts']>([]);
@@ -49,24 +56,67 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   
   // Step 3: Merchandise Selection (New Cascading Logic)
   const [newOrderItems, setNewOrderItems] = useState<OrderItem[]>([]);
-  const [tempTopCategory, setTempTopCategory] = useState('');
   const [tempCategory, setTempCategory] = useState('');
+  const [tempHoverCategory, setTempHoverCategory] = useState('');
+  const [isCategoryPickerOpen, setIsCategoryPickerOpen] = useState(false);
+  const categoryPickerRef = React.useRef<HTMLDivElement>(null);
   const [tempProductId, setTempProductId] = useState('');
   const [tempSkuId, setTempSkuId] = useState('');
   const [tempPricingOptionId, setTempPricingOptionId] = useState('');
   const [tempQuantity, setTempQuantity] = useState(1);
-  const [tempActivationMethod, setTempActivationMethod] = useState<ActivationMethod>('LicenseKey');
+  const [tempActivationMethod, setTempActivationMethod] = useState<ActivationMethod>('Account');
   const [tempLicensePeriod, setTempLicensePeriod] = useState('');
+  const [tempLicensePeriodNum, setTempLicensePeriodNum] = useState<number | ''>('');
+  const [tempLicensePeriodUnit, setTempLicensePeriodUnit] = useState<'年' | '月' | '日'>('年');
   const [negotiatedPrice, setNegotiatedPrice] = useState<number | null>(null);
 
   // Per-item enterprise selection (Customer & Channel types)
   const [tempEnterpriseId, setTempEnterpriseId] = useState('');
+  const [tempLicensee, setTempLicensee] = useState('');
 
   // Install package selection
   const [tempPkgType, setTempPkgType] = useState<'通用' | '定制' | ''>('');
   const [tempPkgCpu, setTempPkgCpu] = useState('');
   const [tempPkgOs, setTempPkgOs] = useState('');
   const [tempPkgLink, setTempPkgLink] = useState('');
+
+  // Conversion (折算) feature
+  const [enableConversion, setEnableConversion] = useState(false);
+  const [selectedConversionIds, setSelectedConversionIds] = useState<string[]>([]);
+  const [isConversionPickerOpen, setIsConversionPickerOpen] = useState(false);
+  const [conversionSearchField, setConversionSearchField] = useState<'enterpriseName' | 'id'>('enterpriseName');
+  const [conversionSearch, setConversionSearch] = useState('');
+  const availableConversionOrders = useMemo(() => initialConversionOrders.filter(c => c.status === 'Available'), []);
+  const filteredConversionOrders = useMemo(() => {
+    if (!conversionSearch) return availableConversionOrders;
+    const q = conversionSearch.toLowerCase();
+    return availableConversionOrders.filter(c =>
+      conversionSearchField === 'enterpriseName'
+        ? c.enterpriseName.toLowerCase().includes(q)
+        : c.id.toLowerCase().includes(q)
+    );
+  }, [availableConversionOrders, conversionSearch, conversionSearchField]);
+  const conversionTotalAmount = useMemo(() =>
+    selectedConversionIds.reduce((sum, id) => {
+      const co = availableConversionOrders.find(c => c.id === id);
+      return sum + (co?.amount ?? 0);
+    }, 0),
+  [selectedConversionIds, availableConversionOrders]);
+
+  const categoryTree = useMemo(() => {
+    const onShelf = products.filter(p => p.status === 'OnShelf');
+    const cats = Array.from(new Set(onShelf.map(p => p.category)));
+    return cats.map(cat => ({
+      label: cat,
+      subs: Array.from(new Set(onShelf.filter(p => p.category === cat && p.subCategory).map(p => p.subCategory!)))
+    })).filter(c => c.subs.length > 0);
+  }, [products]);
+
+  const selectedCategoryLabel = useMemo(() => {
+    if (!tempCategory) return '';
+    const parent = categoryTree.find(c => c.subs.includes(tempCategory));
+    return parent ? `${parent.label} / ${tempCategory}` : tempCategory;
+  }, [tempCategory, categoryTree]);
 
   // Computed data for selection cascade
   const selectedProduct = products.find(p => p.id === tempProductId);
@@ -77,6 +127,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const showLicensePeriod = selectedLicensePeriodType !== 'Forever' && selectedLicensePeriodType !== undefined;
 
   const [originalOrderId, setOriginalOrderId] = useState<string | undefined>(undefined);
+
+  // Seller info (auto-populated from product's salesOrgName)
+  const [sellerName, setSellerName] = useState('');
+  const [sellerContact, setSellerContact] = useState('');
 
   // Step 4: Invoice, Payment & Acceptance & Delivery
   const [invoiceForm, setInvoiceForm] = useState<InvoiceInfo>({
@@ -90,13 +144,15 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       phone: ''
   });
   
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Transfer');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('WechatPay');
   const [paymentTerms, setPaymentTerms] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('Online');
   const [receivingParty, setReceivingParty] = useState('买方');
   const [receivingCompany, setReceivingCompany] = useState('');
   const [receivingMethod, setReceivingMethod] = useState('邮寄');
   const [shippingAddress, setShippingAddress] = useState('');
+  const [shippingPhone, setShippingPhone] = useState('');
+  const [shippingEmail, setShippingEmail] = useState('');
 
   const [acceptanceForm, setAcceptanceForm] = useState<AcceptanceInfo>({
       contactName: '',
@@ -111,7 +167,18 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       { name: '最终验收', percentage: 70 }
   ]);
 
+  type ProductAcceptanceRow = {
+      productIdx: number;
+      method: '一次性验收' | '分期验收';
+      condition: string;
+      expectedDate: string;
+      percentage: number;
+  };
+  const [productAcceptanceRows, setProductAcceptanceRows] = useState<ProductAcceptanceRow[]>([]);
+
+  const [settlementMethod, setSettlementMethod] = useState<'cash' | 'credit' | ''>('');
   const [settlementType, setSettlementType] = useState<'once' | 'installment'>('once');
+  const [expectedPaymentDate, setExpectedPaymentDate] = useState('');
   const [installmentPlans, setInstallmentPlans] = useState<{amount: number; expectedDate: string; actualDate: string; paidAmount: number}[]>([]);
 
   const wizardSteps = [
@@ -164,6 +231,12 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         setOrderSource('Sales');
       }
     }
+    if (buyerType !== 'SelfDeal') {
+      setEnableConversion(false);
+      setSelectedConversionIds([]);
+      setIsAgentOrder(false);
+      setAgentCode('');
+    }
   }, [buyerType]);
 
   // When toggling hasOpportunity, reset related fields
@@ -179,9 +252,25 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   }, [hasOpportunity]);
 
   // Reset downstream selections when upstream changes
-  useEffect(() => { setTempCategory(''); setTempProductId(''); setTempSkuId(''); setTempPricingOptionId(''); setNegotiatedPrice(null); setTempPkgType(''); setTempPkgCpu(''); setTempPkgOs(''); setTempPkgLink(''); }, [tempTopCategory]);
   useEffect(() => { setTempProductId(''); setTempSkuId(''); setTempPricingOptionId(''); setNegotiatedPrice(null); setTempPkgType(''); setTempPkgCpu(''); setTempPkgOs(''); setTempPkgLink(''); }, [tempCategory]);
-  useEffect(() => { setTempSkuId(''); setTempPricingOptionId(''); setNegotiatedPrice(null); setTempPkgType(''); setTempPkgCpu(''); setTempPkgOs(''); setTempPkgLink(''); }, [tempProductId]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (categoryPickerRef.current && !categoryPickerRef.current.contains(e.target as Node)) {
+        setIsCategoryPickerOpen(false);
+      }
+    };
+    if (isCategoryPickerOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isCategoryPickerOpen]);
+  useEffect(() => {
+    setTempSkuId(''); setTempPricingOptionId(''); setNegotiatedPrice(null); setTempPkgType(''); setTempPkgCpu(''); setTempPkgOs(''); setTempPkgLink('');
+    if (tempProductId) {
+      const prod = products.find(p => p.id === tempProductId);
+      const activeSkus = prod?.skus.filter(s => s.status === 'Active') || [];
+      if (activeSkus.length === 1) setTempSkuId(activeSkus[0].id);
+    }
+  }, [tempProductId]);
   useEffect(() => { setTempPkgCpu(''); setTempPkgOs(''); setTempPkgLink(''); }, [tempPkgType]);
   useEffect(() => { 
       setTempPricingOptionId(''); 
@@ -207,6 +296,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setDraftSavedTip(false);
       setNewOrderCustomer('');
       setOrderEnterpriseId('');
+      setIsAgentOrder(false);
+      setAgentCode('');
       setLinkedOpportunityId('');
       setHasOpportunity('');
       setBuyerType(''); 
@@ -215,11 +306,12 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setLinkedContractIds([]);
       setOriginalOrderId(undefined);
       setSelectedChannelId('');
+      setDirectChannel('');
+      setTerminalChannel('');
       setSalesRepId(currentUser.role === 'Sales' ? currentUser.id : '');
       setBusinessManagerId('');
       setCreatorId(currentUser.id);
       setNewOrderItems([]);
-      setTempTopCategory('');
       setTempCategory('');
       setTempProductId('');
       setTempSkuId('');
@@ -232,28 +324,73 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setNegotiatedPrice(null);
       setCurrentStep(1);
       setInvoiceForm({ type: 'VAT_Special', title: '', taxId: '', content: '软件产品', bankName: '', accountNumber: '', address: '', phone: '' });
-      setPaymentMethod('Transfer');
+      setPaymentMethod('WechatPay');
       setPaymentTerms('');
       setDeliveryMethod('Online');
       setReceivingParty('买方');
       setReceivingCompany('');
       setReceivingMethod('邮寄');
       setShippingAddress('');
+      setShippingPhone('');
+      setShippingEmail('');
       setAcceptanceForm({ contactName: '', contactPhone: '', method: 'Remote', email: '' });
       setAcceptanceType('OneTime');
       setPhaseDrafts([{ name: '第一阶段验收', percentage: 30 }, { name: '最终验收', percentage: 70 }]);
+      setProductAcceptanceRows([]);
       setPurchasingContacts([]);
       setItContacts([]);
       setSelectedPurchasingContactId('');
       setSelectedItContactId('');
+      setEnableConversion(false);
+      setSelectedConversionIds([]);
+      setSellerName('');
+      setSellerContact('');
+      setSettlementMethod('');
+      setSettlementType('once');
+      setExpectedPaymentDate('');
+      setInstallmentPlans([]);
   };
 
   const handleClose = () => { onClose(); resetCreateForm(); };
+
+  const buildItemsFromOpportunity = (opp: typeof opportunities[0]) => {
+      if (!opp?.products || opp.products.length === 0) return;
+      const autoItems: OrderItem[] = [];
+      for (const op of opp.products) {
+          const prod = products.find(p => p.status === 'OnShelf' && p.name === op.productName);
+          if (!prod) continue;
+          const sku = op.skuName
+              ? prod.skus.find(s => s.status === 'Active' && s.name === op.skuName) || prod.skus.find(s => s.status === 'Active')
+              : prod.skus.find(s => s.status === 'Active');
+          if (!sku) continue;
+          const pricingOpt = op.licenseType
+              ? sku.pricingOptions?.find(po => po.title === op.licenseType)
+              : sku.pricingOptions?.[0];
+          const price = pricingOpt ? pricingOpt.price : sku.price;
+          const isPermanent = pricingOpt ? pricingOpt.license.periodUnit === 'Forever' : true;
+          autoItems.push({
+              productId: prod.id, productName: prod.name,
+              skuId: sku.id, skuName: sku.name, skuCode: sku.code,
+              quantity: 1, priceAtPurchase: price,
+              pricingOptionId: pricingOpt?.id, pricingOptionName: pricingOpt?.title,
+              licenseType: pricingOpt?.title || op.licenseType,
+              licensePeriod: isPermanent ? '永久' : undefined,
+              activationMethod: (buyerType === 'Customer' || buyerType === 'Channel') ? 'Account' : 'LicenseKey',
+              capabilitiesSnapshot: prod.composition?.map(c => c.name) || [],
+          });
+      }
+      if (autoItems.length > 0) {
+          setNewOrderItems(autoItems);
+          const firstProd = products.find(p => p.id === autoItems[0].productId);
+          if (firstProd?.salesOrgName) setSellerName(firstProd.salesOrgName);
+      }
+  };
 
   const handleOpportunityChange = (oppId: string) => {
       setLinkedOpportunityId(oppId);
       const opp = opportunities.find(o => o.id === oppId);
       if (opp && opp.customerId) handleCustomerChange(opp.customerId);
+      if (opp) buildItemsFromOpportunity(opp);
   };
 
   const handleCustomerChange = (customerId: string) => {
@@ -266,6 +403,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       const customer = customers.find(c => c.id === customerId);
       if (customer) {
           if (customer.ownerId) setSalesRepId(customer.ownerId);
+          setTempLicensee(customer.companyName || '');
           setInvoiceForm(prev => ({
               ...prev,
               title: customer.billingInfo?.title || customer.companyName,
@@ -288,18 +426,13 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
           const iContacts = customer.contacts.filter(c => c.roles.includes('IT'));
           setPurchasingContacts(pContacts);
           setItContacts(iContacts);
-          // 自动选中：唯一一个则直接选中，否则优先选主要联系人
-          if (pContacts.length === 1) {
-              setSelectedPurchasingContactId(pContacts[0].id);
-          } else if (pContacts.length > 1) {
+          if (pContacts.length > 0) {
               const primary = pContacts.find(c => c.isPrimary);
-              if (primary) setSelectedPurchasingContactId(primary.id);
+              setSelectedPurchasingContactId(primary ? primary.id : pContacts[0].id);
           }
-          if (iContacts.length === 1) {
-              setSelectedItContactId(iContacts[0].id);
-          } else if (iContacts.length > 1) {
+          if (iContacts.length > 0) {
               const primary = iContacts.find(c => c.isPrimary);
-              if (primary) setSelectedItContactId(primary.id);
+              setSelectedItContactId(primary ? primary.id : iContacts[0].id);
           }
       }
   };
@@ -314,19 +447,16 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
     const capabilitiesSnapshot = selectedProduct.composition?.map(c => c.name) || [];
 
-    // Resolve selected install package
-    const pkgs = selectedProduct.installPackages || [];
+    // Resolve selected install package from shared data
+    const pkgRows = ALL_INSTALL_PKG_ROWS.filter(r => r.productId === selectedProduct.id && r.enabled);
+    const universalPkgRows = pkgRows.filter(r => r.packageType === 'public');
+    const customPkgRows = pkgRows.filter(r => r.packageType === 'private');
     let resolvedInstallPackageName: string | undefined;
     if (tempPkgType === '通用') {
-        const universalPkgs = pkgs.filter(p => p.cpu === '通用');
-        const matched = universalPkgs.find(p => !tempPkgOs || p.os === tempPkgOs);
-        resolvedInstallPackageName = matched ? `${matched.name} v${matched.version} (${matched.os})` : undefined;
+        const matched = universalPkgRows.find(p => !tempPkgOs || p.os === tempPkgOs);
+        resolvedInstallPackageName = matched ? `${matched.deliveryItemName} (${matched.cpu} / ${matched.os})` : undefined;
     } else if (tempPkgType === '定制') {
-        const customPkgs = pkgs.filter(p => p.cpu !== '通用');
-        const matched = customPkgs.find(p =>
-            (!tempPkgCpu || p.cpu === tempPkgCpu) && (!tempPkgOs || p.os === tempPkgOs)
-        );
-        resolvedInstallPackageName = matched ? `${matched.name} v${matched.version} (${matched.cpu} / ${matched.os})` : undefined;
+        resolvedInstallPackageName = [tempPkgCpu, tempPkgOs].filter(Boolean).join(' / ') || '定制安装包';
     }
 
     // For Customer/Channel: use per-item tempEnterpriseId; for SelfDeal: use orderEnterpriseId
@@ -354,8 +484,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         pricingOptionId: selectedOption?.id,
         pricingOptionName: selectedOption?.title,
         licenseType: derivedLicenseType,
-        licensePeriod: isPermanent ? '永久' : (needsManualPeriod && tempLicensePeriod ? tempLicensePeriod : undefined),
+        licensePeriod: isPermanent ? '永久' : (needsManualPeriod && tempLicensePeriodNum ? `${tempLicensePeriodNum}${tempLicensePeriodUnit}` : undefined),
         activationMethod: tempActivationMethod,
+        licensee: tempLicensee || undefined,
         installPackageName: resolvedInstallPackageName,
         installPackageType: tempPkgType || undefined,
         installPackageLink: tempPkgType === '定制' && tempPkgLink ? tempPkgLink : undefined,
@@ -364,9 +495,60 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         capabilitiesSnapshot
     };
 
-    setNewOrderItems([...newOrderItems, newItem]);
+    const itemsToAdd: OrderItem[] = [newItem];
+
+    // Auto-add linked services
+    const linkedServices = selectedProduct.linkedServices || [];
+    if (linkedServices.length > 0) {
+      const existingProductIds = new Set(newOrderItems.map(i => i.productId));
+      for (const svc of linkedServices) {
+        if (existingProductIds.has(svc.productId)) continue;
+        const svcProduct = products.find(p => p.id === svc.productId);
+        if (!svcProduct || svcProduct.status !== 'OnShelf') continue;
+        const svcSku = svc.skuId
+          ? svcProduct.skus.find(s => s.id === svc.skuId && s.status === 'Active')
+          : svcProduct.skus.find(s => s.status === 'Active');
+        if (!svcSku) continue;
+        const svcOption = svcSku.pricingOptions && svcSku.pricingOptions.length > 0 ? svcSku.pricingOptions[0] : undefined;
+        const svcPrice = svcOption ? svcOption.price : svcSku.price;
+        const svcIsPermanent = svcOption ? svcOption.license.periodUnit === 'Forever' : true;
+        itemsToAdd.push({
+          productId: svcProduct.id,
+          productName: svcProduct.name,
+          skuId: svcSku.id,
+          skuName: svcSku.name,
+          skuCode: svcSku.code,
+          quantity: tempQuantity,
+          priceAtPurchase: svcPrice,
+          pricingOptionId: svcOption?.id,
+          pricingOptionName: svcOption?.title,
+          licenseType: svcOption?.title || undefined,
+          licensePeriod: svcIsPermanent ? '永久' : undefined,
+          activationMethod: tempActivationMethod,
+          enterpriseId: resolvedEntId || undefined,
+          enterpriseName: enterpriseName,
+          capabilitiesSnapshot: svcProduct.composition?.map(c => c.name) || [],
+        });
+      }
+    }
+
+    setNewOrderItems([...newOrderItems, ...itemsToAdd]);
+
+    if (linkedServices.length > 0) {
+      const addedNames = itemsToAdd.slice(1).map(i => i.productName);
+      if (addedNames.length > 0) {
+        setTimeout(() => alert(`已自动带出关联服务：${addedNames.join('、')}`), 100);
+      }
+    }
+
+    if (!sellerName && selectedProduct.salesOrgName) {
+        setSellerName(selectedProduct.salesOrgName);
+    }
+
     setTempQuantity(1); 
     setTempLicensePeriod('');
+    setTempLicensePeriodNum('');
+    setTempLicensePeriodUnit('年');
     setNegotiatedPrice(null);
     setTempSkuId('');
     setTempPricingOptionId('');
@@ -378,7 +560,32 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   };
 
   const handleRemoveItem = (index: number) => setNewOrderItems(prev => prev.filter((_, i) => i !== index));
+  const handleUpdateItem = (index: number, field: keyof OrderItem, value: any) => {
+      setNewOrderItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
+  };
   const calculateNewOrderTotal = () => newOrderItems.reduce((acc, item) => acc + (item.priceAtPurchase * item.quantity), 0);
+
+  // Sync productAcceptanceRows when items change
+  useEffect(() => {
+      setProductAcceptanceRows(prev => {
+          const existingMap = new Map<number, ProductAcceptanceRow[]>();
+          prev.forEach(r => {
+              const arr = existingMap.get(r.productIdx) || [];
+              arr.push(r);
+              existingMap.set(r.productIdx, arr);
+          });
+          const next: ProductAcceptanceRow[] = [];
+          newOrderItems.forEach((_, idx) => {
+              const existing = existingMap.get(idx);
+              if (existing && existing.length > 0) {
+                  next.push(...existing);
+              } else {
+                  next.push({ productIdx: idx, method: '一次性验收', condition: '视同验收', expectedDate: '', percentage: 100 });
+              }
+          });
+          return next;
+      });
+  }, [newOrderItems.length]);
 
   // --- Save Draft ---
   const handleSaveDraft = () => {
@@ -420,13 +627,15 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       currentStep,
       buyerType, orderSource, orderRemark, linkedContractIds, creatorId, originalOrderId,
       hasOpportunity, linkedOpportunityId, newOrderCustomer,
-      orderEnterpriseId, selectedChannelId, salesRepId, businessManagerId,
-      newOrderItems, tempCategory,
-      invoiceForm, paymentMethod, paymentTerms,
-      deliveryMethod, receivingParty, receivingCompany, receivingMethod, shippingAddress,
+      orderEnterpriseId, isAgentOrder, agentCode, selectedChannelId, directChannel, terminalChannel, salesRepId, businessManagerId,
+      newOrderItems, tempCategory, enableConversion, selectedConversionIds, sellerName, sellerContact,
+      invoiceForm,
+      deliveryMethod, receivingParty, receivingCompany, receivingMethod, shippingAddress, shippingPhone, shippingEmail,
       acceptanceForm, acceptanceType, phaseDrafts,
       purchasingContactId: selectedPurchasingContactId,
       itContactId: selectedItContactId,
+      settlementMethod,
+      expectedPaymentDate,
     };
     setOrderDrafts(prev => {
       const exists = prev.findIndex(d => d.id === orderId);
@@ -454,25 +663,35 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     setLinkedOpportunityId(d.linkedOpportunityId);
     setNewOrderCustomer(d.newOrderCustomer);
     setOrderEnterpriseId(d.orderEnterpriseId);
+    setIsAgentOrder(d.isAgentOrder || false);
+    setAgentCode(d.agentCode || '');
     setSelectedChannelId(d.selectedChannelId);
+    setDirectChannel(d.directChannel || '');
+    setTerminalChannel(d.terminalChannel || '');
     setSalesRepId(d.salesRepId);
     setBusinessManagerId(d.businessManagerId);
     setNewOrderItems(d.newOrderItems);
     setTempCategory(d.tempCategory);
+    setEnableConversion(d.enableConversion || false);
+    setSelectedConversionIds(d.selectedConversionIds || []);
+    setSellerName(d.sellerName || '');
+    setSellerContact(d.sellerContact || '');
     setInvoiceForm(d.invoiceForm);
-    setPaymentMethod(d.paymentMethod);
-    setPaymentTerms(d.paymentTerms);
     setDeliveryMethod(d.deliveryMethod);
     setReceivingParty(d.receivingParty);
     setReceivingCompany(d.receivingCompany);
     setReceivingMethod(d.receivingMethod);
     setShippingAddress(d.shippingAddress);
+    setShippingPhone(d.shippingPhone || '');
+    setShippingEmail(d.shippingEmail || '');
     setAcceptanceForm(d.acceptanceForm);
     setAcceptanceType(d.acceptanceType);
     setPhaseDrafts(d.phaseDrafts);
     setCurrentDraftId(d.id);
     setSelectedPurchasingContactId(d.purchasingContactId || '');
     setSelectedItContactId(d.itContactId || '');
+    setSettlementMethod(d.settlementMethod || '');
+    setExpectedPaymentDate(d.expectedPaymentDate || '');
     // 恢复可选联系人列表
     const cust = customers.find(c => c.id === d.newOrderCustomer);
     if (cust) {
@@ -487,9 +706,14 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const handleCreateOrder = () => {
     const selfDealMissingEnterprise = buyerType === 'SelfDeal' && !orderEnterpriseId;
     const otherMissingCustomer = buyerType !== 'SelfDeal' && !newOrderCustomer;
-    const channelMissingChannel = buyerType === 'Channel' && !selectedChannelId;
-    if (selfDealMissingEnterprise || otherMissingCustomer || channelMissingChannel || newOrderItems.length === 0 || !buyerType) {
-        alert(channelMissingChannel ? '渠道订单请选择关联渠道。' : selfDealMissingEnterprise ? '请选择企业 ID。' : '请完善订单信息：客户、产品或订单类型未填写。');
+    if (selfDealMissingEnterprise || otherMissingCustomer || newOrderItems.length === 0 || !buyerType) {
+        alert(selfDealMissingEnterprise ? '请选择企业 ID。' : '请完善订单信息：客户、产品或订单类型未填写。');
+        return;
+    }
+    const missingPurchasing = purchasingContacts.length > 0 && !selectedPurchasingContactId;
+    const missingIT = itContacts.length > 0 && !selectedItContactId;
+    if (missingPurchasing || missingIT) {
+        alert(`请选择${missingPurchasing ? '采购联系人' : ''}${missingPurchasing && missingIT ? '和' : ''}${missingIT ? 'IT 联系人' : ''}`);
         return;
     }
     const customer = customers.find(c => c.id === newOrderCustomer);
@@ -504,12 +728,21 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     const totalAmount = calculateNewOrderTotal();
     
     let phases: AcceptancePhase[] = [];
-    if (acceptanceType === 'OneTime') {
-        phases = [{ id: `ph-${Date.now()}`, name: '整体验收', percentage: 100, amount: totalAmount, status: 'Pending' }];
-    } else {
-        const totalPct = phaseDrafts.reduce((sum, p) => sum + Number(p.percentage), 0);
-        if (Math.abs(totalPct - 100) > 0.1) { alert(`验收阶段总比必须为 100% (当前: ${totalPct}%)`); return; }
-        phases = phaseDrafts.map((p, idx) => ({ id: `ph-${Date.now()}-${idx}`, name: p.name || `阶段 ${idx + 1}`, percentage: Number(p.percentage), amount: (totalAmount * Number(p.percentage)) / 100, status: 'Pending' }));
+    const hasPhased = productAcceptanceRows.some(r => r.method === '分期验收');
+    const resolvedAcceptanceType: AcceptanceType = hasPhased ? 'Phased' : 'OneTime';
+    let phaseIdx = 0;
+    for (let i = 0; i < newOrderItems.length; i++) {
+        const rows = productAcceptanceRows.filter(r => r.productIdx === i);
+        const itemAmount = newOrderItems[i].priceAtPurchase * newOrderItems[i].quantity;
+        for (const row of rows) {
+            phases.push({
+                id: `ph-${Date.now()}-${phaseIdx++}`,
+                name: `${newOrderItems[i].productName}${rows.length > 1 ? ` (${rows.indexOf(row) + 1}/${rows.length})` : ''}`,
+                percentage: row.percentage,
+                amount: Math.round(itemAmount * row.percentage / 100 * 100) / 100,
+                status: 'Pending',
+            });
+        }
     }
 
     const newOrder: Order = {
@@ -528,7 +761,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         receivingCompany,
         receivingMethod,
         originalOrderId: originalOrderId,
-        total: totalAmount, items: newOrderItems, shippingAddress: shippingAddress || (customer ? customer.address : ''),
+        total: totalAmount, items: newOrderItems,
+        shippingAddress: shippingAddress || (customer ? customer.address : ''),
+        shippingPhone: shippingPhone || undefined,
+        shippingEmail: shippingEmail || undefined,
         isPaid: false, 
         isPackageConfirmed: deliveryMethod === 'Online', 
         isCDBurned: deliveryMethod === 'Online', 
@@ -539,19 +775,28 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         buyerType,
         buyerId: buyerType === 'Channel' ? selectedChannelId : (buyerType === 'Customer' ? newOrderCustomer : undefined),
         buyerName: buyerType === 'Channel' ? channels.find(c => c.id === selectedChannelId)?.name : customer?.companyName,
+        directChannel: buyerType === 'Channel' && directChannel ? directChannel : undefined,
+        terminalChannel: buyerType === 'Channel' && terminalChannel ? terminalChannel : undefined,
         invoiceInfo: invoiceForm, 
-        paymentMethod: paymentMethod,
-        paymentTerms: paymentTerms,
+        paymentMethod: undefined,
+        paymentTerms: undefined,
         acceptanceInfo: acceptanceForm,
-        acceptanceConfig: { type: acceptanceType, status: 'Pending', phases, setupDate: new Date().toISOString() },
+        acceptanceConfig: { type: resolvedAcceptanceType, status: 'Pending', phases, setupDate: new Date().toISOString() },
         opportunityId: linkedOpp?.id, opportunityName: linkedOpp?.name,
         orderRemark: orderRemark || undefined,
         purchasingContactId: selectedPurchasingContactId || undefined,
         itContactId: selectedItContactId || undefined,
         linkedContractIds: linkedContractIds.length > 0 ? linkedContractIds : undefined,
         linkedContractNames: linkedContractIds.length > 0 ? linkedContractIds.map(id => contracts.find(c => c.id === id)?.name || id) : undefined,
-        settlementType,
-        installmentPlans: settlementType === 'installment' && installmentPlans.length > 0 ? installmentPlans : undefined,
+        settlementMethod: settlementMethod || undefined,
+        settlementType: settlementMethod === 'credit' ? settlementType : undefined,
+        expectedPaymentDate: settlementMethod === 'credit' && settlementType === 'once' && expectedPaymentDate ? expectedPaymentDate : undefined,
+        installmentPlans: settlementMethod === 'credit' && settlementType === 'installment' && installmentPlans.length > 0 ? installmentPlans : undefined,
+        conversionDeductionAmount: enableConversion && conversionTotalAmount > 0 ? conversionTotalAmount : undefined,
+        sellerName: sellerName || undefined,
+        sellerContact: sellerContact || undefined,
+        isAgentOrder: buyerType === 'SelfDeal' && isAgentOrder ? true : undefined,
+        agentCode: buyerType === 'SelfDeal' && isAgentOrder && agentCode ? agentCode : undefined,
     };
     if (currentDraftId) {
         // Replace the draft order entry with the final order
@@ -646,12 +891,12 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                 </div>
             </div>
 
-            <div className="p-8 overflow-y-auto flex-1 custom-scrollbar bg-gray-50/30 dark:bg-black/20">
+            <div className="p-5 overflow-y-auto flex-1 custom-scrollbar bg-gray-50/30 dark:bg-black/20">
                 {/* Step 1: Order Type & Source */}
                 {currentStep === 1 && (
-                    <div className="space-y-10 animate-fade-in">
+                    <div className="space-y-6 animate-fade-in">
                         <div>
-                            <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2"><Target className="w-5 h-5 text-purple-500"/> 订单类型</h4>
+                            <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2"><Target className="w-5 h-5 text-purple-500"/> 订单类型</h4>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {[
                                     { id: 'Customer', title: '直签订单', icon: Target, color: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' },
@@ -678,7 +923,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                         </div>
 
                         {buyerType && <div>
-                            <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2"><Globe className="w-5 h-5 text-blue-500"/> 订单来源</h4>
+                            <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2"><Globe className="w-5 h-5 text-blue-500"/> 订单来源</h4>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {[
                                     { id: 'OnlineStore', label: '官网', icon: Globe, color: 'text-orange-500 bg-orange-50 dark:bg-orange-900/20' },
@@ -715,7 +960,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
                         {/* 制单人选择 */}
                         <div>
-                            <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                            <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                                 <UserIcon className="w-5 h-5 text-blue-500"/> 制单人
                             </h4>
                             <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-white/5 p-5 flex items-center gap-4 max-w-sm">
@@ -762,15 +1007,15 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
                         {/* 订单备注 */}
                         <div>
-                            <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                            <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                                 <FileText className="w-5 h-5 text-blue-500"/> 订单备注
                             </h4>
                             <textarea
                                 value={orderRemark}
                                 onChange={e => setOrderRemark(e.target.value)}
                                 placeholder="请输入订单备注（选填）..."
-                                rows={3}
-                                className="w-full p-4 bg-white dark:bg-[#2C2C2E] border border-gray-100 dark:border-white/5 rounded-2xl text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0071E3] transition resize-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                                rows={2}
+                                className="w-full p-3 bg-white dark:bg-[#2C2C2E] border border-gray-100 dark:border-white/5 rounded-2xl text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0071E3] transition resize-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
                             />
                         </div>
 
@@ -779,64 +1024,80 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
                 {/* Step 2: Basic Info */}
                 {currentStep === 2 && (
-                    <div className="space-y-5 animate-fade-in">
+                    <div className="space-y-4 animate-fade-in">
 
-                        {/* 是否有商机 */}
+                        {/* 关联商机 */}
                         {buyerType !== 'SelfDeal' && (
-                        <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-4">
-                            <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-3">
-                                <Briefcase className="w-4 h-4 text-purple-500"/> 是否有商机？
-                            </h4>
-                            <div className="flex gap-3">
-                                {[
-                                    { id: 'yes' as const, label: '有商机', desc: '选择已有商机，自动带入客户信息', icon: CheckCircle, color: 'text-green-500 bg-green-50 dark:bg-green-900/20' },
-                                    { id: 'no' as const, label: '无商机', desc: '手动填写客户信息', icon: XCircle, color: 'text-gray-500 bg-gray-50 dark:bg-gray-800/40' }
-                                ].map(opt => (
-                                    <button
-                                        key={opt.id}
-                                        onClick={() => setHasOpportunity(opt.id)}
-                                        className={`px-5 py-3 rounded-xl border-2 flex items-center gap-3 transition-all duration-200 ${
-                                            hasOpportunity === opt.id
-                                            ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/30 dark:bg-white/5 ring-2 ring-blue-500/10'
-                                            : 'border-gray-100 dark:border-white/5 bg-white dark:bg-[#2C2C2E] hover:border-gray-300 dark:hover:border-white/20 hover:shadow-md'
-                                        }`}
-                                    >
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${opt.color}`}>
-                                            <opt.icon className="w-4 h-4"/>
-                                        </div>
-                                        <div className="text-left">
-                                            <span className={`text-sm font-bold block ${hasOpportunity === opt.id ? 'text-[#0071E3] dark:text-[#FF2D55]' : 'text-gray-600 dark:text-gray-300'}`}>{opt.label}</span>
-                                            <span className="text-[11px] text-gray-400 leading-tight">{opt.desc}</span>
-                                        </div>
+                        <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <Briefcase className="w-4 h-4 text-purple-500"/> 关联商机
+                                </h4>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setHasOpportunity('yes')} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${hasOpportunity === 'yes' ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 shadow-sm' : 'border-gray-200 dark:border-white/10 text-gray-400 hover:border-gray-300 dark:hover:border-white/20'}`}>
+                                        <CheckCircle className="w-3.5 h-3.5"/>有商机
                                     </button>
-                                ))}
+                                    <button onClick={() => setHasOpportunity('no')} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${hasOpportunity === 'no' ? 'border-gray-500 bg-gray-100 dark:bg-gray-700/40 text-gray-700 dark:text-gray-200 shadow-sm' : 'border-gray-200 dark:border-white/10 text-gray-400 hover:border-gray-300 dark:hover:border-white/20'}`}>
+                                        <XCircle className="w-3.5 h-3.5"/>无商机
+                                    </button>
+                                </div>
                             </div>
 
                             {/* 有商机：选择商机 */}
                             {hasOpportunity === 'yes' && (
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300">选择商机 <span className="text-red-500">*</span></label>
+                                <div>
                                     {linkedOpportunityId ? (() => {
                                         const linkedOppObj = opportunities.find(o => o.id === linkedOpportunityId);
+                                        const stageClass = linkedOppObj?.stage === '赢单' ? 'unified-tag-green !rounded-full' : linkedOppObj?.stage === '输单' ? 'unified-tag-gray !rounded-full' : linkedOppObj?.stage === '需求判断' ? 'unified-tag-blue !rounded-full' : linkedOppObj?.stage === '确认商机' ? 'unified-tag-indigo !rounded-full' : linkedOppObj?.stage === '确认渠道' ? 'unified-tag-purple !rounded-full' : 'unified-tag-yellow !rounded-full';
                                         return (
-                                        <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30 rounded-xl space-y-2">
-                                            <div className="flex items-center gap-3">
-                                                <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{linkedOppObj?.name}</div>
-                                                    <div className="text-xs text-gray-500 mt-0.5">{selectedCustomerObj?.companyName} · 已自动带入客户信息</div>
+                                        <div className="p-3 bg-green-50/50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/30 rounded-xl space-y-3">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="flex-1 min-w-0 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2">
+                                                    <div>
+                                                        <div className="text-[10px] text-gray-400 uppercase">商机名称</div>
+                                                        <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{linkedOppObj?.name}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[10px] text-gray-400 uppercase">商机编号</div>
+                                                        <div className="text-xs font-mono text-gray-600 dark:text-gray-300">{linkedOppObj?.id}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[10px] text-gray-400 uppercase">客户名称</div>
+                                                        <div className="text-xs text-gray-700 dark:text-gray-300">{linkedOppObj?.customerName}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[10px] text-gray-400 uppercase">商机阶段</div>
+                                                        <span className={stageClass}>{linkedOppObj?.stage}</span>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[10px] text-gray-400 uppercase">所属部门</div>
+                                                        <div className="text-xs text-gray-600 dark:text-gray-400">{linkedOppObj?.department || '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[10px] text-gray-400 uppercase">负责人</div>
+                                                        <div className="text-xs text-gray-600 dark:text-gray-400">{linkedOppObj?.ownerName || '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[10px] text-gray-400 uppercase">预计收入</div>
+                                                        <div className="text-xs font-mono text-gray-700 dark:text-gray-300">{linkedOppObj?.expectedRevenue != null ? `¥${linkedOppObj.expectedRevenue.toLocaleString()}` : '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[10px] text-gray-400 uppercase">预计关闭</div>
+                                                        <div className="text-xs text-gray-600 dark:text-gray-400">{linkedOppObj?.closeDate ? new Date(linkedOppObj.closeDate).toLocaleDateString('zh-CN') : '-'}</div>
+                                                    </div>
                                                 </div>
                                                 <button
-                                                    onClick={() => { setLinkedOpportunityId(''); setNewOrderCustomer(''); setOrderEnterpriseId(''); }}
+                                                    onClick={() => { setLinkedOpportunityId(''); setNewOrderCustomer(''); setOrderEnterpriseId(''); setNewOrderItems([]); setSellerName(''); }}
                                                     className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition shrink-0"
                                                 >
                                                     <X className="w-3.5 h-3.5"/>
                                                 </button>
                                             </div>
                                             {linkedOppObj?.products && linkedOppObj.products.length > 0 && (
-                                                <div className="ml-7 flex flex-wrap gap-1.5">
+                                                <div className="flex flex-wrap gap-1.5 pt-2 border-t border-green-200/50 dark:border-green-800/20">
+                                                    <span className="text-[10px] text-gray-400 uppercase mr-1 self-center">产品:</span>
                                                     {linkedOppObj.products.map((p, pi) => (
-                                                        <span key={pi} className="inline-flex items-center gap-1 px-2 py-1 bg-white/70 dark:bg-black/20 border border-green-200/60 dark:border-green-700/30 rounded-lg text-xs">
+                                                        <span key={pi} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/70 dark:bg-black/20 border border-green-200/60 dark:border-green-700/30 rounded-lg text-xs">
                                                             <span className="font-medium text-gray-800 dark:text-gray-200">{p.productName}</span>
                                                             {p.skuName && <span className="text-gray-400 dark:text-gray-500">/ {p.skuName}</span>}
                                                             {p.licenseType && <span className="text-green-600 dark:text-green-400 text-[10px]">({p.licenseType})</span>}
@@ -856,24 +1117,28 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     )}
                                 </div>
                             )}
+
+                            {hasOpportunity === 'no' && (
+                                <div className="text-xs text-gray-400 dark:text-gray-500">无关联商机，将手动填写客户信息。</div>
+                            )}
                         </div>
                         )}
 
                         {/* 客户与买方信息 */}
                         {(buyerType === 'SelfDeal' || hasOpportunity === 'no' || (hasOpportunity === 'yes' && linkedOpportunityId)) && (
-                        <div className="bg-white dark:bg-[#2C2C2E] p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-6">
-                            <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-4">
-                                <UserIcon className="w-5 h-5 text-indigo-500"/> 客户与买方信息
+                        <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-4">
+                            <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-2">
+                                <UserIcon className="w-4 h-4 text-indigo-500"/> 客户与买方信息
                             </h4>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 {buyerType === 'SelfDeal' ? (
                                 <>
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">企业 ID <span className="text-red-500">*</span></label>
                                     <div className="relative">
                                         <select
-                                            className="w-full p-4 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition"
+                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm"
                                             value={orderEnterpriseId}
                                             onChange={e => handleSelfDealEnterpriseChange(e.target.value)}
                                         >
@@ -910,6 +1175,37 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         </div>
                                     )}
                                 </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">是否代理商订单</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setIsAgentOrder(!isAgentOrder); if (isAgentOrder) setAgentCode(''); }}
+                                        className={`flex items-center gap-3 w-full p-4 rounded-xl border-2 transition-all ${
+                                            isAgentOrder
+                                                ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/40 dark:bg-white/5'
+                                                : 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30'
+                                        }`}
+                                    >
+                                        <div className={`w-10 h-5 rounded-full relative transition-colors ${isAgentOrder ? 'bg-[#0071E3] dark:bg-[#FF2D55]' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                                            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${isAgentOrder ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                                        </div>
+                                        <span className={`text-sm font-medium ${isAgentOrder ? 'text-[#0071E3] dark:text-[#FF2D55]' : 'text-gray-500 dark:text-gray-400'}`}>
+                                            {isAgentOrder ? '是（代理商订单）' : '否'}
+                                        </span>
+                                    </button>
+                                </div>
+                                {isAgentOrder && (
+                                <div className="space-y-2 md:col-span-2">
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">代理商编号 <span className="text-red-500">*</span></label>
+                                    <input
+                                        type="text"
+                                        value={agentCode}
+                                        onChange={e => setAgentCode(e.target.value)}
+                                        placeholder="请输入代理商编号"
+                                        className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm text-sm text-gray-800 dark:text-white placeholder:text-gray-400"
+                                    />
+                                </div>
+                                )}
                                 </>
                                 ) : hasOpportunity === 'yes' ? (
                                 <>
@@ -928,7 +1224,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 <>
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">选择客户 <span className="text-red-500">*</span></label>
-                                    <select className="w-full p-4 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition" value={newOrderCustomer} onChange={e => handleCustomerChange(e.target.value)}>
+                                    <select className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={newOrderCustomer} onChange={e => handleCustomerChange(e.target.value)}>
                                         <option value="">-- 请选择客户 --</option>
                                         {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
                                     </select>
@@ -937,29 +1233,60 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 )}
 
                                 {buyerType === 'Channel' && (
+                                    <>
                                     <div className="space-y-2">
                                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300">选择代理商 (买方) <span className="text-red-500">*</span></label>
-                                        <select className="w-full p-4 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition" value={selectedChannelId} onChange={e => setSelectedChannelId(e.target.value)}>
+                                        <select className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={selectedChannelId} onChange={e => setSelectedChannelId(e.target.value)}>
                                             <option value="">-- 选择渠道商 --</option>
                                             {channels.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                         </select>
                                     </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">直接下级渠道</label>
+                                        <input type="text" className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" placeholder="买方订购本订单产品的渠道商" value={directChannel} onChange={e => setDirectChannel(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">终端渠道</label>
+                                        <input type="text" className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" placeholder="向最终用户销售本订单产品的渠道，与直接下级渠道不同时需要填写" value={terminalChannel} onChange={e => setTerminalChannel(e.target.value)} />
+                                    </div>
+                                    </>
                                 )}
                                 {buyerType !== 'SelfDeal' && (
                                 <>
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">销售负责人</label>
-                                    <select className="w-full p-4 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition" value={salesRepId} onChange={e => setSalesRepId(e.target.value)}>
+                                    <select className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={salesRepId} onChange={e => setSalesRepId(e.target.value)}>
                                         <option value="">-- 分配销售人员 --</option>
                                         {salesUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                                     </select>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">商务负责人</label>
-                                    <select className="w-full p-4 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition" value={businessManagerId} onChange={e => setBusinessManagerId(e.target.value)}>
+                                    <select className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={businessManagerId} onChange={e => setBusinessManagerId(e.target.value)}>
                                         <option value="">-- 分配商务人员 --</option>
                                         {users.filter(u => u.role === 'Business' || u.role === 'Admin').map(u => <option key={u.id} value={u.id}>{u.name.replace(/\s*\(.*?\)/g, '')}</option>)}
                                     </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">卖方名称</label>
+                                    {sellerName ? (
+                                        <div className="flex items-center gap-3 p-3 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800/30 rounded-xl">
+                                            <Briefcase className="w-4 h-4 text-teal-500 shrink-0"/>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{sellerName}</div>
+                                                {linkedOpportunityId && <div className="text-[10px] text-teal-600 dark:text-teal-400 mt-0.5">来自商机产品的销售组织</div>}
+                                            </div>
+                                            <button onClick={() => setSellerName('')} className="text-gray-400 hover:text-red-500 p-0.5 transition shrink-0"><X className="w-3.5 h-3.5"/></button>
+                                        </div>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            value={sellerName}
+                                            onChange={e => setSellerName(e.target.value)}
+                                            placeholder="选择商机后自动带入，也可手动填写"
+                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm text-gray-800 dark:text-white placeholder:text-gray-400"
+                                        />
+                                    )}
                                 </div>
                                 </>
                                 )}
@@ -969,86 +1296,76 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
                         {/* 订单联系人选择 */}
                         {newOrderCustomer && (
-                        <div className="bg-white dark:bg-[#2C2C2E] p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-5">
-                            <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-4">
-                                <Users className="w-5 h-5 text-teal-500"/> 订单联系人
+                        <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-3">
+                            <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-2">
+                                <Users className="w-4 h-4 text-teal-500"/> 订单联系人
                             </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* 采购联系人 */}
-                                <div className="space-y-3">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">采购联系人</label>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">采购联系人 <span className="text-red-500">*</span></label>
                                     {purchasingContacts.length > 0 ? (
-                                        <>
-                                        <div className="space-y-2">
+                                        <div className="space-y-1.5">
                                             {purchasingContacts.map(c => {
                                                 const isSelected = selectedPurchasingContactId === c.id;
                                                 return (
                                                 <div
                                                     key={c.id}
-                                                    onClick={() => setSelectedPurchasingContactId(isSelected ? '' : c.id)}
-                                                    className={`flex items-center gap-3 p-3.5 rounded-2xl cursor-pointer transition-all ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-400 dark:border-blue-500 shadow-sm' : 'bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:border-blue-300 dark:hover:border-blue-700'}`}
+                                                    onClick={() => setSelectedPurchasingContactId(c.id)}
+                                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer transition-all ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-400 dark:border-blue-500' : 'bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:border-blue-300 dark:hover:border-blue-700'}`}
                                                 >
-                                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300 dark:border-gray-600'}`}>
-                                                        {isSelected && <Check className="w-3 h-3 text-white"/>}
+                                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition ${isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300 dark:border-gray-600'}`}>
+                                                        {isSelected && <Check className="w-2.5 h-2.5 text-white"/>}
                                                     </div>
-                                                    <img src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${c.name}`} className="w-9 h-9 rounded-full bg-white border border-gray-200 dark:border-white/10 shrink-0" alt={c.name} />
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="text-sm font-bold text-gray-900 dark:text-white truncate">{c.name}</span>
-                                                            {c.isPrimary && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500 text-white font-bold shrink-0">主要</span>}
-                                                        </div>
-                                                        {c.position && <div className="text-xs text-gray-400 truncate">{c.position}</div>}
-                                                        <div className="flex items-center gap-3 mt-1">
-                                                            {c.phone && <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1"><Phone className="w-3 h-3"/>{c.phone}</span>}
-                                                            {c.email && <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1"><Mail className="w-3 h-3"/>{c.email}</span>}
-                                                        </div>
+                                                    <div className="flex-1 min-w-0 flex items-center gap-2">
+                                                        <span className="text-sm font-bold text-gray-900 dark:text-white whitespace-nowrap">{c.name}</span>
+                                                        {c.isPrimary && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500 text-white font-bold leading-none shrink-0">主要</span>}
+                                                        {c.position && <span className="text-xs text-gray-400 truncate">· {c.position}</span>}
+                                                    </div>
+                                                    <div className="flex items-center gap-3 shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                                                        {c.phone && <span className="flex items-center gap-0.5"><Phone className="w-3 h-3"/>{c.phone}</span>}
+                                                        {c.email && <span className="flex items-center gap-0.5"><Mail className="w-3 h-3"/>{c.email}</span>}
                                                     </div>
                                                 </div>
                                                 );
                                             })}
                                         </div>
-                                        </>
                                     ) : (
-                                        <div className="p-3.5 bg-gray-50 dark:bg-white/5 border border-dashed border-gray-200 dark:border-white/10 rounded-2xl text-xs text-gray-400 text-center">该客户暂无采购联系人</div>
+                                        <div className="px-3 py-2.5 bg-gray-50 dark:bg-white/5 border border-dashed border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-400 text-center">该客户暂无采购联系人</div>
                                     )}
                                 </div>
 
                                 {/* IT 联系人 */}
-                                <div className="space-y-3">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">IT 联系人</label>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">IT 联系人 <span className="text-red-500">*</span></label>
                                     {itContacts.length > 0 ? (
-                                        <>
-                                        <div className="space-y-2">
+                                        <div className="space-y-1.5">
                                             {itContacts.map(c => {
                                                 const isSelected = selectedItContactId === c.id;
                                                 return (
                                                 <div
                                                     key={c.id}
-                                                    onClick={() => setSelectedItContactId(isSelected ? '' : c.id)}
-                                                    className={`flex items-center gap-3 p-3.5 rounded-2xl cursor-pointer transition-all ${isSelected ? 'bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-400 dark:border-purple-500 shadow-sm' : 'bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:border-purple-300 dark:hover:border-purple-700'}`}
+                                                    onClick={() => setSelectedItContactId(c.id)}
+                                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer transition-all ${isSelected ? 'bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-400 dark:border-purple-500' : 'bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:border-purple-300 dark:hover:border-purple-700'}`}
                                                 >
-                                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${isSelected ? 'border-purple-500 bg-purple-500' : 'border-gray-300 dark:border-gray-600'}`}>
-                                                        {isSelected && <Check className="w-3 h-3 text-white"/>}
+                                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition ${isSelected ? 'border-purple-500 bg-purple-500' : 'border-gray-300 dark:border-gray-600'}`}>
+                                                        {isSelected && <Check className="w-2.5 h-2.5 text-white"/>}
                                                     </div>
-                                                    <img src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${c.name}`} className="w-9 h-9 rounded-full bg-white border border-gray-200 dark:border-white/10 shrink-0" alt={c.name} />
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="text-sm font-bold text-gray-900 dark:text-white truncate">{c.name}</span>
-                                                            {c.isPrimary && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500 text-white font-bold shrink-0">主要</span>}
-                                                        </div>
-                                                        {c.position && <div className="text-xs text-gray-400 truncate">{c.position}</div>}
-                                                        <div className="flex items-center gap-3 mt-1">
-                                                            {c.phone && <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1"><Phone className="w-3 h-3"/>{c.phone}</span>}
-                                                            {c.email && <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1"><Mail className="w-3 h-3"/>{c.email}</span>}
-                                                        </div>
+                                                    <div className="flex-1 min-w-0 flex items-center gap-2">
+                                                        <span className="text-sm font-bold text-gray-900 dark:text-white whitespace-nowrap">{c.name}</span>
+                                                        {c.isPrimary && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500 text-white font-bold leading-none shrink-0">主要</span>}
+                                                        {c.position && <span className="text-xs text-gray-400 truncate">· {c.position}</span>}
+                                                    </div>
+                                                    <div className="flex items-center gap-3 shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                                                        {c.phone && <span className="flex items-center gap-0.5"><Phone className="w-3 h-3"/>{c.phone}</span>}
+                                                        {c.email && <span className="flex items-center gap-0.5"><Mail className="w-3 h-3"/>{c.email}</span>}
                                                     </div>
                                                 </div>
                                                 );
                                             })}
                                         </div>
-                                        </>
                                     ) : (
-                                        <div className="p-3.5 bg-gray-50 dark:bg-white/5 border border-dashed border-gray-200 dark:border-white/10 rounded-2xl text-xs text-gray-400 text-center">该客户暂无 IT 联系人</div>
+                                        <div className="px-3 py-2.5 bg-gray-50 dark:bg-white/5 border border-dashed border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-400 text-center">该客户暂无 IT 联系人</div>
                                     )}
                                 </div>
                             </div>
@@ -1057,9 +1374,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
                         {/* 关联合同 - 官网订单不需要选择合同 */}
                         {orderSource !== 'OnlineStore' && <div>
-                            <div className="flex items-center justify-between mb-4">
-                                <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                    <ScrollText className="w-5 h-5 text-blue-500"/> 关联合同
+                            <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <ScrollText className="w-4 h-4 text-blue-500"/> 关联合同
                                     {linkedContractIds.length > 0 && (
                                         <span className="text-sm font-normal text-gray-400 ml-1">({linkedContractIds.length}/5)</span>
                                     )}
@@ -1112,59 +1429,204 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
                 {/* Step 3: Merchandise Selection */}
                 {currentStep === 3 && (
-                    <div className="space-y-8 animate-fade-in">
+                    <div className="space-y-4 animate-fade-in">
                         {orderSource === 'Renewal' && originalOrderId && (
                             <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 p-4 rounded-2xl text-sm text-indigo-700 dark:text-indigo-300 flex items-center gap-3">
                                 <RefreshCcw className="w-5 h-5"/>
                                 <span>续费模式：正在基于订单 <strong>{originalOrderId}</strong> 的明细进行续费。您可以继续添加或移除产品。</span>
                             </div>
                         )}
-                        
-                        <div className="bg-white dark:bg-[#2C2C2E] p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple">
-                            <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-4 mb-6">
-                                <ShoppingBag className="w-5 h-5 text-blue-500"/> 添加产品
+
+                        {/* 订单产品明细列表 - 置顶 */}
+                        <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-white/5 overflow-hidden shadow-apple">
+                            <div className="flex items-center justify-between px-5 pt-4 pb-2">
+                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <ShoppingBag className="w-4 h-4 text-blue-500"/> 订单产品明细
+                                    {newOrderItems.length > 0 && <span className="text-xs font-mono bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full ml-1">{newOrderItems.length}</span>}
+                                </h4>
+                                {newOrderItems.length > 0 && (
+                                    <div className="text-sm text-gray-500">总计：<span className="text-lg font-bold text-red-600 dark:text-red-400">¥{calculateNewOrderTotal().toLocaleString()}</span></div>
+                                )}
+                            </div>
+                            {newOrderItems.length > 0 ? (
+                                <table className="w-full text-left text-sm min-w-[600px]">
+                                    <thead className="unified-table-header">
+                                        <tr><th className="p-3 pl-4">产品/规格</th><th className="p-3">授权类型</th><th className="p-3 text-center">数量</th><th className="p-3 text-center">授权/服务期限</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-3">激活方式</th>}<th className="p-3">安装包</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-3">关联企业</th>}<th className="p-3 text-right">单价</th><th className="p-3 text-right">小计</th><th className="p-3 text-center">操作</th></tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                                        {newOrderItems.map((item, idx) => (
+                                            <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                                <td className="p-3 pl-4"><div className="font-bold text-gray-900 dark:text-white text-sm">{item.productName}</div><div className="text-xs text-gray-500 mt-0.5">{item.skuName}</div></td>
+                                                <td className="p-3"><span className="text-xs bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-lg text-gray-600 dark:text-gray-300 font-medium">{item.pricingOptionName || '默认'}</span></td>
+                                                <td className="p-3 text-center">
+                                                    <input type="number" min={1} value={item.quantity} onChange={e => handleUpdateItem(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))} className="w-16 text-center text-sm font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] dark:focus:border-[#FF2D55] outline-none transition"/>
+                                                </td>
+                                                <td className="p-3 text-center">{item.licensePeriod && item.licensePeriod !== '永久' ? <span className="inline-flex px-2.5 py-1 text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800 rounded-lg">{item.licensePeriod}</span> : <span className="text-gray-300 dark:text-gray-600">-</span>}</td>
+                                                {(buyerType === 'Customer' || buyerType === 'Channel') && (
+                                                    <td className="p-3">
+                                                        <select value={item.activationMethod} onChange={e => handleUpdateItem(idx, 'activationMethod', e.target.value)} className="text-xs font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] dark:focus:border-[#FF2D55] outline-none transition cursor-pointer">
+                                                            <option value="Account">账号激活</option>
+                                                            <option value="SerialKey">序列号激活</option>
+                                                            <option value="AccountAndSerialKey">账号+序列号</option>
+                                                        </select>
+                                                    </td>
+                                                )}
+                                                <td className="p-3 max-w-[180px]">
+                                                    <div className="space-y-1">
+                                                        {item.installPackageType && (
+                                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${item.installPackageType === '通用' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'}`}>{item.installPackageType}</span>
+                                                        )}
+                                                        {item.installPackageName && <div className="text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-lg font-medium">{item.installPackageName}</div>}
+                                                        {item.installPackageLink && <a href={item.installPackageLink} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:underline truncate block" title={item.installPackageLink}>🔗 定制安装包链接</a>}
+                                                        {!item.installPackageType && !item.installPackageName && <span className="text-gray-300 dark:text-gray-600 text-xs">-</span>}
+                                                    </div>
+                                                </td>
+                                                {(buyerType === 'Customer' || buyerType === 'Channel') && (
+                                                    <td className="p-3 max-w-[140px]">
+                                                        {item.enterpriseName ? (
+                                                            <div>
+                                                                <div className="text-xs font-medium text-indigo-600 dark:text-indigo-400">{item.enterpriseName}</div>
+                                                                <div className="text-[10px] text-gray-400 font-mono mt-0.5">{item.enterpriseId}</div>
+                                                            </div>
+                                                        ) : <span className="text-gray-300 dark:text-gray-600 text-xs">-</span>}
+                                                    </td>
+                                                )}
+                                                <td className="p-3 text-right">
+                                                    <input type="number" min={0} step={0.01} value={item.priceAtPurchase} onChange={e => handleUpdateItem(idx, 'priceAtPurchase', Math.max(0, parseFloat(e.target.value) || 0))} className="w-24 text-right text-sm font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] dark:focus:border-[#FF2D55] outline-none transition"/>
+                                                </td>
+                                                <td className="p-3 text-right font-bold text-red-600 dark:text-red-400">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
+                                                <td className="p-3 text-center"><button onClick={() => handleRemoveItem(idx)} className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition"><Trash2 className="w-3.5 h-3.5"/></button></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <div className="px-5 pb-4 pt-1">
+                                    <div className="flex flex-col items-center justify-center py-6 text-gray-300 dark:text-gray-600">
+                                        <ShoppingBag className="w-8 h-8 mb-2 opacity-50"/>
+                                        <p className="text-sm font-medium">暂无产品，请在下方添加</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 折算抵扣 - 仅自成交订单 */}
+                        {buyerType === 'SelfDeal' && (
+                        <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-3">
+                            <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-2">
+                                <Percent className="w-4 h-4 text-amber-500"/> 折算抵扣
                             </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-                                <div className="md:col-span-2 space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">1. 一级分类</label>
-                                    <select
-                                        className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
-                                        value={tempTopCategory}
-                                        onChange={e => setTempTopCategory(e.target.value)}
+                            <div className="flex items-center gap-4">
+                                <label className="text-sm font-bold text-gray-700 dark:text-gray-300">是否折算</label>
+                                <button
+                                    onClick={() => { setEnableConversion(!enableConversion); if (enableConversion) { setSelectedConversionIds([]); } }}
+                                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${enableConversion ? 'bg-[#0071E3]' : 'bg-gray-300 dark:bg-gray-600'}`}
+                                >
+                                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${enableConversion ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                                <span className="text-sm text-gray-500 dark:text-gray-400">{enableConversion ? '需要折算' : '不需要折算'}</span>
+                            </div>
+                            {enableConversion && (
+                                <div className="space-y-4">
+                                    <button
+                                        onClick={() => { setConversionSearch(''); setIsConversionPickerOpen(true); }}
+                                        className="flex items-center gap-2 px-5 py-3 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition text-sm font-medium"
                                     >
-                                        <option value="">-- 请选择 --</option>
-                                        {Array.from(new Set(products.filter(p => p.status === 'OnShelf').map(p => p.category))).map(cat => (
-                                            <option key={cat} value={cat}>{cat}</option>
-                                        ))}
-                                    </select>
+                                        <Search className="w-4 h-4"/> 选择关联折算单
+                                    </button>
+                                    {selectedConversionIds.length > 0 && (
+                                        <div className="space-y-3">
+                                            <div className="grid gap-2">
+                                                {selectedConversionIds.map(cid => {
+                                                    const co = availableConversionOrders.find(c => c.id === cid);
+                                                    if (!co) return null;
+                                                    return (
+                                                        <div key={cid} className="flex items-center justify-between p-3 bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 rounded-xl">
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-xs font-mono text-gray-500 dark:text-gray-400">{co.id}</div>
+                                                                <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-0.5">{co.enterpriseName}</div>
+                                                            </div>
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-sm font-bold text-amber-600 dark:text-amber-400">¥{co.amount.toLocaleString()}</span>
+                                                                <button onClick={() => setSelectedConversionIds(prev => prev.filter(id => id !== cid))} className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition"><X className="w-3.5 h-3.5"/></button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 dark:border-white/10">
+                                                <span className="text-sm font-bold text-gray-500 dark:text-gray-400">折算总金额:</span>
+                                                <span className="text-lg font-bold text-amber-600 dark:text-amber-400">¥{conversionTotalAmount.toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        )}
+                        
+                        <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple">
+                            <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-2 mb-4">
+                                <ShoppingBag className="w-4 h-4 text-blue-500"/> 添加产品
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                                <div className="md:col-span-3 space-y-2 relative" ref={categoryPickerRef}>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">1. 产品分类</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setIsCategoryPickerOpen(!isCategoryPickerOpen); if (!isCategoryPickerOpen && !tempHoverCategory && categoryTree.length > 0) setTempHoverCategory(categoryTree[0].label); }}
+                                        className={`w-full p-3 bg-gray-50 dark:bg-black border rounded-xl outline-none text-sm text-left flex items-center justify-between transition ${isCategoryPickerOpen ? 'ring-2 ring-[#0071E3] border-[#0071E3]' : 'border-gray-200 dark:border-white/10'}`}
+                                    >
+                                        <span className={tempCategory ? 'text-gray-900 dark:text-white' : 'text-gray-400'}>{selectedCategoryLabel || '-- 请选择分类 --'}</span>
+                                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isCategoryPickerOpen ? 'rotate-180' : ''}`}/>
+                                    </button>
+                                    {isCategoryPickerOpen && (
+                                        <div className="absolute z-50 top-full left-0 mt-1 w-[480px] bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/15 rounded-2xl shadow-2xl overflow-hidden flex" style={{ maxHeight: 320 }}>
+                                            <div className="w-[180px] border-r border-gray-100 dark:border-white/10 overflow-y-auto py-1">
+                                                {categoryTree.map(cat => (
+                                                    <div
+                                                        key={cat.label}
+                                                        onMouseEnter={() => setTempHoverCategory(cat.label)}
+                                                        className={`flex items-center justify-between px-4 py-2.5 cursor-pointer text-sm transition-colors ${
+                                                            tempHoverCategory === cat.label
+                                                                ? 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-blue-400 font-bold'
+                                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
+                                                        }`}
+                                                    >
+                                                        <span className="truncate">{cat.label}</span>
+                                                        <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-50"/>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="flex-1 overflow-y-auto py-1">
+                                                {categoryTree.find(c => c.label === tempHoverCategory)?.subs.map(sub => (
+                                                    <div
+                                                        key={sub}
+                                                        onClick={() => { setTempCategory(sub); setIsCategoryPickerOpen(false); }}
+                                                        className={`flex items-center gap-2 px-4 py-2.5 cursor-pointer text-sm transition-colors ${
+                                                            tempCategory === sub
+                                                                ? 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-blue-400 font-bold'
+                                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
+                                                        }`}
+                                                    >
+                                                        {tempCategory === sub && <Check className="w-3.5 h-3.5 text-[#0071E3] dark:text-blue-400 shrink-0"/>}
+                                                        <span className="truncate">{sub}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
-                                <div className="md:col-span-2 space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">2. 二级分类</label>
-                                    <select
-                                        className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50"
-                                        value={tempCategory}
-                                        onChange={e => setTempCategory(e.target.value)}
-                                        disabled={!tempTopCategory}
-                                    >
-                                        <option value="">-- {tempTopCategory ? '请选择' : '请先选一级'} --</option>
-                                        {Array.from(new Set(
-                                            products.filter(p => p.status === 'OnShelf' && p.category === tempTopCategory && p.subCategory).map(p => p.subCategory!)
-                                        )).map(sub => (
-                                            <option key={sub} value={sub}>{sub}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="md:col-span-2 space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">3. 选择产品</label>
+                                <div className="md:col-span-3 space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase">2. 选择产品</label>
                                     <select 
                                         className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50" 
                                         value={tempProductId} 
                                         onChange={e => setTempProductId(e.target.value)}
                                         disabled={!tempCategory}
                                     >
-                                        <option value="">-- {tempCategory ? '请选择' : '请先选二级'} --</option>
+                                        <option value="">-- {tempCategory ? '请选择产品' : '请先选择分类'} --</option>
                                         {products.filter(p => p.status === 'OnShelf' && p.subCategory === tempCategory).map(p => (
                                             <option key={p.id} value={p.id}>{p.name}</option>
                                         ))}
@@ -1172,42 +1634,39 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 </div>
 
                                 <div className="md:col-span-2 space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">4. 选择规格</label>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">3. 规格</label>
                                     <select 
                                         className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50" 
                                         value={tempSkuId} 
                                         onChange={e => setTempSkuId(e.target.value)}
                                         disabled={!tempProductId}
                                     >
-                                        <option value="">-- {tempProductId ? '请选择规格' : '请先选择产品'} --</option>
+                                        <option value="">-- {tempProductId ? '请选择规格' : '自动带出'} --</option>
                                         {selectedProduct?.skus.filter(s => s.status === 'Active').map(s => (
                                             <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
                                         ))}
                                     </select>
                                 </div>
-                                
-                                {selectedSku?.pricingOptions && selectedSku.pricingOptions.length > 0 && (
-                                    <div className="md:col-span-2 space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase">5. 选择授权类型</label>
+
+                                <div className="md:col-span-2 space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase">4. 授权类型</label>
+                                    {selectedSku?.pricingOptions && selectedSku.pricingOptions.length > 0 ? (
                                         <select 
                                             className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm" 
                                             value={tempPricingOptionId} 
                                             onChange={e => setTempPricingOptionId(e.target.value)}
                                         >
-                                            <option value="">-- 请选择授权 --</option>
+                                            <option value="">-- 请选择授权类型 --</option>
                                             {selectedSku.pricingOptions.map(opt => (
-                                                <option key={opt.id} value={opt.id}>
-                                                    {opt.title} - ¥{opt.price.toLocaleString()}
-                                                </option>
+                                                <option key={opt.id} value={opt.id}>{opt.title}</option>
                                             ))}
                                         </select>
-                                        {selectedLicenseType && (
-                                            <div className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                                                授权类型：<span className="font-bold text-purple-600 dark:text-purple-400">{selectedLicenseType}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
+                                    ) : (
+                                        <div className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400">
+                                            {tempSkuId ? '该规格无授权类型' : '请先选择规格'}
+                                        </div>
+                                    )}
+                                </div>
 
                                 <div className="md:col-span-2 space-y-2">
                                     <label className="text-xs font-bold text-gray-500 uppercase">数量</label>
@@ -1217,47 +1676,67 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 {showLicensePeriod && (
                                 <div className="md:col-span-2 space-y-2">
                                     <label className="text-xs font-bold text-teal-600 uppercase flex items-center gap-1">授权/服务期限</label>
-                                    <select
-                                        className="w-full p-3 bg-gray-50 dark:bg-black border border-teal-200 dark:border-teal-900/30 rounded-xl outline-none focus:ring-2 focus:ring-teal-200 transition text-sm font-medium text-teal-700 dark:text-teal-400"
-                                        value={tempLicensePeriod}
-                                        onChange={e => setTempLicensePeriod(e.target.value)}
-                                    >
-                                        <option value="">-- 请选择 --</option>
-                                        <option value="1年">1年</option>
-                                        <option value="2年">2年</option>
-                                        <option value="3年">3年</option>
-                                        <option value="5年">5年</option>
-                                    </select>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            placeholder="请输入"
+                                            className="flex-1 p-3 bg-gray-50 dark:bg-black border border-teal-200 dark:border-teal-900/30 rounded-xl outline-none focus:ring-2 focus:ring-teal-200 transition text-sm font-medium text-teal-700 dark:text-teal-400"
+                                            value={tempLicensePeriodNum}
+                                            onChange={e => setTempLicensePeriodNum(e.target.value === '' ? '' : Number(e.target.value))}
+                                        />
+                                        <select
+                                            className="w-20 p-3 bg-gray-50 dark:bg-black border border-teal-200 dark:border-teal-900/30 rounded-xl outline-none focus:ring-2 focus:ring-teal-200 transition text-sm font-medium text-teal-700 dark:text-teal-400"
+                                            value={tempLicensePeriodUnit}
+                                            onChange={e => setTempLicensePeriodUnit(e.target.value as '年' | '月' | '日')}
+                                        >
+                                            <option value="年">年</option>
+                                            <option value="月">月</option>
+                                            <option value="日">日</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 )}
                                 
-                                {(buyerType === 'Customer' || buyerType === 'Channel') && newOrderCustomer && selectedCustomerObj?.enterprises && selectedCustomerObj.enterprises.length > 0 && (
-                                    <div className="md:col-span-3 space-y-2">
-                                        <label className="text-xs font-bold text-indigo-500 uppercase flex items-center gap-1">
-                                            <Briefcase className="w-3 h-3"/> 关联企业 ID
-                                        </label>
-                                        <select
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-indigo-200 dark:border-indigo-900/30 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200 transition text-sm text-indigo-700 dark:text-indigo-400"
-                                            value={tempEnterpriseId}
-                                            onChange={e => setTempEnterpriseId(e.target.value)}
-                                        >
-                                            <option value="">-- 不关联企业 --</option>
-                                            {selectedCustomerObj.enterprises.map(ent => (
-                                                <option key={ent.id} value={ent.id}>{ent.name} (ID: {ent.id})</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-
                                 <div className={`${showLicensePeriod ? 'md:col-span-2' : 'md:col-span-3'} space-y-2`}>
                                     <label className="text-xs font-bold text-orange-500 uppercase flex items-center gap-1"><ArrowUpRight className="w-3 h-3"/> 最终单价 (可议价)</label>
-                                    <input 
-                                        type="number" 
-                                        className="w-full p-3 bg-gray-50 dark:bg-black border border-orange-200 dark:border-orange-900/30 rounded-xl outline-none focus:ring-2 focus:ring-orange-200 transition text-sm font-bold text-orange-600" 
-                                        value={negotiatedPrice !== null ? negotiatedPrice : ''} 
-                                        onChange={e => setNegotiatedPrice(Number(e.target.value))} 
-                                        placeholder={`基准: ¥${selectedOption?.price || selectedSku?.price || 0}`} 
-                                    />
+                                    <div className="relative">
+                                        <input 
+                                            type="number" 
+                                            className="w-full p-3 pr-16 bg-gray-50 dark:bg-black border border-orange-200 dark:border-orange-900/30 rounded-xl outline-none focus:ring-2 focus:ring-orange-200 transition text-sm font-bold text-orange-600" 
+                                            value={negotiatedPrice !== null ? negotiatedPrice : ''} 
+                                            onChange={e => setNegotiatedPrice(Number(e.target.value))} 
+                                            placeholder={`基准: ¥${selectedOption?.price || selectedSku?.price || 0}`} 
+                                        />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-orange-400 font-medium pointer-events-none">
+                                            {showLicensePeriod ? `元/${tempLicensePeriodUnit}` : '元'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className={`${showLicensePeriod ? 'md:col-span-2' : 'md:col-span-3'} space-y-2`}>
+                                    <label className="text-xs font-bold text-red-500 uppercase flex items-center gap-1">产品金额</label>
+                                    {(() => {
+                                        const unitPrice = negotiatedPrice !== null ? negotiatedPrice : (selectedOption?.price || selectedSku?.price || 0);
+                                        const periodMultiplier = showLicensePeriod && tempLicensePeriodNum
+                                            ? (tempLicensePeriodUnit === '年' ? Number(tempLicensePeriodNum) : tempLicensePeriodUnit === '月' ? Number(tempLicensePeriodNum) / 12 : Number(tempLicensePeriodNum) / 365)
+                                            : 1;
+                                        const totalAmount = unitPrice * tempQuantity * periodMultiplier;
+                                        return (
+                                            <div className="w-full p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-xl text-sm font-bold text-red-600 dark:text-red-400 text-right font-mono">
+                                                ¥{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                {showLicensePeriod && tempLicensePeriodNum ? (
+                                                    <span className="text-[10px] font-normal text-red-400 dark:text-red-500 ml-2">
+                                                        ({unitPrice.toLocaleString()} × {tempQuantity} × {tempLicensePeriodNum}{tempLicensePeriodUnit})
+                                                    </span>
+                                                ) : tempQuantity > 1 ? (
+                                                    <span className="text-[10px] font-normal text-red-400 dark:text-red-500 ml-2">
+                                                        ({unitPrice.toLocaleString()} × {tempQuantity})
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
 
                                 <div className={showLicensePeriod ? 'md:col-span-2' : 'md:col-span-3'}>
@@ -1269,33 +1748,105 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         <Plus className="w-4 h-4"/> 加入清单
                                     </button>
                                 </div>
+
+                                {/* 激活方式 / 被授权方 / 关联企业 / 供货组织 - 独占一行 */}
+                                {tempProductId && (
+                                <div className="md:col-span-12 grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 mt-1 border-t border-gray-100 dark:border-white/10">
+                                    {(buyerType === 'Customer' || buyerType === 'Channel') && (
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-purple-500 uppercase flex items-center gap-1"><Zap className="w-3 h-3"/> 激活方式</label>
+                                        <div className="flex gap-1.5">
+                                            {([
+                                                { id: 'Account' as ActivationMethod, label: '账号激活' },
+                                                { id: 'SerialKey' as ActivationMethod, label: '序列号激活' },
+                                                { id: 'AccountAndSerialKey' as ActivationMethod, label: '账号+序列号' },
+                                            ]).map(opt => (
+                                                <button
+                                                    key={opt.id}
+                                                    type="button"
+                                                    onClick={() => setTempActivationMethod(opt.id)}
+                                                    className={`flex-1 py-2 px-1.5 rounded-lg text-xs font-bold transition border ${
+                                                        tempActivationMethod === opt.id
+                                                            ? 'border-purple-400 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400'
+                                                            : 'border-gray-200 dark:border-white/10 text-gray-500 hover:border-purple-300 dark:hover:border-purple-700'
+                                                    }`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    )}
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-cyan-500 uppercase flex items-center gap-1"><UserIcon className="w-3 h-3"/> 被授权方</label>
+                                        <input
+                                            type="text"
+                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-cyan-200 dark:border-cyan-900/30 rounded-xl outline-none focus:ring-2 focus:ring-cyan-200 transition text-sm text-cyan-700 dark:text-cyan-400"
+                                            placeholder="默认取客户名称"
+                                            value={tempLicensee}
+                                            onChange={e => setTempLicensee(e.target.value)}
+                                        />
+                                    </div>
+
+                                    {(buyerType === 'Customer' || buyerType === 'Channel') && newOrderCustomer && selectedCustomerObj?.enterprises && selectedCustomerObj.enterprises.length > 0 && (
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-indigo-500 uppercase flex items-center gap-1"><Briefcase className="w-3 h-3"/> 关联企业 ID</label>
+                                        <select
+                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-indigo-200 dark:border-indigo-900/30 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200 transition text-sm text-indigo-700 dark:text-indigo-400"
+                                            value={tempEnterpriseId}
+                                            onChange={e => setTempEnterpriseId(e.target.value)}
+                                        >
+                                            <option value="">-- 不关联企业 --</option>
+                                            {selectedCustomerObj.enterprises.map(ent => (
+                                                <option key={ent.id} value={ent.id}>{ent.name} (ID: {ent.id})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    )}
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-teal-500 uppercase flex items-center gap-1"><Briefcase className="w-3 h-3"/> 供货组织</label>
+                                        <input
+                                            type="text"
+                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-teal-200 dark:border-teal-900/30 rounded-xl outline-none focus:ring-2 focus:ring-teal-200 transition text-sm text-teal-700 dark:text-teal-400"
+                                            placeholder="自动带出"
+                                            value={sellerName}
+                                            onChange={e => setSellerName(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                )}
                             </div>
 
                             {/* 安装包选择 */}
                             {(() => {
                                 if (!selectedProduct) return null;
-                                const pkgs = selectedProduct.installPackages || [];
+                                const allPkgRows = ALL_INSTALL_PKG_ROWS.filter(r => r.productId === selectedProduct.id && r.enabled);
 
-                                const universalPkgs = pkgs.filter(p => p.cpu === '通用');
-                                const customPkgs = pkgs.filter(p => p.cpu !== '通用');
+                                const universalPkgs = allPkgRows.filter(r => r.packageType === 'public');
+                                const customPkgs = allPkgRows.filter(r => r.packageType === 'private');
 
-                                const universalOsOptions = Array.from(new Set(universalPkgs.map(p => p.os).filter(Boolean)));
-                                const customCpuOptions = Array.from(new Set(customPkgs.map(p => p.cpu).filter(Boolean)));
+                                const universalCpuOptions = Array.from(new Set(universalPkgs.map(p => p.cpu).filter(v => v && v !== '-')));
+                                const universalOsOptions = Array.from(new Set(universalPkgs.map(p => p.os).filter(v => v && v !== '-')));
+                                const customCpuOptions = Array.from(new Set(customPkgs.map(p => p.cpu).filter(v => v && v !== '-')));
                                 const customOsOptions = Array.from(new Set(
-                                    customPkgs.filter(p => !tempPkgCpu || p.cpu === tempPkgCpu).map(p => p.os).filter(Boolean)
+                                    customPkgs.filter(p => !tempPkgCpu || p.cpu === tempPkgCpu).map(p => p.os).filter(v => v && v !== '-')
                                 ));
 
-                                let previewPkg = null;
-                                if (tempPkgType === '通用' && tempPkgOs) {
+                                if (allPkgRows.length === 0) return null;
+
+                                let previewPkg: typeof allPkgRows[0] | null = null;
+                                if (tempPkgType === '通用' && tempPkgCpu && tempPkgOs) {
+                                    previewPkg = universalPkgs.find(p => p.cpu === tempPkgCpu && p.os === tempPkgOs) || null;
+                                } else if (tempPkgType === '通用' && tempPkgOs) {
                                     previewPkg = universalPkgs.find(p => p.os === tempPkgOs) || null;
-                                } else if (tempPkgType === '定制' && tempPkgCpu && tempPkgOs) {
-                                    previewPkg = customPkgs.find(p => p.cpu === tempPkgCpu && p.os === tempPkgOs) || null;
-                                } else if (tempPkgType === '通用' && universalOsOptions.length === 1) {
+                                } else if (tempPkgType === '通用' && universalPkgs.length === 1) {
                                     previewPkg = universalPkgs[0] || null;
                                 }
 
                                 return (
-                                    <div className="mt-6 pt-6 border-t border-gray-100 dark:border-white/10 space-y-4">
+                                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/10 space-y-3">
                                         <div className="flex items-center gap-2">
                                             <Box className="w-4 h-4 text-indigo-500"/>
                                             <span className="text-sm font-bold text-gray-700 dark:text-gray-200">安装包配置</span>
@@ -1328,9 +1879,23 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             )}
                                         </div>
 
-                                        {/* 通用：选择操作系统（仅在有通用安装包数据时显示） */}
-                                        {tempPkgType === '通用' && universalOsOptions.length > 1 && (
+                                        {/* 通用：选择 CPU 和操作系统 */}
+                                        {tempPkgType === '通用' && universalPkgs.length > 0 && (
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                {universalCpuOptions.length > 0 && (
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-bold text-gray-500 uppercase">CPU</label>
+                                                    <select
+                                                        className="w-full p-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
+                                                        value={tempPkgCpu}
+                                                        onChange={e => { setTempPkgCpu(e.target.value); setTempPkgOs(''); }}
+                                                    >
+                                                        <option value="">-- 请选择 CPU --</option>
+                                                        {universalCpuOptions.map(cpu => <option key={cpu} value={cpu}>{cpu}</option>)}
+                                                    </select>
+                                                </div>
+                                                )}
+                                                {universalOsOptions.length > 0 && (
                                                 <div className="space-y-1.5">
                                                     <label className="text-xs font-bold text-gray-500 uppercase">操作系统</label>
                                                     <select
@@ -1339,9 +1904,12 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                         onChange={e => setTempPkgOs(e.target.value)}
                                                     >
                                                         <option value="">-- 请选择系统 --</option>
-                                                        {universalOsOptions.map(os => <option key={os} value={os}>{os}</option>)}
+                                                        {Array.from(new Set(
+                                                            universalPkgs.filter(p => !tempPkgCpu || p.cpu === tempPkgCpu).map(p => p.os).filter(v => v && v !== '-')
+                                                        )).map(os => <option key={os} value={os}>{os}</option>)}
                                                     </select>
                                                 </div>
+                                                )}
                                             </div>
                                         )}
 
@@ -1404,9 +1972,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             <div className="flex items-center gap-3 p-3.5 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/30 rounded-xl">
                                                 <CheckCircle className="w-4 h-4 text-indigo-500 shrink-0"/>
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="text-sm font-bold text-indigo-800 dark:text-indigo-300">{previewPkg.name} <span className="font-mono font-normal text-xs">{previewPkg.version}</span></div>
+                                                    <div className="text-sm font-bold text-indigo-800 dark:text-indigo-300">{previewPkg.deliveryItemName}</div>
                                                     <div className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
-                                                        {[previewPkg.platform, previewPkg.cpu, previewPkg.os].filter(Boolean).join(' · ')}
+                                                        {[previewPkg.platform, previewPkg.cpu, previewPkg.os].filter(v => v && v !== '-').join(' · ')}
+                                                        {previewPkg.productSpec && <span className="ml-2 text-indigo-400">({previewPkg.productSpec})</span>}
                                                     </div>
                                                 </div>
                                                 <span className="text-xs font-mono text-indigo-400 shrink-0">{previewPkg.id}</span>
@@ -1417,236 +1986,174 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             })()}
                         </div>
 
-                        {newOrderItems.length > 0 && (
-                            <div className="bg-white dark:bg-[#2C2C2E] rounded-3xl border border-gray-100 dark:border-white/5 overflow-hidden shadow-apple">
-                                <table className="w-full text-left text-sm min-w-[600px]">
-                                    <thead className="unified-table-header">
-                                        <tr><th className="p-5 pl-6">产品/规格</th><th className="p-5">授权类型</th><th className="p-5 text-center">数量</th><th className="p-5 text-center">授权/服务期限</th><th className="p-5">安装包</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-5">关联企业</th>}<th className="p-5 text-right">单价</th><th className="p-5 text-right">小计</th><th className="p-5 text-center">操作</th></tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                                        {newOrderItems.map((item, idx) => (
-                                            <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                                <td className="p-5 pl-6"><div className="font-bold text-gray-900 dark:text-white">{item.productName}</div><div className="text-xs text-gray-500 mt-0.5">{item.skuName}</div></td>
-                                                <td className="p-5"><span className="text-xs bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-lg text-gray-600 dark:text-gray-300 font-medium">{item.pricingOptionName || '默认'}</span></td>
-                                                <td className="p-5 text-center dark:text-white font-medium">{item.quantity}</td>
-                                                <td className="p-5 text-center">{item.licensePeriod && item.licensePeriod !== '永久' ? <span className="inline-flex px-2.5 py-1 text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800 rounded-lg">{item.licensePeriod}</span> : <span className="text-gray-300 dark:text-gray-600">-</span>}</td>
-                                                <td className="p-5 max-w-[180px]">
-                                                    <div className="space-y-1">
-                                                        {item.installPackageType && (
-                                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${item.installPackageType === '通用' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'}`}>{item.installPackageType}</span>
-                                                        )}
-                                                        {item.installPackageName && <div className="text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-lg font-medium">{item.installPackageName}</div>}
-                                                        {item.installPackageLink && <a href={item.installPackageLink} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:underline truncate block" title={item.installPackageLink}>🔗 定制安装包链接</a>}
-                                                        {!item.installPackageType && !item.installPackageName && <span className="text-gray-300 dark:text-gray-600 text-xs">-</span>}
-                                                    </div>
-                                                </td>
-                                                {(buyerType === 'Customer' || buyerType === 'Channel') && (
-                                                    <td className="p-5 max-w-[140px]">
-                                                        {item.enterpriseName ? (
-                                                            <div>
-                                                                <div className="text-xs font-medium text-indigo-600 dark:text-indigo-400">{item.enterpriseName}</div>
-                                                                <div className="text-[10px] text-gray-400 font-mono mt-0.5">{item.enterpriseId}</div>
-                                                            </div>
-                                                        ) : <span className="text-gray-300 dark:text-gray-600 text-xs">-</span>}
-                                                    </td>
-                                                )}
-                                                <td className="p-5 text-right dark:text-white">¥{item.priceAtPurchase.toLocaleString()}</td>
-                                                <td className="p-5 text-right font-bold text-red-600 dark:text-red-400">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
-                                                <td className="p-5 text-center"><button onClick={() => handleRemoveItem(idx)} className="text-gray-400 hover:text-red-500 p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition"><Trash2 className="w-4 h-4"/></button></td>
-                                            </tr>
-                                        ))}
-                                        <tr className="bg-gray-50/50 dark:bg-white/5">
-                                            <td colSpan={(buyerType === 'Customer' || buyerType === 'Channel') ? 7 : 6} className="p-5 text-right font-bold text-gray-500">总计金额:</td>
-                                            <td className="p-5 text-right text-xl font-bold text-red-600 dark:text-red-400">¥{calculateNewOrderTotal().toLocaleString()}</td>
-                                            <td></td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+
                     </div>
                 )}
 
                 {/* Step 4: Commerce & Delivery */}
                 {currentStep === 4 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-in">
-                        <div className="space-y-8">
-                            <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-6">
-                                <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><CreditCard className="w-5 h-5 text-indigo-500"/> 支付方式</h4>
-                                <div className="grid grid-cols-3 gap-4">
-                                    {[
-                                        { id: 'Online', label: '在线支付', icon: Wallet, color: 'text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400' },
-                                        { id: 'Transfer', label: '银行转账', icon: Settings, color: 'text-purple-600 bg-purple-50 border-purple-200 dark:bg-purple-900/30 dark:border-purple-800 dark:text-purple-400' },
-                                        { id: 'COD', label: '货到付款', icon: Truck, color: 'text-orange-600 bg-orange-50 border-orange-200 dark:bg-orange-900/30 dark:border-orange-800 dark:text-orange-400' },
-                                    ].map(method => (
-                                        <button 
-                                            key={method.id}
-                                            onClick={() => setPaymentMethod(method.id as PaymentMethod)}
-                                            className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all gap-2 ${
-                                                paymentMethod === method.id 
-                                                ? method.color 
-                                                : 'border-gray-100 dark:border-white/10 text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5 hover:border-gray-200'
-                                            }`}
-                                        >
-                                            <method.icon className="w-6 h-6"/>
-                                            <span className="text-xs font-bold">{method.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                                {paymentMethod === 'Online' && (
-                                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 text-xs text-blue-600 dark:text-blue-300 rounded-xl border border-blue-100 dark:border-blue-900/30 leading-relaxed">
-                                        订单提交后系统将生成聚合支付二维码，支持微信/支付宝。
-                                    </div>
-                                )}
-                                {paymentMethod === 'Transfer' && (
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase block">付款方户名 (用于对账)</label>
-                                        <input 
-                                            value={paymentTerms} 
-                                            onChange={e => setPaymentTerms(e.target.value)}
-                                            placeholder="请输入汇款账户名称..." 
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-500/20 dark:text-white"
-                                        />
-                                    </div>
-                                )}
-                            </div>
-
+                    <div className="space-y-4 animate-fade-in">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-4">
                             {/* 结算方式 */}
-                            <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-5">
-                                <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><Banknote className="w-5 h-5 text-emerald-500"/> 结算方式</h4>
-                                <div className="flex bg-gray-100 dark:bg-white/10 p-1.5 rounded-xl">
-                                    <button onClick={() => { setSettlementType('once'); setInstallmentPlans([]); }} className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${settlementType === 'once' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}>一次性结算</button>
-                                    <button onClick={() => { setSettlementType('installment'); if (installmentPlans.length === 0) { const total = calculateNewOrderTotal(); setInstallmentPlans([{ amount: total, expectedDate: '', actualDate: '', paidAmount: 0 }]); } }} className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${settlementType === 'installment' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}>分期结算</button>
+                            <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-4">
+                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><Banknote className="w-4 h-4 text-emerald-500"/> 结算方式</h4>
+
+                                {/* 第一层：现结销售 vs 信用额度 */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => { setSettlementMethod('cash'); setSettlementType('once'); setInstallmentPlans([]); setExpectedPaymentDate(''); }}
+                                        className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
+                                            settlementMethod === 'cash'
+                                                ? 'border-emerald-500 dark:border-emerald-400 bg-emerald-50/60 dark:bg-emerald-900/20'
+                                                : 'border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20'
+                                        }`}
+                                    >
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${settlementMethod === 'cash' ? 'bg-emerald-500 text-white' : 'bg-gray-100 dark:bg-white/10 text-gray-400'}`}>
+                                            <Banknote className="w-4 h-4"/>
+                                        </div>
+                                        <div className="text-left">
+                                            <div className={`text-sm font-bold ${settlementMethod === 'cash' ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-600 dark:text-gray-300'}`}>现结销售</div>
+                                            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">款到发货，一次性结清</div>
+                                        </div>
+                                    </button>
+                                    <button
+                                        onClick={() => { setSettlementMethod('credit'); setSettlementType('once'); setInstallmentPlans([]); }}
+                                        className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
+                                            settlementMethod === 'credit'
+                                                ? 'border-blue-500 dark:border-blue-400 bg-blue-50/60 dark:bg-blue-900/20'
+                                                : 'border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20'
+                                        }`}
+                                    >
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${settlementMethod === 'credit' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-white/10 text-gray-400'}`}>
+                                            <CreditCard className="w-4 h-4"/>
+                                        </div>
+                                        <div className="text-left">
+                                            <div className={`text-sm font-bold ${settlementMethod === 'credit' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-300'}`}>信用额度</div>
+                                            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">先货后款，支持分期</div>
+                                        </div>
+                                    </button>
                                 </div>
-                                {settlementType === 'once' && (
-                                    <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 text-xs text-emerald-600 dark:text-emerald-300 rounded-xl border border-emerald-100 dark:border-emerald-900/30 leading-relaxed">
-                                        订单全部款项将在一次结算中完成支付。
+
+                                {/* 现结销售提示 */}
+                                {settlementMethod === 'cash' && (
+                                    <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 text-xs text-emerald-600 dark:text-emerald-300 rounded-xl border border-emerald-100 dark:border-emerald-900/30 leading-relaxed flex items-center gap-2">
+                                        <Check className="w-4 h-4 shrink-0"/>
+                                        <span>现结销售：订单全部款项将在发货前一次性结清，无需分期。</span>
                                     </div>
                                 )}
-                                {settlementType === 'installment' && (
-                                    <div className="space-y-3">
-                                        <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-white/10">
-                                            <table className="w-full text-left text-sm">
-                                                <thead>
-                                                    <tr className="bg-gray-50 dark:bg-white/5 border-b border-gray-100 dark:border-white/10">
-                                                        <th className="px-4 py-2.5 text-xs font-bold text-gray-500 uppercase whitespace-nowrap">分期计划</th>
-                                                        <th className="px-4 py-2.5 text-xs font-bold text-gray-500 uppercase whitespace-nowrap">分期金额</th>
-                                                        <th className="px-4 py-2.5 text-xs font-bold text-gray-500 uppercase whitespace-nowrap">预计付款时间</th>
-                                                        <th className="px-4 py-2.5 text-xs font-bold text-gray-500 uppercase whitespace-nowrap">实际付款时间</th>
-                                                        <th className="px-4 py-2.5 text-xs font-bold text-gray-500 uppercase whitespace-nowrap">付款金额</th>
-                                                        <th className="px-4 py-2.5 w-10"></th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-gray-50 dark:divide-white/5">
-                                                    {installmentPlans.map((plan, idx) => (
-                                                        <tr key={idx} className="hover:bg-gray-50/50 dark:hover:bg-white/3">
-                                                            <td className="px-4 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 whitespace-nowrap">第{idx + 1}期</td>
-                                                            <td className="px-4 py-2.5">
-                                                                <input
-                                                                    type="number"
-                                                                    value={plan.amount || ''}
-                                                                    onChange={e => { const next = [...installmentPlans]; next[idx] = { ...next[idx], amount: Number(e.target.value) }; setInstallmentPlans(next); }}
-                                                                    className="w-28 p-1.5 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/20 text-right font-mono"
-                                                                    placeholder="0.00"
-                                                                />
-                                                            </td>
-                                                            <td className="px-4 py-2.5">
-                                                                <input
-                                                                    type="date"
-                                                                    value={plan.expectedDate}
-                                                                    onChange={e => { const next = [...installmentPlans]; next[idx] = { ...next[idx], expectedDate: e.target.value }; setInstallmentPlans(next); }}
-                                                                    className="w-36 p-1.5 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/20"
-                                                                />
-                                                            </td>
-                                                            <td className="px-4 py-2.5 text-xs text-gray-400">-</td>
-                                                            <td className="px-4 py-2.5 text-xs text-gray-400">-</td>
-                                                            <td className="px-4 py-2.5">
-                                                                {installmentPlans.length > 1 && (
-                                                                    <button onClick={() => setInstallmentPlans(installmentPlans.filter((_, i) => i !== idx))} className="text-gray-400 hover:text-red-500 p-1 transition"><X className="w-3.5 h-3.5"/></button>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        <div className="flex items-center justify-between">
+
+                                {/* 信用额度：第二层 - 一次性付款 vs 分期付款 */}
+                                {settlementMethod === 'credit' && (
+                                    <div className="space-y-4">
+                                        <div className="flex bg-gray-100 dark:bg-white/10 p-1.5 rounded-xl">
                                             <button
-                                                onClick={() => setInstallmentPlans([...installmentPlans, { amount: 0, expectedDate: '', actualDate: '', paidAmount: 0 }])}
-                                                className="flex items-center gap-1.5 text-xs font-bold text-blue-500 hover:text-blue-700 transition"
+                                                onClick={() => { setSettlementType('once'); setInstallmentPlans([]); }}
+                                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${settlementType === 'once' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}
                                             >
-                                                <Plus className="w-3.5 h-3.5"/> 添加分期
+                                                一次性付款
                                             </button>
-                                            <div className="text-xs text-gray-500">
-                                                分期合计：<span className={`font-bold font-mono ${Math.abs(installmentPlans.reduce((s, p) => s + p.amount, 0) - calculateNewOrderTotal()) < 0.01 ? 'text-green-600' : 'text-red-500'}`}>¥{installmentPlans.reduce((s, p) => s + p.amount, 0).toLocaleString()}</span>
-                                                <span className="mx-1.5">/</span>
-                                                订单总额：<span className="font-bold font-mono text-gray-700 dark:text-gray-300">¥{calculateNewOrderTotal().toLocaleString()}</span>
-                                            </div>
+                                            <button
+                                                onClick={() => { setSettlementType('installment'); setExpectedPaymentDate(''); if (installmentPlans.length === 0) { const total = calculateNewOrderTotal(); setInstallmentPlans([{ amount: total, expectedDate: '', actualDate: '', paidAmount: 0 }]); } }}
+                                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${settlementType === 'installment' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}
+                                            >
+                                                分期付款
+                                            </button>
                                         </div>
+
+                                        {/* 一次性付款：填写预计付款时间 */}
+                                        {settlementType === 'once' && (
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-gray-500">预计付款时间</label>
+                                                <input
+                                                    type="date"
+                                                    value={expectedPaymentDate}
+                                                    onChange={e => setExpectedPaymentDate(e.target.value)}
+                                                    className="w-full md:w-64 p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm"
+                                                />
+                                                <p className="text-[10px] text-gray-400 dark:text-gray-500">信用额度模式下，全部款项将在上述日期前一次性付清。</p>
+                                            </div>
+                                        )}
+
+                                        {/* 分期付款：填写每期金额与预计付款时间 */}
+                                        {settlementType === 'installment' && (
+                                            <div className="space-y-3">
+                                                <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-white/10">
+                                                    <table className="w-full text-left text-sm">
+                                                        <thead>
+                                                            <tr className="bg-gray-50 dark:bg-white/5 border-b border-gray-100 dark:border-white/10">
+                                                                <th className="px-4 py-2.5 text-xs font-bold text-gray-500 whitespace-nowrap">分期计划</th>
+                                                                <th className="px-4 py-2.5 text-xs font-bold text-gray-500 whitespace-nowrap">分期金额</th>
+                                                                <th className="px-4 py-2.5 text-xs font-bold text-gray-500 whitespace-nowrap">预计付款时间</th>
+                                                                <th className="px-4 py-2.5 w-10"></th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                                                            {installmentPlans.map((plan, idx) => (
+                                                                <tr key={idx} className="hover:bg-gray-50/50 dark:hover:bg-white/3">
+                                                                    <td className="px-4 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 whitespace-nowrap">第{idx + 1}期</td>
+                                                                    <td className="px-4 py-2.5">
+                                                                        <input
+                                                                            type="number"
+                                                                            value={plan.amount || ''}
+                                                                            onChange={e => { const next = [...installmentPlans]; next[idx] = { ...next[idx], amount: Number(e.target.value) }; setInstallmentPlans(next); }}
+                                                                            className="w-28 p-1.5 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/20 text-right font-mono"
+                                                                            placeholder="0.00"
+                                                                        />
+                                                                    </td>
+                                                                    <td className="px-4 py-2.5">
+                                                                        <input
+                                                                            type="date"
+                                                                            value={plan.expectedDate}
+                                                                            onChange={e => { const next = [...installmentPlans]; next[idx] = { ...next[idx], expectedDate: e.target.value }; setInstallmentPlans(next); }}
+                                                                            className="w-36 p-1.5 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                                        />
+                                                                    </td>
+                                                                    <td className="px-4 py-2.5">
+                                                                        {installmentPlans.length > 1 && (
+                                                                            <button onClick={() => setInstallmentPlans(installmentPlans.filter((_, i) => i !== idx))} className="text-gray-400 hover:text-red-500 p-1 transition"><X className="w-3.5 h-3.5"/></button>
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <button
+                                                        onClick={() => setInstallmentPlans([...installmentPlans, { amount: 0, expectedDate: '', actualDate: '', paidAmount: 0 }])}
+                                                        className="flex items-center gap-1.5 text-xs font-bold text-blue-500 hover:text-blue-700 transition"
+                                                    >
+                                                        <Plus className="w-3.5 h-3.5"/> 添加分期
+                                                    </button>
+                                                    <div className="text-xs text-gray-500">
+                                                        分期合计：<span className={`font-bold font-mono ${Math.abs(installmentPlans.reduce((s, p) => s + p.amount, 0) - calculateNewOrderTotal()) < 0.01 ? 'text-green-600' : 'text-red-500'}`}>¥{installmentPlans.reduce((s, p) => s + p.amount, 0).toLocaleString()}</span>
+                                                        <span className="mx-1.5">/</span>
+                                                        订单总额：<span className="font-bold font-mono text-gray-700 dark:text-gray-300">¥{calculateNewOrderTotal().toLocaleString()}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
                         </div>
 
-                        <div className="space-y-8">
-                            <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-6">
-                                <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><Truck className="w-5 h-5 text-green-500"/> 发货方式</h4>
-                                <div className="grid grid-cols-3 gap-4">
-                                    {[
-                                        { id: 'Online', label: '线上发货', icon: Zap, color: 'text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400' },
-                                        { id: 'Offline', label: '线下发货', icon: Box, color: 'text-orange-600 bg-orange-50 border-orange-200 dark:bg-orange-900/30 dark:border-orange-800 dark:text-orange-400' },
-                                        { id: 'Hybrid', label: '混合发货', icon: Layers, color: 'text-purple-600 bg-purple-50 border-purple-200 dark:bg-purple-900/30 dark:border-purple-800 dark:text-purple-400' },
-                                    ].map(method => (
-                                        <button 
-                                            key={method.id}
-                                            onClick={() => setDeliveryMethod(method.id as DeliveryMethod)}
-                                            className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all gap-2 ${
-                                                deliveryMethod === method.id 
-                                                ? method.color 
-                                                : 'border-gray-100 dark:border-white/10 text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5 hover:border-gray-200'
-                                            }`}
-                                        >
-                                            <method.icon className="w-6 h-6"/>
-                                            <span className="text-xs font-bold">{method.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                                <div className="text-xs text-gray-500 bg-gray-50 dark:bg-white/10 p-4 rounded-xl border border-gray-100 dark:border-white/5">
-                                    {deliveryMethod === 'Online' && '仅生成电子授权，无需实物物流。'}
-                                    {deliveryMethod === 'Offline' && '需准备光盘/U盘介质，并通过快递发货。'}
-                                    {deliveryMethod === 'Hybrid' && '同时包含电子授权与实物介质交付。'}
-                                </div>
-                            </div>
-
-                            <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-6">
-                                <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><MapPin className="w-5 h-5 text-red-500"/> 收货信息</h4>
+                        <div className="space-y-4">
+                            <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-4">
+                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><MapPin className="w-4 h-4 text-red-500"/> 收货信息</h4>
                                 <div className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">收货方</label>
-                                            <select 
-                                                className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
-                                                value={receivingParty}
-                                                onChange={e => setReceivingParty(e.target.value)}
-                                            >
-                                                <option value="买方">买方</option>
-                                                <option value="代理商">代理商</option>
-                                                <option value="最终用户">最终用户</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">收货方式</label>
-                                            <select 
-                                                className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
-                                                value={receivingMethod}
-                                                onChange={e => setReceivingMethod(e.target.value)}
-                                            >
-                                                <option value="邮寄">邮寄</option>
-                                                <option value="自提">自提</option>
-                                                <option value="送货上门">送货上门</option>
-                                                <option value="电子交付">电子交付</option>
-                                            </select>
-                                        </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">收货方</label>
+                                        <select 
+                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
+                                            value={receivingParty}
+                                            onChange={e => setReceivingParty(e.target.value)}
+                                        >
+                                            <option value="买方">买方</option>
+                                            <option value="代理商">代理商</option>
+                                            <option value="最终用户">最终用户</option>
+                                        </select>
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">收货单位名称</label>
@@ -1657,51 +2164,170 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             placeholder="请输入收货单位全称..."
                                         />
                                     </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">联系电话</label>
+                                            <input 
+                                                type="tel"
+                                                className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20" 
+                                                value={shippingPhone} 
+                                                onChange={e => setShippingPhone(e.target.value)}
+                                                placeholder="请输入收货联系电话..."
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">联系邮箱</label>
+                                            <input 
+                                                type="email"
+                                                className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20" 
+                                                value={shippingEmail} 
+                                                onChange={e => setShippingEmail(e.target.value)}
+                                                placeholder="请输入收货联系邮箱..."
+                                            />
+                                        </div>
+                                    </div>
                                     <div>
                                         <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">收货地址</label>
                                         <textarea 
                                             className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20 h-20 resize-none" 
                                             value={shippingAddress} 
                                             onChange={e => setShippingAddress(e.target.value)}
-                                            placeholder="请输入详细收货地址及联系人信息..."
+                                            placeholder="请输入详细收货地址..."
                                         />
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
 
-                            <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-apple space-y-6">
-                                <h4 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><ClipboardCheck className="w-5 h-5 text-green-500"/> 验收计划</h4>
-                                <div className="flex bg-gray-100 dark:bg-white/10 p-1.5 rounded-xl">
-                                    <button onClick={()=>setAcceptanceType('OneTime')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${acceptanceType === 'OneTime' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}>整体验收</button>
-                                    <button onClick={()=>setAcceptanceType('Phased')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${acceptanceType === 'Phased' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}>分期验收</button>
-                                </div>
-                                {acceptanceType === 'Phased' && (
-                                    <div className="space-y-3 p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10">
-                                        {phaseDrafts.map((p, idx) => (
-                                            <div key={idx} className="flex gap-3 items-center">
-                                                <input className="flex-1 p-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="阶段名称" value={p.name} onChange={e=> {
-                                                    const next = [...phaseDrafts]; next[idx].name = e.target.value; setPhaseDrafts(next);
-                                                }} />
-                                                <div className="w-24 relative">
-                                                    <input type="number" className="w-full p-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/20 pr-6" value={p.percentage} onChange={e=> {
-                                                        const next = [...phaseDrafts]; next[idx].percentage = Number(e.target.value); setPhaseDrafts(next);
-                                                    }} />
-                                                    <Percent className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"/>
-                                                </div>
-                                                <button onClick={() => setPhaseDrafts(phaseDrafts.filter((_,i) => i !== idx))} className="text-gray-400 hover:text-red-500 p-1"><X className="w-4 h-4"/></button>
-                                            </div>
-                                        ))}
-                                        <button onClick={()=>setPhaseDrafts([...phaseDrafts, { name: '', percentage: 0 }])} className="w-full py-2.5 border border-dashed border-gray-300 dark:border-white/20 rounded-lg text-xs font-bold text-blue-500 hover:bg-blue-50 dark:hover:bg-white/5 transition">+ 添加验收节点</button>
+                    {/* 验收计划 - 整行展示 */}
+                    <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple overflow-hidden">
+                        <div className="px-5 pt-4 pb-2 flex items-center justify-between">
+                            <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><ClipboardCheck className="w-4 h-4 text-green-500"/> 验收计划</h4>
+                        </div>
+                        {newOrderItems.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="unified-table-header">
+                                        <tr>
+                                            <th className="px-4 py-3 pl-5 text-center w-16">明细编号</th>
+                                            <th className="px-4 py-3">产品名称</th>
+                                            <th className="px-4 py-3">验收方式</th>
+                                            <th className="px-4 py-3">验收条件</th>
+                                            <th className="px-4 py-3">预计验收时间</th>
+                                            <th className="px-4 py-3 text-center">验收比例</th>
+                                            <th className="px-4 py-3 text-right">验收金额</th>
+                                            <th className="px-4 py-3 text-center w-10"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                                        {newOrderItems.map((item, itemIdx) => {
+                                            const rows = productAcceptanceRows.filter(r => r.productIdx === itemIdx);
+                                            const itemAmount = item.priceAtPurchase * item.quantity;
+                                            return rows.map((row, rowIdx) => {
+                                                const globalIdx = productAcceptanceRows.indexOf(row);
+                                                const isFirst = rowIdx === 0;
+                                                const rowAmount = Math.round(itemAmount * row.percentage / 100 * 100) / 100;
+                                                return (
+                                                    <tr key={`${itemIdx}-${rowIdx}`} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                                        {isFirst && (
+                                                            <td className="px-4 py-3 pl-5 text-center align-top" rowSpan={rows.length}>
+                                                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800/40 text-xs font-bold font-mono text-green-600 dark:text-green-400">{itemIdx + 1}</span>
+                                                            </td>
+                                                        )}
+                                                        {isFirst && (
+                                                            <td className="px-4 py-3 align-top" rowSpan={rows.length}>
+                                                                <div className="font-bold text-gray-900 dark:text-white text-sm">{item.productName}</div>
+                                                                {item.skuName && <div className="text-xs text-gray-500 mt-0.5">{item.skuName}</div>}
+                                                            </td>
+                                                        )}
+                                                        <td className="px-4 py-3">
+                                                            <select value={row.method} onChange={e => {
+                                                                const next = [...productAcceptanceRows];
+                                                                const newMethod = e.target.value as '一次性验收' | '分期验收';
+                                                                next[globalIdx] = { ...next[globalIdx], method: newMethod };
+                                                                if (newMethod === '一次性验收') {
+                                                                    const filtered = next.filter(r => !(r.productIdx === itemIdx && next.indexOf(r) !== globalIdx));
+                                                                    filtered[filtered.indexOf(next[globalIdx])] = { ...next[globalIdx], percentage: 100 };
+                                                                    setProductAcceptanceRows(filtered);
+                                                                } else {
+                                                                    setProductAcceptanceRows(next);
+                                                                }
+                                                            }} className="text-xs font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1.5 bg-white dark:bg-black/30 dark:text-white outline-none focus:border-[#0071E3] transition cursor-pointer">
+                                                                <option value="一次性验收">一次性验收</option>
+                                                                <option value="分期验收">分期验收</option>
+                                                            </select>
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <select value={row.condition} onChange={e => {
+                                                                const next = [...productAcceptanceRows];
+                                                                next[globalIdx] = { ...next[globalIdx], condition: e.target.value };
+                                                                setProductAcceptanceRows(next);
+                                                            }} className="text-xs font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1.5 bg-white dark:bg-black/30 dark:text-white outline-none focus:border-[#0071E3] transition cursor-pointer">
+                                                                <option value="视同验收">视同验收</option>
+                                                                <option value="签字验收">签字验收</option>
+                                                                <option value="系统验收">系统验收</option>
+                                                            </select>
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <input type="date" value={row.expectedDate} onChange={e => {
+                                                                const next = [...productAcceptanceRows];
+                                                                next[globalIdx] = { ...next[globalIdx], expectedDate: e.target.value };
+                                                                setProductAcceptanceRows(next);
+                                                            }} className="text-xs border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1.5 bg-white dark:bg-black/30 dark:text-white outline-none focus:border-[#0071E3] transition w-32"/>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <div className="flex items-center justify-center gap-0.5">
+                                                                <input type="number" min={0} max={100} value={row.percentage} onChange={e => {
+                                                                    const next = [...productAcceptanceRows];
+                                                                    next[globalIdx] = { ...next[globalIdx], percentage: Math.min(100, Math.max(0, Number(e.target.value) || 0)) };
+                                                                    setProductAcceptanceRows(next);
+                                                                }} className="w-14 text-center text-xs font-mono border border-gray-200 dark:border-white/10 rounded-lg px-1 py-1.5 bg-white dark:bg-black/30 dark:text-white outline-none focus:border-[#0071E3] transition"/>
+                                                                <span className="text-xs text-gray-400">%</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-mono font-bold text-gray-900 dark:text-white text-xs">¥{rowAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            {row.method === '分期验收' && rows.length > 1 && (
+                                                                <button onClick={() => setProductAcceptanceRows(prev => prev.filter((_, i) => i !== globalIdx))} className="text-gray-400 hover:text-red-500 p-0.5 transition"><X className="w-3.5 h-3.5"/></button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            });
+                                        })}
+                                    </tbody>
+                                </table>
+                                {newOrderItems.some((_, idx) => productAcceptanceRows.some(r => r.productIdx === idx && r.method === '分期验收')) && (
+                                    <div className="px-5 py-3 border-t border-gray-100 dark:border-white/5 flex flex-wrap gap-2">
+                                        {newOrderItems.map((item, idx) => {
+                                            const rows = productAcceptanceRows.filter(r => r.productIdx === idx);
+                                            if (!rows.some(r => r.method === '分期验收')) return null;
+                                            const totalPct = rows.reduce((s, r) => s + r.percentage, 0);
+                                            return (
+                                                <button key={idx} onClick={() => setProductAcceptanceRows(prev => [...prev, { productIdx: idx, method: '分期验收', condition: '视同验收', expectedDate: '', percentage: Math.max(0, 100 - totalPct) }])} className="flex items-center gap-1 text-xs font-bold text-blue-500 hover:text-blue-700 px-3 py-1.5 rounded-lg border border-dashed border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition">
+                                                    <Plus className="w-3 h-3"/> {item.productName} 添加分期
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
-                        </div>
+                        ) : (
+                            <div className="px-5 pb-4 pt-1">
+                                <div className="flex flex-col items-center justify-center py-6 text-gray-300 dark:text-gray-600">
+                                    <ClipboardCheck className="w-8 h-8 mb-2 opacity-50"/>
+                                    <p className="text-sm font-medium">请先添加产品后配置验收计划</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                     </div>
                 )}
             </div>
 
             {/* Footer Actions */}
-            <div className="unified-card p-6 dark:bg-[#1C1C1E] border-t border-gray-100 dark:border-white/10 flex justify-between items-center shrink-0 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20">
+            <div className="unified-card p-4 dark:bg-[#1C1C1E] border-t border-gray-100 dark:border-white/10 flex justify-between items-center shrink-0 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20">
                 <div className="flex items-center gap-3">
                     <button onClick={() => currentStep > 1 ? setCurrentStep(currentStep - 1) : handleClose()} className="px-8 py-3 text-gray-500 dark:text-gray-400 font-bold hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition text-sm">
                         {currentStep === 1 ? '取消' : '上一步'}
@@ -1725,10 +2351,13 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 (currentStep === 2 && (
                                     buyerType === 'SelfDeal' ? !orderEnterpriseId
                                     : !hasOpportunity || (hasOpportunity === 'yes' ? (!linkedOpportunityId || !newOrderCustomer) : !newOrderCustomer)
+                                       || (buyerType === 'Channel' && !selectedChannelId)
                                 )) ||
                                 (currentStep === 3 && newOrderItems.length === 0)
                             }
-                            onClick={() => setCurrentStep(currentStep + 1)} 
+                            onClick={() => {
+                                setCurrentStep(currentStep + 1);
+                            }}
                             className="bg-[#0071E3] text-white px-10 py-3 rounded-xl font-bold shadow-xl hover:scale-105 hover:shadow-blue-500/30 transition disabled:opacity-50 disabled:hover:scale-100 disabled:shadow-none text-sm"
                         >
                             下一步
@@ -1743,6 +2372,101 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         </div>
         </ModalPortal>
 
+
+        {/* 折算单选择弹窗 */}
+        {isConversionPickerOpen && (
+            <ModalPortal>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[600] p-4 animate-fade-in">
+                <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col border-white/10 animate-modal-enter">
+                    <div className="p-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-white/50 dark:bg-white/5 shrink-0">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">选择关联折算单</h3>
+                        <button onClick={() => setIsConversionPickerOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full text-gray-400 hover:text-gray-600 transition">
+                            <X className="w-5 h-5"/>
+                        </button>
+                    </div>
+                    <div className="p-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center gap-3 shrink-0">
+                        <select className="bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm outline-none" value={conversionSearchField} onChange={e => setConversionSearchField(e.target.value as 'enterpriseName' | 'id')}>
+                            <option value="enterpriseName">企业名称</option>
+                            <option value="id">折算单号</option>
+                        </select>
+                        <div className="flex items-center gap-2 flex-1 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2">
+                            <Search className="w-4 h-4 text-gray-400 shrink-0"/>
+                            <input
+                                type="text"
+                                placeholder="请输入"
+                                className="bg-transparent border-none outline-none flex-1 text-gray-700 dark:text-gray-200 placeholder-gray-400 text-sm"
+                                value={conversionSearch}
+                                onChange={e => setConversionSearch(e.target.value)}
+                                autoFocus
+                            />
+                            {conversionSearch && (
+                                <button onClick={() => setConversionSearch('')} className="text-gray-400 hover:text-gray-600 transition"><X className="w-4 h-4"/></button>
+                            )}
+                        </div>
+                    </div>
+                    <div className="overflow-y-auto flex-1 custom-scrollbar">
+                        <table className="w-full text-left text-sm">
+                            <thead className="unified-table-header sticky top-0">
+                                <tr>
+                                    <th className="p-4 pl-5 w-10">
+                                        <input
+                                            type="checkbox"
+                                            className="w-4 h-4 accent-[#0071E3] rounded"
+                                            checked={filteredConversionOrders.length > 0 && filteredConversionOrders.every(c => selectedConversionIds.includes(c.id))}
+                                            ref={(el) => { if (el) el.indeterminate = filteredConversionOrders.some(c => selectedConversionIds.includes(c.id)) && !filteredConversionOrders.every(c => selectedConversionIds.includes(c.id)); }}
+                                            onChange={e => {
+                                                if (e.target.checked) {
+                                                    const newIds = new Set([...selectedConversionIds, ...filteredConversionOrders.map(c => c.id)]);
+                                                    setSelectedConversionIds(Array.from(newIds));
+                                                } else {
+                                                    const removeIds = new Set(filteredConversionOrders.map(c => c.id));
+                                                    setSelectedConversionIds(prev => prev.filter(id => !removeIds.has(id)));
+                                                }
+                                            }}
+                                        />
+                                    </th>
+                                    <th className="p-4 whitespace-nowrap">折算单号</th>
+                                    <th className="p-4 whitespace-nowrap text-center">折算金额</th>
+                                    <th className="p-4 whitespace-nowrap">企业名称</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                                {filteredConversionOrders.length === 0 ? (
+                                    <tr><td colSpan={4} className="p-10 text-center text-sm text-gray-400 dark:text-gray-500">未找到可用的折算单</td></tr>
+                                ) : filteredConversionOrders.map(co => {
+                                    const isSelected = selectedConversionIds.includes(co.id);
+                                    return (
+                                        <tr
+                                            key={co.id}
+                                            onClick={() => {
+                                                if (isSelected) setSelectedConversionIds(prev => prev.filter(id => id !== co.id));
+                                                else setSelectedConversionIds(prev => [...prev, co.id]);
+                                            }}
+                                            className={`cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/80 dark:bg-blue-900/20' : 'hover:bg-blue-50/60 dark:hover:bg-white/[0.06]'}`}
+                                        >
+                                            <td className="p-4 pl-5"><input type="checkbox" className="w-4 h-4 accent-[#0071E3] rounded pointer-events-none" checked={isSelected} readOnly /></td>
+                                            <td className="p-4 font-mono text-xs text-gray-600 dark:text-gray-300">{co.id}</td>
+                                            <td className="p-4 text-center font-medium text-gray-900 dark:text-white">¥{co.amount.toLocaleString()}</td>
+                                            <td className="p-4 text-gray-700 dark:text-gray-300 font-medium">{co.enterpriseName}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="p-4 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center justify-between shrink-0">
+                        <span className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                            折算总金额: <span className="text-amber-600 dark:text-amber-400">¥{selectedConversionIds.reduce((s, id) => s + (availableConversionOrders.find(c => c.id === id)?.amount ?? 0), 0).toLocaleString()}</span>
+                        </span>
+                        <div className="flex items-center gap-3">
+                            <button onClick={() => setIsConversionPickerOpen(false)} className="px-5 py-2 text-sm text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition">取消</button>
+                            <button onClick={() => setIsConversionPickerOpen(false)} className="unified-button-primary bg-[#0071E3] text-sm">确定</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </ModalPortal>
+        )}
 
         {/* 商机选择器弹窗 */}
         {isContractPickerOpen && (
@@ -1765,7 +2489,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             placeholder="搜索合同名称、编号、甲方或乙方..."
                             className="bg-transparent border-none outline-none flex-1 text-gray-700 dark:text-gray-200 placeholder-gray-400 text-sm"
                             value={contractPickerSearch}
-                            onChange={e => setContractPickerSearch(e.target.value)}
+                            onChange={e => { setContractPickerSearch(e.target.value); setContractPickerPage(1); }}
                             autoFocus
                         />
                         {contractPickerSearch && (
@@ -1808,14 +2532,17 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         PENDING_BUSINESS: '待商务审核', PENDING: '待审核',
                                         VERIFIED: '已审核', APPROVED: '已批准', REJECTED: '已拒绝',
                                     };
-                                    const statusColor: Record<string, string> = {
-                                        PENDING_BUSINESS: 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400',
-                                        PENDING: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
-                                        VERIFIED: 'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400',
-                                        APPROVED: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
-                                        REJECTED: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400',
+                                    const statusTagClass: Record<string, string> = {
+                                        PENDING_BUSINESS: 'unified-tag-yellow !rounded-full',
+                                        PENDING: 'unified-tag-blue !rounded-full',
+                                        VERIFIED: 'unified-tag-indigo !rounded-full',
+                                        APPROVED: 'unified-tag-green !rounded-full',
+                                        REJECTED: 'unified-tag-red !rounded-full',
                                     };
-                                    return filtered.map(c => {
+                                    const totalFiltered = filtered.length;
+                                    const totalPages = Math.ceil(totalFiltered / CONTRACT_PAGE_SIZE);
+                                    const paginated = filtered.slice((contractPickerPage - 1) * CONTRACT_PAGE_SIZE, contractPickerPage * CONTRACT_PAGE_SIZE);
+                                    return paginated.map(c => {
                                         const isSelected = linkedContractIds.includes(c.id);
                                         const isDisabled = !isSelected && linkedContractIds.length >= 5;
                                         return (
@@ -1856,7 +2583,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                     {c.signDate ? new Date(c.signDate).toLocaleDateString('zh-CN') : '-'}
                                                 </td>
                                                 <td className="p-4 whitespace-nowrap">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${statusColor[c.verifyStatus] || 'bg-gray-100 text-gray-500'}`}>
+                                                    <span className={statusTagClass[c.verifyStatus] || 'unified-tag-gray !rounded-full'}>
                                                         {statusLabel[c.verifyStatus] || c.verifyStatus}
                                                     </span>
                                                 </td>
@@ -1867,11 +2594,63 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             </tbody>
                         </table>
                     </div>
-                    {/* 底部确认栏 */}
+                    {/* 分页 + 底部确认栏 */}
                     <div className="p-4 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center justify-between shrink-0">
                         <span className="text-sm text-gray-500 dark:text-gray-400">
                             {linkedContractIds.length === 0 ? '点击行选择合同' : `已选 ${linkedContractIds.length} 个合同`}
                         </span>
+                        {(() => {
+                            const q = contractPickerSearch.toLowerCase();
+                            const totalFiltered = contracts.filter(c =>
+                                !q || c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || (c.partyA || '').toLowerCase().includes(q) || (c.partyB || '').toLowerCase().includes(q)
+                            ).length;
+                            const totalPages = Math.ceil(totalFiltered / CONTRACT_PAGE_SIZE);
+                            if (totalPages <= 1) return null;
+                            return (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-400">共 {totalFiltered} 条</span>
+                                    <button
+                                        onClick={() => setContractPickerPage(p => Math.max(1, p - 1))}
+                                        disabled={contractPickerPage <= 1}
+                                        className="px-2.5 py-1 text-xs font-medium rounded-lg border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        上一页
+                                    </button>
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                        .filter(p => p === 1 || p === totalPages || Math.abs(p - contractPickerPage) <= 2)
+                                        .reduce<(number | '...')[]>((acc, p, idx, arr) => {
+                                            if (idx > 0 && p - (arr[idx - 1]) > 1) acc.push('...');
+                                            acc.push(p);
+                                            return acc;
+                                        }, [])
+                                        .map((p, i) =>
+                                            p === '...' ? (
+                                                <span key={`e${i}`} className="text-xs text-gray-400 px-1">…</span>
+                                            ) : (
+                                                <button
+                                                    key={p}
+                                                    onClick={() => setContractPickerPage(p)}
+                                                    className={`w-7 h-7 text-xs font-bold rounded-lg transition ${
+                                                        contractPickerPage === p
+                                                            ? 'bg-[#0071E3] text-white shadow'
+                                                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'
+                                                    }`}
+                                                >
+                                                    {p}
+                                                </button>
+                                            )
+                                        )
+                                    }
+                                    <button
+                                        onClick={() => setContractPickerPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={contractPickerPage >= totalPages}
+                                        className="px-2.5 py-1 text-xs font-medium rounded-lg border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        下一页
+                                    </button>
+                                </div>
+                            );
+                        })()}
                         <button
                             onClick={() => { setIsContractPickerOpen(false); setContractPickerSearch(''); }}
                             className="unified-button-primary bg-[#0071E3] text-sm"

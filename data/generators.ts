@@ -659,6 +659,41 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
           conversionAmount: (i % 4 === 0 || i % 4 === 2) ? Math.floor(_productTotal * 0.7 / 100) * 100 || 500 : undefined,
         };
       })(),
+      ...(() => {
+        let sm: 'cash' | 'credit' | 'prepaid';
+        if (buyerType === 'Channel') {
+          sm = (['credit', 'cash', 'credit', 'prepaid', 'credit'] as const)[i % 5];
+        } else if (buyerType === 'Customer') {
+          sm = (['cash', 'credit', 'prepaid', 'cash', 'credit'] as const)[i % 5];
+        } else {
+          sm = (['cash', 'prepaid', 'cash'] as const)[i % 3];
+        }
+        if (sm === 'credit') {
+          const plans: { amount: number; expectedDate: string; actualDate: string; paidAmount: number }[] = [];
+          const planCount = buyerType === 'Channel' ? [4, 6, 3, 4, 6][i % 5] : [3, 4, 6][i % 3];
+          const baseDate = new Date(date);
+          baseDate.setMonth(baseDate.getMonth() + (buyerType === 'Channel' ? 3 : 6));
+          const ratios = planCount === 6
+            ? [0.30, 0.25, 0.15, 0.15, 0.10, 0.05]
+            : planCount === 4
+              ? [0.40, 0.30, 0.20, 0.10]
+              : [0.50, 0.30, 0.20];
+          for (let p = 0; p < planCount; p++) {
+            const planDate = new Date(baseDate);
+            planDate.setMonth(planDate.getMonth() + p * (buyerType === 'Channel' ? 6 : 12));
+            const planAmt = Math.round(total * ratios[p] * 100) / 100;
+            const paid = isPaid && p < Math.ceil(planCount / 2);
+            plans.push({
+              amount: planAmt,
+              expectedDate: planDate.toISOString().slice(0, 10),
+              actualDate: paid ? planDate.toISOString().slice(0, 10) : '',
+              paidAmount: paid ? planAmt : 0,
+            });
+          }
+          return { settlementMethod: sm as 'credit', settlementType: 'installment' as const, installmentPlans: plans };
+        }
+        return { settlementMethod: sm, settlementType: 'once' as const };
+      })(),
       linkedContractIds: (() => {
         const customerContracts = contracts.filter(c => c.customerId === customer.id);
         if (customerContracts.length === 0) return [];

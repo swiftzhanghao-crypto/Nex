@@ -1,7 +1,23 @@
 import {
     SalesMerchandise, Product, User, Channel, Department, AtomicCapability,
-    AuthTypeData, RoleDefinition, Enterprise
+    AuthTypeData, RoleDefinition, Enterprise, ConversionOrder
 } from '../types';
+
+export interface InstallPackageRow {
+  id: string;
+  deliveryItemId: string;
+  deliveryItemName: string;
+  productId: string;
+  productLine: string;
+  productType: string;
+  productName: string;
+  productSpec: string;
+  platform: string;
+  os: string;
+  cpu: string;
+  enabled: boolean;
+  packageType: 'public' | 'private';
+}
 
 // --- Atomic Capabilities ---
 export const initialAtomicCapabilities: AtomicCapability[] = [
@@ -110,6 +126,9 @@ export const initialAuthTypes: AuthTypeData[] = [
 export const initialProducts: Product[] = [
   {
     id: 'AB0002807', name: 'WPS协作办公系统V7.1', category: '私有云单品', subCategory: 'WPS协作', status: 'OnShelf', tags: ['生态'], productType: 'WPS协作', onlineDelivery: 'WPS+第三方产品', productClass: 'WPS软件业务', productClassification: '非端', productSeries: 'WPS协作/协作中台', productCategory: '软件', productLine: 'WPS365私有云', productClassFinance: 'WPS365', productLineFinance: 'WPS365私有云', productSeriesFinance: 'WPS协作', maintenanceContent: '/', maintenanceStandard: '/', hasUpgradeWarranty: false, hasAfterSalesService: false, salesOrgName: '珠海金山办公软件有限公司', businessDeliveryName: '协作办公助手软件', taxRefundType: '非退税',
+    linkedServices: [
+      { productId: 'AB0002635', productName: 'WPS文档中心系统技术服务', skuId: 'SKU0018029', skuName: '文档中心系统A包', required: false, remark: '推荐配套技术服务' },
+    ],
     skus: [
       { id: 'SKU0018306', code: 'SKU0018306', name: '定制版（寒武纪）', price: 100000, stock: 999, status: 'Active', pricingOptions: [{id:'po-SKU0018306', title:'用户年授权', price:100000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}}] }
     ],
@@ -126,6 +145,9 @@ export const initialProducts: Product[] = [
   },
   {
     id: 'AB0002790', name: 'WPS政务AI平台V3.0', category: '私有云单品', subCategory: '电子公文库系统', status: 'OnShelf', tags: ['AI'], productType: '电子公文库系统', onlineDelivery: 'WPS+第三方产品', productClass: 'WPS软件业务', productClassification: '非端', productSeries: 'WPS 政务AI平台', productCategory: '软件', productLine: 'WPS365私有云', productClassFinance: 'WPS365', productLineFinance: 'WPS365私有云', productSeriesFinance: '政务AI平台', maintenanceContent: '/', maintenanceStandard: '/', hasUpgradeWarranty: false, hasAfterSalesService: false, salesOrgName: '珠海金山办公软件有限公司', businessDeliveryName: '政务AI平台软件', taxRefundType: '即征即退',
+    linkedServices: [
+      { productId: 'AB0002800', productName: '电子公文资源库系统运维保障服务', skuId: 'SKU0018298', skuName: 'A包', required: true, remark: '必选运维保障服务' },
+    ],
     skus: [
       { id: 'SKU0018284', code: 'SKU0018284', name: '标准版', price: 15000, stock: 999, status: 'Active', pricingOptions: [{id:'po-SKU0018284', title:'用户授权', price:15000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 User'}}] }
     ],
@@ -166,6 +188,9 @@ export const initialProducts: Product[] = [
   },
   {
     id: 'AB0001880', name: 'WPS文档中台系统V7', category: '私有云单品', subCategory: '文档中台V7', status: 'OnShelf', tags: ['生态'], productType: '文档中台V7', onlineDelivery: 'WPS+第三方产品', productClass: 'WPS软件业务', productClassification: '非端', productSeries: '文档中台', productCategory: '软件', productLine: 'WPS365私有云', productClassFinance: 'WPS365', productLineFinance: 'WPS365私有云', productSeriesFinance: 'WPS365私有云', maintenanceContent: '/', maintenanceStandard: '/', hasUpgradeWarranty: false, hasAfterSalesService: false, salesOrgName: '北京金山办公软件股份有限公司', businessDeliveryName: '文档中台系统软件', taxRefundType: '即征即退',
+    linkedServices: [
+      { productId: 'AB0002635', productName: 'WPS文档中心系统技术服务', skuId: 'SKU0018029', skuName: '文档中心系统A包', required: true, remark: '必选技术服务包' },
+    ],
     skus: [
       { id: 'SKU0018038', code: 'SKU0018038', name: '协作版（附加应用）', price: 20000, stock: 999, status: 'Active', pricingOptions: [{id:'po-SKU0018038', title:'附加应用授权', price:20000, license:{type:'Perpetual', period:1, periodUnit:'Forever', scope:'1 User'}}] },
       { id: 'SKU0017613', code: 'SKU0017613', name: '协作版（附加应用）', price: 100000, stock: 999, status: 'Active', pricingOptions: [{id:'po-SKU0017613', title:'附加应用年授权', price:100000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}}] }
@@ -1073,6 +1098,20 @@ export const initialChannels: Channel[] = [
     { id: 'CH50004715', crmId: 'CH50004715', name: '天津飞天云动科技有限公司', type: 'SI', level: 'Tier3', contactName: '冯飞', contactPhone: '18555345678', email: 'feng@ftyd.tj.cn', region: '华北', province: '天津市', city: '天津市', district: '滨海新区', country: '中国', companyAddress: '滨海新区信息安全产业园区A5栋', companyPhone: '022-65432109', companyEmail: 'admin@ftyd.tj.cn', companyZipCode: '300457', relatedParty: '非关联方', rebate: '无', parentChannel: '北京龙安天下科技有限公司', firstLevelChannel: '北京龙安天下科技有限公司', bChannelManager: '冯飞', gChannelManager: '-', status: 'Active', contractStatus: '已签约', erpSyncStatus: '已同步', agreementDate: '2023-01-28' },
 ];
 
+// --- Conversion Orders (折算单，由退单订单折算产生) ---
+export const initialConversionOrders: ConversionOrder[] = [
+    { id: 'ZS20260326142401000002', amount: 0.2, enterpriseName: '365套餐', sourceOrderId: 'RF20260326001', createdAt: '2026-03-26T14:24:01Z', status: 'Available' },
+    { id: 'ZS20260324114815000002', amount: 10, enterpriseName: '测试2', sourceOrderId: 'RF20260324001', createdAt: '2026-03-24T11:48:15Z', status: 'Available' },
+    { id: 'ZS20260324113911000004', amount: 41, enterpriseName: '测试进入缓冲期第二公司', sourceOrderId: 'RF20260324002', createdAt: '2026-03-24T11:39:11Z', status: 'Available' },
+    { id: 'ZS20260324113911000003', amount: 149, enterpriseName: '测试进入缓冲期第二公司', sourceOrderId: 'RF20260324003', createdAt: '2026-03-24T11:39:11Z', status: 'Available' },
+    { id: 'ZS20260324112519000003', amount: 33, enterpriseName: '0324lv2免费成长计划', sourceOrderId: 'RF20260324004', createdAt: '2026-03-24T11:25:19Z', status: 'Available' },
+    { id: 'ZS20260320091245000001', amount: 520, enterpriseName: '量子云算科技有限公司', sourceOrderId: 'RF20260320001', createdAt: '2026-03-20T09:12:45Z', status: 'Available' },
+    { id: 'ZS20260318155032000002', amount: 1200, enterpriseName: '星海数字信息技术有限公司', sourceOrderId: 'RF20260318001', createdAt: '2026-03-18T15:50:32Z', status: 'Available' },
+    { id: 'ZS20260315103622000001', amount: 88.5, enterpriseName: '鼎鑫智能制造有限公司', sourceOrderId: 'RF20260315001', createdAt: '2026-03-15T10:36:22Z', status: 'Available' },
+    { id: 'ZS20260312142201000003', amount: 2500, enterpriseName: '极光网络安全科技有限公司', sourceOrderId: 'RF20260312001', createdAt: '2026-03-12T14:22:01Z', status: 'Used' },
+    { id: 'ZS20260310081530000001', amount: 450, enterpriseName: '万象大数据服务有限公司', sourceOrderId: 'RF20260310001', createdAt: '2026-03-10T08:15:30Z', status: 'Available' },
+];
+
 // --- Standalone Enterprises ---
 export const initialStandaloneEnterprises: Enterprise[] = [
     { id: '99000001', name: '量子云算科技有限公司' },
@@ -1086,3 +1125,89 @@ export const initialStandaloneEnterprises: Enterprise[] = [
     { id: '99000009', name: '凌峰人工智能有限公司' },
     { id: '99000010', name: '聚能新能源软件有限公司' },
 ];
+
+// --- Install Package Rows (shared between InstallPackageManager and OrderCreateWizard) ---
+export const INSTALL_PKG_PUBLIC_ROWS: InstallPackageRow[] = [
+  { id: 'AZ0006288', deliveryItemId: '-', deliveryItemName: 'WPS PDF for Linux专业版', productId: 'AB0001878', productLine: '信创端', productType: 'PDF（信创）', productName: 'WPS PDF for Linux专业版软件V12', productSpec: '专业版', platform: 'Linux', os: '统信UOS', cpu: '海光', enabled: true, packageType: 'public' },
+  { id: 'AZ0006287', deliveryItemId: '-', deliveryItemName: '数科OFD套式办公套件-通用机', productId: 'AB0002683', productLine: '信创端', productType: '数科OFD用户端', productName: '数科OFD办公套件软件V5.0', productSpec: '2025通用机版', platform: 'Linux', os: '麒麟', cpu: '麒麟', enabled: true, packageType: 'public' },
+  { id: 'AZ0006286', deliveryItemId: '-', deliveryItemName: 'JK开发工具包专用', productId: 'AB0001010', productLine: '信创端', productType: 'WPS for Linux开发工具包专用', productName: 'WPS Office开发工具包软件V11', productSpec: 'JK专用', platform: 'Linux', os: '统信UOS', cpu: '飞腾', enabled: true, packageType: 'public' },
+  { id: 'AZ0000336', deliveryItemId: '-', deliveryItemName: 'WPS Office 2023 for Linux流版套装办公软件V12.8', productId: 'AB0000772', productLine: '信创端', productType: '流版套装2023（Linux）', productName: 'WPS Office 2023 for Linux流版套装办公软件V12.8', productSpec: '专业版（Lin版）', platform: 'Linux', os: '中科方德', cpu: 'intel/AMD', enabled: true, packageType: 'public' },
+  { id: 'AZ0000340', deliveryItemId: '-', deliveryItemName: 'WPS Office 2023 for Linux流版套装办公软件V12.8', productId: 'AB0000772', productLine: '信创端', productType: '流版套装2023（Linux）', productName: 'WPS Office 2023 for Linux流版套装办公软件V12.8', productSpec: '专业版（Lin版）', platform: 'Linux', os: '统信UOS', cpu: '海光', enabled: true, packageType: 'public' },
+  { id: 'AZ0005369', deliveryItemId: '905875', deliveryItemName: '12.8.2.24730-2023流版套装（非金融）通用机x64+中科方德', productId: 'AB0000772', productLine: '信创端', productType: '流版套装2023（Linux）', productName: 'WPS Office 2023 for Linux流版套装办公软件V12.8', productSpec: '专业版（Lin版）', platform: 'Linux', os: '中科方德', cpu: '兆芯', enabled: true, packageType: 'public' },
+  { id: 'AZ0005371', deliveryItemId: '-', deliveryItemName: 'xc23流版套装非金融', productId: 'AB0000772', productLine: '信创端', productType: '流版套装2023（Linux）', productName: 'WPS Office 2023 for Linux流版套装办公软件V12.8', productSpec: '专业版（Lin版）', platform: 'Linux', os: '统信UOS', cpu: 'intel/AMD', enabled: false, packageType: 'public' },
+  { id: 'AZ0005210', deliveryItemId: '-', deliveryItemName: 'WPS 365 信创版-飞腾专用', productId: 'AB0001927', productLine: '信创端', productType: 'WPS365信创版', productName: 'WPS 365 for Linux信创版办公软件V13', productSpec: '标准版', platform: 'Linux', os: '麒麟', cpu: '飞腾', enabled: true, packageType: 'public' },
+  { id: 'AZ0005211', deliveryItemId: '-', deliveryItemName: 'WPS 365 信创版-龙芯专用', productId: 'AB0001927', productLine: '信创端', productType: 'WPS365信创版', productName: 'WPS 365 for Linux信创版办公软件V13', productSpec: '标准版', platform: 'Linux', os: '统信UOS', cpu: '龙芯mips', enabled: true, packageType: 'public' },
+  { id: 'AZ0005212', deliveryItemId: '906100', deliveryItemName: 'WPS 365 信创版-兆芯专用-金融行业', productId: 'AB0001927', productLine: '信创端', productType: 'WPS365信创版', productName: 'WPS 365 for Linux信创版办公软件V13', productSpec: '金融版', platform: 'Linux', os: '麒麟', cpu: '兆芯', enabled: true, packageType: 'public' },
+  { id: 'AZ0004900', deliveryItemId: '-', deliveryItemName: 'WPS Office 2023 Win专业版', productId: 'AB0000765', productLine: 'Win端', productType: 'Win2023专业版', productName: 'WPS Office 2023专业版V12.8', productSpec: '专业版', platform: 'Windows', os: 'Windows', cpu: 'intel/AMD', enabled: true, packageType: 'public' },
+  { id: 'AZ0004901', deliveryItemId: '812300', deliveryItemName: 'WPS Office 2023 Win专业增强版', productId: 'AB0000768', productLine: 'Win端', productType: 'Win2023专业增强版', productName: 'WPS Office 2023专业增强版V12.8', productSpec: '专业增强版', platform: 'Windows', os: 'Windows', cpu: 'intel/AMD', enabled: true, packageType: 'public' },
+  { id: 'AZ0004902', deliveryItemId: '-', deliveryItemName: 'WPS Office 2023 Win标准版', productId: 'AB0000790', productLine: 'Win端', productType: 'Win2023标准版', productName: 'WPS Office 2023标准版V12.8', productSpec: '标准版', platform: 'Windows', os: 'Windows', cpu: 'intel/AMD', enabled: true, packageType: 'public' },
+  { id: 'AZ0004950', deliveryItemId: '-', deliveryItemName: 'WPS Office 2023 Mac版', productId: 'AB0000841', productLine: 'Mac端', productType: 'Mac2023', productName: 'WPS Office 2023 for Mac软件V13', productSpec: '标准版', platform: 'Mac', os: 'MacOS', cpu: 'Mac', enabled: true, packageType: 'public' },
+  { id: 'AZ0004951', deliveryItemId: '889200', deliveryItemName: 'WPS Office 2023 Mac专业版', productId: 'AB0000840', productLine: 'Mac端', productType: 'Mac2023专业版', productName: 'WPS Office 2023 for Mac专业版V13', productSpec: '专业版', platform: 'Mac', os: 'MacOS', cpu: 'Mac', enabled: true, packageType: 'public' },
+  { id: 'AZ0003800', deliveryItemId: '-', deliveryItemName: 'WPS 365 移动端Android', productId: 'AB0002797', productLine: '移动端', productType: 'Android版', productName: 'WPS 365移动版V11.5', productSpec: '标准版', platform: 'Android', os: '-', cpu: 'intel/AMD', enabled: true, packageType: 'public' },
+  { id: 'AZ0003801', deliveryItemId: '-', deliveryItemName: 'WPS 365 移动端iOS', productId: 'AB0002646', productLine: '移动端', productType: 'iOS版', productName: 'WPS 365移动版iOS V11.5', productSpec: '标准版', platform: 'iOS', os: '-', cpu: 'intel/AMD', enabled: true, packageType: 'public' },
+  { id: 'AZ0003900', deliveryItemId: '801500', deliveryItemName: 'WPS PDF Win版专业套装', productId: 'AB0001879', productLine: 'Win端', productType: 'PDF工具', productName: 'WPS PDF专业版V5.0', productSpec: '专业版', platform: 'Windows', os: 'Windows', cpu: 'intel/AMD', enabled: true, packageType: 'public' },
+  { id: 'AZ0003901', deliveryItemId: '-', deliveryItemName: 'WPS PDF Mac版专业套装', productId: 'AB0000015', productLine: 'Mac端', productType: 'PDF工具', productName: 'WPS PDF for Mac专业版V4.0', productSpec: '专业版', platform: 'Mac', os: 'MacOS', cpu: 'Mac', enabled: true, packageType: 'public' },
+  { id: 'AZ0002100', deliveryItemId: '-', deliveryItemName: 'WPS365 Win桌面端V13', productId: 'AB0001964', productLine: 'Win端', productType: 'WPS365专业版', productName: 'WPS 365企业版V13', productSpec: '企业版', platform: 'Windows', os: 'Windows', cpu: 'intel/AMD', enabled: true, packageType: 'public' },
+  { id: 'AZ0002101', deliveryItemId: '778800', deliveryItemName: 'WPS365 Win桌面端V13-信创麒麟', productId: 'AB0001964', productLine: '信创端', productType: 'WPS365信创企业版', productName: 'WPS 365企业版V13（信创）', productSpec: '企业版', platform: 'Linux', os: '麒麟', cpu: '麒麟', enabled: true, packageType: 'public' },
+  { id: 'AZ0002102', deliveryItemId: '-', deliveryItemName: 'WPS365 Win桌面端V13-信创海光', productId: 'AB0001964', productLine: '信创端', productType: 'WPS365信创企业版', productName: 'WPS 365企业版V13（信创）', productSpec: '企业版', platform: 'Linux', os: '统信UOS', cpu: '海光', enabled: false, packageType: 'public' },
+  { id: 'AZ0001500', deliveryItemId: '-', deliveryItemName: 'WPS轻文档Windows版', productId: 'AB0000047', productLine: 'Win端', productType: '轻文档', productName: 'WPS轻文档V3.0', productSpec: '标准版', platform: 'Windows', os: 'Windows', cpu: 'intel/AMD', enabled: true, packageType: 'public' },
+  { id: 'AZ0001501', deliveryItemId: '-', deliveryItemName: 'WPS轻文档Mac版', productId: 'AB0001707', productLine: 'Mac端', productType: '轻文档', productName: 'WPS轻文档V3.0 for Mac', productSpec: '标准版', platform: 'Mac', os: 'MacOS', cpu: 'Mac', enabled: true, packageType: 'public' },
+  { id: 'AZ0000900', deliveryItemId: '745600', deliveryItemName: '数科OFD Linux专业版V4', productId: 'AB0000285', productLine: '信创端', productType: '数科OFD用户端', productName: '数科OFD办公套件软件V4.0', productSpec: '专业版', platform: 'Linux', os: '麒麟', cpu: '飞腾', enabled: true, packageType: 'public' },
+  { id: 'AZ0000901', deliveryItemId: '-', deliveryItemName: '数科OFD Linux标准版V4', productId: 'AB0000285', productLine: '信创端', productType: '数科OFD用户端', productName: '数科OFD办公套件软件V4.0', productSpec: '标准版', platform: 'Linux', os: '深度', cpu: '龙芯mips', enabled: true, packageType: 'public' },
+  { id: 'AZ0000902', deliveryItemId: '-', deliveryItemName: '数科OFD Linux通用版V4', productId: 'AB0000285', productLine: '信创端', productType: '数科OFD用户端', productName: '数科OFD办公套件软件V4.0', productSpec: '通用版', platform: 'Linux', os: '中科方德', cpu: 'intel/AMD', enabled: false, packageType: 'public' },
+  { id: 'AZ0006100', deliveryItemId: '-', deliveryItemName: 'WPS Office 2025 信创版海光', productId: 'AB0002012', productLine: '信创端', productType: 'WPS2025信创版', productName: 'WPS Office 2025信创版V14', productSpec: '专业版', platform: 'Linux', os: '统信UOS', cpu: '海光', enabled: true, packageType: 'public' },
+  { id: 'AZ0006101', deliveryItemId: '920100', deliveryItemName: 'WPS Office 2025 信创版麒麟', productId: 'AB0002012', productLine: '信创端', productType: 'WPS2025信创版', productName: 'WPS Office 2025信创版V14', productSpec: '专业版', platform: 'Linux', os: '麒麟', cpu: '麒麟', enabled: true, packageType: 'public' },
+  { id: 'AZ0006102', deliveryItemId: '-', deliveryItemName: 'WPS Office 2025 信创版兆芯', productId: 'AB0002012', productLine: '信创端', productType: 'WPS2025信创版', productName: 'WPS Office 2025信创版V14', productSpec: '专业版', platform: 'Linux', os: '中科方德', cpu: '兆芯', enabled: true, packageType: 'public' },
+  { id: 'AZ0006103', deliveryItemId: '-', deliveryItemName: 'WPS Office 2025 信创版飞腾', productId: 'AB0002012', productLine: '信创端', productType: 'WPS2025信创版', productName: 'WPS Office 2025信创版V14', productSpec: '专业版', platform: 'Linux', os: '统信UOS', cpu: '飞腾', enabled: true, packageType: 'public' },
+  { id: 'AZ0006104', deliveryItemId: '-', deliveryItemName: 'WPS Office 2025 信创版龙芯', productId: 'AB0002012', productLine: '信创端', productType: 'WPS2025信创版', productName: 'WPS Office 2025信创版V14', productSpec: '专业版', platform: 'Linux', os: '统信UOS', cpu: '龙芯aarch', enabled: false, packageType: 'public' },
+  { id: 'AZ0006200', deliveryItemId: '-', deliveryItemName: 'WPS Office 2025 信创版鲲鹏', productId: 'AB0002012', productLine: '信创端', productType: 'WPS2025信创版', productName: 'WPS Office 2025信创版V14', productSpec: '专业版', platform: 'Linux', os: '麒麟', cpu: '鲲鹏', enabled: true, packageType: 'public' },
+  { id: 'AZ0006201', deliveryItemId: '-', deliveryItemName: 'WPS Office 2025 信创版腾锐', productId: 'AB0000021', productLine: '信创端', productType: 'WPS2025信创版', productName: 'WPS Office 2025信创版V14', productSpec: '专业版', platform: 'Linux', os: '统信UOS', cpu: '腾锐', enabled: true, packageType: 'public' },
+  { id: 'AZ0006202', deliveryItemId: '-', deliveryItemName: 'WPS Office 2025 信创版申威', productId: 'AB0000021', productLine: '信创端', productType: 'WPS2025信创版', productName: 'WPS Office 2025信创版V14', productSpec: '专业版', platform: 'Linux', os: '深度', cpu: '申威', enabled: true, packageType: 'public' },
+  { id: 'AZ0006203', deliveryItemId: '-', deliveryItemName: 'WPS Office 2025 信创版盘古', productId: 'AB0000021', productLine: '信创端', productType: 'WPS2025信创版', productName: 'WPS Office 2025信创版V14', productSpec: '专业版', platform: 'Linux', os: '中科方德', cpu: '盘古', enabled: false, packageType: 'public' },
+  { id: 'AZ0020050', deliveryItemId: '-', deliveryItemName: 'WPS365高级平台-客户端通用包(Win)', productId: 'AB0002815', productLine: 'Win端', productType: 'WPS365高级版', productName: 'WPS 365专业办公高级平台V7', productSpec: '标准版', platform: 'Windows', os: 'Windows', cpu: 'intel/AMD', enabled: true, packageType: 'public' },
+  { id: 'AZ0020051', deliveryItemId: '-', deliveryItemName: 'WPS365高级平台-客户端通用包(Linux麒麟)', productId: 'AB0002815', productLine: '信创端', productType: 'WPS365高级版', productName: 'WPS 365专业办公高级平台V7', productSpec: '信创版', platform: 'Linux', os: '麒麟', cpu: '飞腾', enabled: true, packageType: 'public' },
+  { id: 'AZ0020052', deliveryItemId: '-', deliveryItemName: 'WPS365高级平台-客户端通用包(Linux统信)', productId: 'AB0002815', productLine: '信创端', productType: 'WPS365高级版', productName: 'WPS 365专业办公高级平台V7', productSpec: '信创版', platform: 'Linux', os: '统信UOS', cpu: '海光', enabled: true, packageType: 'public' },
+  { id: 'AZ0020060', deliveryItemId: '-', deliveryItemName: 'WPS365旗舰平台-客户端通用包(Win)', productId: 'AB0002796', productLine: 'Win端', productType: 'WPS365旗舰版', productName: 'WPS 365专业办公旗舰平台V7', productSpec: '标准版', platform: 'Windows', os: 'Windows', cpu: 'intel/AMD', enabled: true, packageType: 'public' },
+  { id: 'AZ0020061', deliveryItemId: '-', deliveryItemName: 'WPS365旗舰平台-客户端通用包(Linux)', productId: 'AB0002796', productLine: '信创端', productType: 'WPS365旗舰版', productName: 'WPS 365专业办公旗舰平台V7', productSpec: '信创版', platform: 'Linux', os: '统信UOS', cpu: '海光', enabled: true, packageType: 'public' },
+  { id: 'AZ0020070', deliveryItemId: '-', deliveryItemName: 'WPS365高级平台V7-客户端通用包(Win)', productId: 'AB0002814', productLine: 'Win端', productType: 'WPS365高级版', productName: 'WPS 365专业办公高级平台V7', productSpec: '标准版', platform: 'Windows', os: 'Windows', cpu: 'intel/AMD', enabled: true, packageType: 'public' },
+  { id: 'AZ0020071', deliveryItemId: '-', deliveryItemName: 'WPS365高级平台V7-客户端通用包(Linux)', productId: 'AB0002814', productLine: '信创端', productType: 'WPS365高级版', productName: 'WPS 365专业办公高级平台V7', productSpec: '信创版', platform: 'Linux', os: '麒麟', cpu: '鲲鹏', enabled: true, packageType: 'public' },
+];
+
+export const INSTALL_PKG_PRIVATE_ROWS: InstallPackageRow[] = [
+  { id: 'AZ0010001', deliveryItemId: '-', deliveryItemName: 'WPS 365私有云部署包-标准版', productId: 'AB0002815', productLine: 'WPS365私有云', productType: 'WPS365高级版（私有云）', productName: 'WPS 365私有云企业版V7', productSpec: '标准版', platform: 'Linux', os: '-', cpu: 'intel/AMD', enabled: true, packageType: 'private' },
+  { id: 'AZ0010002', deliveryItemId: '913000', deliveryItemName: 'WPS 365私有云部署包-高可用版', productId: 'AB0002815', productLine: 'WPS365私有云', productType: 'WPS365高级版（私有云）', productName: 'WPS 365私有云企业版V7', productSpec: '高可用版', platform: 'Linux', os: '-', cpu: 'intel/AMD', enabled: true, packageType: 'private' },
+  { id: 'AZ0010003', deliveryItemId: '-', deliveryItemName: 'WPS 365私有云部署包-ARM版', productId: 'AB0002815', productLine: 'WPS365私有云', productType: 'WPS365高级版（私有云）', productName: 'WPS 365私有云企业版V7', productSpec: 'ARM版', platform: 'Linux', os: '-', cpu: '鲲鹏', enabled: true, packageType: 'private' },
+  { id: 'AZ0010004', deliveryItemId: '-', deliveryItemName: 'WPS 365私有云基础版部署包', productId: 'AB0002814', productLine: 'WPS365私有云', productType: 'WPS365高级版（私有云）', productName: 'WPS 365私有云基础版V7', productSpec: '基础版', platform: 'Linux', os: '-', cpu: 'intel/AMD', enabled: true, packageType: 'private' },
+  { id: 'AZ0010005', deliveryItemId: '913100', deliveryItemName: 'WPS 365私有云基础版-信创飞腾', productId: 'AB0002814', productLine: 'WPS365私有云', productType: 'WPS365高级版（私有云）', productName: 'WPS 365私有云基础版V7', productSpec: '信创版', platform: 'Linux', os: '麒麟', cpu: '飞腾', enabled: true, packageType: 'private' },
+  { id: 'AZ0010006', deliveryItemId: '-', deliveryItemName: 'WPS 365私有云基础版-信创麒麟', productId: 'AB0002814', productLine: 'WPS365私有云', productType: 'WPS365高级版（私有云）', productName: 'WPS 365私有云基础版V7', productSpec: '信创版', platform: 'Linux', os: '麒麟', cpu: '麒麟', enabled: false, packageType: 'private' },
+  { id: 'AZ0010100', deliveryItemId: '-', deliveryItemName: '私有云文档协作平台V3', productId: 'AB0002807', productLine: 'WPS365私有云', productType: '文档协作私有云', productName: '私有云文档协作平台软件V3.0', productSpec: '企业版', platform: 'Linux', os: '-', cpu: 'intel/AMD', enabled: true, packageType: 'private' },
+  { id: 'AZ0010101', deliveryItemId: '915500', deliveryItemName: '私有云文档协作平台V3-ARM', productId: 'AB0002807', productLine: 'WPS365私有云', productType: '文档协作私有云', productName: '私有云文档协作平台软件V3.0', productSpec: '企业版ARM', platform: 'Linux', os: '-', cpu: '鲲鹏', enabled: true, packageType: 'private' },
+  { id: 'AZ0010200', deliveryItemId: '-', deliveryItemName: '私有云IM服务部署包V2', productId: 'AB0002746', productLine: 'WPS365私有云', productType: '私有云IM', productName: 'WPS私有IM服务V2', productSpec: '标准版', platform: 'Linux', os: '-', cpu: 'intel/AMD', enabled: true, packageType: 'private' },
+  { id: 'AZ0010201', deliveryItemId: '-', deliveryItemName: '私有云会议系统部署包', productId: 'AB0002796', productLine: 'WPS365私有云', productType: '私有云会议', productName: '私有云企业会议系统V2', productSpec: '标准版', platform: 'Linux', os: '-', cpu: 'intel/AMD', enabled: true, packageType: 'private' },
+  { id: 'AZ0010300', deliveryItemId: '918800', deliveryItemName: '混合云连接器-标准版', productId: 'AB0001880', productLine: '混合云方案', productType: '混合云连接器', productName: '混合云连接器软件V1.5', productSpec: '标准版', platform: 'Linux', os: '-', cpu: 'intel/AMD', enabled: true, packageType: 'private' },
+  { id: 'AZ0010301', deliveryItemId: '-', deliveryItemName: '混合云连接器-高可用版', productId: 'AB0001880', productLine: '混合云方案', productType: '混合云连接器', productName: '混合云连接器软件V1.5', productSpec: '高可用版', platform: 'Linux', os: '-', cpu: 'intel/AMD', enabled: false, packageType: 'private' },
+  { id: 'AZ0010400', deliveryItemId: '-', deliveryItemName: 'WebOffice私有化SDK-x86', productId: 'AB0001841', productLine: '私有云单品', productType: 'Web Office', productName: 'WebOffice SDK私有版V3.5', productSpec: '标准版', platform: 'Linux', os: '-', cpu: 'intel/AMD', enabled: true, packageType: 'private' },
+  { id: 'AZ0010401', deliveryItemId: '922000', deliveryItemName: 'WebOffice私有化SDK-ARM', productId: 'AB0001841', productLine: '私有云单品', productType: 'Web Office', productName: 'WebOffice SDK私有版V3.5', productSpec: 'ARM版', platform: 'Linux', os: '-', cpu: '鲲鹏', enabled: true, packageType: 'private' },
+  { id: 'AZ0010500', deliveryItemId: '-', deliveryItemName: 'WPS 365私有云V8-全功能包', productId: 'AB0002764', productLine: 'WPS365私有云', productType: 'WPS365私有云V8', productName: 'WPS 365私有云企业版V8', productSpec: '全功能版', platform: 'Linux', os: '-', cpu: 'intel/AMD', enabled: true, packageType: 'private' },
+  { id: 'AZ0010501', deliveryItemId: '-', deliveryItemName: 'WPS 365私有云V8-基础包', productId: 'AB0002764', productLine: 'WPS365私有云', productType: 'WPS365私有云V8', productName: 'WPS 365私有云企业版V8', productSpec: '基础版', platform: 'Linux', os: '-', cpu: 'intel/AMD', enabled: true, packageType: 'private' },
+  { id: 'AZ0010502', deliveryItemId: '925600', deliveryItemName: 'WPS 365私有云V8-信创兆芯', productId: 'AB0002764', productLine: 'WPS365私有云', productType: 'WPS365私有云V8', productName: 'WPS 365私有云企业版V8', productSpec: '信创版', platform: 'Linux', os: '统信UOS', cpu: '兆芯', enabled: true, packageType: 'private' },
+  { id: 'AZ0010600', deliveryItemId: '-', deliveryItemName: '文档中台私有化部署包', productId: 'AB0002613', productLine: '私有云单品', productType: '文档中台', productName: '文档中台私有化软件V2.0', productSpec: '标准版', platform: 'Linux', os: '-', cpu: 'intel/AMD', enabled: true, packageType: 'private' },
+  { id: 'AZ0010601', deliveryItemId: '-', deliveryItemName: '文档中台私有化部署包-ARM', productId: 'AB0002613', productLine: '私有云单品', productType: '文档中台', productName: '文档中台私有化软件V2.0', productSpec: 'ARM版', platform: 'Linux', os: '-', cpu: '鲲鹏', enabled: false, packageType: 'private' },
+  { id: 'AZ0020001', deliveryItemId: '-', deliveryItemName: 'WPS 2023 Win专业版-企业定制部署包', productId: 'AB0000765', productLine: 'Win端', productType: 'Win2023专业版', productName: 'WPS Office 2023专业版V12.8', productSpec: '企业定制版', platform: 'Windows', os: 'Windows', cpu: 'intel/AMD', enabled: true, packageType: 'private' },
+  { id: 'AZ0020002', deliveryItemId: '-', deliveryItemName: 'WPS 2023 Win专业版-金融定制包', productId: 'AB0000765', productLine: 'Win端', productType: 'Win2023专业版', productName: 'WPS Office 2023专业版V12.8', productSpec: '金融定制版', platform: 'Windows', os: 'Windows Server', cpu: 'intel/AMD', enabled: true, packageType: 'private' },
+  { id: 'AZ0020010', deliveryItemId: '-', deliveryItemName: 'WPS 2023 Linux专业版-定制部署包(麒麟)', productId: 'AB0000772', productLine: '信创端', productType: '信创2023', productName: 'WPS Office 2023 for Linux专业版V12.8', productSpec: '定制版', platform: 'Linux', os: '麒麟', cpu: '飞腾', enabled: true, packageType: 'private' },
+  { id: 'AZ0020011', deliveryItemId: '-', deliveryItemName: 'WPS 2023 Linux专业版-定制部署包(统信)', productId: 'AB0000772', productLine: '信创端', productType: '信创2023', productName: 'WPS Office 2023 for Linux专业版V12.8', productSpec: '定制版', platform: 'Linux', os: '统信UOS', cpu: '海光', enabled: true, packageType: 'private' },
+  { id: 'AZ0020012', deliveryItemId: '-', deliveryItemName: 'WPS 2023 Linux专业版-金融定制包', productId: 'AB0000772', productLine: '信创端', productType: '信创2023', productName: 'WPS Office 2023 for Linux专业版V12.8', productSpec: '金融定制版', platform: 'Linux', os: '麒麟', cpu: '鲲鹏', enabled: true, packageType: 'private' },
+  { id: 'AZ0020020', deliveryItemId: '-', deliveryItemName: 'WPS 2025信创版-政府定制部署包', productId: 'AB0002012', productLine: '信创端', productType: 'WPS2025信创版', productName: 'WPS Office 2025信创版V14', productSpec: '政府定制版', platform: 'Linux', os: '麒麟', cpu: '飞腾', enabled: true, packageType: 'private' },
+  { id: 'AZ0020021', deliveryItemId: '-', deliveryItemName: 'WPS 2025信创版-央企定制部署包', productId: 'AB0002012', productLine: '信创端', productType: 'WPS2025信创版', productName: 'WPS Office 2025信创版V14', productSpec: '央企定制版', platform: 'Linux', os: '统信UOS', cpu: '海光', enabled: true, packageType: 'private' },
+  { id: 'AZ0020030', deliveryItemId: '-', deliveryItemName: 'WPS365 央企版-定制部署包(Win)', productId: 'AB0001964', productLine: 'Win端', productType: 'WPS365企业版', productName: 'WPS 365企业版V13', productSpec: '央企定制版', platform: 'Windows', os: 'Windows', cpu: 'intel/AMD', enabled: true, packageType: 'private' },
+  { id: 'AZ0020031', deliveryItemId: '-', deliveryItemName: 'WPS365 央企版-信创定制包(麒麟)', productId: 'AB0001964', productLine: '信创端', productType: 'WPS365企业版', productName: 'WPS 365企业版V13', productSpec: '信创定制版', platform: 'Linux', os: '麒麟', cpu: '麒麟', enabled: true, packageType: 'private' },
+  { id: 'AZ0020040', deliveryItemId: '-', deliveryItemName: 'WPS365信创版-政务定制包(飞腾)', productId: 'AB0001927', productLine: '信创端', productType: 'WPS365信创版', productName: 'WPS 365 for Linux信创版V13', productSpec: '政务定制版', platform: 'Linux', os: '麒麟', cpu: '飞腾', enabled: true, packageType: 'private' },
+  { id: 'AZ0020041', deliveryItemId: '-', deliveryItemName: 'WPS365信创版-政务定制包(龙芯)', productId: 'AB0001927', productLine: '信创端', productType: 'WPS365信创版', productName: 'WPS 365 for Linux信创版V13', productSpec: '政务定制版', platform: 'Linux', os: '统信UOS', cpu: '龙芯mips', enabled: true, packageType: 'private' },
+  { id: 'AZ0020080', deliveryItemId: '-', deliveryItemName: 'WPS PDF Win专业版-企业定制包', productId: 'AB0001879', productLine: 'Win端', productType: 'PDF工具', productName: 'WPS PDF专业版V5.0', productSpec: '企业定制版', platform: 'Windows', os: 'Windows', cpu: 'intel/AMD', enabled: true, packageType: 'private' },
+  { id: 'AZ0020081', deliveryItemId: '-', deliveryItemName: 'WPS PDF Linux专业版-定制包', productId: 'AB0001878', productLine: '信创端', productType: 'PDF（信创）', productName: 'WPS PDF for Linux专业版软件V12', productSpec: '定制版', platform: 'Linux', os: '麒麟', cpu: '飞腾', enabled: true, packageType: 'private' },
+  { id: 'AZ0020090', deliveryItemId: '-', deliveryItemName: '数科OFD V5.0-政务定制包', productId: 'AB0002683', productLine: '信创端', productType: '数科OFD用户端', productName: '数科OFD版式软件V5.0', productSpec: '政务定制版', platform: 'Linux', os: '麒麟', cpu: '飞腾', enabled: true, packageType: 'private' },
+  { id: 'AZ0020091', deliveryItemId: '-', deliveryItemName: '数科OFD V3.0-定制部署包', productId: 'AB0000285', productLine: '信创端', productType: '数科OFD用户端', productName: '数科OFD版式软件V3.0', productSpec: '定制版', platform: 'Linux', os: '统信UOS', cpu: '海光', enabled: true, packageType: 'private' },
+];
+
+export const ALL_INSTALL_PKG_ROWS: InstallPackageRow[] = [...INSTALL_PKG_PUBLIC_ROWS, ...INSTALL_PKG_PRIVATE_ROWS];
