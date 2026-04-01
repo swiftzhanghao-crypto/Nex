@@ -68,7 +68,7 @@ const OrderDetails: React.FC = () => {
 
   const [fulfillmentItemIndex, setFulfillmentItemIndex] = useState<number | null>(null);
   const [fulfillmentContent, setFulfillmentContent] = useState('');
-  const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'FULFILLMENT' | 'EMAIL'>('MANAGEMENT');
+  const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'FULFILLMENT' | 'EMAIL' | 'SERIAL'>('MANAGEMENT');
   const [isContractPreviewOpen, setIsContractPreviewOpen] = useState(false);
   const [contractZoom, setContractZoom] = useState(100);
   const [expandedContractIds, setExpandedContractIds] = useState<Set<string>>(new Set());
@@ -498,7 +498,7 @@ const OrderDetails: React.FC = () => {
                        {selectedOrder.source === 'Sales'         && <span className="unified-tag-xs unified-tag-blue">后台下单</span>}
                        {selectedOrder.source === 'ChannelPortal' && <span className="unified-tag-xs unified-tag-indigo">渠道下单</span>}
                        {selectedOrder.source === 'OnlineStore'   && <span className="unified-tag-xs unified-tag-orange">官网下单</span>}
-                       {selectedOrder.source === 'APISync'       && <span className="unified-tag-xs unified-tag-gray">第三方下单</span>}
+                       {selectedOrder.source === 'APISync'       && <span className="unified-tag-xs unified-tag-green">三方平台</span>}
                        {selectedOrder.source === 'Renewal'       && <span className="unified-tag-xs unified-tag-green">客户续费</span>}
                    </div>
                </div>
@@ -632,12 +632,13 @@ const OrderDetails: React.FC = () => {
           <div className="flex gap-1 overflow-x-auto no-scrollbar pt-2 border-b border-gray-200 dark:border-white/10">
               {([
                   { id: 'MANAGEMENT', label: '订单信息', permission: undefined },
+                  { id: 'SERIAL', label: '序列号', permission: undefined },
                   { id: 'EMAIL', label: '发货信息', permission: 'order_detail_shipping' },
                   { id: 'FULFILLMENT', label: '订单交付', permission: 'order_detail_delivery' },
-              ] as { id: string; label: string; permission?: string }[]).filter(tab => !tab.permission || hasPermission(tab.permission)).map(tab => (
+              ] as { id: string; label: string; permission?: string; hidden?: boolean }[]).filter(tab => !tab.hidden && (!tab.permission || hasPermission(tab.permission))).map(tab => (
                   <button
                       key={tab.id}
-                      onClick={() => setActiveTab(tab.id as 'MANAGEMENT' | 'FULFILLMENT' | 'EMAIL')}
+                      onClick={() => setActiveTab(tab.id as 'MANAGEMENT' | 'FULFILLMENT' | 'EMAIL' | 'SERIAL')}
                       className={`relative px-5 py-2 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 -mb-px ${
                           activeTab === tab.id
                           ? 'text-[#0071E3] dark:text-[#0A84FF] border-[#0071E3] dark:border-[#0A84FF]'
@@ -931,7 +932,7 @@ const OrderDetails: React.FC = () => {
                       <Building className="w-5 h-5 text-[#0071E3]" />
                       <h3 className="text-base font-semibold text-gray-900 dark:text-white">客户信息</h3>
                   </div>
-                  <div className="px-4 py-2">
+                  <div className="p-5">
                       <div className="divide-y divide-gray-50 dark:divide-white/5">
                           {[
                               { label: '客户名称', value: selectedOrder.customerName, link: `/customers/${selectedOrder.customerId}` },
@@ -941,14 +942,14 @@ const OrderDetails: React.FC = () => {
                               { label: '报备标签', value: selectedOrder.reportTag },
                               { label: '授权覆盖客户', value: selectedOrder.customerStatus },
                           ].map((item, idx) => (
-                              <div key={idx} className="flex items-center justify-between py-2.5 gap-4">
-                                  <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{item.label}</span>
+                              <div key={idx} className="flex items-center gap-8 py-3.5">
+                                  <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-32 shrink-0 whitespace-nowrap">{item.label}</span>
                                   {item.link ? (
-                                      <button onClick={() => navigate(item.link!)} className="text-sm font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline truncate text-right" title={item.value || '-'}>
+                                      <button onClick={() => navigate(item.link!)} className="text-sm font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline truncate flex-1" title={item.value || '-'}>
                                           {item.value || '-'}
                                       </button>
                                   ) : (
-                                      <span className="text-sm font-medium text-gray-900 dark:text-white truncate text-right" title={item.value || '-'}>{item.value || '-'}</span>
+                                      <span className="text-sm font-medium text-gray-900 dark:text-white truncate flex-1" title={item.value || '-'}>{item.value || '-'}</span>
                                   )}
                               </div>
                           ))}
@@ -1000,7 +1001,7 @@ const OrderDetails: React.FC = () => {
                       <Users className="w-5 h-5 text-indigo-500" />
                       <h3 className="text-base font-semibold text-gray-900 dark:text-white">交易双方信息</h3>
                   </div>
-                  <div className="px-4 py-2">
+                  <div className="p-5">
                       <div className="divide-y divide-gray-50 dark:divide-white/5">
                           {[
                               { label: '买方名称', value: selectedOrder.buyerName },
@@ -1009,9 +1010,9 @@ const OrderDetails: React.FC = () => {
                               { label: '终端渠道', value: selectedOrder.terminalChannel },
                               { label: '渠道服务', value: selectedOrder.channelService },
                           ].map((item, idx) => (
-                              <div key={idx} className="flex items-center justify-between py-2.5 gap-4">
-                                  <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{item.label}</span>
-                                  <span className="text-sm font-medium text-gray-900 dark:text-white truncate text-right" title={item.value || '-'}>{item.value || '-'}</span>
+                              <div key={idx} className="flex items-center gap-8 py-3.5">
+                                  <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-32 shrink-0 whitespace-nowrap">{item.label}</span>
+                                  <span className="text-sm font-medium text-gray-900 dark:text-white truncate flex-1" title={item.value || '-'}>{item.value || '-'}</span>
                               </div>
                           ))}
                       </div>
@@ -1234,8 +1235,65 @@ const OrderDetails: React.FC = () => {
                     </div>
                 </div>
             )}
+
           </>
         )}
+
+          {activeTab === 'SERIAL' && (
+            <div className="unified-card overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-separate border-spacing-0">
+                        <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E]">
+                            <tr>
+                                <th className="pl-6 px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">序列号</th>
+                                <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">序列号来源</th>
+                                <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">序列号生成方式</th>
+                                <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">序列号生成明组</th>
+                                <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">序列号类型</th>
+                                <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">序列号状态</th>
+                                <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">序列号生成时间</th>
+                                <th className="px-3 py-2.5 pr-6 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">序列号截止时间</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-white/5 text-sm">
+                            {selectedOrder.serialNumbers && selectedOrder.serialNumbers.length > 0 ? selectedOrder.serialNumbers.map((sn, idx) => (
+                                <tr key={idx} className="group hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors border-b border-gray-100/50 dark:border-white/5 last:border-0">
+                                    <td className="pl-6 px-3 py-2.5">
+                                        <span className="font-mono font-semibold text-gray-900 dark:text-white">{sn.serialNo}</span>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-gray-600 dark:text-gray-300">{sn.source}</td>
+                                    <td className="px-3 py-2.5 text-gray-600 dark:text-gray-300">{sn.generateMethod}</td>
+                                    <td className="px-3 py-2.5 text-gray-600 dark:text-gray-300">{sn.generateGroup}</td>
+                                    <td className="px-3 py-2.5">
+                                        <span className={`text-xs px-2.5 py-1 rounded-lg font-bold border ${
+                                            sn.type === '正式' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-800/30'
+                                            : sn.type === '试用' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-800/30'
+                                            : 'bg-gray-50 dark:bg-gray-800/20 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700/30'
+                                        }`}>{sn.type}</span>
+                                    </td>
+                                    <td className="px-3 py-2.5">
+                                        <span className={`text-xs px-2.5 py-1 rounded-lg font-bold border ${
+                                            sn.status === '已生效' ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-100 dark:border-green-800/30'
+                                            : sn.status === '待生效' ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-100 dark:border-yellow-800/30'
+                                            : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800/30'
+                                        }`}>{sn.status}</span>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-gray-600 dark:text-gray-300 font-mono text-xs">{sn.generateTime}</td>
+                                    <td className="px-3 py-2.5 pr-6 text-gray-600 dark:text-gray-300 font-mono text-xs">{sn.expireTime}</td>
+                                </tr>
+                            )) : (
+                                <tr>
+                                    <td colSpan={8} className="px-3 py-16 text-center text-gray-400 dark:text-gray-500 text-sm">暂无序列号数据</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                <div className="px-6 py-3 border-t border-gray-100 dark:border-white/10 flex items-center text-xs text-gray-400 dark:text-gray-500">
+                    <span>共 {selectedOrder.serialNumbers?.length || 0} 条</span>
+                </div>
+            </div>
+          )}
 
           {activeTab === 'FULFILLMENT' && hasPermission('order_detail_delivery') && (
           <div className="space-y-6">

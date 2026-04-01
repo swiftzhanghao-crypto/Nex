@@ -38,6 +38,7 @@ import DeliveryMethodConfig from './components/system/DeliveryMethodConfig';
 import SalesOrgConfig from './components/system/SalesOrgConfig';
 import ProductMsrpManager from './components/product/ProductMsrpManager';
 import ProductChannelPriceManager from './components/product/ProductChannelPriceManager';
+import ProductPolicyManager from './components/product/ProductPolicyManager';
 
 function AppRoutes() {
   return (
@@ -46,6 +47,7 @@ function AppRoutes() {
         <Route path="/" element={<Dashboard />} />
 
         <Route path="/product-center" element={<ProductCenter />} />
+        <Route path="/product-policy" element={<ProductPolicyManager />} />
         <Route path="/catalog/:id/preview" element={<ProductPreview />} />
         <Route path="/products" element={<ProductManager />} />
         <Route path="/products/:id" element={<ProductDetails />} />

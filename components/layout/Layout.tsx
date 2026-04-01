@@ -54,6 +54,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       '/delivery-info': '交付信息',
       '/products': '产品列表',
       '/product-center': '产品目录',
+      '/product-policy': '产品政策',
       '/product-manage/component-pool': '组件池',
       '/product-manage/packages': '安装包管理',
       '/product-manage/license-templates': '产品授权模板',
@@ -186,7 +187,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         setActiveTopNav('ORDER_CENTER');
     } else if (location.pathname.startsWith('/organization') || location.pathname.startsWith('/users') || location.pathname.startsWith('/roles') || location.pathname.startsWith('/system/')) {
           setActiveTopNav('SYSTEM_CONFIG');
-      } else if (location.pathname.startsWith('/products') || location.pathname.startsWith('/merchandises') || location.pathname.startsWith('/catalog') || location.pathname.startsWith('/product-center') || location.pathname.startsWith('/product-pricing') || location.pathname.startsWith('/product-manage')) {
+      } else if (location.pathname.startsWith('/products') || location.pathname.startsWith('/merchandises') || location.pathname.startsWith('/catalog') || location.pathname.startsWith('/product-center') || location.pathname.startsWith('/product-policy') || location.pathname.startsWith('/product-pricing') || location.pathname.startsWith('/product-manage')) {
           setActiveTopNav('PRODUCT_CENTER');
       } else if (location.pathname.startsWith('/performance')) {
           setActiveTopNav('PERFORMANCE_CENTER');
@@ -489,6 +490,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         {renderSectionGroup('product_catalog', '产品目录',
                           <>
                             <NavItem to="/product-center" icon={Layers} label="产品目录" alsoMatch={['/catalog']} permission="product_display_view" />
+                            <NavItem to="/product-policy" icon={FileBadge} label="产品政策" permission="product_display_view" />
                           </>,
                           ['product_display_view', 'product_display_preview']
                         )}

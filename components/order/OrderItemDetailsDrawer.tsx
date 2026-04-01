@@ -1,6 +1,6 @@
 import React from 'react';
 import { OrderItem, Product } from '../../types';
-import { X, Box, CreditCard, Truck, Package, Disc, AlertCircle, ShieldCheck } from 'lucide-react';
+import { X, Box, CreditCard, Truck, Package, Disc, AlertCircle, ShieldCheck, RefreshCcw } from 'lucide-react';
 
 interface Props {
   item: OrderItem | null;
@@ -160,8 +160,53 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
 
                           </div>
 
-                          {/* 右侧小列 (1/3)：产品交付信息 + 安装包 纵向排列 */}
+                          {/* 右侧小列 (1/3)：续费信息 + 产品交付信息 + 安装包 纵向排列 */}
                           <div className="space-y-4">
+
+                              {/* 续费信息 */}
+                              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10">
+                                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                                      <RefreshCcw className="w-5 h-5 text-green-500" />
+                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">续费信息</h4>
+                                  </div>
+                                  <div className="p-5">
+                                      {(() => {
+                                          const purchaseNatureLabel = (() => {
+                                              switch (selectedItemForDetails.purchaseNature) {
+                                                  case 'New': return '新购';
+                                                  case 'Renewal': return '续费';
+                                                  case 'AddOn': return '增购';
+                                                  case 'Upgrade': return '升级';
+                                                  default: return '-';
+                                              }
+                                          })();
+                                          const purchaseNature365Label = (() => {
+                                              switch (selectedItemForDetails.purchaseNature365) {
+                                                  case 'New': return '新购';
+                                                  case 'Renewal': return '续费';
+                                                  case 'AddOn': return '增购';
+                                                  case 'Upgrade': return '升级';
+                                                  default: return '-';
+                                              }
+                                          })();
+                                          const fields = [
+                                              { label: '订购性质', value: purchaseNatureLabel },
+                                              { label: '增续类型', value: selectedItemForDetails.renewalSubType || '-' },
+                                              { label: '365 订购性质', value: purchaseNature365Label },
+                                          ];
+                                          return (
+                                              <div className="divide-y divide-gray-50 dark:divide-white/5">
+                                                  {fields.map((f, idx) => (
+                                                      <div key={idx} className="flex items-center gap-8 py-3.5">
+                                                          <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-44 shrink-0 whitespace-nowrap">{f.label}</span>
+                                                          <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{f.value}</span>
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          );
+                                      })()}
+                                  </div>
+                              </div>
 
                               {/* 产品交付信息 */}
                               <div className="unified-card dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10">
@@ -171,8 +216,17 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
                                   </div>
                                   <div className="p-5">
                                       {(() => {
-                                          const activationLabel = selectedItemForDetails.activationMethod === 'LicenseKey' ? '授权码激活'
-                                              : selectedItemForDetails.activationMethod === 'Online' ? '在线激活' : '加密狗';
+                                          const activationLabel = (() => {
+                                              switch (selectedItemForDetails.activationMethod) {
+                                                  case 'Account': return '账号激活';
+                                                  case 'SerialKey': return '序列号激活';
+                                                  case 'AccountAndSerialKey': return '账号+序列号';
+                                                  case 'LicenseKey': return '授权码激活';
+                                                  case 'Online': return '在线激活';
+                                                  case 'Dongle': return '加密狗';
+                                                  default: return '-';
+                                              }
+                                          })();
                                           const distMode = selectedItemForDetails.distributionMode
                                               || (selectedItemIndex % 2 === 0 ? '账号分发' : '兑换码分发');
                                           const enterpriseName = selectedItemForDetails.enterpriseName || selectedOrder.customerName;
@@ -199,29 +253,42 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
                                   </div>
                               </div>
 
-                              {/* 安装包 */}
+                              {/* 交付物信息 */}
                               <div className="unified-card dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10">
                                   <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                                       <Disc className="w-5 h-5 text-blue-500" />
-                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">安装包</h4>
+                                      <h4 className="text-base font-semibold text-gray-900 dark:text-white">交付物信息</h4>
                                   </div>
                                   <div className="p-5">
                                       {(() => {
                                           const product = products.find(p => p.id === selectedItemForDetails.productId);
                                           const pkg = product?.installPackages?.[0];
                                           const itemPkgType = selectedItemForDetails.installPackageType;
+                                          const itemPkgName = selectedItemForDetails.installPackageName;
                                           const itemPkgLink = selectedItemForDetails.installPackageLink;
+
+                                          const activationLabel = (() => {
+                                              switch (selectedItemForDetails.activationMethod) {
+                                                  case 'Account': return '账号激活';
+                                                  case 'SerialKey': return '序列号激活';
+                                                  case 'AccountAndSerialKey': return '账号+序列号';
+                                                  case 'LicenseKey': return '授权码激活';
+                                                  case 'Online': return '在线激活';
+                                                  case 'Dongle': return '加密狗';
+                                                  default: return '-';
+                                              }
+                                          })();
 
                                           const rows: { label: string; value: string; isLink?: boolean }[] = [];
 
-                                          if (itemPkgType) {
-                                              rows.push({ label: '安装包类型', value: itemPkgType });
-                                          }
+                                          rows.push({ label: '激活方式', value: activationLabel });
+                                          rows.push({ label: '介质数量', value: String(selectedItemForDetails.mediaCount ?? 1) });
+                                          rows.push({ label: '安装包类型', value: itemPkgType || '-' });
+                                          rows.push({ label: '安装包名称', value: itemPkgName || pkg?.name || '-' });
 
                                           if (pkg) {
                                               rows.push(
                                                   { label: '安装包编号', value: pkg.id },
-                                                  { label: '安装包名称', value: pkg.name },
                                                   { label: 'CPU', value: pkg.cpu || '-' },
                                                   { label: '操作系统', value: pkg.os || '-' },
                                                   { label: '发布平台', value: pkg.platform || '-' },
@@ -234,17 +301,6 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
                                               rows.push({ label: '定制安装包链接', value: itemPkgLink, isLink: true });
                                           }
 
-                                          if (rows.length === 0) {
-                                              return (
-                                                  <div className="flex flex-col items-center justify-center py-10 text-center space-y-3">
-                                                      <div className="w-12 h-12 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center">
-                                                          <AlertCircle className="w-6 h-6 text-gray-300" />
-                                                      </div>
-                                                      <div className="text-sm text-gray-400 italic">暂无安装包数据</div>
-                                                  </div>
-                                              );
-                                          }
-
                                           return (
                                               <div className="divide-y divide-gray-50 dark:divide-white/5">
                                                   {rows.map((row, i) => (
@@ -253,7 +309,9 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
                                                           {row.isLink && row.value !== '-' ? (
                                                               <a href={row.value} target="_blank" rel="noreferrer" className="text-sm font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline flex-1 truncate">{row.value}</a>
                                                           ) : row.label === '安装包类型' ? (
-                                                              <span className={`text-xs px-2 py-0.5 rounded font-medium ${row.value === '通用' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'}`}>{row.value}</span>
+                                                              <span className={`text-xs px-2 py-0.5 rounded font-medium ${row.value === '通用' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : row.value === '定制' ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'text-gray-400'}`}>{row.value}</span>
+                                                          ) : row.label === '激活方式' ? (
+                                                              <span className="text-xs px-2.5 py-1 rounded-lg font-bold bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-800/30">{row.value}</span>
                                                           ) : (
                                                               <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{row.value}</span>
                                                           )}

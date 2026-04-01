@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>产品中心 - 产品政策</title><link rel="stylesheet" href="common.css" /></head>
+<body>
+  <header class="topbar"><div style="display:flex;align-items:center;"><div class="brand">WPS365 业务平台</div><nav class="top-nav"><a href="dashboard.html">数据看板</a><a class="active" href="product-catalog.html">产品中心</a><a href="system-settings.html">系统设置</a></nav></div><div>👤 管理员</div></header>
+  <div class="layout"><aside class="sidebar"><div class="side-title">产品中心</div>
+      <div class="menu-group">
+        <div class="menu-parent active"><a class="menu-item active" href="product-catalog.html">产品目录</a><button class="toggle-arrow" onclick="this.closest('.menu-group').classList.toggle('collapsed')">▼</button></div>
+        <div class="menu-children">
+          <a class="menu-item sub" href="product-catalog.html">产品目录</a>
+          <a class="menu-item sub active" href="product-policy.html">产品政策</a>
+        </div>
+      </div>
+      <div class="menu-group">
+        <div class="menu-parent"><a class="menu-item" href="product-management.html">产品管理</a><button class="toggle-arrow" onclick="this.closest('.menu-group').classList.toggle('collapsed')">▼</button></div>
+        <div class="menu-children">
+          <a class="menu-item sub" href="product-list.html">产品列表</a>
+          <a class="menu-item sub" href="product-component-pool.html">组件池</a>
+        </div>
+      </div></aside>
+  <main class="content">
+    <section class="panel" style="padding:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div>
+          <h3 style="margin:0 0 6px;font-size:20px;color:#223255;">产品政策</h3>
+          <p style="margin:0;color:#7386a7;font-size:14px;">年度产品政策，点击链接可直接访问。</p>
+        </div>
+        <button onclick="document.getElementById('upload-modal').style.display='flex'" style="border:none;background:#1677ff;color:#fff;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;white-space:nowrap;">上传政策</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;" id="policy-table">
+        <thead>
+          <tr style="background:#f8fbff;color:#627392;font-weight:600;">
+            <th style="padding:12px 14px;text-align:left;border-bottom:1px solid #e8eef8;width:40px;">#</th>
+            <th style="padding:12px 14px;text-align:left;border-bottom:1px solid #e8eef8;">所属年份</th>
+            <th style="padding:12px 14px;text-align:left;border-bottom:1px solid #e8eef8;">政策分类</th>
+            <th style="padding:12px 14px;text-align:left;border-bottom:1px solid #e8eef8;">文档名称</th>
+            <th style="padding:12px 14px;text-align:left;border-bottom:1px solid #e8eef8;">文档链接</th>
+            <th style="padding:12px 14px;text-align:left;border-bottom:1px solid #e8eef8;width:100px;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="policy-body">
+          <tr>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;color:#8a99b4;">1</td>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;color:#4b5f84;">2026</td>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;"><span style="background:#edf4ff;color:#3f75cb;border:1px solid #d3e4ff;border-radius:5px;padding:2px 8px;font-size:12px;">产品政策</span></td>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;color:#1f314f;font-weight:500;">WPS365 政务产品采购政策（2026版）</td>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;"><a href="https://example.com/policy/wps365-procurement-2026.pdf" target="_blank" rel="noopener noreferrer" style="color:#1677ff;text-decoration:none;word-break:break-all;">https://example.com/policy/wps365-procurement-2026.pdf</a></td>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;"><button onclick="editRow(this)" style="border:none;background:none;color:#1677ff;cursor:pointer;font-size:13px;padding:0 6px;">编辑</button><button onclick="deleteRow(this)" style="border:none;background:none;color:#e5382f;cursor:pointer;font-size:13px;padding:0 6px;">删除</button></td>
+          </tr>
+          <tr>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;color:#8a99b4;">2</td>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;color:#4b5f84;">2026</td>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;"><span style="background:#fff7e6;color:#d48806;border:1px solid #ffe4a3;border-radius:5px;padding:2px 8px;font-size:12px;">价格政策</span></td>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;color:#1f314f;font-weight:500;">云服务产品定价与折扣管理办法</td>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;"><a href="https://example.com/policy/cloud-pricing-rule.pdf" target="_blank" rel="noopener noreferrer" style="color:#1677ff;text-decoration:none;word-break:break-all;">https://example.com/policy/cloud-pricing-rule.pdf</a></td>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;"><button onclick="editRow(this)" style="border:none;background:none;color:#1677ff;cursor:pointer;font-size:13px;padding:0 6px;">编辑</button><button onclick="deleteRow(this)" style="border:none;background:none;color:#e5382f;cursor:pointer;font-size:13px;padding:0 6px;">删除</button></td>
+          </tr>
+          <tr>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;color:#8a99b4;">3</td>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;color:#4b5f84;">2025</td>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;"><span style="background:#edf4ff;color:#3f75cb;border:1px solid #d3e4ff;border-radius:5px;padding:2px 8px;font-size:12px;">产品政策</span></td>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;color:#1f314f;font-weight:500;">渠道合作与授权合规指引</td>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;"><a href="https://example.com/policy/channel-compliance-guide.pdf" target="_blank" rel="noopener noreferrer" style="color:#1677ff;text-decoration:none;word-break:break-all;">https://example.com/policy/channel-compliance-guide.pdf</a></td>
+            <td style="padding:12px 14px;border-bottom:1px solid #eef3fa;"><button onclick="editRow(this)" style="border:none;background:none;color:#1677ff;cursor:pointer;font-size:13px;padding:0 6px;">编辑</button><button onclick="deleteRow(this)" style="border:none;background:none;color:#e5382f;cursor:pointer;font-size:13px;padding:0 6px;">删除</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <div id="upload-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.35);z-index:100;align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:14px;width:480px;max-width:92vw;box-shadow:0 12px 40px rgba(20,40,80,.15);padding:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+          <h4 id="modal-title" style="margin:0;font-size:18px;color:#223255;">上传政策文件</h4>
+          <span onclick="closeModal()" style="cursor:pointer;font-size:22px;color:#8a99b4;line-height:1;">&times;</span>
+        </div>
+        <form id="upload-form" style="display:flex;flex-direction:column;gap:14px;">
+          <div>
+            <label style="display:block;font-size:13px;color:#4b5f84;margin-bottom:5px;">所属年份</label>
+            <div style="position:relative;" id="year-picker">
+              <input id="f-year-input" type="text" placeholder="输入或选择年份" autocomplete="off" style="width:100%;height:38px;border:1px solid #dce6f5;border-radius:8px;padding:0 12px;font-size:14px;background:#fbfdff;outline:none;cursor:pointer;" onfocus="showYearDropdown()" oninput="filterYears()" />
+              <input id="f-year" type="hidden" value="" />
+              <div id="year-dropdown" style="display:none;position:absolute;top:42px;left:0;right:0;background:#fff;border:1px solid #dce6f5;border-radius:8px;box-shadow:0 6px 16px rgba(20,40,80,.1);max-height:200px;overflow-y:auto;z-index:10;"></div>
+            </div>
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;color:#4b5f84;margin-bottom:5px;">政策分类</label>
+            <select id="f-category" style="width:100%;height:38px;border:1px solid #dce6f5;border-radius:8px;padding:0 12px;font-size:14px;background:#fbfdff;outline:none;">
+              <option value="产品政策">产品政策</option>
+              <option value="价格政策">价格政策</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;color:#4b5f84;margin-bottom:5px;">文档名称</label>
+            <input id="f-name" type="text" placeholder="请输入政策文档名称" required style="width:100%;height:38px;border:1px solid #dce6f5;border-radius:8px;padding:0 12px;font-size:14px;background:#fbfdff;outline:none;" />
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;color:#4b5f84;margin-bottom:5px;">文档链接</label>
+            <input id="f-link" type="url" placeholder="https://..." required style="width:100%;height:38px;border:1px solid #dce6f5;border-radius:8px;padding:0 12px;font-size:14px;background:#fbfdff;outline:none;" />
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:4px;">
+            <button type="button" onclick="closeModal()" style="border:1px solid #d8e4f8;background:#fff;color:#4b628f;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;">取消</button>
+            <button type="submit" style="border:none;background:#1677ff;color:#fff;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;">确认提交</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+var editingRow = null;
+var tdStyle = 'padding:12px 14px;border-bottom:1px solid #eef3fa;';
+var catStyles = {
+  '产品政策': 'background:#edf4ff;color:#3f75cb;border:1px solid #d3e4ff;border-radius:5px;padding:2px 8px;font-size:12px;',
+  '价格政策': 'background:#fff7e6;color:#d48806;border:1px solid #ffe4a3;border-radius:5px;padding:2px 8px;font-size:12px;'
+};
+
+function closeModal() {
+  document.getElementById('upload-modal').style.display = 'none';
+  editingRow = null;
+  document.getElementById('modal-title').textContent = '上传政策文件';
+  document.getElementById('upload-form').reset();
+  var cy = new Date().getFullYear().toString();
+  document.getElementById('f-year-input').value = cy;
+  document.getElementById('f-year').value = cy;
+}
+
+function reindex() {
+  var rows = document.getElementById('policy-body').rows;
+  for (var i = 0; i < rows.length; i++) {
+    rows[i].cells[0].textContent = i + 1;
+  }
+}
+
+function buildRowHTML(year, cat, name, link) {
+  var cs = catStyles[cat] || catStyles['产品政策'];
+  return '<td style="' + tdStyle + 'color:#8a99b4;"></td>' +
+    '<td style="' + tdStyle + 'color:#4b5f84;">' + year + '</td>' +
+    '<td style="' + tdStyle + '"><span style="' + cs + '">' + cat + '</span></td>' +
+    '<td style="' + tdStyle + 'color:#1f314f;font-weight:500;">' + name + '</td>' +
+    '<td style="' + tdStyle + '"><a href="' + link + '" target="_blank" rel="noopener noreferrer" style="color:#1677ff;text-decoration:none;word-break:break-all;">' + link + '</a></td>' +
+    '<td style="' + tdStyle + '"><button onclick="editRow(this)" style="border:none;background:none;color:#1677ff;cursor:pointer;font-size:13px;padding:0 6px;">编辑</button><button onclick="deleteRow(this)" style="border:none;background:none;color:#e5382f;cursor:pointer;font-size:13px;padding:0 6px;">删除</button></td>';
+}
+
+function editRow(btn) {
+  var row = btn.closest('tr');
+  editingRow = row;
+  var yearVal = row.cells[1].textContent.trim();
+  document.getElementById('f-year').value = yearVal;
+  document.getElementById('f-year-input').value = yearVal;
+  document.getElementById('f-category').value = row.cells[2].textContent.trim();
+  document.getElementById('f-name').value = row.cells[3].textContent.trim();
+  var a = row.cells[4].querySelector('a');
+  document.getElementById('f-link').value = a ? a.href : '';
+  document.getElementById('modal-title').textContent = '编辑政策文件';
+  document.getElementById('upload-modal').style.display = 'flex';
+}
+
+function deleteRow(btn) {
+  if (!confirm('确认删除该条政策？')) return;
+  btn.closest('tr').remove();
+  reindex();
+}
+
+document.getElementById('upload-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var year = document.getElementById('f-year').value;
+  var cat = document.getElementById('f-category').value;
+  var name = document.getElementById('f-name').value;
+  var link = document.getElementById('f-link').value;
+
+  if (editingRow) {
+    editingRow.innerHTML = buildRowHTML(year, cat, name, link);
+    reindex();
+    closeModal();
+  } else {
+    var tbody = document.getElementById('policy-body');
+    var row = tbody.insertRow(0);
+    row.innerHTML = buildRowHTML(year, cat, name, link);
+    reindex();
+    closeModal();
+  }
+});
+
+var yearOptions = ['2028','2027','2026','2025','2024','2023','2022','2021'];
+var yearDropdown = document.getElementById('year-dropdown');
+var yearInput = document.getElementById('f-year-input');
+var yearHidden = document.getElementById('f-year');
+
+function renderYearList(filter) {
+  var list = yearOptions.filter(function(y) { return !filter || y.indexOf(filter) !== -1; });
+  yearDropdown.innerHTML = list.map(function(y) {
+    return '<div style="padding:8px 14px;cursor:pointer;font-size:14px;color:#1f314f;" onmousedown="selectYear(\'' + y + '\')" onmouseenter="this.style.background=\'#f0f5ff\'" onmouseleave="this.style.background=\'#fff\'">' + y + '</div>';
+  }).join('');
+  if (list.length === 0) {
+    yearDropdown.innerHTML = '<div style="padding:8px 14px;color:#8a99b4;font-size:13px;">无匹配年份</div>';
+  }
+}
+
+function showYearDropdown() {
+  renderYearList(yearInput.value.trim());
+  yearDropdown.style.display = 'block';
+}
+
+function filterYears() {
+  renderYearList(yearInput.value.trim());
+}
+
+function selectYear(y) {
+  yearInput.value = y;
+  yearHidden.value = y;
+  yearDropdown.style.display = 'none';
+}
+
+yearInput.addEventListener('blur', function() {
+  setTimeout(function() { yearDropdown.style.display = 'none'; }, 150);
+});
+
+var currentYear = new Date().getFullYear().toString();
+yearInput.value = currentYear;
+yearHidden.value = currentYear;
+</script>
+</body>
+</html>

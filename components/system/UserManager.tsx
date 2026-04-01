@@ -784,13 +784,26 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
 
                               {/* Functional Permissions - 三级树 */}
                               {roleConfigTab === 'FUNCTIONAL' && (
-                              <div className="animate-fade-in space-y-1">
+                              <div className="animate-fade-in">
                                   {/* 全选 / 全不选 快捷操作 */}
                                   <div className="flex items-center justify-between mb-3 px-1">
                                       <span className="text-xs text-gray-400 dark:text-gray-500">
                                           已选 <strong className="text-[#0071E3]">{(roleForm.permissions || []).length}</strong> 个权限点
                                       </span>
                                       <div className="flex gap-2">
+                                          <button
+                                              onClick={() => {
+                                                  setExpandedGroups(permissionTree.map(g => g.id));
+                                                  setExpandedSubgroups(permissionTree.flatMap(g => g.subgroups.map(sg => sg.id)));
+                                              }}
+                                              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:underline"
+                                          >展开全部</button>
+                                          <span className="text-gray-300 dark:text-gray-600">|</span>
+                                          <button
+                                              onClick={() => { setExpandedGroups([]); setExpandedSubgroups([]); }}
+                                              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:underline"
+                                          >折叠全部</button>
+                                          <span className="text-gray-300 dark:text-gray-600">|</span>
                                           <button
                                               onClick={() => setRoleForm({ ...roleForm, permissions: permissionTree.flatMap(g => g.subgroups.flatMap(sg => sg.permissions.map(p => p.id))) })}
                                               className="text-xs text-[#0071E3] hover:underline"
@@ -803,25 +816,22 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                       </div>
                                   </div>
 
-                                  {permissionTree.map(group => {
+                                  <div className="border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden bg-white dark:bg-[#1C1C1E]">
+                                  {permissionTree.map((group, gIdx) => {
                                       const current      = roleForm.permissions || [];
                                       const groupPerms   = allPermsInGroup(group);
                                       const groupState   = getCheckState(groupPerms, current);
                                       const isGroupOpen  = expandedGroups.includes(group.id);
 
                                       return (
-                                          <div key={group.id} className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
+                                          <div key={group.id} className={gIdx > 0 ? 'border-t border-gray-100 dark:border-white/10' : ''}>
                                               {/* ── 一级：模块组 ── */}
                                               <div
-                                                  className={`flex items-center gap-2 px-4 py-3 cursor-pointer select-none transition-colors
-                                                      ${groupState !== 'none'
-                                                          ? 'bg-blue-50/60 dark:bg-blue-900/10'
-                                                          : 'bg-gray-50 dark:bg-white/5'
-                                                      }`}
+                                                  className={`flex items-center gap-2.5 px-4 py-2.5 select-none transition-colors ${groupState !== 'none' ? 'bg-blue-50/50 dark:bg-blue-900/10' : 'hover:bg-gray-50/50 dark:hover:bg-white/[0.02]'}`}
                                               >
                                                   <button
                                                       onClick={() => toggleGroupExpand(group.id)}
-                                                      className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
+                                                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
                                                   >
                                                       {isGroupOpen
                                                           ? <ChevronDown className="w-4 h-4"/>
@@ -830,7 +840,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                   </button>
                                                   <div
                                                       onClick={() => toggleModule(group.id)}
-                                                      className="flex items-center gap-2.5 flex-1 cursor-pointer group"
+                                                      className="flex items-center gap-2 flex-1 cursor-pointer group"
                                                   >
                                                       <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0
                                                           ${groupState === 'all'  ? 'bg-blue-600 border-blue-600' :
@@ -839,99 +849,86 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                           {groupState !== 'none' && <Check className="w-3 h-3 text-white"/>}
                                                       </div>
                                                       <span className="font-bold text-sm text-gray-800 dark:text-gray-100">{group.label}</span>
-                                                      <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">
-                                                          ({groupPerms.filter(id => current.includes(id)).length}/{groupPerms.length})
+                                                      <span className="text-[11px] text-gray-400 dark:text-gray-500 font-mono">
+                                                          {groupPerms.filter(id => current.includes(id)).length}/{groupPerms.length}
                                                       </span>
                                                   </div>
                                               </div>
 
                                               {/* ── 二级：子模块 ── */}
-                                              {isGroupOpen && (
-                                                  <div className="divide-y divide-gray-100 dark:divide-white/5">
-                                                      {group.subgroups.map(sg => {
-                                                          if (sg.dependsOn && !current.includes(sg.dependsOn)) return null;
-                                                          const sgPerms   = allPermsInSubgroup(sg);
-                                                          const sgState   = getCheckState(sgPerms, current);
-                                                          const isSgOpen  = expandedSubgroups.includes(sg.id);
+                                              {isGroupOpen && group.subgroups.map(sg => {
+                                                  if (sg.dependsOn && !current.includes(sg.dependsOn)) return null;
+                                                  const sgPerms   = allPermsInSubgroup(sg);
+                                                  const sgState   = getCheckState(sgPerms, current);
+                                                  const isSgOpen  = expandedSubgroups.includes(sg.id);
 
-                                                          return (
-                                                              <div key={sg.id} className="bg-white dark:bg-[#1C1C1E]">
-                                                                  <div
-                                                                      className={`flex items-center gap-2 pl-10 pr-4 py-2.5 cursor-pointer select-none transition-colors
-                                                                          ${sgState !== 'none'
-                                                                              ? 'bg-blue-50/40 dark:bg-blue-900/5'
-                                                                              : 'hover:bg-gray-50 dark:hover:bg-white/3'
-                                                                          }`}
-                                                                  >
-                                                                      <button
-                                                                          onClick={() => toggleSubgroupExpand(sg.id)}
-                                                                          className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
-                                                                      >
-                                                                          {isSgOpen
-                                                                              ? <ChevronDown className="w-3.5 h-3.5"/>
-                                                                              : <ChevronRight className="w-3.5 h-3.5"/>
-                                                                          }
-                                                                      </button>
-                                                                      <div
-                                                                          onClick={() => toggleSubgroupPerms(sg)}
-                                                                          className="flex items-center gap-2 flex-1 cursor-pointer group"
-                                                                      >
-                                                                          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0
-                                                                              ${sgState === 'all'  ? 'bg-blue-600 border-blue-600' :
-                                                                                sgState === 'some' ? 'bg-blue-400/60 border-blue-400' :
-                                                                                'border-gray-300 bg-white dark:bg-transparent dark:border-gray-600 group-hover:border-blue-400'}`}>
-                                                                              {sgState !== 'none' && <Check className="w-2.5 h-2.5 text-white"/>}
-                                                                          </div>
-                                                                          <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">{sg.label}</span>
-                                                                          <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">
-                                                                              ({sgPerms.filter(id => current.includes(id)).length}/{sgPerms.length})
-                                                                          </span>
-                                                                      </div>
+                                                  return (
+                                                      <div key={sg.id}>
+                                                          <div
+                                                              className={`flex items-center gap-2.5 py-2 pr-4 select-none transition-colors ${sgState !== 'none' ? 'bg-blue-50/30 dark:bg-blue-900/5' : 'hover:bg-gray-50/50 dark:hover:bg-white/[0.02]'}`}
+                                                              style={{ paddingLeft: 44 }}
+                                                          >
+                                                              <div className="w-px h-4 bg-gray-200 dark:bg-white/10 -ml-[1px] mr-1 shrink-0"/>
+                                                              <button
+                                                                  onClick={() => toggleSubgroupExpand(sg.id)}
+                                                                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
+                                                              >
+                                                                  {isSgOpen
+                                                                      ? <ChevronDown className="w-3.5 h-3.5"/>
+                                                                      : <ChevronRight className="w-3.5 h-3.5"/>
+                                                                  }
+                                                              </button>
+                                                              <div
+                                                                  onClick={() => toggleSubgroupPerms(sg)}
+                                                                  className="flex items-center gap-2 flex-1 cursor-pointer group"
+                                                              >
+                                                                  <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0
+                                                                      ${sgState === 'all'  ? 'bg-blue-600 border-blue-600' :
+                                                                        sgState === 'some' ? 'bg-blue-400/60 border-blue-400' :
+                                                                        'border-gray-300 bg-white dark:bg-transparent dark:border-gray-600 group-hover:border-blue-400'}`}>
+                                                                      {sgState !== 'none' && <Check className="w-2.5 h-2.5 text-white"/>}
                                                                   </div>
-
-                                                                  {/* ── 三级：权限点 ── */}
-                                                                  {isSgOpen && (
-                                                                      <div className="pl-16 pr-4 pb-3 pt-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
-                                                                          {sg.permissions.map(perm => {
-                                                                              const isChecked = current.includes(perm.id);
-                                                                              return (
-                                                                                  <div
-                                                                                      key={perm.id}
-                                                                                      onClick={() => togglePermission(perm.id)}
-                                                                                      className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all
-                                                                                          ${isChecked
-                                                                                              ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700/50'
-                                                                                              : 'border-transparent hover:bg-gray-50 dark:hover:bg-white/5 hover:border-gray-200 dark:hover:border-white/10'
-                                                                                          }`}
-                                                                                  >
-                                                                                      <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 mt-0.5
-                                                                                          ${isChecked
-                                                                                              ? 'bg-blue-600 border-blue-600'
-                                                                                              : 'border-gray-300 bg-white dark:bg-transparent dark:border-gray-600'
-                                                                                          }`}>
-                                                                                          {isChecked && <Check className="w-2.5 h-2.5 text-white"/>}
-                                                                                      </div>
-                                                                                      <div>
-                                                                                          <div className={`text-sm leading-tight ${isChecked ? 'text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>
-                                                                                              {perm.label}
-                                                                                          </div>
-                                                                                          {perm.desc && (
-                                                                                              <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 leading-snug">{perm.desc}</div>
-                                                                                          )}
-                                                                                      </div>
-                                                                                  </div>
-                                                                              );
-                                                                          })}
-                                                                      </div>
-                                                                  )}
+                                                                  <span className="text-[13px] font-semibold text-gray-700 dark:text-gray-300">{sg.label}</span>
+                                                                  <span className="text-[11px] text-gray-400 dark:text-gray-500 font-mono">
+                                                                      {sgPerms.filter(id => current.includes(id)).length}/{sgPerms.length}
+                                                                  </span>
                                                               </div>
-                                                          );
-                                                      })}
-                                                  </div>
-                                              )}
+                                                          </div>
+
+                                                          {/* ── 三级：权限点 ── */}
+                                                          {isSgOpen && sg.permissions.map(perm => {
+                                                              const isChecked = current.includes(perm.id);
+                                                              return (
+                                                                  <div
+                                                                      key={perm.id}
+                                                                      onClick={() => togglePermission(perm.id)}
+                                                                      className={`flex items-center gap-2.5 py-1.5 pr-4 cursor-pointer select-none transition-colors ${isChecked ? 'bg-blue-50/20 dark:bg-blue-900/5' : 'hover:bg-gray-50/50 dark:hover:bg-white/[0.02]'}`}
+                                                                      style={{ paddingLeft: 72 }}
+                                                                  >
+                                                                      <div className="w-px h-4 bg-gray-200 dark:bg-white/10 -ml-[1px] mr-1 shrink-0"/>
+                                                                      <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0
+                                                                          ${isChecked
+                                                                              ? 'bg-blue-600 border-blue-600'
+                                                                              : 'border-gray-300 bg-white dark:bg-transparent dark:border-gray-600'
+                                                                          }`}>
+                                                                          {isChecked && <Check className="w-2.5 h-2.5 text-white"/>}
+                                                                      </div>
+                                                                      <span className={`text-sm flex-1 ${isChecked ? 'text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-600 dark:text-gray-400'}`}>
+                                                                          {perm.label}
+                                                                      </span>
+                                                                      {perm.desc && (
+                                                                          <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[200px]">{perm.desc}</span>
+                                                                      )}
+                                                                  </div>
+                                                              );
+                                                          })}
+                                                      </div>
+                                                  );
+                                              })}
                                           </div>
                                       );
                                   })}
+                                  </div>
                               </div>
                               )}
 
@@ -1294,51 +1291,118 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                               {/* Column Data Permissions */}
                               {roleConfigTab === 'COLUMN' && (
                               <div className="animate-fade-in">
-                                  <div className="bg-gray-50 dark:bg-black/20 p-6 rounded-2xl border border-gray-100 dark:border-white/5 space-y-6">
-                                      {/* Resource Selection */}
-                                      <div className="flex gap-4 border-b border-gray-200 dark:border-white/10 pb-4">
-                                          {columnConfig.map(res => (
-                                              <button
-                                                  key={res.id}
-                                                  onClick={() => setSelectedColumnResource(res.id)}
-                                                  className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${selectedColumnResource === res.id ? 'bg-blue-600 text-white shadow-apple' : 'bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'}`}
-                                              >
-                                                  {res.label}
-                                              </button>
-                                          ))}
+                                  <div className="bg-gray-50 dark:bg-black/20 rounded-2xl border border-gray-100 dark:border-white/5 flex overflow-hidden min-h-[420px]">
+                                      {/* Left: Resource List */}
+                                      <div className="w-[180px] min-w-[180px] border-r border-gray-200 dark:border-white/10 bg-white/60 dark:bg-white/[0.02] flex flex-col">
+                                          <div className="px-4 pt-4 pb-2">
+                                              <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">数据资源</div>
+                                          </div>
+                                          <div className="flex-1 px-2 pb-2 space-y-0.5">
+                                              {columnConfig.map(res => {
+                                                  const rule = roleForm.columnPermissions?.find(r => r.resource === res.id);
+                                                  const checkedCount = rule ? rule.allowedColumns.length : 0;
+                                                  const isActive = selectedColumnResource === res.id;
+                                                  return (
+                                                      <button
+                                                          key={res.id}
+                                                          onClick={() => setSelectedColumnResource(res.id)}
+                                                          className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all ${isActive ? 'bg-purple-50 dark:bg-purple-900/20 shadow-sm' : 'hover:bg-gray-100 dark:hover:bg-white/5'}`}
+                                                      >
+                                                          <div className={`w-2 h-2 rounded-full flex-shrink-0 transition-colors ${isActive ? 'bg-purple-500' : 'bg-gray-300 dark:bg-gray-600'}`}/>
+                                                          <div className="flex-1 min-w-0">
+                                                              <div className={`text-sm font-semibold truncate ${isActive ? 'text-purple-700 dark:text-purple-300' : 'text-gray-700 dark:text-gray-300'}`}>{res.label}</div>
+                                                              <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                                                                  {checkedCount > 0 ? `${checkedCount}/${res.columns.length} 列可见` : `${res.columns.length} 个数据列`}
+                                                              </div>
+                                                          </div>
+                                                          {checkedCount > 0 && (
+                                                              <span className="w-5 h-5 rounded-full bg-purple-500 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{checkedCount}</span>
+                                                          )}
+                                                      </button>
+                                                  );
+                                              })}
+                                          </div>
                                       </div>
 
-                                      {/* Columns Selection */}
-                                      {columnConfig.find(r => r.id === selectedColumnResource) && (
-                                          <div className="space-y-6">
-                                              <div className="flex items-center gap-4">
-                                                  <span className="text-sm font-bold text-gray-700 dark:text-gray-300 w-20">可见列</span>
-                                                  <div className="flex gap-4 flex-wrap">
-                                                      {columnConfig.find(r => r.id === selectedColumnResource)?.columns.map(col => {
-                                                          const rule = roleForm.columnPermissions?.find(r => r.resource === selectedColumnResource);
-                                                          const isChecked = rule ? rule.allowedColumns.includes(col.id) : false;
-                                                          return (
-                                                              <label key={col.id} className="flex items-center gap-2 cursor-pointer group">
-                                                                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isChecked ? 'bg-blue-600 border-blue-600' : 'border-gray-300 bg-white dark:bg-transparent dark:border-gray-600 group-hover:border-blue-400'}`}>
-                                                                      {isChecked && <Check className="w-3 h-3 text-white"/>}
-                                                                  </div>
-                                                                  <input 
-                                                                      type="checkbox" 
-                                                                      className="hidden" 
-                                                                      checked={isChecked} 
-                                                                      onChange={() => toggleColumn(col.id)} 
-                                                                  />
-                                                                  <span className="text-sm text-gray-700 dark:text-gray-300">{col.label}</span>
-                                                              </label>
-                                                          );
-                                                      })}
-                                                  </div>
-                                              </div>
-                                              <div className="text-center py-4 text-gray-400 text-sm italic border-t border-gray-200 dark:border-white/10">
-                                                  勾选代表该角色可以查看对应的数据列。如果不勾选任何列，则默认可见所有基础列。
-                                              </div>
-                                          </div>
-                                      )}
+                                      {/* Right: Column Permission Config */}
+                                      <div className="flex-1 p-5 space-y-5 overflow-y-auto">
+                                          {(() => {
+                                              const resConfig = columnConfig.find(r => r.id === selectedColumnResource);
+                                              if (!resConfig) return null;
+                                              const rule = roleForm.columnPermissions?.find(r => r.resource === selectedColumnResource);
+                                              const checkedCount = rule ? rule.allowedColumns.length : 0;
+                                              return (
+                                                  <>
+                                                      <div className="flex items-start justify-between gap-3">
+                                                          <div>
+                                                              <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200">{resConfig.label} — 列权限配置</h4>
+                                                              <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">勾选代表该角色可以查看对应的数据列</p>
+                                                          </div>
+                                                          <div className="flex items-center gap-2">
+                                                              <button
+                                                                  onClick={() => {
+                                                                      const allColIds = resConfig.columns.map(c => c.id);
+                                                                      const currentRules = roleForm.columnPermissions || [];
+                                                                      const existingRule = currentRules.find(r => r.resource === selectedColumnResource);
+                                                                      if (existingRule) {
+                                                                          setRoleForm(prev => ({
+                                                                              ...prev,
+                                                                              columnPermissions: prev.columnPermissions?.map(r =>
+                                                                                  r.resource === selectedColumnResource ? { ...r, allowedColumns: allColIds } : r
+                                                                              )
+                                                                          }));
+                                                                      } else {
+                                                                          setRoleForm(prev => ({
+                                                                              ...prev,
+                                                                              columnPermissions: [...currentRules, { resource: selectedColumnResource, allowedColumns: allColIds }]
+                                                                          }));
+                                                                      }
+                                                                  }}
+                                                                  className="text-xs text-purple-600 dark:text-purple-400 hover:underline font-medium"
+                                                              >全选</button>
+                                                              <span className="text-gray-300 dark:text-gray-600">|</span>
+                                                              <button
+                                                                  onClick={() => {
+                                                                      setRoleForm(prev => ({
+                                                                          ...prev,
+                                                                          columnPermissions: (prev.columnPermissions || []).filter(r => r.resource !== selectedColumnResource)
+                                                                      }));
+                                                                  }}
+                                                                  className="text-xs text-gray-500 dark:text-gray-400 hover:underline font-medium"
+                                                              >全不选</button>
+                                                          </div>
+                                                      </div>
+
+                                                      <div className="space-y-2">
+                                                          {resConfig.columns.map(col => {
+                                                              const isChecked = rule ? rule.allowedColumns.includes(col.id) : false;
+                                                              return (
+                                                                  <label
+                                                                      key={col.id}
+                                                                      className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${
+                                                                          isChecked
+                                                                              ? 'bg-purple-50 dark:bg-purple-900/15 border-purple-200 dark:border-purple-800/40'
+                                                                              : 'bg-white dark:bg-white/[0.02] border-gray-100 dark:border-white/10 hover:border-purple-200 dark:hover:border-purple-800/30'
+                                                                      }`}
+                                                                  >
+                                                                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${isChecked ? 'bg-purple-500 border-purple-500' : 'border-gray-300 dark:border-gray-600'}`}>
+                                                                          {isChecked && <Check className="w-3 h-3 text-white"/>}
+                                                                      </div>
+                                                                      <input type="checkbox" className="hidden" checked={isChecked} onChange={() => toggleColumn(col.id)} />
+                                                                      <span className={`text-sm font-medium ${isChecked ? 'text-purple-700 dark:text-purple-300' : 'text-gray-600 dark:text-gray-400'}`}>{col.label}</span>
+                                                                      {isChecked && <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-500 dark:text-purple-400 font-bold">可见</span>}
+                                                                  </label>
+                                                              );
+                                                          })}
+                                                      </div>
+
+                                                      <div className="text-xs text-gray-400 dark:text-gray-500 italic pt-2 border-t border-gray-200/60 dark:border-white/10">
+                                                          已选 <strong className="text-purple-600 dark:text-purple-400">{checkedCount}</strong> / {resConfig.columns.length} 列可见{checkedCount === 0 && '，默认可见所有基础列'}
+                                                      </div>
+                                                  </>
+                                              );
+                                          })()}
+                                      </div>
                                   </div>
                               </div>
                               )}
@@ -1428,37 +1492,59 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                   ({(roleForm.permissions || []).length} 个权限点)
                                               </span>
                                           </h3>
-                                          <div className="space-y-1">
-                                              {permissionTree.map(group => {
+                                          {(roleForm.permissions || []).length === 0 ? (
+                                              <div className="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-lg">暂未配置任何功能权限</div>
+                                          ) : (
+                                              <div className="border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden bg-white dark:bg-[#1C1C1E]">
+                                              {permissionTree.map((group, gIdx) => {
                                                   const current    = roleForm.permissions || [];
                                                   const groupPerms = allPermsInGroup(group);
                                                   const groupState = getCheckState(groupPerms, current);
                                                   if (groupState === 'none') return null;
                                                   return (
-                                                      <div key={group.id} className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
-                                                          <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-50/60 dark:bg-blue-900/10">
+                                                      <div key={group.id} className={gIdx > 0 ? 'border-t border-gray-100 dark:border-white/10' : ''}>
+                                                          <div className="flex items-center gap-2.5 px-4 py-2 bg-blue-50/50 dark:bg-blue-900/10">
                                                               <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${groupState === 'all' ? 'bg-blue-600 border-blue-600' : 'bg-blue-400/60 border-blue-400'}`}>
                                                                   <Check className="w-2.5 h-2.5 text-white"/>
                                                               </div>
                                                               <span className="font-bold text-sm text-gray-800 dark:text-gray-100">{group.label}</span>
-                                                              <span className="text-xs text-blue-500 dark:text-blue-400 ml-auto">
+                                                              <span className="text-[11px] text-blue-500 dark:text-blue-400 ml-auto font-mono">
                                                                   {groupPerms.filter(id => current.includes(id)).length}/{groupPerms.length}
                                                               </span>
                                                           </div>
-                                                          <div className="px-4 py-2.5 bg-white dark:bg-[#1C1C1E] flex flex-wrap gap-2">
-                                                              {group.subgroups.flatMap(sg => sg.permissions).filter(p => current.includes(p.id)).map(p => (
-                                                                  <span key={p.id} className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-xs font-medium border border-blue-100 dark:border-blue-800/30">
-                                                                      {p.label}
-                                                                  </span>
-                                                              ))}
-                                                          </div>
+                                                          {group.subgroups.map(sg => {
+                                                              const sgPerms = allPermsInSubgroup(sg);
+                                                              const sgState = getCheckState(sgPerms, current);
+                                                              if (sgState === 'none') return null;
+                                                              return (
+                                                                  <div key={sg.id}>
+                                                                      <div className="flex items-center gap-2.5 py-1.5 pr-4" style={{ paddingLeft: 36 }}>
+                                                                          <div className="w-px h-4 bg-gray-200 dark:bg-white/10 -ml-[1px] mr-1 shrink-0"/>
+                                                                          <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${sgState === 'all' ? 'bg-blue-600 border-blue-600' : 'bg-blue-400/60 border-blue-400'}`}>
+                                                                              <Check className="w-2 h-2 text-white"/>
+                                                                          </div>
+                                                                          <span className="text-[13px] font-semibold text-gray-700 dark:text-gray-300">{sg.label}</span>
+                                                                          <span className="text-[11px] text-gray-400 dark:text-gray-500 font-mono">
+                                                                              {sgPerms.filter(id => current.includes(id)).length}/{sgPerms.length}
+                                                                          </span>
+                                                                      </div>
+                                                                      {sg.permissions.filter(p => current.includes(p.id)).map(perm => (
+                                                                          <div key={perm.id} className="flex items-center gap-2.5 py-1 pr-4" style={{ paddingLeft: 64 }}>
+                                                                              <div className="w-px h-3.5 bg-gray-200 dark:bg-white/10 -ml-[1px] mr-1 shrink-0"/>
+                                                                              <div className="w-3 h-3 rounded border bg-blue-600 border-blue-600 flex items-center justify-center shrink-0">
+                                                                                  <Check className="w-2 h-2 text-white"/>
+                                                                              </div>
+                                                                              <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">{perm.label}</span>
+                                                                          </div>
+                                                                      ))}
+                                                                  </div>
+                                                              );
+                                                          })}
                                                       </div>
                                                   );
                                               })}
-                                              {(roleForm.permissions || []).length === 0 && (
-                                                  <div className="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-lg">暂未配置任何功能权限</div>
-                                              )}
-                                          </div>
+                                              </div>
+                                          )}
                                       </div>
 
                                       {/* 数据行权限 */}

@@ -125,7 +125,7 @@ export const initialAuthTypes: AuthTypeData[] = [
 // --- Products ---
 export const initialProducts: Product[] = [
   {
-    id: 'AB0002807', name: 'WPS协作办公系统V7.1', category: '私有云单品', subCategory: 'WPS协作', status: 'OnShelf', tags: ['生态'], productType: 'WPS协作', onlineDelivery: 'WPS+第三方产品', productClass: 'WPS软件业务', productClassification: '非端', productSeries: 'WPS协作/协作中台', productCategory: '软件', productLine: 'WPS365私有云', productClassFinance: 'WPS365', productLineFinance: 'WPS365私有云', productSeriesFinance: 'WPS协作', maintenanceContent: '/', maintenanceStandard: '/', hasUpgradeWarranty: false, hasAfterSalesService: false, salesOrgName: '珠海金山办公软件有限公司', businessDeliveryName: '协作办公助手软件', taxRefundType: '非退税',
+    id: 'AB0002807', name: 'WPS协作办公系统V7.1', category: '私有云单品', subCategory: 'WPS协作', status: 'OnShelf', tags: ['生态'], productType: 'WPS协作', onlineDelivery: 'WPS+第三方产品', productClass: 'WPS软件业务', productClassification: '非端', productSeries: 'WPS协作/协作中台', productCategory: '软件', productLine: 'WPS365私有云', productClassFinance: 'WPS365', productLineFinance: 'WPS365私有云', productSeriesFinance: 'WPS协作', maintenanceContent: '/', maintenanceStandard: '/', hasUpgradeWarranty: false, hasAfterSalesService: false, salesOrgName: '珠海金山办公有限公司', businessDeliveryName: '协作办公助手软件', taxRefundType: '非退税',
     linkedServices: [
       { productId: 'AB0002635', productName: 'WPS文档中心系统技术服务', skuId: 'SKU0018029', skuName: '文档中心系统A包', required: false, remark: '推荐配套技术服务' },
     ],
@@ -136,7 +136,7 @@ export const initialProducts: Product[] = [
     composition: [{id:'AC023',name:'WPS协作办公系统',type:'Component'}]
   },
   {
-    id: 'AB0002800', name: '电子公文资源库系统运维保障服务', category: '私有云单品', subCategory: '数科OFD服务端（运维保障）', status: 'OnShelf', tags: ['生态'], productType: '数科OFD服务端（运维保障）', onlineDelivery: '无', productClass: 'WPS软件业务', productClassification: '非端', productSeries: 'WPS 政务AI平台', productCategory: '服务', productLine: 'WPS365私有云', productClassFinance: 'WPS365', productLineFinance: '实施服务及其他', productSeriesFinance: '政务AI平台', maintenanceContent: '/', maintenanceStandard: '/', hasUpgradeWarranty: false, hasAfterSalesService: true, salesOrgName: '北京数科网维技术有限责任公司', businessDeliveryName: '电子公文资源库系统运维服务', taxRefundType: '非退税',
+    id: 'AB0002800', name: '电子公文资源库系统运维保障服务', category: '私有云单品', subCategory: '数科OFD服务端（运维保障）', status: 'OnShelf', tags: ['生态'], productType: '数科OFD服务端（运维保障）', onlineDelivery: '无', productClass: 'WPS软件业务', productClassification: '非端', productSeries: 'WPS 政务AI平台', productCategory: '服务', productLine: 'WPS365私有云', productClassFinance: 'WPS365', productLineFinance: '实施服务及其他', productSeriesFinance: '政务AI平台', maintenanceContent: '/', maintenanceStandard: '/', hasUpgradeWarranty: false, hasAfterSalesService: true, salesOrgName: '北京金山办公有限公司', businessDeliveryName: '电子公文资源库系统运维服务', taxRefundType: '非退税',
     skus: [
       { id: 'SKU0018298', code: 'SKU0018298', name: 'A包', price: 5000, stock: 999, status: 'Active', pricingOptions: [{id:'po-SKU0018298', title:'运维保障', price:5000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'Platform'}}] }
     ],
@@ -144,7 +144,7 @@ export const initialProducts: Product[] = [
     composition: [{id:'AC007',name:'实施部署服务',type:'Service'}, {id:'AC028',name:'电子公文资源库系统',type:'Component'}]
   },
   {
-    id: 'AB0002790', name: 'WPS政务AI平台V3.0', category: '私有云单品', subCategory: '电子公文库系统', status: 'OnShelf', tags: ['AI'], productType: '电子公文库系统', onlineDelivery: 'WPS+第三方产品', productClass: 'WPS软件业务', productClassification: '非端', productSeries: 'WPS 政务AI平台', productCategory: '软件', productLine: 'WPS365私有云', productClassFinance: 'WPS365', productLineFinance: 'WPS365私有云', productSeriesFinance: '政务AI平台', maintenanceContent: '/', maintenanceStandard: '/', hasUpgradeWarranty: false, hasAfterSalesService: false, salesOrgName: '珠海金山办公软件有限公司', businessDeliveryName: '政务AI平台软件', taxRefundType: '即征即退',
+    id: 'AB0002790', name: 'WPS政务AI平台V3.0', category: '私有云单品', subCategory: '电子公文库系统', status: 'OnShelf', tags: ['AI'], productType: '电子公文库系统', onlineDelivery: 'WPS+第三方产品', productClass: 'WPS软件业务', productClassification: '非端', productSeries: 'WPS 政务AI平台', productCategory: '软件', productLine: 'WPS365私有云', productClassFinance: 'WPS365', productLineFinance: 'WPS365私有云', productSeriesFinance: '政务AI平台', maintenanceContent: '/', maintenanceStandard: '/', hasUpgradeWarranty: false, hasAfterSalesService: false, salesOrgName: '珠海金山办公有限公司', businessDeliveryName: '政务AI平台软件', taxRefundType: '即征即退',
     linkedServices: [
       { productId: 'AB0002800', productName: '电子公文资源库系统运维保障服务', skuId: 'SKU0018298', skuName: 'A包', required: true, remark: '必选运维保障服务' },
     ],
@@ -187,7 +187,7 @@ export const initialProducts: Product[] = [
     composition: [{id:'AC007',name:'实施部署服务',type:'Service'}]
   },
   {
-    id: 'AB0001880', name: 'WPS文档中台系统V7', category: '私有云单品', subCategory: '文档中台V7', status: 'OnShelf', tags: ['生态'], productType: '文档中台V7', onlineDelivery: 'WPS+第三方产品', productClass: 'WPS软件业务', productClassification: '非端', productSeries: '文档中台', productCategory: '软件', productLine: 'WPS365私有云', productClassFinance: 'WPS365', productLineFinance: 'WPS365私有云', productSeriesFinance: 'WPS365私有云', maintenanceContent: '/', maintenanceStandard: '/', hasUpgradeWarranty: false, hasAfterSalesService: false, salesOrgName: '北京金山办公软件股份有限公司', businessDeliveryName: '文档中台系统软件', taxRefundType: '即征即退',
+    id: 'AB0001880', name: 'WPS文档中台系统V7', category: '私有云单品', subCategory: '文档中台V7', status: 'OnShelf', tags: ['生态'], productType: '文档中台V7', onlineDelivery: 'WPS+第三方产品', productClass: 'WPS软件业务', productClassification: '非端', productSeries: '文档中台', productCategory: '软件', productLine: 'WPS365私有云', productClassFinance: 'WPS365', productLineFinance: 'WPS365私有云', productSeriesFinance: 'WPS365私有云', maintenanceContent: '/', maintenanceStandard: '/', hasUpgradeWarranty: false, hasAfterSalesService: false, salesOrgName: '武汉金山办公有限公司', businessDeliveryName: '文档中台系统软件', taxRefundType: '即征即退',
     linkedServices: [
       { productId: 'AB0002635', productName: 'WPS文档中心系统技术服务', skuId: 'SKU0018029', skuName: '文档中心系统A包', required: true, remark: '必选技术服务包' },
     ],
@@ -316,7 +316,7 @@ export const initialProducts: Product[] = [
     composition: [{id:'AC007',name:'实施部署服务',type:'Service'}, {id:'AC030',name:'WPS政务AI平台',type:'Component'}, {id:'AC031',name:'WPS AI',type:'Feature'}]
   },
   {
-    id: 'AB0002622', name: 'WPS AI', category: '私有云单品', subCategory: '文档中心V7', status: 'OnShelf', tags: ['AI'], productType: '文档中心V7', onlineDelivery: '无', productClass: 'WPS软件业务', productClassification: '非端', productSeries: '文档中心', productCategory: '软件', productLine: 'WPS365私有云', productClassFinance: 'WPS365', productLineFinance: 'WPS365私有云', productSeriesFinance: 'WPS365私有云', maintenanceContent: '/', maintenanceStandard: '/', hasUpgradeWarranty: false, hasAfterSalesService: false, salesOrgName: '珠海金山办公软件有限公司', businessDeliveryName: 'WPS AI智能办公软件', taxRefundType: '退税',
+    id: 'AB0002622', name: 'WPS AI', category: '私有云单品', subCategory: '文档中心V7', status: 'OnShelf', tags: ['AI'], productType: '文档中心V7', onlineDelivery: '无', productClass: 'WPS软件业务', productClassification: '非端', productSeries: '文档中心', productCategory: '软件', productLine: 'WPS365私有云', productClassFinance: 'WPS365', productLineFinance: 'WPS365私有云', productSeriesFinance: 'WPS365私有云', maintenanceContent: '/', maintenanceStandard: '/', hasUpgradeWarranty: false, hasAfterSalesService: false, salesOrgName: '珠海金山办公有限公司', businessDeliveryName: 'WPS AI智能办公软件', taxRefundType: '退税',
     skus: [
       { id: 'SKU0018010', code: 'SKU0018010', name: '定制版（西部钻探）', price: 100000, stock: 999, status: 'Active', pricingOptions: [{id:'po-SKU0018010', title:'用户年授权', price:100000, license:{type:'Subscription', period:1, periodUnit:'Year', scope:'1 User'}}] }
     ],

@@ -21,6 +21,9 @@ import {
   type Product,
   type SalesMerchandise,
   type Channel,
+  type ActivationMethod,
+  type PurchaseNature,
+  type SerialNumber,
 } from '../types';
 
 export function generateLicenseKey(): string {
@@ -177,10 +180,10 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       name: '2022-银联商务-文档中台V7-增购',
       customerId: customers[0]?.id,
       customerName: customers[0]?.companyName || '银联商务支付股份有限公司',
-      productType: '文档中台V6/年授权、文档中台V7/服务器年授权',
+      productType: 'WPS文档中台系统V7/附加应用年授权、WPS文档中心系统技术服务/运维保障',
       products: [
-        { productName: '文档中台V6', skuName: '年授权', licenseType: '服务器授权' },
-        { productName: '文档中台V7', skuName: '服务器年授权', licenseType: '服务器授权' },
+        { productName: 'WPS文档中台系统V7', skuName: '协作版（附加应用）', licenseType: '附加应用年授权' },
+        { productName: 'WPS文档中心系统技术服务', skuName: '文档中心系统A包', licenseType: '运维保障' },
       ],
       stage: '确认渠道',
       probability: 80,
@@ -199,10 +202,10 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       name: '2024-建行-文档中台V7-增购',
       customerId: customers[1]?.id,
       customerName: customers[1]?.companyName || '中国建设银行股份有限公司',
-      productType: '私有云单品增值服务包/软件保障、文档中台V7/服务器授权',
+      productType: 'WPS文档中台运维保障服务/运维保障、WPS智能文档库/用户年授权',
       products: [
-        { productName: '私有云单品增值服务包', skuName: '软件保障', licenseType: '服务器授权' },
-        { productName: '文档中台V7', skuName: '服务器授权', licenseType: '服务器授权' },
+        { productName: 'WPS文档中台运维保障服务', skuName: '文档中台A包', licenseType: '运维保障' },
+        { productName: 'WPS智能文档库', skuName: '标准版', licenseType: '用户年授权' },
       ],
       stage: '确认渠道',
       probability: 60,
@@ -221,9 +224,9 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       name: '2024-京东-WPS365高级版-新购',
       customerId: customers[2]?.id,
       customerName: customers[2]?.companyName || '北京京东世纪贸易有限公司',
-      productType: 'WPS365高级版/用户订阅许可（含端年场地）',
+      productType: 'WPS 365协作办公高级平台V12/用户订阅许可（含端年场地）',
       products: [
-        { productName: 'WPS 365 高级版', skuName: '用户订阅许可（含端年场地）', licenseType: '用户订阅' },
+        { productName: 'WPS 365协作办公高级平台V12', skuName: '高级版（Win版）', licenseType: '用户订阅许可（含端年场地）' },
       ],
       stage: '确认商机',
       probability: 40,
@@ -242,10 +245,10 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       name: '2024-大连捷成实业-WPS365高级版-新购',
       customerId: customers[3]?.id,
       customerName: customers[3]?.companyName || '大连捷成实业发展有限公司',
-      productType: 'WPS365高级版/用户订阅许可（含端年场地）',
+      productType: 'WPS 365 企业高级版/用户订阅许可、WPS AI软件授权/用户年授权',
       products: [
-        { productName: 'WPS 365 高级版', skuName: '用户订阅许可（含端年场地）', licenseType: '用户订阅' },
-        { productName: 'WPS AI 助手', skuName: '年度订阅', licenseType: '用户订阅' },
+        { productName: 'WPS 365 企业高级版', skuName: '高级版（Win版）', licenseType: '用户订阅许可' },
+        { productName: 'WPS AI软件授权', skuName: '标准版', licenseType: '用户年授权' },
       ],
       stage: '证实方案',
       probability: 65,
@@ -264,9 +267,9 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       name: '2024-深圳技尔通-WPS365协作版-新购',
       customerId: customers[4]?.id,
       customerName: customers[4]?.companyName || '深圳市技尔通科技有限公司',
-      productType: 'WPS365协作版/用户订阅许可',
+      productType: 'WPS 365 商业协作版/用户订阅许可',
       products: [
-        { productName: 'WPS 365 协作版', skuName: '用户订阅许可', licenseType: '用户订阅' },
+        { productName: 'WPS 365 商业协作版', skuName: '协作版', licenseType: '用户订阅许可' },
       ],
       stage: '需求判断',
       probability: 30,
@@ -285,11 +288,11 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       name: '2024-博大教育-WPS365教育版-新购',
       customerId: customers[5]?.id,
       customerName: customers[5]?.companyName,
-      productType: 'WPS365教育版/校园正版化授权',
+      productType: 'WPS 365协作办公教育版旗舰平台V12/用户订阅许可、WPS 365 教育高级版/用户订阅许可、WPS智慧教育平台/用户订阅许可',
       products: [
-        { productName: 'WPS 365 教育版', skuName: '校园正版化授权', licenseType: '场地授权' },
-        { productName: 'WPS AI 助手', skuName: '教育专享年度订阅', licenseType: '用户订阅' },
-        { productName: '金山文档教育版', skuName: '协作空间', licenseType: '场地授权' },
+        { productName: 'WPS 365协作办公教育版旗舰平台V12', skuName: '旗舰版', licenseType: '用户订阅许可' },
+        { productName: 'WPS 365 教育高级版', skuName: '高级版（Win版）', licenseType: '用户订阅许可' },
+        { productName: 'WPS智慧教育平台', skuName: '标准版', licenseType: '用户订阅许可' },
       ],
       stage: '确认商机',
       probability: 75,
@@ -308,9 +311,9 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       name: '2024-瑞通物流-移动办公接入',
       customerId: customers[6]?.id,
       customerName: customers[6]?.companyName,
-      productType: 'WPS365标准版/用户订阅许可',
+      productType: 'WPS 365 商业协作版/用户订阅许可',
       products: [
-        { productName: 'WPS 365 标准版', skuName: '用户订阅许可', licenseType: '用户订阅' },
+        { productName: 'WPS 365 商业协作版', skuName: '协作版', licenseType: '用户订阅许可' },
       ],
       stage: '输单',
       probability: 0,
@@ -329,10 +332,10 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       name: '2024-金桥金融-文档安全管控',
       customerId: customers[7]?.id,
       customerName: customers[7]?.companyName,
-      productType: '文档中台V7/服务器年授权、安全管控组件/年授权',
+      productType: 'WPS文档中台系统V7/附加应用授权、数科电子签章系统V1.0/服务器授权',
       products: [
-        { productName: '文档中台V7', skuName: '服务器年授权', licenseType: '服务器授权' },
-        { productName: '安全管控组件', skuName: '年授权', licenseType: '服务器授权' },
+        { productName: 'WPS文档中台系统V7', skuName: '协作版（附加应用）', licenseType: '附加应用授权' },
+        { productName: '数科电子签章系统V1.0', skuName: '生态版', licenseType: '服务器授权' },
       ],
       stage: '证实方案',
       probability: 55,
@@ -351,11 +354,11 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       name: '2024-海纳制造-PLM集成方案',
       customerId: customers[8]?.id,
       customerName: customers[8]?.companyName,
-      productType: 'WPS365高级版/用户订阅许可、API调用包/年授权',
+      productType: 'WPS 365 企业旗舰版/用户订阅许可、WPS在线编辑办公软件V1/并发年授权、WPS在线预览系统V1/并发年授权',
       products: [
-        { productName: 'WPS 365 高级版', skuName: '用户订阅许可', licenseType: '用户订阅' },
-        { productName: 'API 调用包', skuName: '年授权', licenseType: 'API授权' },
-        { productName: '文档格式兼容组件', skuName: '企业版', licenseType: '服务器授权' },
+        { productName: 'WPS 365 企业旗舰版', skuName: '旗舰版', licenseType: '用户订阅许可' },
+        { productName: 'WPS在线编辑办公软件V1', skuName: '在线编辑（API生态基础版）', licenseType: '并发年授权' },
+        { productName: 'WPS在线预览系统V1', skuName: '在线预览（API生态基础版）', licenseType: '并发年授权' },
       ],
       stage: '确认渠道',
       probability: 30,
@@ -374,10 +377,10 @@ export function generateOpportunities(customers: Customer[]): Opportunity[] {
       name: '2024-智汇科技-API接口调用包',
       customerId: customers[9]?.id,
       customerName: customers[9]?.companyName,
-      productType: 'API调用包/年度订阅',
+      productType: 'PDF文档转换服务/计次服务、Web Office服务/客户订阅许可',
       products: [
-        { productName: 'API 调用包', skuName: '年度订阅', licenseType: 'API授权' },
-        { productName: 'WPS 365 协作版', skuName: '用户订阅许可', licenseType: '用户订阅' },
+        { productName: 'PDF文档转换服务', skuName: '定制版（百度网盘）', licenseType: '计次服务' },
+        { productName: 'Web Office服务', skuName: '2000并发，300M文档大小', licenseType: '客户订阅许可' },
       ],
       stage: '赢单',
       probability: 100,
@@ -493,6 +496,14 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
       { productId: 'AB0000765', productName: 'WPS Office 2023专业版办公软件V12.8', skuId: 'SKU0013394', skuName: '专业版', price: 698 },
     ];
 
+    const activationMethods: ActivationMethod[] = ['Account', 'SerialKey', 'AccountAndSerialKey'];
+    const purchaseNatures: PurchaseNature[] = ['New', 'Renewal', 'AddOn', 'Upgrade'];
+    const renewalSubTypeMap: Record<string, string[]> = {
+      AddOn: ['产品增购', '数量增购', '产品增购-批量', '数量增购-批量'],
+      Renewal: ['普通续费', '批量续费', '间隔两年续费', '间隔两年续费-批量'],
+    };
+    const supplyOrgs = ['珠海金山办公软件有限公司', '武汉金山办公软件有限公司', '北京金山办公软件有限公司'];
+
     const makeItem = (mItem: { productId: string; productName: string; skuId: string; skuName: string; quantity?: number }, unitPrice: number, idxOffset: number): OrderItem => {
       const product = products.find(p => p.id === mItem.productId);
       const capabilitiesSnapshot = product?.composition?.map(c => c.name) || [];
@@ -500,6 +511,12 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
       const defaultOption = sku?.pricingOptions?.[0];
       const lt = defaultOption ? deriveLicenseType(defaultOption) : licenseTypeFallbacks[(i + idxOffset) % licenseTypeFallbacks.length];
       const periodOptions = ['1年', '2年', '3年', '5年'];
+
+      const pn = purchaseNatures[(i + idxOffset) % purchaseNatures.length];
+      const pn365 = purchaseNatures[(i + idxOffset + 1) % purchaseNatures.length];
+      const subTypes = renewalSubTypeMap[pn];
+      const rst = subTypes ? subTypes[(i + idxOffset) % subTypes.length] : undefined;
+
       return {
         merchandiseId: merchandise?.id,
         merchandiseName: merchandise?.name,
@@ -513,7 +530,16 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
         priceAtPurchase: unitPrice,
         capabilitiesSnapshot,
         deliveredContent: status === OrderStatus.DELIVERED || status === OrderStatus.SHIPPED ? [generateLicenseKey()] : [],
-        activationMethod: 'LicenseKey',
+        activationMethod: activationMethods[(i + idxOffset) % activationMethods.length],
+        mediaCount: ((i + idxOffset) % 5) + 1,
+        purchaseNature: pn,
+        renewalSubType: rst,
+        purchaseNature365: pn365,
+        licensee: customer.companyName,
+        enterpriseId: customer.enterprises?.[0]?.id,
+        enterpriseName: customer.enterprises?.[0]?.name || customer.companyName,
+        supplyOrgInfo: supplyOrgs[(i + idxOffset) % supplyOrgs.length],
+        installPackageType: (i + idxOffset) % 3 === 0 ? '定制' : '通用',
         pricingOptionId: defaultOption?.id,
         pricingOptionName: defaultOption?.title,
       };
@@ -578,6 +604,34 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
       if (progress >= 4) isCDBurned = true;
     }
 
+    const serialSources = ['SMS', 'SaaS', 'CRM'];
+    const serialMethods = ['生成新序列号', '导入序列号', '手动录入'];
+    const serialGroups = ['1个新序列号', '批量序列号组', '续费序列号组'];
+    const serialTypes = ['正式', '试用', '内部测试'];
+    const serialStatuses = ['已生效', '待生效', '已过期'];
+    const serialNumbers: SerialNumber[] = (isCompleted || status === OrderStatus.PROCESSING_PROD || status === OrderStatus.SHIPPED)
+      ? Array.from({ length: Math.min(orderItems.length, 3) }, (_, si) => {
+          const genDate = new Date(date);
+          genDate.setDate(genDate.getDate() + si + 1);
+          const expDate = new Date(genDate);
+          expDate.setFullYear(expDate.getFullYear() + [1, 2, 3][si % 3]);
+          const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+          const sn = Array.from({ length: 2 }, () => chars[Math.floor(Math.random() * 26)]).join('')
+              + '****'
+              + Array.from({ length: 2 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+          return {
+              serialNo: sn,
+              source: serialSources[(i + si) % serialSources.length],
+              generateMethod: serialMethods[(i + si) % serialMethods.length],
+              generateGroup: serialGroups[(i + si) % serialGroups.length],
+              type: serialTypes[(i + si) % serialTypes.length],
+              status: serialStatuses[si % serialStatuses.length],
+              generateTime: `${genDate.getFullYear()}-${String(genDate.getMonth() + 1).padStart(2, '0')}-${String(genDate.getDate()).padStart(2, '0')} ${String(genDate.getHours()).padStart(2, '0')}:${String(genDate.getMinutes()).padStart(2, '0')}:${String(genDate.getSeconds()).padStart(2, '0')}`,
+              expireTime: `${expDate.getFullYear()}-${String(expDate.getMonth() + 1).padStart(2, '0')}-${String(expDate.getDate()).padStart(2, '0')} ${String(expDate.getHours()).padStart(2, '0')}:00:00`,
+          };
+      })
+      : [];
+
     mockOrders.push({
       id: `S${date.getFullYear().toString().slice(-2)}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}${Math.floor(Math.random() * 1e12).toString().padStart(12, '0')}`,
       customerId: customer.id,
@@ -594,6 +648,8 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
       total,
       items: orderItems,
       shippingAddress: customer.address,
+      purchasingContactId: customer.contacts?.find(c => c.roles?.includes('Purchasing'))?.id,
+      itContactId: customer.contacts?.find(c => c.roles?.includes('IT'))?.id,
       isPaid,
       paymentDate: isPaid ? dateStr : undefined,
       isAuthConfirmed,
@@ -623,10 +679,10 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
       },
       opportunityId: oppId,
       opportunityName: oppName,
-      buyerName: '北京小优易教科技有限公司',
-      directChannel: '-',
-      terminalChannel: '-',
-      orderType: ['新购订单', '续费订单', '增购订单', '降配订单', '退款订单'][i % 5],
+      buyerName: buyerName,
+      directChannel: buyerType === 'Channel' ? (channels[(i + 1) % channels.length]?.name || '-') : '-',
+      terminalChannel: buyerType === 'Channel' ? (channels[(i + 2) % channels.length]?.name || '-') : '-',
+      orderType: ['新购订单', '续费订单', '增购订单', '升级订单'][i % 4],
       creatorId: 'u10',
       creatorName: '苏雪松',
       creatorPhone: '17610166961',
@@ -716,6 +772,7 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
         '',
         '',
       ][i % 13],
+      serialNumbers,
     });
   }
   return mockOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Order, OrderStatus, OrderItem, ActivationMethod, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, DeliveryMethod, OrderDraft, ConversionOrder } from '../../types';
+import { Order, OrderStatus, OrderItem, ActivationMethod, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, DeliveryMethod, OrderDraft, ConversionOrder, CustomerContact, PurchaseNature } from '../../types';
 import { initialConversionOrders, ALL_INSTALL_PKG_ROWS } from '../../data/staticData';
-import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Network, Globe, Radio, RefreshCcw, Wallet, Zap, Box, Settings, MapPin, Briefcase, XCircle, Search, Save, ScrollText, Phone, Mail, Users, Banknote, Calendar, Check, ChevronRight, ChevronDown, Pencil } from 'lucide-react';
+import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Network, Globe, Radio, RefreshCcw, Wallet, Zap, Box, Settings, MapPin, Briefcase, XCircle, Search, Save, ScrollText, Phone, Mail, Users, Banknote, Calendar, Check, ChevronRight, ChevronDown, Pencil, Key, Building2 } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
 
@@ -15,7 +15,7 @@ interface OrderCreateWizardProps {
 }
 
 const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, renewalOrder, initialDraft }) => {
-  const { products, customers, channels, opportunities, contracts, users, orders, setOrders, currentUser, standaloneEnterprises, orderDrafts, setOrderDrafts } = useAppContext();
+  const { products, customers, setCustomers, channels, opportunities, contracts, users, orders, setOrders, currentUser, standaloneEnterprises, orderDrafts, setOrderDrafts } = useAppContext();
   const navigate = useNavigate();
 
   const [currentStep, setCurrentStep] = useState(1); // 1: Type, 2: Info, 3: Products, 4: Delivery
@@ -36,6 +36,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   // Step 2: Customer & Buyer & Opportunity
   const [hasOpportunity, setHasOpportunity] = useState<'yes' | 'no' | ''>('');
   const [linkedOpportunityId, setLinkedOpportunityId] = useState('');
+  const [oppItemWarnings, setOppItemWarnings] = useState<{ productName: string; missingFields: string[] }[]>([]);
   const [isOppPickerOpen, setIsOppPickerOpen] = useState(false);
   const [oppPickerSearch, setOppPickerSearch] = useState('');
   const [newOrderCustomer, setNewOrderCustomer] = useState('');
@@ -53,6 +54,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const [itContacts, setItContacts] = useState<typeof customers[0]['contacts']>([]);
   const [selectedPurchasingContactId, setSelectedPurchasingContactId] = useState('');
   const [selectedItContactId, setSelectedItContactId] = useState('');
+  const [showNewContactModal, setShowNewContactModal] = useState<'Purchasing' | 'IT' | null>(null);
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [newContactForm, setNewContactForm] = useState({ name: '', phone: '', email: '', position: '' });
   
   // Step 3: Merchandise Selection (New Cascading Logic)
   const [newOrderItems, setNewOrderItems] = useState<OrderItem[]>([]);
@@ -65,6 +70,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const [tempPricingOptionId, setTempPricingOptionId] = useState('');
   const [tempQuantity, setTempQuantity] = useState(1);
   const [tempActivationMethod, setTempActivationMethod] = useState<ActivationMethod>('Account');
+  const [tempMediaCount, setTempMediaCount] = useState<number | ''>(1);
+  const [tempPurchaseNature, setTempPurchaseNature] = useState<PurchaseNature>('New');
+  const [tempRenewalSubType, setTempRenewalSubType] = useState('');
+  const [tempPurchaseNature365, setTempPurchaseNature365] = useState<PurchaseNature>('New');
   const [tempLicensePeriod, setTempLicensePeriod] = useState('');
   const [tempLicensePeriodNum, setTempLicensePeriodNum] = useState<number | ''>('');
   const [tempLicensePeriodUnit, setTempLicensePeriodUnit] = useState<'年' | '月' | '日'>('年');
@@ -180,12 +189,46 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const [settlementType, setSettlementType] = useState<'once' | 'installment'>('once');
   const [expectedPaymentDate, setExpectedPaymentDate] = useState('');
   const [installmentPlans, setInstallmentPlans] = useState<{amount: number; expectedDate: string; actualDate: string; paidAmount: number}[]>([]);
+  const [serialNumberRequirement, setSerialNumberRequirement] = useState<'生成新序列号' | '沿用正式序列号' | '沿用测试序列号'>('生成新序列号');
+
+  type SubUnit = {
+    id: string;
+    unitName: string;
+    enterpriseId: string;
+    enterpriseName: string;
+    authCount: string;
+    itContact: string;
+    phone: string;
+    email: string;
+    customerType: string;
+    industryLine: string;
+    sellerContact: string;
+  };
+  const [enableSubUnitAuth, setEnableSubUnitAuth] = useState(false);
+  const [subUnits, setSubUnits] = useState<SubUnit[]>([]);
+
+  const addSubUnit = () => {
+    setSubUnits(prev => [...prev, {
+      id: `su_${Date.now()}`,
+      unitName: '', enterpriseId: '', enterpriseName: '-',
+      authCount: '', itContact: '', phone: '', email: '',
+      customerType: '-', industryLine: '-', sellerContact: '-',
+    }]);
+  };
+
+  const updateSubUnit = (id: string, field: keyof SubUnit, value: string) => {
+    setSubUnits(prev => prev.map(u => u.id === id ? { ...u, [field]: value } : u));
+  };
+
+  const removeSubUnit = (id: string) => {
+    setSubUnits(prev => prev.filter(u => u.id !== id));
+  };
 
   const wizardSteps = [
       { id: 1, label: '订单类型', desc: '来源与模式', icon: Layers },
       { id: 2, label: '客户信息', desc: '客户/商机', icon: UserIcon },
       { id: 3, label: '产品配置', desc: '规格/价格', icon: ShoppingBag },
-      { id: 4, label: '商务交付', desc: '备注/验收', icon: ClipboardCheck },
+      { id: 4, label: '交付信息', desc: '备注/验收', icon: ClipboardCheck },
   ];
 
   const selectedCustomerObj = customers.find(c => c.id === newOrderCustomer);
@@ -244,6 +287,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     if (isRestoringDraftRef.current) return;
     if (hasOpportunity === 'no') {
       setLinkedOpportunityId('');
+      setOppItemWarnings([]);
     }
     if (hasOpportunity === 'yes') {
       setNewOrderCustomer('');
@@ -356,13 +400,20 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const buildItemsFromOpportunity = (opp: typeof opportunities[0]) => {
       if (!opp?.products || opp.products.length === 0) return;
       const autoItems: OrderItem[] = [];
+      const warnings: { productName: string; missingFields: string[] }[] = [];
       for (const op of opp.products) {
           const prod = products.find(p => p.status === 'OnShelf' && p.name === op.productName);
-          if (!prod) continue;
+          if (!prod) {
+              warnings.push({ productName: op.productName, missingFields: ['未找到匹配的在售产品，请手动添加'] });
+              continue;
+          }
           const sku = op.skuName
               ? prod.skus.find(s => s.status === 'Active' && s.name === op.skuName) || prod.skus.find(s => s.status === 'Active')
               : prod.skus.find(s => s.status === 'Active');
-          if (!sku) continue;
+          if (!sku) {
+              warnings.push({ productName: op.productName, missingFields: ['无可用 SKU 规格，请手动添加'] });
+              continue;
+          }
           const pricingOpt = op.licenseType
               ? sku.pricingOptions?.find(po => po.title === op.licenseType)
               : sku.pricingOptions?.[0];
@@ -378,12 +429,17 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
               activationMethod: (buyerType === 'Customer' || buyerType === 'Channel') ? 'Account' : 'LicenseKey',
               capabilitiesSnapshot: prod.composition?.map(c => c.name) || [],
           });
+          const missing: string[] = [];
+          if (!pricingOpt) missing.push('授权类型');
+          if (!isPermanent && !pricingOpt?.license?.period) missing.push('授权期限');
+          if (missing.length > 0) warnings.push({ productName: prod.name, missingFields: missing });
       }
       if (autoItems.length > 0) {
           setNewOrderItems(autoItems);
           const firstProd = products.find(p => p.id === autoItems[0].productId);
           if (firstProd?.salesOrgName) setSellerName(firstProd.salesOrgName);
       }
+      setOppItemWarnings(warnings);
   };
 
   const handleOpportunityChange = (oppId: string) => {
@@ -426,19 +482,45 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
           const iContacts = customer.contacts.filter(c => c.roles.includes('IT'));
           setPurchasingContacts(pContacts);
           setItContacts(iContacts);
-          if (pContacts.length > 0) {
-              const primary = pContacts.find(c => c.isPrimary);
-              setSelectedPurchasingContactId(primary ? primary.id : pContacts[0].id);
-          }
-          if (iContacts.length > 0) {
-              const primary = iContacts.find(c => c.isPrimary);
-              setSelectedItContactId(primary ? primary.id : iContacts[0].id);
-          }
+          setSelectedPurchasingContactId('');
+          setSelectedItContactId('');
       }
+  };
+
+  const handleSaveNewContact = () => {
+    if (!newContactForm.name.trim() || !newOrderCustomer || !showNewContactModal) return;
+    const role = showNewContactModal;
+    const newContact: CustomerContact = {
+      id: `contact-${Date.now()}`,
+      name: newContactForm.name.trim(),
+      phone: newContactForm.phone.trim(),
+      email: newContactForm.email.trim(),
+      position: newContactForm.position.trim() || undefined,
+      roles: [role],
+      isPrimary: false,
+      creatorId: currentUser.id,
+      creatorName: currentUser.name,
+      createdAt: new Date().toISOString(),
+    };
+    setCustomers(prev => prev.map(c => c.id === newOrderCustomer ? { ...c, contacts: [...c.contacts, newContact] } : c));
+    if (role === 'Purchasing') {
+      setPurchasingContacts(prev => [...prev, newContact]);
+      setSelectedPurchasingContactId(newContact.id);
+    } else {
+      setItContacts(prev => [...prev, newContact]);
+      setSelectedItContactId(newContact.id);
+    }
+    setShowNewContactModal(null);
+    setNewContactForm({ name: '', phone: '', email: '', position: '' });
   };
 
   const handleAddItem = () => {
     if (!selectedProduct || !selectedSku || tempQuantity <= 0) return;
+
+    if (editingItemIndex === null && enableSubUnitAuth && newOrderItems.length >= 1) {
+        alert('下级单位授权模式下仅允许添加一个产品明细，请先移除已有产品或关闭下级单位授权。');
+        return;
+    }
     
     if (selectedSku.pricingOptions && selectedSku.pricingOptions.length > 0 && !selectedOption) {
         alert("请选择授权类型 (Pricing Option)");
@@ -486,6 +568,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         licenseType: derivedLicenseType,
         licensePeriod: isPermanent ? '永久' : (needsManualPeriod && tempLicensePeriodNum ? `${tempLicensePeriodNum}${tempLicensePeriodUnit}` : undefined),
         activationMethod: tempActivationMethod,
+        mediaCount: typeof tempMediaCount === 'number' ? tempMediaCount : undefined,
+        purchaseNature: tempPurchaseNature,
+        renewalSubType: tempRenewalSubType || undefined,
+        purchaseNature365: tempPurchaseNature365,
         licensee: tempLicensee || undefined,
         installPackageName: resolvedInstallPackageName,
         installPackageType: tempPkgType || undefined,
@@ -532,16 +618,21 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       }
     }
 
-    setNewOrderItems([...newOrderItems, ...itemsToAdd]);
+    if (editingItemIndex !== null) {
+        setNewOrderItems(prev => prev.map((item, i) => i === editingItemIndex ? newItem : item));
+        setEditingItemIndex(null);
+    } else {
+        setNewOrderItems([...newOrderItems, ...itemsToAdd]);
 
-    if (linkedServices.length > 0) {
-      const addedNames = itemsToAdd.slice(1).map(i => i.productName);
-      if (addedNames.length > 0) {
-        setTimeout(() => alert(`已自动带出关联服务：${addedNames.join('、')}`), 100);
-      }
+        if (linkedServices.length > 0) {
+          const addedNames = itemsToAdd.slice(1).map(i => i.productName);
+          if (addedNames.length > 0) {
+            setTimeout(() => alert(`已自动带出关联服务：${addedNames.join('、')}`), 100);
+          }
+        }
     }
 
-    if (!sellerName && selectedProduct.salesOrgName) {
+    if (selectedProduct.salesOrgName) {
         setSellerName(selectedProduct.salesOrgName);
     }
 
@@ -557,12 +648,49 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     setTempPkgCpu('');
     setTempPkgOs('');
     setTempPkgLink('');
+    setTempMediaCount(1);
+    setShowAddProductModal(false);
   };
 
   const handleRemoveItem = (index: number) => setNewOrderItems(prev => prev.filter((_, i) => i !== index));
   const handleUpdateItem = (index: number, field: keyof OrderItem, value: any) => {
       setNewOrderItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
   };
+  const handleEditItem = (index: number) => {
+      const item = newOrderItems[index];
+      if (!item) return;
+      setTempProductId(item.productId);
+      setTempSkuId(item.skuId);
+      setTempPricingOptionId(item.pricingOptionId || '');
+      setTempQuantity(item.quantity);
+      setTempActivationMethod(item.activationMethod || 'Account');
+      setTempMediaCount(item.mediaCount ?? 1);
+      setTempPurchaseNature((item.purchaseNature as PurchaseNature) || 'New');
+      setTempRenewalSubType(item.renewalSubType || '');
+      setTempPurchaseNature365((item.purchaseNature365 as PurchaseNature) || 'New');
+      setNegotiatedPrice(item.priceAtPurchase);
+      setTempEnterpriseId(item.enterpriseId || '');
+      setTempLicensee(item.licensee || '');
+      setTempPkgType((item.installPackageType as '通用' | '定制' | '') || '');
+      setTempPkgLink(item.installPackageLink || '');
+      if (item.licensePeriod && item.licensePeriod !== '永久') {
+          const match = item.licensePeriod.match(/^(\d+)(年|月|日)$/);
+          if (match) {
+              setTempLicensePeriodNum(parseInt(match[1]));
+              setTempLicensePeriodUnit(match[2] as '年' | '月' | '日');
+          }
+      } else {
+          setTempLicensePeriodNum('');
+          setTempLicensePeriodUnit('年');
+      }
+      const prod = products.find(p => p.id === item.productId);
+      if (prod) {
+          setTempCategory(prod.category);
+      }
+      setEditingItemIndex(index);
+      setShowAddProductModal(true);
+  };
+
   const calculateNewOrderTotal = () => newOrderItems.reduce((acc, item) => acc + (item.priceAtPurchase * item.quantity), 0);
 
   // Sync productAcceptanceRows when items change
@@ -636,6 +764,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       itContactId: selectedItContactId,
       settlementMethod,
       expectedPaymentDate,
+      serialNumberRequirement,
     };
     setOrderDrafts(prev => {
       const exists = prev.findIndex(d => d.id === orderId);
@@ -692,6 +821,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     setSelectedItContactId(d.itContactId || '');
     setSettlementMethod(d.settlementMethod || '');
     setExpectedPaymentDate(d.expectedPaymentDate || '');
+    setSerialNumberRequirement(d.serialNumberRequirement || '生成新序列号');
     // 恢复可选联系人列表
     const cust = customers.find(c => c.id === d.newOrderCustomer);
     if (cust) {
@@ -708,12 +838,6 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     const otherMissingCustomer = buyerType !== 'SelfDeal' && !newOrderCustomer;
     if (selfDealMissingEnterprise || otherMissingCustomer || newOrderItems.length === 0 || !buyerType) {
         alert(selfDealMissingEnterprise ? '请选择企业 ID。' : '请完善订单信息：客户、产品或订单类型未填写。');
-        return;
-    }
-    const missingPurchasing = purchasingContacts.length > 0 && !selectedPurchasingContactId;
-    const missingIT = itContacts.length > 0 && !selectedItContactId;
-    if (missingPurchasing || missingIT) {
-        alert(`请选择${missingPurchasing ? '采购联系人' : ''}${missingPurchasing && missingIT ? '和' : ''}${missingIT ? 'IT 联系人' : ''}`);
         return;
     }
     const customer = customers.find(c => c.id === newOrderCustomer);
@@ -928,7 +1052,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 {[
                                     { id: 'OnlineStore', label: '官网', icon: Globe, color: 'text-orange-500 bg-orange-50 dark:bg-orange-900/20' },
                                     { id: 'ChannelPortal', label: '渠道来源', icon: Network, color: 'text-purple-500 bg-purple-50 dark:bg-purple-900/20' },
-                                    { id: 'APISync', label: '第三方系统', icon: Radio, color: 'text-teal-500 bg-teal-50 dark:bg-teal-900/20' },
+                                    { id: 'APISync', label: '三方平台', icon: Radio, color: 'text-teal-500 bg-teal-50 dark:bg-teal-900/20' },
                                     { id: 'Sales', label: '后台下单', icon: UserIcon, color: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' }
                                 ].filter(src => {
                                     if (buyerType === 'Customer') return src.id === 'Sales';
@@ -990,15 +1114,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                 <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{sel.name.replace(/\s*\(.*?\)/g, '')}</div>
                                                 {sel.phone && <div className="text-xs text-gray-400 font-mono mt-0.5">{sel.phone}</div>}
                                             </div>
-                                            <select
-                                                className="text-sm bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-[#0071E3] transition"
-                                                value={creatorId}
-                                                onChange={e => setCreatorId(e.target.value)}
-                                            >
-                                                {users.filter(u => u.status === 'Active').map(u => (
-                                                    <option key={u.id} value={u.id}>{u.name.replace(/\s*\(.*?\)/g, '')}</option>
-                                                ))}
-                                            </select>
+                                            <span className="text-[10px] px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold border border-blue-100 dark:border-blue-800 shrink-0">当前用户</span>
                                         </>
                                     );
                                 })()}
@@ -1087,7 +1203,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                     </div>
                                                 </div>
                                                 <button
-                                                    onClick={() => { setLinkedOpportunityId(''); setNewOrderCustomer(''); setOrderEnterpriseId(''); setNewOrderItems([]); setSellerName(''); }}
+                                                    onClick={() => { setLinkedOpportunityId(''); setNewOrderCustomer(''); setOrderEnterpriseId(''); setNewOrderItems([]); setSellerName(''); setOppItemWarnings([]); }}
                                                     className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition shrink-0"
                                                 >
                                                     <X className="w-3.5 h-3.5"/>
@@ -1304,69 +1420,69 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 {/* 采购联系人 */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">采购联系人 <span className="text-red-500">*</span></label>
-                                    {purchasingContacts.length > 0 ? (
-                                        <div className="space-y-1.5">
-                                            {purchasingContacts.map(c => {
-                                                const isSelected = selectedPurchasingContactId === c.id;
-                                                return (
-                                                <div
-                                                    key={c.id}
-                                                    onClick={() => setSelectedPurchasingContactId(c.id)}
-                                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer transition-all ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-400 dark:border-blue-500' : 'bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:border-blue-300 dark:hover:border-blue-700'}`}
-                                                >
-                                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition ${isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300 dark:border-gray-600'}`}>
-                                                        {isSelected && <Check className="w-2.5 h-2.5 text-white"/>}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0 flex items-center gap-2">
-                                                        <span className="text-sm font-bold text-gray-900 dark:text-white whitespace-nowrap">{c.name}</span>
-                                                        {c.isPrimary && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500 text-white font-bold leading-none shrink-0">主要</span>}
-                                                        {c.position && <span className="text-xs text-gray-400 truncate">· {c.position}</span>}
-                                                    </div>
-                                                    <div className="flex items-center gap-3 shrink-0 text-xs text-gray-500 dark:text-gray-400">
-                                                        {c.phone && <span className="flex items-center gap-0.5"><Phone className="w-3 h-3"/>{c.phone}</span>}
-                                                        {c.email && <span className="flex items-center gap-0.5"><Mail className="w-3 h-3"/>{c.email}</span>}
-                                                    </div>
-                                                </div>
-                                                );
-                                            })}
-                                        </div>
-                                    ) : (
-                                        <div className="px-3 py-2.5 bg-gray-50 dark:bg-white/5 border border-dashed border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-400 text-center">该客户暂无采购联系人</div>
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                        <select
+                                            value={selectedPurchasingContactId}
+                                            onChange={e => setSelectedPurchasingContactId(e.target.value)}
+                                            className="flex-1 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-[#2C2C2E] text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 outline-none transition"
+                                        >
+                                            <option value="">请选择采购联系人</option>
+                                            {purchasingContacts.map(c => (
+                                                <option key={c.id} value={c.id}>{c.name}{c.isPrimary ? '（主要）' : ''}{c.position ? ` · ${c.position}` : ''}</option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            onClick={() => { setNewContactForm({ name: '', phone: '', email: '', position: '' }); setShowNewContactModal('Purchasing'); }}
+                                            className="shrink-0 flex items-center gap-1 px-3 py-2 text-xs font-bold text-[#0071E3] dark:text-[#0A84FF] bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800 rounded-xl transition"
+                                        >
+                                            <Plus className="w-3.5 h-3.5"/>新建
+                                        </button>
+                                    </div>
+                                    {selectedPurchasingContactId && (() => {
+                                        const c = purchasingContacts.find(x => x.id === selectedPurchasingContactId);
+                                        if (!c) return null;
+                                        return (
+                                            <div className="flex items-center gap-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/40 rounded-xl text-xs text-gray-600 dark:text-gray-300">
+                                                {c.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3 text-blue-500"/>{c.phone}</span>}
+                                                {c.email && <span className="flex items-center gap-1"><Mail className="w-3 h-3 text-blue-500"/>{c.email}</span>}
+                                                {!c.phone && !c.email && <span className="text-gray-400">暂无联系方式</span>}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
 
                                 {/* IT 联系人 */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">IT 联系人 <span className="text-red-500">*</span></label>
-                                    {itContacts.length > 0 ? (
-                                        <div className="space-y-1.5">
-                                            {itContacts.map(c => {
-                                                const isSelected = selectedItContactId === c.id;
-                                                return (
-                                                <div
-                                                    key={c.id}
-                                                    onClick={() => setSelectedItContactId(c.id)}
-                                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer transition-all ${isSelected ? 'bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-400 dark:border-purple-500' : 'bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:border-purple-300 dark:hover:border-purple-700'}`}
-                                                >
-                                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition ${isSelected ? 'border-purple-500 bg-purple-500' : 'border-gray-300 dark:border-gray-600'}`}>
-                                                        {isSelected && <Check className="w-2.5 h-2.5 text-white"/>}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0 flex items-center gap-2">
-                                                        <span className="text-sm font-bold text-gray-900 dark:text-white whitespace-nowrap">{c.name}</span>
-                                                        {c.isPrimary && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500 text-white font-bold leading-none shrink-0">主要</span>}
-                                                        {c.position && <span className="text-xs text-gray-400 truncate">· {c.position}</span>}
-                                                    </div>
-                                                    <div className="flex items-center gap-3 shrink-0 text-xs text-gray-500 dark:text-gray-400">
-                                                        {c.phone && <span className="flex items-center gap-0.5"><Phone className="w-3 h-3"/>{c.phone}</span>}
-                                                        {c.email && <span className="flex items-center gap-0.5"><Mail className="w-3 h-3"/>{c.email}</span>}
-                                                    </div>
-                                                </div>
-                                                );
-                                            })}
-                                        </div>
-                                    ) : (
-                                        <div className="px-3 py-2.5 bg-gray-50 dark:bg-white/5 border border-dashed border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-400 text-center">该客户暂无 IT 联系人</div>
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                        <select
+                                            value={selectedItContactId}
+                                            onChange={e => setSelectedItContactId(e.target.value)}
+                                            className="flex-1 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-[#2C2C2E] text-gray-800 dark:text-white focus:ring-2 focus:ring-purple-500/30 focus:border-purple-400 outline-none transition"
+                                        >
+                                            <option value="">请选择 IT 联系人</option>
+                                            {itContacts.map(c => (
+                                                <option key={c.id} value={c.id}>{c.name}{c.isPrimary ? '（主要）' : ''}{c.position ? ` · ${c.position}` : ''}</option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            onClick={() => { setNewContactForm({ name: '', phone: '', email: '', position: '' }); setShowNewContactModal('IT'); }}
+                                            className="shrink-0 flex items-center gap-1 px-3 py-2 text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 border border-purple-200 dark:border-purple-800 rounded-xl transition"
+                                        >
+                                            <Plus className="w-3.5 h-3.5"/>新建
+                                        </button>
+                                    </div>
+                                    {selectedItContactId && (() => {
+                                        const c = itContacts.find(x => x.id === selectedItContactId);
+                                        if (!c) return null;
+                                        return (
+                                            <div className="flex items-center gap-3 px-3 py-2 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800/40 rounded-xl text-xs text-gray-600 dark:text-gray-300">
+                                                {c.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3 text-purple-500"/>{c.phone}</span>}
+                                                {c.email && <span className="flex items-center gap-1"><Mail className="w-3 h-3 text-purple-500"/>{c.email}</span>}
+                                                {!c.phone && !c.email && <span className="text-gray-400">暂无联系方式</span>}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         </div>
@@ -1437,26 +1553,108 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             </div>
                         )}
 
+                        {linkedOpportunityId && (newOrderItems.length > 0 || oppItemWarnings.length > 0) && (
+                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 rounded-2xl text-sm text-amber-700 dark:text-amber-300 space-y-2">
+                                {newOrderItems.length > 0 && (
+                                    <>
+                                        <div className="flex items-center gap-2 font-bold">
+                                            <Briefcase className="w-4 h-4 shrink-0"/>
+                                            <span>已从商机自动带入 {newOrderItems.length} 个产品，以下信息需要您补充完善：</span>
+                                        </div>
+                                        <ul className="list-disc list-inside text-xs space-y-1 ml-6 text-amber-600 dark:text-amber-400">
+                                            <li>订购性质、增续类型、365订购性质 — 请根据实际情况选择</li>
+                                            <li>数量、授权/服务期限 — 请确认或修改</li>
+                                            <li>激活方式、安装包类型、介质数量 — 请点击编辑按钮补充</li>
+                                        </ul>
+                                    </>
+                                )}
+                                {oppItemWarnings.length > 0 && (
+                                    <div className={`space-y-1 ${newOrderItems.length > 0 ? 'mt-2 pt-2 border-t border-amber-200 dark:border-amber-700/50' : ''}`}>
+                                        {newOrderItems.length === 0 && (
+                                            <div className="flex items-center gap-2 font-bold mb-2">
+                                                <XCircle className="w-4 h-4 text-red-500 shrink-0"/>
+                                                <span className="text-red-600 dark:text-red-400">商机产品匹配失败，请手动添加产品：</span>
+                                            </div>
+                                        )}
+                                        {oppItemWarnings.map((w, wi) => (
+                                            <div key={wi} className="text-xs flex items-start gap-1.5">
+                                                <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5"/>
+                                                <span><strong>{w.productName}</strong>：{w.missingFields.join('、')}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* 订单产品明细列表 - 置顶 */}
                         <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-white/5 overflow-hidden shadow-apple">
                             <div className="flex items-center justify-between px-5 pt-4 pb-2">
                                 <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                     <ShoppingBag className="w-4 h-4 text-blue-500"/> 订单产品明细
                                     {newOrderItems.length > 0 && <span className="text-xs font-mono bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full ml-1">{newOrderItems.length}</span>}
+                                    {enableSubUnitAuth && <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full">下级单位授权模式·仅限1个产品</span>}
                                 </h4>
-                                {newOrderItems.length > 0 && (
-                                    <div className="text-sm text-gray-500">总计：<span className="text-lg font-bold text-red-600 dark:text-red-400">¥{calculateNewOrderTotal().toLocaleString()}</span></div>
-                                )}
+                                <div className="flex items-center gap-3">
+                                    {newOrderItems.length > 0 && (
+                                        <div className="text-sm text-gray-500">总计：<span className="text-lg font-bold text-red-600 dark:text-red-400">¥{calculateNewOrderTotal().toLocaleString()}</span></div>
+                                    )}
+                                    <button
+                                        onClick={() => { setEditingItemIndex(null); setShowAddProductModal(true); }}
+                                        disabled={enableSubUnitAuth && newOrderItems.length >= 1}
+                                        title={enableSubUnitAuth && newOrderItems.length >= 1 ? '下级单位授权模式下仅允许一个产品明细' : undefined}
+                                        className="flex items-center gap-1.5 px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-xl text-xs font-bold transition shadow-apple disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#0071E3]"
+                                    >
+                                        <Plus className="w-3.5 h-3.5"/> 添加产品
+                                    </button>
+                                </div>
                             </div>
                             {newOrderItems.length > 0 ? (
                                 <table className="w-full text-left text-sm min-w-[600px]">
                                     <thead className="unified-table-header">
-                                        <tr><th className="p-3 pl-4">产品/规格</th><th className="p-3">授权类型</th><th className="p-3 text-center">数量</th><th className="p-3 text-center">授权/服务期限</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-3">激活方式</th>}<th className="p-3">安装包</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-3">关联企业</th>}<th className="p-3 text-right">单价</th><th className="p-3 text-right">小计</th><th className="p-3 text-center">操作</th></tr>
+                                        <tr><th className="p-3 pl-4">产品/规格</th><th className="p-3">订购性质</th><th className="p-3">增续类型</th><th className="p-3">365订购性质</th><th className="p-3">授权类型</th><th className="p-3 text-center">数量</th><th className="p-3 text-center">授权/服务期限</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-3">激活方式</th>}<th className="p-3">安装包</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-3">关联企业</th>}<th className="p-3 text-right">单价</th><th className="p-3 text-right">小计</th><th className="p-3 text-center">操作</th></tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                                         {newOrderItems.map((item, idx) => (
                                             <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                                 <td className="p-3 pl-4"><div className="font-bold text-gray-900 dark:text-white text-sm">{item.productName}</div><div className="text-xs text-gray-500 mt-0.5">{item.skuName}</div></td>
+                                                <td className="p-3">
+                                                    <select value={item.purchaseNature || 'New'} onChange={e => { handleUpdateItem(idx, 'purchaseNature', e.target.value); handleUpdateItem(idx, 'renewalSubType', ''); }} className="text-xs font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] outline-none transition cursor-pointer">
+                                                        <option value="New">新购</option>
+                                                        <option value="Renewal">续费</option>
+                                                        <option value="AddOn">增购</option>
+                                                        <option value="Upgrade">升级</option>
+                                                    </select>
+                                                </td>
+                                                <td className="p-3">
+                                                    {(item.purchaseNature === 'AddOn' || item.purchaseNature === 'Renewal') ? (
+                                                        <select value={item.renewalSubType || ''} onChange={e => handleUpdateItem(idx, 'renewalSubType', e.target.value)} className="text-xs font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] outline-none transition cursor-pointer">
+                                                            <option value="">--</option>
+                                                            {item.purchaseNature === 'AddOn' && <>
+                                                                <option value="产品增购">产品增购</option>
+                                                                <option value="数量增购">数量增购</option>
+                                                                <option value="产品增购-批量">产品增购-批量</option>
+                                                                <option value="数量增购-批量">数量增购-批量</option>
+                                                            </>}
+                                                            {item.purchaseNature === 'Renewal' && <>
+                                                                <option value="普通续费">普通续费</option>
+                                                                <option value="批量续费">批量续费</option>
+                                                                <option value="间隔两年续费">间隔两年续费</option>
+                                                                <option value="间隔两年续费-批量">间隔两年续费-批量</option>
+                                                            </>}
+                                                        </select>
+                                                    ) : (
+                                                        <span className="text-gray-300 dark:text-gray-600 text-xs">-</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-3">
+                                                    <select value={item.purchaseNature365 || 'New'} onChange={e => handleUpdateItem(idx, 'purchaseNature365', e.target.value)} className="text-xs font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] outline-none transition cursor-pointer">
+                                                        <option value="New">新购</option>
+                                                        <option value="Renewal">续费</option>
+                                                        <option value="AddOn">增购</option>
+                                                        <option value="Upgrade">升级</option>
+                                                    </select>
+                                                </td>
                                                 <td className="p-3"><span className="text-xs bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-lg text-gray-600 dark:text-gray-300 font-medium">{item.pricingOptionName || '默认'}</span></td>
                                                 <td className="p-3 text-center">
                                                     <input type="number" min={1} value={item.quantity} onChange={e => handleUpdateItem(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))} className="w-16 text-center text-sm font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] dark:focus:border-[#FF2D55] outline-none transition"/>
@@ -1495,16 +1693,19 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                     <input type="number" min={0} step={0.01} value={item.priceAtPurchase} onChange={e => handleUpdateItem(idx, 'priceAtPurchase', Math.max(0, parseFloat(e.target.value) || 0))} className="w-24 text-right text-sm font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] dark:focus:border-[#FF2D55] outline-none transition"/>
                                                 </td>
                                                 <td className="p-3 text-right font-bold text-red-600 dark:text-red-400">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
-                                                <td className="p-3 text-center"><button onClick={() => handleRemoveItem(idx)} className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition"><Trash2 className="w-3.5 h-3.5"/></button></td>
+                                                <td className="p-3 text-center flex items-center justify-center gap-1">
+                                                    <button onClick={() => handleEditItem(idx)} className="text-gray-400 hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20 transition" title="编辑"><Pencil className="w-3.5 h-3.5"/></button>
+                                                    <button onClick={() => handleRemoveItem(idx)} className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="删除"><Trash2 className="w-3.5 h-3.5"/></button>
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             ) : (
                                 <div className="px-5 pb-4 pt-1">
-                                    <div className="flex flex-col items-center justify-center py-6 text-gray-300 dark:text-gray-600">
-                                        <ShoppingBag className="w-8 h-8 mb-2 opacity-50"/>
-                                        <p className="text-sm font-medium">暂无产品，请在下方添加</p>
+                                    <div className="flex flex-col items-center justify-center py-10 text-gray-300 dark:text-gray-600">
+                                        <ShoppingBag className="w-10 h-10 mb-3 opacity-40"/>
+                                        <p className="text-sm font-medium">暂无产品，请点击右上方"添加产品"按钮</p>
                                     </div>
                                 </div>
                             )}
@@ -1564,14 +1765,143 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             )}
                         </div>
                         )}
-                        
-                        <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple">
-                            <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-2 mb-4">
-                                <ShoppingBag className="w-4 h-4 text-blue-500"/> 添加产品
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                                <div className="md:col-span-3 space-y-2 relative" ref={categoryPickerRef}>
-                                    <label className="text-xs font-bold text-gray-500 uppercase">1. 产品分类</label>
+
+                        {/* 下级单位授权 */}
+                        <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple overflow-hidden">
+                            <div className="px-5 pt-4 pb-3 flex items-center justify-between">
+                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <Building2 className="w-4 h-4 text-indigo-500"/> 下级单位授权
+                                </h4>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-sm text-gray-500 dark:text-gray-400">{enableSubUnitAuth ? '按下级单位提供授权' : '不按下级单位提供'}</span>
+                                    <button
+                                        onClick={() => {
+                                            if (!enableSubUnitAuth && newOrderItems.length > 1) {
+                                                alert(`下级单位授权模式下仅允许一个产品明细，当前有 ${newOrderItems.length} 个产品。请先移除多余产品后再开启。`);
+                                                return;
+                                            }
+                                            setEnableSubUnitAuth(!enableSubUnitAuth);
+                                            if (enableSubUnitAuth) setSubUnits([]);
+                                        }}
+                                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${enableSubUnitAuth ? 'bg-[#0071E3]' : 'bg-gray-300 dark:bg-gray-600'}`}
+                                    >
+                                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${enableSubUnitAuth ? 'translate-x-6' : 'translate-x-1'}`} />
+                                    </button>
+                                </div>
+                            </div>
+                            {enableSubUnitAuth && (
+                                <div className="space-y-3">
+                                    <div className="px-5 space-y-1.5">
+                                        <div className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                                            <span className="shrink-0 mt-0.5">●</span>
+                                            <span>选此方式表示按照"客户下级单位名称"分别在不同的企业ID下呈现电子授权信息；金山将交付邮件分别发送至"客户下级单位名称"对应邮箱</span>
+                                        </div>
+                                        <div className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                                            <span className="shrink-0 mt-0.5">●</span>
+                                            <span>下级单位【卖方业务联系人】需要与主订单【卖方业务联系人】保持一致，否则存在鉴权可能性</span>
+                                        </div>
+                                    </div>
+                                    <div className="px-5 flex items-center gap-3 pb-2">
+                                        <button onClick={addSubUnit} className="flex items-center gap-1.5 px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-xl text-xs font-bold transition shadow-apple">
+                                            <Plus className="w-3.5 h-3.5"/> 新增下级单位
+                                        </button>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-sm" style={{ minWidth: 1200 }}>
+                                            <thead className="unified-table-header">
+                                                <tr>
+                                                    <th className="p-3 pl-5 w-10 text-center">#</th>
+                                                    <th className="p-3 whitespace-nowrap">客户下级单位名称</th>
+                                                    <th className="p-3 whitespace-nowrap">企业ID</th>
+                                                    <th className="p-3 whitespace-nowrap">企业名称</th>
+                                                    <th className="p-3 whitespace-nowrap">授权数量</th>
+                                                    <th className="p-3 whitespace-nowrap">IT部/信息部联系人</th>
+                                                    <th className="p-3 whitespace-nowrap">手机</th>
+                                                    <th className="p-3 whitespace-nowrap">邮箱</th>
+                                                    <th className="p-3 whitespace-nowrap">客户类型</th>
+                                                    <th className="p-3 whitespace-nowrap">行业条线</th>
+                                                    <th className="p-3 whitespace-nowrap">卖方业务联系人</th>
+                                                    <th className="p-3 pr-5 whitespace-nowrap text-center">操作</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                                                {subUnits.map((unit, idx) => (
+                                                    <tr key={unit.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors align-top">
+                                                        <td className="p-3 pl-5 text-center text-gray-400 font-mono text-xs">{idx + 1}</td>
+                                                        <td className="p-3">
+                                                            <input value={unit.unitName} onChange={e => updateSubUnit(unit.id, 'unitName', e.target.value)} placeholder="请输入单位名称" className={`w-full min-w-[140px] px-2.5 py-1.5 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-blue-400 ${!unit.unitName ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}/>
+                                                            {!unit.unitName && <div className="text-[10px] text-red-500 mt-1">必填字段</div>}
+                                                        </td>
+                                                        <td className="p-3">
+                                                            {selectedCustomerObj?.enterprises && selectedCustomerObj.enterprises.length > 0 ? (
+                                                                <select value={unit.enterpriseId} onChange={e => { const ent = selectedCustomerObj.enterprises.find(en => en.id === e.target.value); updateSubUnit(unit.id, 'enterpriseId', e.target.value); updateSubUnit(unit.id, 'enterpriseName', ent?.name || '-'); }} className={`w-full min-w-[100px] px-2.5 py-1.5 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white cursor-pointer focus:border-blue-400 ${!unit.enterpriseId ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}>
+                                                                    <option value="">选择</option>
+                                                                    {selectedCustomerObj.enterprises.map(ent => <option key={ent.id} value={ent.id}>{ent.id}</option>)}
+                                                                </select>
+                                                            ) : (
+                                                                <span className="text-xs text-blue-600 dark:text-blue-400 cursor-pointer hover:underline">选择</span>
+                                                            )}
+                                                            {!unit.enterpriseId && <div className="text-[10px] text-red-500 mt-1">必填</div>}
+                                                        </td>
+                                                        <td className="p-3 text-xs text-gray-500 dark:text-gray-400">{unit.enterpriseName}</td>
+                                                        <td className="p-3">
+                                                            <input type="number" min={1} value={unit.authCount} onChange={e => updateSubUnit(unit.id, 'authCount', e.target.value)} placeholder="请输入" className={`w-full min-w-[80px] px-2.5 py-1.5 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-blue-400 ${!unit.authCount ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}/>
+                                                            {!unit.authCount && <div className="text-[10px] text-red-500 mt-1">必填字段</div>}
+                                                        </td>
+                                                        <td className="p-3">
+                                                            <input value={unit.itContact} onChange={e => updateSubUnit(unit.id, 'itContact', e.target.value)} placeholder="请输入" className="w-full min-w-[100px] px-2.5 py-1.5 border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-blue-400"/>
+                                                        </td>
+                                                        <td className="p-3">
+                                                            <input value={unit.phone} onChange={e => updateSubUnit(unit.id, 'phone', e.target.value)} placeholder="请输入" className="w-full min-w-[100px] px-2.5 py-1.5 border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-blue-400"/>
+                                                        </td>
+                                                        <td className="p-3">
+                                                            <input type="email" value={unit.email} onChange={e => updateSubUnit(unit.id, 'email', e.target.value)} placeholder="请输入" className={`w-full min-w-[120px] px-2.5 py-1.5 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-blue-400 ${!unit.email ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}/>
+                                                            {!unit.email && <div className="text-[10px] text-red-500 mt-1">必填字段</div>}
+                                                        </td>
+                                                        <td className="p-3 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{unit.customerType}</td>
+                                                        <td className="p-3 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{unit.industryLine}</td>
+                                                        <td className="p-3 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{unit.sellerContact}</td>
+                                                        <td className="p-3 pr-5 text-center">
+                                                            <button onClick={() => removeSubUnit(unit.id)} className="text-red-500 hover:text-red-700 dark:hover:text-red-400 text-xs font-bold hover:underline transition">删除</button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {subUnits.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={12} className="px-3 py-10 text-center text-gray-300 dark:text-gray-600 text-sm">暂无下级单位，请点击"新增下级单位"添加</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 添加产品抽屉 */}
+                        {showAddProductModal && (
+                        <ModalPortal>
+                        <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-[600] animate-fade-in" onClick={() => { setShowAddProductModal(false); setEditingItemIndex(null); }}/>
+                        <div className="fixed inset-y-0 right-0 z-[601] w-[75vw] max-w-[1200px] flex flex-col bg-white dark:bg-[#1C1C1E] shadow-[-8px_0_30px_rgba(0,0,0,0.12)] dark:shadow-[-8px_0_30px_rgba(0,0,0,0.5)] animate-drawer-enter">
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/10 shrink-0 bg-white dark:bg-[#1C1C1E]">
+                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <ShoppingBag className="w-4 h-4 text-blue-500"/> {editingItemIndex !== null ? '编辑产品' : '添加产品'}
+                                </h4>
+                                <button onClick={() => { setShowAddProductModal(false); setEditingItemIndex(null); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition">
+                                    <X className="w-4 h-4"/>
+                                </button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto px-6 py-5 pb-8 space-y-5">
+
+                            {/* ═══ 产品信息 ═══ */}
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-white/10">
+                                    <ShoppingBag className="w-4 h-4 text-blue-500"/>
+                                    <span className="text-sm font-bold text-gray-900 dark:text-white">产品信息</span>
+                                </div>
+                                <div className="grid grid-cols-4 gap-4">
+                                <div className="space-y-2 relative" ref={categoryPickerRef}>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">产品分类</label>
                                     <button
                                         type="button"
                                         onClick={() => { setIsCategoryPickerOpen(!isCategoryPickerOpen); if (!isCategoryPickerOpen && !tempHoverCategory && categoryTree.length > 0) setTempHoverCategory(categoryTree[0].label); }}
@@ -1618,8 +1948,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     )}
                                 </div>
 
-                                <div className="md:col-span-3 space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">2. 选择产品</label>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase">选择产品</label>
                                     <select 
                                         className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50" 
                                         value={tempProductId} 
@@ -1633,8 +1963,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     </select>
                                 </div>
 
-                                <div className="md:col-span-2 space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">3. 规格</label>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase">规格</label>
                                     <select 
                                         className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50" 
                                         value={tempSkuId} 
@@ -1648,8 +1978,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     </select>
                                 </div>
 
-                                <div className="md:col-span-2 space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">4. 授权类型</label>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase">授权类型</label>
                                     {selectedSku?.pricingOptions && selectedSku.pricingOptions.length > 0 ? (
                                         <select 
                                             className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm" 
@@ -1668,13 +1998,13 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     )}
                                 </div>
 
-                                <div className="md:col-span-2 space-y-2">
+                                <div className="space-y-2">
                                     <label className="text-xs font-bold text-gray-500 uppercase">数量</label>
                                     <input type="number" className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm" min="1" value={tempQuantity} onChange={e => setTempQuantity(Number(e.target.value))} />
                                 </div>
 
                                 {showLicensePeriod && (
-                                <div className="md:col-span-2 space-y-2">
+                                <div className="space-y-2">
                                     <label className="text-xs font-bold text-teal-600 uppercase flex items-center gap-1">授权/服务期限</label>
                                     <div className="flex gap-2">
                                         <input
@@ -1698,7 +2028,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 </div>
                                 )}
                                 
-                                <div className={`${showLicensePeriod ? 'md:col-span-2' : 'md:col-span-3'} space-y-2`}>
+                                <div className="space-y-2">
                                     <label className="text-xs font-bold text-orange-500 uppercase flex items-center gap-1"><ArrowUpRight className="w-3 h-3"/> 最终单价 (可议价)</label>
                                     <div className="relative">
                                         <input 
@@ -1714,7 +2044,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     </div>
                                 </div>
 
-                                <div className={`${showLicensePeriod ? 'md:col-span-2' : 'md:col-span-3'} space-y-2`}>
+                                <div className="space-y-2">
                                     <label className="text-xs font-bold text-red-500 uppercase flex items-center gap-1">产品金额</label>
                                     {(() => {
                                         const unitPrice = negotiatedPrice !== null ? negotiatedPrice : (selectedOption?.price || selectedSku?.price || 0);
@@ -1739,21 +2069,106 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     })()}
                                 </div>
 
-                                <div className={showLicensePeriod ? 'md:col-span-2' : 'md:col-span-3'}>
-                                    <button
-                                        onClick={handleAddItem}
-                                        disabled={!tempProductId || !tempSkuId || (selectedSku?.pricingOptions?.length > 0 && !tempPricingOptionId)}
-                                        className="w-full bg-black dark:bg-white text-white dark:text-black py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:opacity-80 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-apple"
-                                    >
-                                        <Plus className="w-4 h-4"/> 加入清单
-                                    </button>
                                 </div>
+                            </div>
 
-                                {/* 激活方式 / 被授权方 / 关联企业 / 供货组织 - 独占一行 */}
-                                {tempProductId && (
-                                <div className="md:col-span-12 grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 mt-1 border-t border-gray-100 dark:border-white/10">
-                                    {(buyerType === 'Customer' || buyerType === 'Channel') && (
+                            {/* ═══ 续费信息 ═══ */}
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-white/10">
+                                    <Target className="w-4 h-4 text-green-500"/>
+                                    <span className="text-sm font-bold text-gray-900 dark:text-white">续费信息</span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-4">
                                     <div className="space-y-2">
+                                        <label className="text-xs font-bold text-green-600 uppercase flex items-center gap-1"><Target className="w-3 h-3"/> 订购性质</label>
+                                        <div className="flex gap-1.5">
+                                            {([
+                                                { id: 'New' as PurchaseNature, label: '新购' },
+                                                { id: 'Renewal' as PurchaseNature, label: '续费' },
+                                                { id: 'AddOn' as PurchaseNature, label: '增购' },
+                                                { id: 'Upgrade' as PurchaseNature, label: '升级' },
+                                            ]).map(opt => (
+                                                <button
+                                                    key={opt.id}
+                                                    type="button"
+                                                    onClick={() => { setTempPurchaseNature(opt.id); setTempRenewalSubType(''); }}
+                                                    className={`flex-1 py-2 px-1.5 rounded-lg text-xs font-bold transition border ${
+                                                        tempPurchaseNature === opt.id
+                                                            ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'
+                                                            : 'border-gray-200 dark:border-white/10 text-gray-500 hover:border-green-300 dark:hover:border-green-700'
+                                                    }`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-emerald-500 uppercase flex items-center gap-1"><Layers className="w-3 h-3"/> 增续类型</label>
+                                        {(tempPurchaseNature === 'AddOn' || tempPurchaseNature === 'Renewal') ? (
+                                            <select
+                                                value={tempRenewalSubType}
+                                                onChange={e => setTempRenewalSubType(e.target.value)}
+                                                className="w-full p-2.5 bg-gray-50 dark:bg-black border border-emerald-200 dark:border-emerald-900/30 rounded-xl outline-none focus:ring-2 focus:ring-emerald-200 transition text-xs font-medium text-emerald-700 dark:text-emerald-400"
+                                            >
+                                                <option value="">-- 请选择 --</option>
+                                                {tempPurchaseNature === 'AddOn' && <>
+                                                    <option value="产品增购">产品增购</option>
+                                                    <option value="数量增购">数量增购</option>
+                                                    <option value="产品增购-批量">产品增购-批量</option>
+                                                    <option value="数量增购-批量">数量增购-批量</option>
+                                                </>}
+                                                {tempPurchaseNature === 'Renewal' && <>
+                                                    <option value="普通续费">普通续费</option>
+                                                    <option value="批量续费">批量续费</option>
+                                                    <option value="间隔两年续费">间隔两年续费</option>
+                                                    <option value="间隔两年续费-批量">间隔两年续费-批量</option>
+                                                </>}
+                                            </select>
+                                        ) : (
+                                            <div className="w-full p-2.5 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-400 dark:text-gray-500">
+                                                {tempPurchaseNature === 'New' ? '新购无增续类型' : '升级无增续类型'}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-sky-600 uppercase flex items-center gap-1"><Radio className="w-3 h-3"/> 365 订购性质</label>
+                                        <div className="flex gap-1.5">
+                                            {([
+                                                { id: 'New' as PurchaseNature, label: '新购' },
+                                                { id: 'Renewal' as PurchaseNature, label: '续费' },
+                                                { id: 'AddOn' as PurchaseNature, label: '增购' },
+                                                { id: 'Upgrade' as PurchaseNature, label: '升级' },
+                                            ]).map(opt => (
+                                                <button
+                                                    key={opt.id}
+                                                    type="button"
+                                                    onClick={() => setTempPurchaseNature365(opt.id)}
+                                                    className={`flex-1 py-2 px-1.5 rounded-lg text-xs font-bold transition border ${
+                                                        tempPurchaseNature365 === opt.id
+                                                            ? 'border-sky-400 dark:border-sky-500 bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400'
+                                                            : 'border-gray-200 dark:border-white/10 text-gray-500 hover:border-sky-300 dark:hover:border-sky-700'
+                                                    }`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ═══ 交付物信息 ═══ */}
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-white/10">
+                                    <Box className="w-4 h-4 text-indigo-500"/>
+                                    <span className="text-sm font-bold text-gray-900 dark:text-white">交付物信息</span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-4">
+                                    {(buyerType === 'Customer' || buyerType === 'Channel') && (
+                                    <div className="col-span-3 space-y-2">
                                         <label className="text-xs font-bold text-purple-500 uppercase flex items-center gap-1"><Zap className="w-3 h-3"/> 激活方式</label>
                                         <div className="flex gap-1.5">
                                             {([
@@ -1778,45 +2193,19 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     </div>
                                     )}
 
+                                    {/* 介质数量 */}
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-cyan-500 uppercase flex items-center gap-1"><UserIcon className="w-3 h-3"/> 被授权方</label>
+                                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">介质数量</label>
                                         <input
-                                            type="text"
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-cyan-200 dark:border-cyan-900/30 rounded-xl outline-none focus:ring-2 focus:ring-cyan-200 transition text-sm text-cyan-700 dark:text-cyan-400"
-                                            placeholder="默认取客户名称"
-                                            value={tempLicensee}
-                                            onChange={e => setTempLicensee(e.target.value)}
-                                        />
-                                    </div>
-
-                                    {(buyerType === 'Customer' || buyerType === 'Channel') && newOrderCustomer && selectedCustomerObj?.enterprises && selectedCustomerObj.enterprises.length > 0 && (
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-indigo-500 uppercase flex items-center gap-1"><Briefcase className="w-3 h-3"/> 关联企业 ID</label>
-                                        <select
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-indigo-200 dark:border-indigo-900/30 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200 transition text-sm text-indigo-700 dark:text-indigo-400"
-                                            value={tempEnterpriseId}
-                                            onChange={e => setTempEnterpriseId(e.target.value)}
-                                        >
-                                            <option value="">-- 不关联企业 --</option>
-                                            {selectedCustomerObj.enterprises.map(ent => (
-                                                <option key={ent.id} value={ent.id}>{ent.name} (ID: {ent.id})</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    )}
-
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-teal-500 uppercase flex items-center gap-1"><Briefcase className="w-3 h-3"/> 供货组织</label>
-                                        <input
-                                            type="text"
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-teal-200 dark:border-teal-900/30 rounded-xl outline-none focus:ring-2 focus:ring-teal-200 transition text-sm text-teal-700 dark:text-teal-400"
-                                            placeholder="自动带出"
-                                            value={sellerName}
-                                            onChange={e => setSellerName(e.target.value)}
+                                            type="number"
+                                            min={1}
+                                            value={tempMediaCount}
+                                            onChange={e => setTempMediaCount(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))}
+                                            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 outline-none transition"
+                                            placeholder="请输入介质数量"
                                         />
                                     </div>
                                 </div>
-                                )}
                             </div>
 
                             {/* 安装包选择 */}
@@ -1846,11 +2235,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 }
 
                                 return (
-                                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/10 space-y-3">
-                                        <div className="flex items-center gap-2">
-                                            <Box className="w-4 h-4 text-indigo-500"/>
-                                            <span className="text-sm font-bold text-gray-700 dark:text-gray-200">安装包配置</span>
-                                        </div>
+                                    <div className="space-y-3">
 
                                         {/* 通用 / 定制 切换 */}
                                         <div className="flex gap-3">
@@ -1984,7 +2369,69 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     </div>
                                 );
                             })()}
+
+                            {/* ═══ 产品交付信息 ═══ */}
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-white/10">
+                                    <Truck className="w-4 h-4 text-cyan-500"/>
+                                    <span className="text-sm font-bold text-gray-900 dark:text-white">产品交付信息</span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-cyan-500 uppercase flex items-center gap-1"><UserIcon className="w-3 h-3"/> 被授权方</label>
+                                        <input
+                                            type="text"
+                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-cyan-200 dark:border-cyan-900/30 rounded-xl outline-none focus:ring-2 focus:ring-cyan-200 transition text-sm text-cyan-700 dark:text-cyan-400"
+                                            placeholder="默认取客户名称"
+                                            value={tempLicensee}
+                                            onChange={e => setTempLicensee(e.target.value)}
+                                        />
+                                    </div>
+
+                                    {(buyerType === 'Customer' || buyerType === 'Channel') && newOrderCustomer && selectedCustomerObj?.enterprises && selectedCustomerObj.enterprises.length > 0 && (
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-indigo-500 uppercase flex items-center gap-1"><Briefcase className="w-3 h-3"/> 关联企业 ID</label>
+                                        <select
+                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-indigo-200 dark:border-indigo-900/30 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200 transition text-sm text-indigo-700 dark:text-indigo-400"
+                                            value={tempEnterpriseId}
+                                            onChange={e => setTempEnterpriseId(e.target.value)}
+                                        >
+                                            <option value="">-- 不关联企业 --</option>
+                                            {selectedCustomerObj.enterprises.map(ent => (
+                                                <option key={ent.id} value={ent.id}>{ent.name} (ID: {ent.id})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    )}
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-teal-500 uppercase flex items-center gap-1"><Briefcase className="w-3 h-3"/> 供货组织</label>
+                                        <input
+                                            type="text"
+                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-teal-200 dark:border-teal-900/30 rounded-xl outline-none focus:ring-2 focus:ring-teal-200 transition text-sm text-teal-700 dark:text-teal-400"
+                                            placeholder="自动带出"
+                                            value={sellerName}
+                                            onChange={e => setSellerName(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            </div>
+                            {/* 底部操作栏 */}
+                            <div className="shrink-0 px-6 py-4 border-t border-gray-100 dark:border-white/10 bg-white dark:bg-[#1C1C1E] flex items-center justify-between">
+                                <button onClick={() => { setShowAddProductModal(false); setEditingItemIndex(null); }} className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition">取消</button>
+                                <button
+                                    onClick={handleAddItem}
+                                    disabled={!tempProductId || !tempSkuId || (selectedSku?.pricingOptions?.length > 0 && !tempPricingOptionId)}
+                                    className="px-8 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-xl text-sm font-bold flex items-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-apple"
+                                >
+                                    {editingItemIndex !== null ? <><Check className="w-4 h-4"/> 保存修改</> : <><Plus className="w-4 h-4"/> 加入清单</>}
+                                </button>
+                            </div>
                         </div>
+                        </ModalPortal>
+                        )}
 
 
                     </div>
@@ -2197,6 +2644,26 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     </div>
                                 </div>
                             </div>
+
+                            <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-4">
+                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><Key className="w-4 h-4 text-amber-500"/> 序列号需求</h4>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {(['生成新序列号', '沿用正式序列号', '沿用测试序列号'] as const).map(opt => (
+                                        <button
+                                            key={opt}
+                                            onClick={() => setSerialNumberRequirement(opt)}
+                                            className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 text-sm font-bold transition-all ${
+                                                serialNumberRequirement === opt
+                                                    ? 'border-amber-500 dark:border-amber-400 bg-amber-50/60 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
+                                                    : 'border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-white/20'
+                                            }`}
+                                        >
+                                            {serialNumberRequirement === opt && <Check className="w-4 h-4 shrink-0" />}
+                                            {opt}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -2356,6 +2823,14 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 (currentStep === 3 && newOrderItems.length === 0)
                             }
                             onClick={() => {
+                                if (currentStep === 2) {
+                                    const missingPurchasing = purchasingContacts.length > 0 && !selectedPurchasingContactId;
+                                    const missingIT = itContacts.length > 0 && !selectedItContactId;
+                                    if (missingPurchasing || missingIT) {
+                                        alert(`请选择${missingPurchasing ? '采购联系人' : ''}${missingPurchasing && missingIT ? '和' : ''}${missingIT ? 'IT 联系人' : ''}`);
+                                        return;
+                                    }
+                                }
                                 setCurrentStep(currentStep + 1);
                             }}
                             className="bg-[#0071E3] text-white px-10 py-3 rounded-xl font-bold shadow-xl hover:scale-105 hover:shadow-blue-500/30 transition disabled:opacity-50 disabled:hover:scale-100 disabled:shadow-none text-sm"
@@ -2770,6 +3245,74 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 )}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+            </ModalPortal>
+        )}
+
+        {/* New Contact Modal */}
+        {showNewContactModal && (
+            <ModalPortal>
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[600] animate-fade-in" onClick={() => setShowNewContactModal(null)}>
+                <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl shadow-2xl w-[440px] animate-modal-enter" onClick={e => e.stopPropagation()}>
+                    <div className="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                        <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                            新建{showNewContactModal === 'Purchasing' ? '采购' : 'IT'}联系人
+                        </h3>
+                        <button onClick={() => setShowNewContactModal(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition">
+                            <X className="w-4 h-4"/>
+                        </button>
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 block">姓名 <span className="text-red-500">*</span></label>
+                            <input
+                                value={newContactForm.name}
+                                onChange={e => setNewContactForm(f => ({ ...f, name: e.target.value }))}
+                                className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-[#1C1C1E] text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                                placeholder="请输入联系人姓名"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 block">职位</label>
+                            <input
+                                value={newContactForm.position}
+                                onChange={e => setNewContactForm(f => ({ ...f, position: e.target.value }))}
+                                className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-[#1C1C1E] text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                                placeholder="请输入职位"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 block">手机号</label>
+                                <input
+                                    value={newContactForm.phone}
+                                    onChange={e => setNewContactForm(f => ({ ...f, phone: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-[#1C1C1E] text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                                    placeholder="请输入手机号"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 block">邮箱</label>
+                                <input
+                                    value={newContactForm.email}
+                                    onChange={e => setNewContactForm(f => ({ ...f, email: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-[#1C1C1E] text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                                    placeholder="请输入邮箱"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="px-6 py-4 border-t border-gray-100 dark:border-white/10 flex justify-end gap-2">
+                        <button onClick={() => setShowNewContactModal(null)} className="px-4 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition">取消</button>
+                        <button
+                            onClick={handleSaveNewContact}
+                            disabled={!newContactForm.name.trim()}
+                            className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-xl text-sm font-medium transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            确定创建
+                        </button>
                     </div>
                 </div>
             </div>

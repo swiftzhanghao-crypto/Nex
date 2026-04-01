@@ -30,7 +30,7 @@ import {
 const USE_API = import.meta.env.VITE_API_MODE === 'true';
 
 // --- Mock data fallback (bump version when schema changes to force refresh) ---
-const MOCK_DATA_VERSION = 5;
+const MOCK_DATA_VERSION = 8;
 const mockCustomers = generateCustomers(initialUsers);
 const mockOpportunities = generateOpportunities(mockCustomers);
 const mockContracts = generateContracts(mockCustomers);
@@ -98,7 +98,10 @@ export function useAppContext(): AppContextType {
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     // --- Product domain ---
-    const [products, setProducts] = useState(initialProducts);
+    const [products, setProducts] = useState(() => {
+        const salesOrgs = ['珠海金山办公有限公司', '北京金山办公有限公司', '武汉金山办公有限公司'];
+        return initialProducts.map((p, i) => p.salesOrgName ? p : { ...p, salesOrgName: salesOrgs[i % salesOrgs.length] });
+    });
     const [merchandises, setMerchandises] = useState(initialMerchandises);
     const [atomicCapabilities, setAtomicCapabilities] = useState(initialAtomicCapabilities);
     const [authTypes, setAuthTypes] = useState(initialAuthTypes);

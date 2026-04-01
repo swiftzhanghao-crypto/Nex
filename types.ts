@@ -34,6 +34,7 @@ export interface OrderItem extends MerchandiseItem {
     installPackageType?: '通用' | '定制';
     installPackageLink?: string;
     activationMethod: ActivationMethod;
+    mediaCount?: number;
     deliveredContent?: string[];
 
     // Enterprise Connect
@@ -78,9 +79,16 @@ export interface OrderItem extends MerchandiseItem {
     licenseScope?: string;
     subUnitLicenseAllowed?: boolean;
 
+    // Purchase nature
+    purchaseNature?: PurchaseNature;
+    renewalSubType?: string;
+    purchaseNature365?: PurchaseNature;
+
     // After-sale info
     afterSaleWarrantyPeriod?: string;
 }
+
+export type PurchaseNature = 'New' | 'Renewal' | 'AddOn' | 'Upgrade';
 
 export type CapabilityType = 'Component' | 'Feature' | 'Service';
 export type ComponentNature = '自有' | '第三方采购' | '第三方授权';
@@ -587,6 +595,19 @@ export interface Order {
     settlementType?: 'once' | 'installment';
     expectedPaymentDate?: string;
     installmentPlans?: { amount: number; expectedDate: string; actualDate: string; paidAmount: number }[];
+
+    serialNumbers?: SerialNumber[];
+}
+
+export interface SerialNumber {
+    serialNo: string;
+    source: string;
+    generateMethod: string;
+    generateGroup: string;
+    type: string;
+    status: string;
+    generateTime: string;
+    expireTime: string;
 }
 
 // --- Contract (migrated from ContractManager.tsx) ---

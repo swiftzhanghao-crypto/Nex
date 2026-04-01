@@ -416,7 +416,7 @@ const OrderManager: React.FC = () => {
           case 'Sales':        return <span className="unified-tag-blue">后台下单</span>;
           case 'ChannelPortal':return <span className="unified-tag-indigo">渠道下单</span>;
           case 'OnlineStore':  return <span className="unified-tag-orange">官网下单</span>;
-          case 'APISync':      return <span className="unified-tag-gray">第三方下单</span>;
+          case 'APISync':      return <span className="unified-tag-green">三方平台</span>;
           case 'Renewal':      return <span className="unified-tag-green">客户续费</span>;
           default:             return <span className="unified-tag-gray">{source}</span>;
       }

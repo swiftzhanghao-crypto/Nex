@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Plus, Settings, Info, ChevronDown, ChevronUp, Pencil, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 
@@ -103,35 +103,27 @@ const initialRules: DeliveryRule[] = [
   },
 ];
 
-const COLLAPSE_LIMIT = 80;
+const TruncatedCell: React.FC<{ text: string; title: string; onShowDetail: (title: string, content: string) => void }> = ({ text, title, onShowDetail }) => {
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [isClamped, setIsClamped] = useState(false);
 
-const CollapsibleText: React.FC<{ text: string; limit?: number }> = ({ text, limit = COLLAPSE_LIMIT }) => {
-  const [expanded, setExpanded] = useState(false);
-  if (text.length <= limit) return <span className="text-[13px] text-gray-700 dark:text-gray-300 leading-relaxed">{text}</span>;
-  return (
-    <span className="text-[13px] text-gray-700 dark:text-gray-300 leading-relaxed">
-      {expanded ? text : text.slice(0, limit) + '...'}
-      <button onClick={e => { e.stopPropagation(); setExpanded(!expanded); }} className="text-blue-600 dark:text-blue-400 ml-1 hover:underline text-[13px] font-medium whitespace-nowrap">
-        {expanded ? '收起' : '展开'}
-      </button>
-    </span>
-  );
-};
+  useEffect(() => {
+    const el = textRef.current;
+    if (el) setIsClamped(el.scrollHeight > el.clientHeight + 1);
+  }, [text]);
 
-const RegionCell: React.FC<{ regions: { province: string; cities: string[] }[] }> = ({ regions }) => {
-  const [expanded, setExpanded] = useState(false);
-  const summary = regions.map(r => {
-    if (r.cities.length === 0) return r.province;
-    return `【${r.province}】${r.cities.join('、')}`;
-  }).join('；');
-  if (summary.length <= COLLAPSE_LIMIT) return <span className="text-[13px] text-gray-700 dark:text-gray-300 leading-relaxed">{summary}</span>;
   return (
-    <span className="text-[13px] text-gray-700 dark:text-gray-300 leading-relaxed">
-      {expanded ? summary : summary.slice(0, COLLAPSE_LIMIT) + '...'}
-      <button onClick={e => { e.stopPropagation(); setExpanded(!expanded); }} className="text-blue-600 dark:text-blue-400 ml-1 hover:underline text-[13px] font-medium whitespace-nowrap">
-        {expanded ? '收起' : '展开'}
-      </button>
-    </span>
+    <div>
+      <span ref={textRef} className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-3">{text}</span>
+      {isClamped && (
+        <button
+          onClick={e => { e.stopPropagation(); onShowDetail(title, text); }}
+          className="mt-1 inline-flex items-center gap-0.5 text-[11px] font-semibold text-[#0071E3] dark:text-[#0A84FF] bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-100 dark:border-blue-800 px-2 py-0.5 rounded-full transition"
+        >
+          更多
+        </button>
+      )}
+    </div>
   );
 };
 
@@ -144,7 +136,8 @@ const DeliveryMethodConfig: React.FC = () => {
   const [editingRule, setEditingRule] = useState<DeliveryRule | null>(null);
   const [toast, setToast] = useState('');
   const [page, setPage] = useState(1);
-  const pageSize = 20;
+  const [pageSize, setPageSize] = useState(20);
+  const [detailModal, setDetailModal] = useState<{ title: string; content: string } | null>(null);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -253,47 +246,60 @@ const DeliveryMethodConfig: React.FC = () => {
       </div>
 
       {/* Rules Table */}
-      <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden">
-        <table className="w-full text-sm table-fixed">
-          <thead>
-            <tr className="bg-gray-50 dark:bg-black/20 text-xs text-gray-400 font-semibold">
-              <th className="px-4 py-2.5 text-left w-[18%]">产品类型</th>
-              <th className="px-4 py-2.5 text-left w-[10%]">发货方式</th>
-              <th className="px-4 py-2.5 text-left w-[9%]">账号分发模式</th>
-              <th className="px-4 py-2.5 text-left w-[18%]">客户类型</th>
-              <th className="px-4 py-2.5 text-left w-[18%]">行业条线</th>
-              <th className="px-4 py-2.5 text-left w-[18%]">发货地区</th>
-              <th className="px-4 py-2.5 text-center w-[9%]">操作</th>
+      <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
+        <table className="w-full text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '9%' }} />
+          </colgroup>
+          <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E]">
+            <tr>
+              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">发货方式</th>
+              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">账号分发模式</th>
+              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">产品类型</th>
+              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">客户类型</th>
+              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">行业条线</th>
+              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">发货地区</th>
+              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E] text-right">操作</th>
             </tr>
           </thead>
           <tbody>
             {pagedRules.length === 0 && (
               <tr><td colSpan={7} className="py-16 text-center text-gray-400 text-sm">暂无自定义发货规则</td></tr>
             )}
-            {pagedRules.map(rule => (
-              <tr key={rule.id} className="border-t border-gray-100 dark:border-white/5 align-top hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition">
-                <td className="px-4 py-3">
-                  <CollapsibleText text={rule.productTypes.join('、')} />
+            {pagedRules.map((rule, idx) => (
+              <tr key={rule.id} className={`align-top transition-colors ${idx % 2 === 0 ? 'bg-white dark:bg-transparent' : 'bg-gray-50/50 dark:bg-white/[0.02]'} hover:bg-blue-50/40 dark:hover:bg-blue-900/10`}>
+                <td className="px-3 py-2.5">
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{rule.deliveryMethod}</span>
                 </td>
-                <td className="px-4 py-3">
-                  <span className="text-[13px] text-gray-700 dark:text-gray-300">{rule.deliveryMethod}</span>
+                <td className="px-3 py-2.5">
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{rule.accountDistMode}</span>
                 </td>
-                <td className="px-4 py-3">
-                  <span className="text-[13px] text-gray-700 dark:text-gray-300">{rule.accountDistMode}</span>
+                <td className="px-3 py-2.5">
+                  <TruncatedCell text={rule.productTypes.join('、')} title="产品类型" onShowDetail={(t, c) => setDetailModal({ title: t, content: c })} />
                 </td>
-                <td className="px-4 py-3">
-                  <CollapsibleText text={rule.customerTypes.join('、')} />
+                <td className="px-3 py-2.5">
+                  <TruncatedCell text={rule.customerTypes.join('、')} title="客户类型" onShowDetail={(t, c) => setDetailModal({ title: t, content: c })} />
                 </td>
-                <td className="px-4 py-3">
-                  <CollapsibleText text={rule.industryLines.join('、')} />
+                <td className="px-3 py-2.5">
+                  <TruncatedCell text={rule.industryLines.join('、')} title="行业条线" onShowDetail={(t, c) => setDetailModal({ title: t, content: c })} />
                 </td>
-                <td className="px-4 py-3">
-                  <RegionCell regions={rule.regions} />
+                <td className="px-3 py-2.5">
+                  <TruncatedCell
+                    text={rule.regions.map(r => r.cities.length === 0 ? r.province : `【${r.province}】${r.cities.join('、')}`).join('；')}
+                    title="发货地区"
+                    onShowDetail={(t, c) => setDetailModal({ title: t, content: c })}
+                  />
                 </td>
-                <td className="px-4 py-3 text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <button onClick={() => openEdit(rule)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">编辑</button>
-                    <button onClick={() => deleteRule(rule.id)} className="text-xs text-red-500 hover:underline">删除</button>
+                <td className="px-3 py-2.5 text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <button onClick={() => openEdit(rule)} className="text-sm text-[#0071E3] dark:text-[#0A84FF] hover:underline font-medium">编辑</button>
+                    <button onClick={() => deleteRule(rule.id)} className="text-sm text-red-500 hover:underline font-medium">删除</button>
                   </div>
                 </td>
               </tr>
@@ -301,36 +307,29 @@ const DeliveryMethodConfig: React.FC = () => {
           </tbody>
         </table>
 
-        {/* Pagination */}
+        {/* Pagination — 与订单列表一致 */}
         {rules.length > 0 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-white/5">
-            <span className="text-xs text-gray-400">{pageSize}条/页</span>
-            <div className="flex items-center gap-1">
-              <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="w-7 h-7 flex items-center justify-center rounded border border-gray-200 dark:border-white/10 text-gray-500 disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-white/5 transition">
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                <button key={p} onClick={() => setPage(p)} className={`w-7 h-7 flex items-center justify-center rounded text-xs font-medium transition ${page === p ? 'bg-blue-600 text-white' : 'border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5'}`}>
-                  {p}
-                </button>
-              ))}
-              <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="w-7 h-7 flex items-center justify-center rounded border border-gray-200 dark:border-white/10 text-gray-500 disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-white/5 transition">
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-              <span className="text-xs text-gray-400 ml-2">前往</span>
-              <input
-                type="number"
-                min={1}
-                max={totalPages}
-                className="w-10 h-7 border border-gray-200 dark:border-white/10 rounded text-xs text-center bg-transparent text-gray-700 dark:text-gray-300"
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    const v = parseInt((e.target as HTMLInputElement).value);
-                    if (v >= 1 && v <= totalPages) setPage(v);
-                  }
-                }}
-              />
-              <span className="text-xs text-gray-400">页</span>
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200/50 dark:border-white/10">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 dark:text-gray-500">共 <span className="font-mono text-gray-600 dark:text-gray-300">{rules.length}</span> 条</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">每页</span>
+                <select
+                  value={pageSize}
+                  onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+                  className="unified-card h-7 pl-2 pr-6 text-xs font-medium text-gray-700 dark:text-gray-200 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 outline-none appearance-none cursor-pointer transition"
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
+                >
+                  {[20, 50, 100].map(n => <option key={n} value={n}>{n} 条</option>)}
+                </select>
+              </div>
+              <span className="text-xs text-gray-400 dark:text-gray-500">第 {page} / {totalPages} 页</span>
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => setPage(p => p - 1)} disabled={page <= 1} className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium transition disabled:cursor-not-allowed">上一页</button>
+                <button onClick={() => setPage(p => p + 1)} disabled={page >= totalPages} className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium transition disabled:cursor-not-allowed">下一页</button>
+              </div>
             </div>
           </div>
         )}
@@ -449,6 +448,25 @@ const DeliveryMethodConfig: React.FC = () => {
               <div className="flex justify-end gap-2 mt-6">
                 <button onClick={() => { setShowEditModal(false); setEditingRule(null); }} className="px-4 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm text-gray-700 dark:text-gray-300">取消</button>
                 <button onClick={saveRule} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">确定</button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* Detail Modal */}
+      {detailModal && (
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in" onClick={() => setDetailModal(null)}>
+            <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl shadow-2xl border border-gray-100 dark:border-white/10 w-[520px] max-h-[70vh] flex flex-col animate-modal-enter" onClick={e => e.stopPropagation()}>
+              <div className="px-5 py-3.5 border-b border-gray-100 dark:border-white/10 flex items-center justify-between shrink-0">
+                <span className="text-sm font-bold text-gray-900 dark:text-white">{detailModal.title}</span>
+                <button onClick={() => setDetailModal(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-5 overflow-y-auto custom-scrollbar flex-1">
+                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap break-words">{detailModal.content}</p>
               </div>
             </div>
           </div>
