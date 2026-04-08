@@ -358,8 +358,10 @@ const OrderDetails: React.FC = () => {
       handleCloseDrawer();
   };
 
+  const canAccept = selectedOrder.status === OrderStatus.SHIPPED;
+
   const handleAcceptPhase = (phaseId: string) => {
-      if (!selectedOrder.acceptanceConfig) return;
+      if (!selectedOrder.acceptanceConfig || !canAccept) return;
       const phases = selectedOrder.acceptanceConfig.phases.map(p => p.id === phaseId ? { ...p, status: 'Accepted' as const, acceptedDate: new Date().toISOString() } : p);
       updateOrder({ 
           ...selectedOrder, 
@@ -369,7 +371,7 @@ const OrderDetails: React.FC = () => {
   };
 
   const handleCompleteAcceptance = () => {
-      if (selectedOrder.status === OrderStatus.DELIVERED) return;
+      if (!canAccept) { alert('仅在"已发货"状态下可进行验收操作。'); return; }
       let phases = selectedOrder.acceptanceConfig?.phases || [];
       const hasPending = phases.some(p => p.status !== 'Accepted');
       if (hasPending) {
@@ -633,7 +635,7 @@ const OrderDetails: React.FC = () => {
               {([
                   { id: 'MANAGEMENT', label: '订单信息', permission: undefined },
                   { id: 'SERIAL', label: '序列号', permission: undefined },
-                  { id: 'EMAIL', label: '发货信息', permission: 'order_detail_shipping' },
+                  { id: 'EMAIL', label: '发货记录', permission: 'order_detail_shipping' },
                   { id: 'FULFILLMENT', label: '订单交付', permission: 'order_detail_delivery' },
               ] as { id: string; label: string; permission?: string; hidden?: boolean }[]).filter(tab => !tab.hidden && (!tab.permission || hasPermission(tab.permission))).map(tab => (
                   <button
@@ -700,8 +702,8 @@ const OrderDetails: React.FC = () => {
                   <Package className="w-5 h-5 text-orange-500" />
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white">订单产品明细</h3>
               </div>
+              {(
               <div className="flex items-stretch">
-                  {/* Left: items table (fills remaining) */}
                   <div className="flex-1 min-w-0 overflow-x-auto border-r border-gray-100 dark:border-white/10">
                       <table className="w-full text-left min-w-[520px]">
                           <thead className="unified-table-header">
@@ -759,7 +761,6 @@ const OrderDetails: React.FC = () => {
                       </table>
                   </div>
 
-                  {/* Right: price summary */}
                   <div className="w-[27%] shrink-0 flex flex-col justify-between p-6 bg-gray-50/50 dark:bg-white/5">
                       {(() => {
                           const productTotal = selectedOrder.items.reduce((sum, item) => sum + item.priceAtPurchase * item.quantity, 0);
@@ -837,6 +838,8 @@ const OrderDetails: React.FC = () => {
                       })()}
                   </div>
               </div>
+              )}
+
           </div>
           )}
 
@@ -851,75 +854,52 @@ const OrderDetails: React.FC = () => {
                           <Target className="w-5 h-5 text-orange-500" />
                           <h3 className="text-base font-semibold text-gray-900 dark:text-white">商机信息</h3>
                       </div>
-                      <div className="overflow-x-auto">
-                          <table className="w-full text-left min-w-[520px]">
-                              <thead className="unified-table-header">
-                                  <tr>
-                                      <th className="px-5 py-4 pl-6 whitespace-nowrap">商机名称</th>
-                                      <th className="px-5 py-4 whitespace-nowrap">商机编号</th>
-                                      <th className="px-5 py-4 whitespace-nowrap">客户名称</th>
-                                      <th className="px-5 py-4 whitespace-nowrap">商机阶段</th>
-                                      <th className="px-5 py-4 whitespace-nowrap">所属部门</th>
-                                      <th className="px-5 py-4 whitespace-nowrap">负责人</th>
-                                      <th className="px-5 py-4 text-right whitespace-nowrap">商机金额</th>
-                                      <th className="px-5 py-4 whitespace-nowrap">结单日期</th>
-                                  </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-50 dark:divide-white/5">
-                                  <tr className="group text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                      <td className="px-5 py-5 pl-6 font-bold text-gray-900 dark:text-white max-w-[200px] truncate" title={opp.name}>{opp.name}</td>
-                                      <td className="px-5 py-5 font-mono text-xs text-gray-500 dark:text-gray-400">{opp.id}</td>
-                                      <td className="px-5 py-5 text-gray-700 dark:text-gray-300">{opp.customerName}</td>
-                                      <td className="px-5 py-5"><span className={stageClass}>{opp.stage}</span></td>
-                                      <td className="px-5 py-5 text-gray-600 dark:text-gray-400 text-xs">{opp.department || '-'}</td>
-                                      <td className="px-5 py-5 text-gray-600 dark:text-gray-400 text-xs">{opp.ownerName || '-'}</td>
-                                      <td className="px-5 py-5 text-right font-mono font-bold text-gray-900 dark:text-white">¥{(opp.amount || opp.expectedRevenue || 0).toLocaleString()}</td>
-                                      <td className="px-5 py-5 font-mono text-gray-700 dark:text-gray-300 text-xs">{opp.closeDate ? new Date(opp.closeDate).toLocaleDateString('zh-CN') : '-'}</td>
-                                  </tr>
-                              </tbody>
-                          </table>
-                      </div>
-                      {opp.products && opp.products.length > 0 && (
-                          <div className="border-t border-gray-100 dark:border-white/10">
-                              <div className="px-5 pt-3 pb-1">
-                                  <div className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">商机产品明细</div>
-                              </div>
-                              <div className="overflow-x-auto">
-                                  <table className="w-full text-left min-w-[520px]">
-                                      <thead className="unified-table-header">
-                                          <tr>
-                                              <th className="px-5 py-4 pl-6 text-center w-16 whitespace-nowrap">序号</th>
-                                              <th className="px-5 py-4">产品信息</th>
-                                              <th className="px-5 py-4">授权类型</th>
-                                          </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-gray-50 dark:divide-white/5">
-                                          {opp.products.map((p, pi) => (
-                                              <tr key={pi} className="group text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                                  <td className="px-5 py-5 pl-6 text-center">
-                                                      <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800/40 text-xs font-bold font-mono text-orange-600 dark:text-orange-400">{String(pi + 1).padStart(3, '0')}</span>
-                                                  </td>
-                                                  <td className="px-5 py-5">
-                                                      <div className="font-bold text-gray-900 dark:text-white text-sm">{p.productName}</div>
-                                                      {p.skuName && (
-                                                          <div className="flex items-center gap-1.5 mt-1.5">
-                                                              <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">{p.skuName}</span>
-                                                          </div>
-                                                      )}
-                                                  </td>
-                                                  <td className="px-5 py-5">
-                                                      {p.licenseType
-                                                          ? <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg">{p.licenseType}</span>
-                                                          : <span className="text-gray-300 dark:text-gray-600">-</span>
-                                                      }
-                                                  </td>
-                                              </tr>
-                                          ))}
-                                      </tbody>
-                                  </table>
-                              </div>
+                      <div className="p-5">
+                          <div className="grid grid-cols-2 gap-x-6">
+                              {[
+                                  { label: '商机名称', value: opp.name },
+                                  { label: '商机编号', value: opp.id, mono: true },
+                                  { label: '客户名称', value: opp.customerName },
+                                  { label: '商机阶段', tag: true },
+                                  { label: '所属部门', value: opp.department || '-' },
+                                  { label: '负责人', value: opp.ownerName || '-' },
+                                  { label: '商机金额', value: `¥${(opp.amount || opp.expectedRevenue || 0).toLocaleString()}`, isAmount: true },
+                                  { label: '结单日期', value: opp.closeDate ? new Date(opp.closeDate).toLocaleDateString('zh-CN') : '-', mono: true },
+                              ].map((f, idx) => (
+                                  <div key={idx} className="flex items-center gap-8 py-3.5 border-b border-gray-50 dark:border-white/5 last:border-0">
+                                      <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-24 shrink-0 whitespace-nowrap">{f.label}</span>
+                                      {f.tag ? (
+                                          <span className={stageClass}>{opp.stage}</span>
+                                      ) : (
+                                          <span className={`text-sm font-medium flex-1 truncate ${f.isAmount ? 'font-mono font-bold text-red-600 dark:text-red-400' : f.mono ? 'font-mono text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'}`} title={f.value}>{f.value}</span>
+                                      )}
+                                  </div>
+                              ))}
                           </div>
-                      )}
+                          {opp.products && opp.products.length > 0 && (
+                              <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/10">
+                                  <div className="flex items-center gap-8">
+                                      <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-24 shrink-0 whitespace-nowrap">产品信息</span>
+                                      <div className="flex-1 flex flex-col gap-2">
+                                          {opp.products.map((p, pi) => (
+                                              <div key={pi} className="flex flex-col">
+                                                  <div className="flex items-center gap-2">
+                                                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-orange-50 dark:bg-orange-900/20 text-[10px] font-bold font-mono text-orange-600 dark:text-orange-400 shrink-0">{pi + 1}</span>
+                                                      <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{p.productName}</span>
+                                                  </div>
+                                                  {(p.skuName || p.licenseType) && (
+                                                      <div className="flex items-center gap-1.5 mt-1 ml-7 flex-wrap">
+                                                          {p.skuName && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">{p.skuName}</span>}
+                                                          {p.licenseType && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg">{p.licenseType}</span>}
+                                                      </div>
+                                                  )}
+                                              </div>
+                                          ))}
+                                      </div>
+                                  </div>
+                              </div>
+                          )}
+                      </div>
                   </div>
               );
           })()}
@@ -927,12 +907,12 @@ const OrderDetails: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* 客户信息 (1/3 卡片，含订单联系人) */}
               {hasPermission('order_detail_customer') && (
-              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden self-start">
-                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col">
+                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 shrink-0">
                       <Building className="w-5 h-5 text-[#0071E3]" />
                       <h3 className="text-base font-semibold text-gray-900 dark:text-white">客户信息</h3>
                   </div>
-                  <div className="p-5">
+                  <div className="p-5 flex-1">
                       <div className="divide-y divide-gray-50 dark:divide-white/5">
                           {[
                               { label: '客户名称', value: selectedOrder.customerName, link: `/customers/${selectedOrder.customerId}` },
@@ -996,12 +976,12 @@ const OrderDetails: React.FC = () => {
 
               {/* 交易双方信息 (1/3 卡片) */}
               {hasPermission('order_detail_trader') && (
-              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden self-start">
-                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col">
+                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 shrink-0">
                       <Users className="w-5 h-5 text-indigo-500" />
                       <h3 className="text-base font-semibold text-gray-900 dark:text-white">交易双方信息</h3>
                   </div>
-                  <div className="p-5">
+                  <div className="p-5 flex-1">
                       <div className="divide-y divide-gray-50 dark:divide-white/5">
                           {[
                               { label: '买方名称', value: selectedOrder.buyerName },
@@ -1190,49 +1170,105 @@ const OrderDetails: React.FC = () => {
             {/* Acceptance Information Table */}
             {hasPermission('order_detail_acceptance') && (
             <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
-                    <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
-                        <ClipboardCheck className="w-5 h-5 text-green-500" />
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">验收信息</h3>
+                    <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <ClipboardCheck className="w-5 h-5 text-green-500" />
+                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">验收信息</h3>
+                        </div>
+                        {selectedOrder.acceptanceConfig && (
+                            <span className={`text-xs px-3 py-1 rounded-lg font-bold border ${
+                                selectedOrder.acceptanceConfig.status === 'Completed'
+                                    ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
+                                    : selectedOrder.acceptanceConfig.status === 'In Progress'
+                                    ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800'
+                                    : 'bg-gray-50 dark:bg-gray-800/20 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700'
+                            }`}>
+                                {selectedOrder.acceptanceConfig.type === 'Phased' ? '分期验收' : '一次性验收'}
+                                {' · '}
+                                {selectedOrder.acceptanceConfig.status === 'Completed' ? '已完成' : selectedOrder.acceptanceConfig.status === 'In Progress' ? '进行中' : '待验收'}
+                            </span>
+                        )}
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
                             <thead className="unified-table-header">
                                 <tr>
-                                    <th className="px-5 py-4 pl-6 text-center w-16 whitespace-nowrap">明细编号</th>
-                                    <th className="px-5 py-4">产品名称</th>
+                                    <th className="px-5 py-4 pl-6 text-center w-16 whitespace-nowrap">阶段编号</th>
+                                    <th className="px-5 py-4">产品/阶段名称</th>
                                     <th className="px-5 py-4">验收方式</th>
-                                    <th className="px-5 py-4">验收条件</th>
-                                    <th className="px-5 py-4">预计验收时间</th>
                                     <th className="px-5 py-4">验收比例</th>
-                                    <th className="px-5 py-4 text-right pr-8">验收金额</th>
+                                    <th className="px-5 py-4 text-right">验收金额</th>
+                                    <th className="px-5 py-4 text-center">验收状态</th>
+                                    <th className="px-5 py-4 pr-8">验收时间</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50 dark:divide-white/5">
-                                {selectedOrder.items.map((item, idx) => {
-                                    const lineNo = String(idx + 1).padStart(3, '0');
-                                    return (
-                                    <tr key={idx} className="group text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                {selectedOrder.acceptanceConfig?.phases && selectedOrder.acceptanceConfig.phases.length > 0
+                                    ? selectedOrder.acceptanceConfig.phases.map((phase, idx) => (
+                                    <tr key={phase.id} className="group text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                         <td className="px-5 py-5 pl-6 text-center">
                                             <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 text-xs font-bold font-mono text-[#0071E3] dark:text-[#0A84FF]">
-                                                {lineNo}
+                                                {String(idx + 1).padStart(3, '0')}
                                             </span>
                                         </td>
-                                        <td className="px-5 py-5 font-bold text-gray-900 dark:text-white">{item.productName}</td>
+                                        <td className="px-5 py-5 font-bold text-gray-900 dark:text-white">{phase.name}</td>
                                         <td className="px-5 py-5 text-gray-600 dark:text-gray-300">
                                             {selectedOrder.acceptanceConfig?.type === 'Phased' ? '分期验收' : '一次性验收'}
                                         </td>
-                                        <td className="px-5 py-5 text-gray-600 dark:text-gray-300">视同验收</td>
-                                        <td className="px-5 py-5 text-gray-600 dark:text-gray-300">发货后2日</td>
-                                        <td className="px-5 py-5 text-gray-600 dark:text-gray-300">100%</td>
-                                        <td className="px-5 py-5 text-right pr-8 font-bold text-gray-900 dark:text-white">
-                                            ¥{(item.priceAtPurchase * item.quantity).toLocaleString()}
+                                        <td className="px-5 py-5 text-gray-600 dark:text-gray-300">{phase.percentage}%</td>
+                                        <td className="px-5 py-5 text-right font-bold text-gray-900 dark:text-white">
+                                            ¥{phase.amount.toLocaleString()}
+                                        </td>
+                                        <td className="px-5 py-5 text-center">
+                                            <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg ${
+                                                phase.status === 'Accepted'
+                                                    ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'
+                                                    : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
+                                            }`}>
+                                                {phase.status === 'Accepted' ? '✓ 已验收' : '待验收'}
+                                            </span>
+                                        </td>
+                                        <td className="px-5 py-5 pr-8 text-gray-500 dark:text-gray-400 text-xs">
+                                            {phase.acceptedDate ? new Date(phase.acceptedDate).toLocaleDateString('zh-CN') : '-'}
                                         </td>
                                     </tr>
-                                    );
-                                })}
+                                    ))
+                                    : selectedOrder.items.map((item, idx) => (
+                                    <tr key={idx} className="group text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                        <td className="px-5 py-5 pl-6 text-center">
+                                            <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 text-xs font-bold font-mono text-[#0071E3] dark:text-[#0A84FF]">
+                                                {String(idx + 1).padStart(3, '0')}
+                                            </span>
+                                        </td>
+                                        <td className="px-5 py-5 font-bold text-gray-900 dark:text-white">{item.productName}</td>
+                                        <td className="px-5 py-5 text-gray-600 dark:text-gray-300">一次性验收</td>
+                                        <td className="px-5 py-5 text-gray-600 dark:text-gray-300">100%</td>
+                                        <td className="px-5 py-5 text-right font-bold text-gray-900 dark:text-white">
+                                            ¥{(item.priceAtPurchase * item.quantity).toLocaleString()}
+                                        </td>
+                                        <td className="px-5 py-5 text-center">
+                                            <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400">
+                                                待验收
+                                            </span>
+                                        </td>
+                                        <td className="px-5 py-5 pr-8 text-gray-500 dark:text-gray-400 text-xs">-</td>
+                                    </tr>
+                                    ))
+                                }
                             </tbody>
                         </table>
                     </div>
+                    {selectedOrder.acceptanceConfig?.phases && selectedOrder.acceptanceConfig.phases.length > 0 && (
+                        <div className="px-5 py-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between text-xs">
+                            <span className="text-gray-500 dark:text-gray-400">
+                                共 {selectedOrder.acceptanceConfig.phases.length} 个验收阶段，
+                                已完成 {selectedOrder.acceptanceConfig.phases.filter(p => p.status === 'Accepted').length} 个
+                            </span>
+                            <span className="font-bold text-gray-900 dark:text-white">
+                                验收金额合计: ¥{selectedOrder.acceptanceConfig.phases.reduce((s, p) => s + p.amount, 0).toLocaleString()}
+                            </span>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -1438,7 +1474,7 @@ const OrderDetails: React.FC = () => {
                   <div className="w-[460px] shrink-0 space-y-3 pr-6 overflow-y-auto">
                     <div className="flex items-center gap-2 px-1 mb-4">
                       <Truck className="w-5 h-5 text-blue-500" />
-                      <span className="text-base font-semibold text-gray-900 dark:text-white">发货信息</span>
+                      <span className="text-base font-semibold text-gray-900 dark:text-white">发货记录</span>
                       <span className="ml-auto text-xs font-mono"><span className="text-[#0071E3] dark:text-[#0A84FF]">{deliveryRecords.length}</span><span className="text-gray-400 dark:text-gray-500"> 条</span></span>
                     </div>
                     {deliveryRecords.map((rec) => {
@@ -1938,8 +1974,10 @@ const OrderDetails: React.FC = () => {
                                            </div>
                                            {p.status === 'Accepted' ? (
                                                <span className="text-xs text-green-600 font-bold flex items-center gap-1"><CheckCircle className="w-3 h-3"/> 已验收</span>
-                                           ) : (
+                                           ) : canAccept ? (
                                                <button onClick={() => handleAcceptPhase(p.id)} className="px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition">通过验收</button>
+                                           ) : (
+                                               <span className="text-xs text-gray-400 dark:text-gray-500 font-bold">需先发货</span>
                                            )}
                                        </div>
                                    ))}
@@ -1947,9 +1985,10 @@ const OrderDetails: React.FC = () => {
                                
                                <button 
                                   onClick={handleCompleteAcceptance} 
-                                  className="w-full py-4 bg-green-600 text-white rounded-2xl font-bold shadow-lg hover:bg-green-700 transition mt-4"
+                                  disabled={!canAccept}
+                                  className="w-full py-4 bg-green-600 text-white rounded-2xl font-bold shadow-lg hover:bg-green-700 transition mt-4 disabled:opacity-30 disabled:cursor-not-allowed"
                                >
-                                  确认完成验收
+                                  {canAccept ? '确认完成验收' : '需先发货后才可验收'}
                                </button>
                           </div>
                       )}
@@ -2222,7 +2261,9 @@ const OrderDetails: React.FC = () => {
                                         <div className="grid grid-cols-2 gap-x-16 gap-y-6">
                                             <div className="flex items-start gap-4">
                                                 <span className="text-gray-400 text-sm min-w-[100px]">下级单位清单:</span>
-                                                <span className="text-gray-900 dark:text-white text-sm font-medium">-</span>
+                                                <span className="text-gray-900 dark:text-white text-sm font-medium">
+                                                    {(() => { const totalSubs = selectedOrder.items.reduce((s, it) => s + (it.subUnits?.length || 0), 0); return totalSubs > 0 ? `${totalSubs} 个下级单位（分布于 ${selectedOrder.items.filter(it => it.subUnits && it.subUnits.length > 0).length} 个明细行）` : '-'; })()}
+                                                </span>
                                             </div>
                                             <div className="flex items-start gap-4">
                                                 <span className="text-gray-400 text-sm min-w-[100px]">授权备注:</span>

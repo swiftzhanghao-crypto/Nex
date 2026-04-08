@@ -1,6 +1,6 @@
-import React from 'react';
-import { OrderItem, Product } from '../../types';
-import { X, Box, CreditCard, Truck, Package, Disc, AlertCircle, ShieldCheck, RefreshCcw } from 'lucide-react';
+import React, { useState } from 'react';
+import { OrderItem, Product, SubUnit } from '../../types';
+import { X, Box, CreditCard, Truck, Package, Disc, AlertCircle, ShieldCheck, RefreshCcw, Building2 } from 'lucide-react';
 
 interface Props {
   item: OrderItem | null;
@@ -12,6 +12,7 @@ interface Props {
 }
 
 const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, onClose, products, selectedOrder }) => {
+  const [itemDetailTab, setItemDetailTab] = useState<'INFO' | 'SUBUNIT'>('INFO');
   if (!item) return null;
   const selectedItemForDetails = item;
   const selectedItemIndex = itemIndex;
@@ -55,10 +56,39 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
                       </button>
                   </div>
                   
+                  <div className="border-b border-gray-100 dark:border-white/10 bg-white dark:bg-[#1C1C1E] shrink-0">
+                      <div className="flex items-center gap-0.5 px-6">
+                          {[
+                              { id: 'INFO' as const, label: '明细信息', icon: Box },
+                              { id: 'SUBUNIT' as const, label: '下级单位授权', icon: Building2 },
+                          ].map(tab => (
+                              <button
+                                  key={tab.id}
+                                  onClick={() => setItemDetailTab(tab.id)}
+                                  className={`relative flex items-center gap-1.5 px-5 py-3 text-sm font-bold transition-all ${
+                                      itemDetailTab === tab.id
+                                          ? 'text-[#0071E3] dark:text-[#0A84FF]'
+                                          : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                                  }`}
+                              >
+                                  <tab.icon className="w-4 h-4" />
+                                  {tab.label}
+                                  {tab.id === 'SUBUNIT' && selectedItemForDetails.subUnits && selectedItemForDetails.subUnits.length > 0 && (
+                                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold">{selectedItemForDetails.subUnits.length}</span>
+                                  )}
+                                  {itemDetailTab === tab.id && (
+                                      <span className="absolute bottom-0 left-5 right-5 h-[2px] bg-[#0071E3] dark:bg-[#0A84FF] rounded-full" />
+                                  )}
+                              </button>
+                          ))}
+                      </div>
+                  </div>
+
                   <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-gray-50/30 dark:bg-black/20">
+
+                  {itemDetailTab === 'INFO' && (
                       <div className="grid grid-cols-3 gap-4">
 
-                          {/* 左侧大列 (2/3)：产品交易信息、产品交付信息、产品授权信息 纵向排列 */}
                           <div className="col-span-2 space-y-4">
 
                               {/* 产品交易信息 */}
@@ -325,6 +355,79 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
 
                           </div>
                       </div>
+                  )}
+
+                  {itemDetailTab === 'SUBUNIT' && (
+                      <div className="space-y-4">
+                          {selectedItemForDetails.subUnitAuthMode && selectedItemForDetails.subUnitAuthMode !== 'none' ? (
+                              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10">
+                                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                          <Building2 className="w-5 h-5 text-indigo-500" />
+                                          <h4 className="text-base font-semibold text-gray-900 dark:text-white">下级单位授权</h4>
+                                      </div>
+                                      <span className="text-xs px-3 py-1 rounded-lg font-bold border bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800">
+                                          {{ separate_auth_separate_eid: '授权分别呈现，企业ID分别管理', separate_auth_unified_eid: '授权分别呈现，企业ID统一管理', unified_auth_with_list: '授权和企业ID统一管理并提供下级清单' }[selectedItemForDetails.subUnitAuthMode] || selectedItemForDetails.subUnitAuthMode}
+                                      </span>
+                                  </div>
+                                  {selectedItemForDetails.subUnits && selectedItemForDetails.subUnits.length > 0 ? (
+                                      <div className="overflow-x-auto">
+                                          <table className="w-full text-left text-sm">
+                                              <thead><tr className="bg-indigo-50/50 dark:bg-indigo-900/10 text-xs text-indigo-700 dark:text-indigo-300 font-bold">
+                                                  <th className="px-4 py-3 pl-5 text-center w-10">#</th>
+                                                  <th className="px-4 py-3">单位名称</th>
+                                                  <th className="px-4 py-3">企业ID</th>
+                                                  <th className="px-4 py-3">企业名称</th>
+                                                  <th className="px-4 py-3 text-center">授权数量</th>
+                                                  <th className="px-4 py-3">IT联系人</th>
+                                                  <th className="px-4 py-3">手机</th>
+                                                  <th className="px-4 py-3">邮箱</th>
+                                                  <th className="px-4 py-3">客户类型</th>
+                                                  <th className="px-4 py-3">行业线</th>
+                                                  <th className="px-4 py-3">卖方联系人</th>
+                                              </tr></thead>
+                                              <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                                                  {(selectedItemForDetails.subUnits as SubUnit[]).map((unit, ui) => (
+                                                  <tr key={unit.id} className="text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                                      <td className="px-4 py-3 pl-5 text-center"><span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-[10px] font-bold text-indigo-600 dark:text-indigo-400">{ui + 1}</span></td>
+                                                      <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">{unit.unitName || '-'}</td>
+                                                      <td className="px-4 py-3 font-mono text-xs text-[#0071E3] dark:text-[#0A84FF] font-bold">{unit.enterpriseId || '-'}</td>
+                                                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{unit.enterpriseName || '-'}</td>
+                                                      <td className="px-4 py-3 font-bold text-gray-900 dark:text-white text-center">{unit.authCount || '-'}</td>
+                                                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{unit.itContact || '-'}</td>
+                                                      <td className="px-4 py-3 text-gray-500 font-mono text-xs">{unit.phone || '-'}</td>
+                                                      <td className="px-4 py-3 text-gray-500 text-xs">{unit.email || '-'}</td>
+                                                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{unit.customerType || '-'}</td>
+                                                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{unit.industryLine || '-'}</td>
+                                                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{unit.sellerContact || '-'}</td>
+                                                  </tr>
+                                                  ))}
+                                              </tbody>
+                                          </table>
+                                      </div>
+                                  ) : (
+                                      <div className="px-5 py-8 text-center text-gray-400 text-sm">暂无下级单位数据</div>
+                                  )}
+                                  {selectedItemForDetails.subUnits && selectedItemForDetails.subUnits.length > 0 && (
+                                      <div className="px-5 py-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between text-xs">
+                                          <span className="text-gray-500">共 {selectedItemForDetails.subUnits.length} 个下级单位</span>
+                                          <span className={`font-bold ${(selectedItemForDetails.subUnits as SubUnit[]).reduce((s, u) => s + (parseInt(u.authCount) || 0), 0) === selectedItemForDetails.quantity ? 'text-green-600' : 'text-red-600'}`}>
+                                              合计: {(selectedItemForDetails.subUnits as SubUnit[]).reduce((s, u) => s + (parseInt(u.authCount) || 0), 0)} / 明细数量: {selectedItemForDetails.quantity}
+                                          </span>
+                                      </div>
+                                  )}
+                              </div>
+                          ) : (
+                              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10">
+                                  <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500">
+                                      <Building2 className="w-10 h-10 mb-3 opacity-30" />
+                                      <p className="text-sm font-medium">该明细行未配置下级单位授权</p>
+                                  </div>
+                              </div>
+                          )}
+                      </div>
+                  )}
+
                   </div>
               </div>
           </div>

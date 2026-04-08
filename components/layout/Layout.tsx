@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ExternalLink, Minus, Trash2 } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ExternalLink, Minus, Trash2, ClipboardCheck } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import manualContent from '../../docs/产品说明文档.md?raw';
 import { useAppContext } from '../../contexts/AppContext';
@@ -24,7 +24,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [activeTopNav, setActiveTopNav] = useState<'DASHBOARD' | 'ORDER_CENTER' | 'PRODUCT_CENTER' | 'PERFORMANCE_CENTER' | 'CHANNEL_CENTER' | 'LEADS_CENTER' | 'OPERATIONS_CENTER' | 'SYSTEM_CONFIG'>('DASHBOARD');
+  const [activeTopNav, setActiveTopNav] = useState<'DASHBOARD' | 'ORDER_CENTER' | 'CONTRACT_CENTER' | 'PRODUCT_CENTER' | 'PERFORMANCE_CENTER' | 'CHANNEL_CENTER' | 'LEADS_CENTER' | 'OPERATIONS_CENTER' | 'SYSTEM_CONFIG'>('DASHBOARD');
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
         const saved = localStorage.getItem('theme');
@@ -52,6 +52,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       '/invoices': '发票管理',
       '/authorizations': '授权信息',
       '/delivery-info': '交付信息',
+      '/acceptances': '验收管理',
       '/products': '产品列表',
       '/product-center': '产品目录',
       '/product-policy': '产品政策',
@@ -183,7 +184,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         setActiveTopNav('OPERATIONS_CENTER');
     } else if (location.pathname.startsWith('/channels')) {
         setActiveTopNav('CHANNEL_CENTER');
-    } else if (location.pathname.startsWith('/customers') || location.pathname.startsWith('/opportunities') || location.pathname.startsWith('/contracts') || location.pathname.startsWith('/remittances') || location.pathname.startsWith('/invoices') || location.pathname.startsWith('/authorizations') || location.pathname.startsWith('/delivery-info')) {
+    } else if (location.pathname.startsWith('/contracts')) {
+        setActiveTopNav('CONTRACT_CENTER');
+    } else if (location.pathname.startsWith('/customers') || location.pathname.startsWith('/opportunities') || location.pathname.startsWith('/remittances') || location.pathname.startsWith('/invoices') || location.pathname.startsWith('/authorizations') || location.pathname.startsWith('/delivery-info') || location.pathname.startsWith('/acceptances')) {
         setActiveTopNav('ORDER_CENTER');
     } else if (location.pathname.startsWith('/organization') || location.pathname.startsWith('/users') || location.pathname.startsWith('/roles') || location.pathname.startsWith('/system/')) {
           setActiveTopNav('SYSTEM_CONFIG');
@@ -234,10 +237,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const topNavItems = [
       { id: 'DASHBOARD', label: '数据看板', path: '/', permissions: ['dashboard_view'] },
-      { id: 'ORDER_CENTER', label: '订单中心', path: '/orders', permissions: ['order_list_view', 'order_view_all', 'order_view_pending_approval', 'order_view_pending_confirm', 'order_view_auth_confirm', 'order_view_stock_pkg', 'order_view_stock_ship', 'order_view_stock_cd', 'order_view_payment', 'order_view_shipped', 'order_view_completed', 'contract_view', 'remittance_view', 'invoice_manage', 'authorization_view', 'delivery_info_view'] },
+      { id: 'ORDER_CENTER', label: '订单中心', path: '/orders', permissions: ['order_list_view', 'order_view_all', 'order_view_pending_approval', 'order_view_pending_confirm', 'order_view_auth_confirm', 'order_view_stock_pkg', 'order_view_stock_ship', 'order_view_stock_cd', 'order_view_payment', 'order_view_shipped', 'order_view_completed', 'remittance_view', 'invoice_manage', 'authorization_view', 'delivery_info_view', 'acceptance_view'] },
       { id: 'PRODUCT_CENTER', label: '产品中心', path: '/product-center', permissions: ['product_display_view', 'product_display_preview', 'product_view', 'merchandise_view', 'product_msrp_view', 'product_channel_price_view', 'product_component_pool_view', 'product_package_view', 'product_license_template_view', 'product_attr_config_view'] },
-      { id: 'PERFORMANCE_CENTER', label: '业绩中心', path: '/performance', permissions: ['performance_view'] },
       { id: 'CHANNEL_CENTER', label: '渠道中心', path: '/channels', permissions: ['channel_view'] },
+      { id: 'CONTRACT_CENTER', label: '合同中心', path: '/contracts', permissions: ['contract_view'] },
+      { id: 'PERFORMANCE_CENTER', label: '业绩中心', path: '/performance', permissions: ['performance_view'] },
       { id: 'LEADS_CENTER', label: '线索中心', path: '/leads', permissions: ['leads_view'] },
       { id: 'OPERATIONS_CENTER', label: '运营中心', path: '/wps-ops', permissions: ['wps_ops_view'] },
       { id: 'SYSTEM_CONFIG', label: '系统配置', path: '/organization', permissions: ['admin_view', 'user_manage', 'role_manage', 'org_manage', 'license_type_view'] }
@@ -454,25 +458,41 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         {renderSectionGroup('order_main', '订单中心',
                           <>
                             <NavItem to="/orders" icon={ShoppingCart} label="订单管理" />
+                            <NavItem to="/acceptances" icon={ClipboardCheck} label="验收管理" permission="acceptance_view" />
+                          </>,
+                          ['order_list_view', 'order_view_all', 'order_view_pending_approval', 'order_view_pending_confirm', 'order_view_auth_confirm', 'order_view_stock_pkg', 'order_view_stock_ship', 'order_view_stock_cd', 'order_view_payment', 'order_view_shipped', 'order_view_completed', 'acceptance_view']
+                        )}
+                        {renderSectionGroup('finance_center', '结算与资金',
+                          <>
                             <NavItem to="/remittances" icon={Banknote} label="汇款管理" permission="remittance_view" />
                             <NavItem to="/invoices" icon={Receipt} label="发票管理" permission="invoice_manage" />
                           </>,
-                          ['order_list_view', 'order_view_all', 'order_view_pending_approval', 'order_view_pending_confirm', 'order_view_auth_confirm', 'order_view_stock_pkg', 'order_view_stock_ship', 'order_view_stock_cd', 'order_view_payment', 'order_view_shipped', 'order_view_completed', 'remittance_view', 'invoice_manage']
+                          ['remittance_view', 'invoice_manage']
                         )}
-                        {renderSectionGroup('order_fulfillment', '履约信息',
+                        {renderSectionGroup('order_fulfillment', '授权与交付物',
                           <>
-                            <NavItem to="/contracts" icon={FileBadge} label="合同信息" permission="contract_view" />
                             <NavItem to="/authorizations" icon={KeyRound} label="授权信息" permission="authorization_view" />
                             <NavItem to="/delivery-info" icon={PackageCheck} label="交付信息" permission="delivery_info_view" />
                           </>,
-                          ['contract_view', 'authorization_view', 'delivery_info_view']
+                          ['authorization_view', 'delivery_info_view']
                         )}
-                        {renderSectionGroup('crm_info', 'CRM 信息',
+                        {renderSectionGroup('crm_info', '关联信息',
                           <>
                             <NavItem to="/customers" icon={Users} label="客户信息" permission="customer_view" />
                             <NavItem to="/opportunities" icon={Target} label="商机信息" permission="opportunity_manage" />
                           </>,
                           ['customer_view', 'opportunity_manage']
+                        )}
+                      </>
+                    )}
+
+                    {activeTopNav === 'CONTRACT_CENTER' && (
+                      <>
+                        {renderSectionGroup('contract_main', '合同中心',
+                          <>
+                            <NavItem to="/contracts" icon={FileBadge} label="合同信息" permission="contract_view" />
+                          </>,
+                          ['contract_view']
                         )}
                       </>
                     )}

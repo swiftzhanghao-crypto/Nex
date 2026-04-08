@@ -535,9 +535,21 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
         purchaseNature: pn,
         renewalSubType: rst,
         purchaseNature365: pn365,
-        licensee: customer.companyName,
-        enterpriseId: customer.enterprises?.[0]?.id,
-        enterpriseName: customer.enterprises?.[0]?.name || customer.companyName,
+        licensee: (() => {
+          const ents = customer.enterprises || [];
+          if (ents.length === 0) return customer.companyName;
+          return ents[(i + idxOffset) % ents.length].name;
+        })(),
+        enterpriseId: (() => {
+          const ents = customer.enterprises || [];
+          if (ents.length === 0) return undefined;
+          return ents[(i + idxOffset) % ents.length].id;
+        })(),
+        enterpriseName: (() => {
+          const ents = customer.enterprises || [];
+          if (ents.length === 0) return customer.companyName;
+          return ents[(i + idxOffset) % ents.length].name;
+        })(),
         supplyOrgInfo: supplyOrgs[(i + idxOffset) % supplyOrgs.length],
         installPackageType: (i + idxOffset) % 3 === 0 ? '定制' : '通用',
         pricingOptionId: defaultOption?.id,
@@ -564,6 +576,40 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
     });
 
     const orderItems: OrderItem[] = [...baseItems, ...extraItems];
+
+    const subUnitContacts = ['张明', '李华', '王芳', '赵磊', '陈静', '刘洋', '周强', '吴敏'];
+    const subUnitModes = ['separate_auth_separate_eid', 'separate_auth_unified_eid', 'unified_auth_with_list'] as const;
+    const otherCusts = customers.filter(c => c.id !== customer.id);
+    if (i % 5 !== 0 && otherCusts.length > 0) {
+      for (let ai = 0; ai < orderItems.length; ai++) {
+        const itm = orderItems[ai];
+        const subCount = Math.min([2, 3, 2, 3, 4][(i + ai) % 5], otherCusts.length);
+        const baseQ = Math.floor(itm.quantity / subCount);
+        const rem = itm.quantity - baseQ * subCount;
+        orderItems[ai] = {
+          ...itm,
+          subUnitAuthMode: subUnitModes[(i + ai) % 3],
+          subUnits: Array.from({ length: subCount }, (_, si) => {
+            const sc = otherCusts[(i + ai + si) % otherCusts.length];
+            const ent = sc.enterprises && sc.enterprises.length > 0 ? sc.enterprises[si % sc.enterprises.length] : null;
+            return {
+              id: `su_${i}_${ai}_${si}`,
+              unitName: sc.companyName,
+              enterpriseId: ent?.id || '-',
+              enterpriseName: ent?.name || sc.companyName,
+              authCount: String(baseQ + (si < rem ? 1 : 0)),
+              itContact: subUnitContacts[(i + ai + si) % subUnitContacts.length],
+              phone: `1${['38', '39', '56', '77', '88'][(i + ai + si) % 5]}${String(10000000 + i * 100 + ai * 10 + si).slice(0, 8)}`,
+              email: sc.contacts[0]?.email || `it${si + 1}@company.com`,
+              customerType: sc.customerType || '企业客户',
+              industryLine: sc.industryLine || sc.industry || '-',
+              sellerContact: '李海瑞 (00019829)',
+            };
+          }),
+        };
+      }
+    }
+
     const total = orderItems.reduce((sum, it) => sum + it.priceAtPurchase * it.quantity, 0);
 
     const salesRep = users.find(u => u.id === customer.ownerId);
@@ -677,6 +723,52 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
         contactPhone: customer.contacts[0]?.phone || '',
         method: 'Remote',
       },
+      acceptanceConfig: (() => {
+        const isPhased = i % 3 === 0;
+        const acPhases: { id: string; name: string; percentage: number; amount: number; status: 'Pending' | 'Accepted'; acceptedDate?: string }[] = [];
+        if (isPhased) {
+          for (let ai = 0; ai < orderItems.length; ai++) {
+            const itemAmt = orderItems[ai].priceAtPurchase * orderItems[ai].quantity;
+            const pcts = ai % 2 === 0 ? [40, 60] : [30, 30, 40];
+            let allocated = 0;
+            pcts.forEach((pct, pi) => {
+              const isLastPct = pi === pcts.length - 1;
+              const amt = isLastPct ? Math.round((itemAmt - allocated) * 100) / 100 : Math.round(itemAmt * pct / 100 * 100) / 100;
+              allocated += amt;
+              const phaseAccepted = isCompleted || (status === OrderStatus.SHIPPED && pi === 0);
+              acPhases.push({
+                id: `ph-mock-${i}-${ai}-${pi}`,
+                name: `${orderItems[ai].productName} (${pi + 1}/${pcts.length})`,
+                percentage: pct,
+                amount: amt,
+                status: phaseAccepted ? 'Accepted' : 'Pending',
+                acceptedDate: phaseAccepted ? dateStr : undefined,
+              });
+            });
+          }
+        } else {
+          for (let ai = 0; ai < orderItems.length; ai++) {
+            const itemAmt = orderItems[ai].priceAtPurchase * orderItems[ai].quantity;
+            const phaseAccepted = isCompleted;
+            acPhases.push({
+              id: `ph-mock-${i}-${ai}-0`,
+              name: orderItems[ai].productName,
+              percentage: 100,
+              amount: Math.round(itemAmt * 100) / 100,
+              status: phaseAccepted ? 'Accepted' : 'Pending',
+              acceptedDate: phaseAccepted ? dateStr : undefined,
+            });
+          }
+        }
+        const allAccepted = acPhases.every(p => p.status === 'Accepted');
+        const anyAccepted = acPhases.some(p => p.status === 'Accepted');
+        return {
+          type: isPhased ? 'Phased' as const : 'OneTime' as const,
+          status: allAccepted ? 'Completed' as const : anyAccepted ? 'In Progress' as const : 'Pending' as const,
+          phases: acPhases,
+          setupDate: dateStr,
+        };
+      })(),
       opportunityId: oppId,
       opportunityName: oppName,
       buyerName: buyerName,

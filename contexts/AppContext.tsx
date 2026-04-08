@@ -30,7 +30,7 @@ import {
 const USE_API = import.meta.env.VITE_API_MODE === 'true';
 
 // --- Mock data fallback (bump version when schema changes to force refresh) ---
-const MOCK_DATA_VERSION = 8;
+const MOCK_DATA_VERSION = 9;
 const mockCustomers = generateCustomers(initialUsers);
 const mockOpportunities = generateOpportunities(mockCustomers);
 const mockContracts = generateContracts(mockCustomers);

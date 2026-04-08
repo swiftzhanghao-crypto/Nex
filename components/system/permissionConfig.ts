@@ -8,6 +8,7 @@ export const columnConfig = [
           columns: [
               { id: 'total', label: '订单金额' },
               { id: 'customerName', label: '客户名称' },
+              { id: 'licensee', label: '被授权方' },
               { id: 'status', label: '订单状态' },
               { id: 'paymentRecord', label: '收款记录' },
               { id: 'approval', label: '审批记录' }
@@ -312,6 +313,29 @@ const permissionTree = [
 export type PermSubgroup = { id: string; label: string; dependsOn?: string; permissions: { id: string; label: string; desc: string }[] };
 export type PermGroup = { id: string; label: string; subgroups: PermSubgroup[] };
 
+export const resourceFunctionalPermMap: Record<string, { groupIds: string[]; hint: string }> = {
+    Order: {
+        groupIds: ['g_order'],
+        hint: '请先在功能权限中开启「订单中心」相关权限',
+    },
+    Customer: {
+        groupIds: ['g_crm'],
+        hint: '请先在功能权限中开启「CRM」相关权限',
+    },
+    Product: {
+        groupIds: ['g_product'],
+        hint: '请先在功能权限中开启「产品中心」相关权限',
+    },
+};
+
+export function getRequiredPermIdsForResource(resourceId: string): string[] {
+    const mapping = resourceFunctionalPermMap[resourceId];
+    if (!mapping) return [];
+    return permissionTree
+        .filter(g => mapping.groupIds.includes(g.id))
+        .flatMap(g => g.subgroups.flatMap(sg => sg.permissions.map(p => p.id)));
+}
+
 export const permissionModules = permissionTree.map(g => ({
       id: g.id,
       label: g.label,
@@ -332,6 +356,8 @@ export const resourceConfig = [
               { id: 'directChannelId' as PermissionDimension, label: '直接下级渠道' },
               { id: 'province' as PermissionDimension, label: '省份' },
               { id: 'orderType' as PermissionDimension, label: '订单类型' },
+              { id: 'orderSource' as PermissionDimension, label: '订单来源' },
+              { id: 'orderStatus' as PermissionDimension, label: '订单状态' },
           ]
       },
       {

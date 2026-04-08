@@ -113,7 +113,7 @@ const OrderManager: React.FC = () => {
     return firstException ? firstException.id : 'All';
   });
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchField, setSearchField] = useState<'id' | 'customerName' | 'buyerName' | 'productName'>('id');
+  const [searchField, setSearchField] = useState<'id' | 'customerName' | 'buyerName' | 'productName' | 'licensee'>('id');
   const [isSearchFieldOpen, setIsSearchFieldOpen] = useState(false);
   
   // Advanced Filter State
@@ -252,6 +252,7 @@ const OrderManager: React.FC = () => {
       { id: 'delivery', label: '发货方式' },
       { id: 'address', label: '收货地址' },
       { id: 'invoice', label: '发票抬头' },
+      { id: 'licensee', label: '被授权方' },
       { id: 'opportunity', label: '关联商机' },
       { id: 'action', label: '操作' },
   ];
@@ -325,7 +326,7 @@ const OrderManager: React.FC = () => {
 
   const [tableCopied, setTableCopied] = useState(false);
   const handleCopyTable = () => {
-      const cols = allColumns.filter(c => visibleColumns.includes(c.id) && c.id !== 'action');
+      const cols = visibleColumns.filter(id => id !== 'action').map(id => allColumns.find(c => c.id === id)!).filter(Boolean);
       const header = cols.map(c => c.label).join('\t');
       const statusMap: Record<string, string> = { DRAFT: '草稿', PENDING_CONFIRM: '待确认', CONFIRMED: '已确认', PENDING_SHIPMENT: '待发货', SHIPPED: '已发货', DELIVERED: '已交付', COMPLETED: '已完成', CANCELLED: '已取消', REFUNDED: '已退款', EXCEPTION: '异常' };
       const buyerTypeMap: Record<string, string> = { Customer: '直签订单', Channel: '渠道订单', SelfDeal: '自成交订单', RedeemCode: '兑换码订单' };
@@ -349,6 +350,7 @@ const OrderManager: React.FC = () => {
               case 'delivery': return o.deliveryMethod || '-';
               case 'address': return o.shippingAddress || '-';
               case 'invoice': return o.invoiceInfo?.title || '-';
+              case 'licensee': return [...new Set(o.items.map(i => i.licensee).filter(Boolean))].join('、') || '-';
               case 'opportunity': return o.opportunityId || '-';
               default: return '-';
           }
@@ -532,6 +534,7 @@ const OrderManager: React.FC = () => {
         searchField === 'id'           ? order.id.toLowerCase().includes(searchLower) :
         searchField === 'customerName' ? order.customerName.toLowerCase().includes(searchLower) :
         searchField === 'productName'  ? order.items.some(item => item.productName.toLowerCase().includes(searchLower)) :
+        searchField === 'licensee'     ? order.items.some(item => (item.licensee || '').toLowerCase().includes(searchLower)) :
         (order.buyerName || order.customerName).toLowerCase().includes(searchLower)
     );
     const matchesSource = filterSource === 'All' || order.source === filterSource;
@@ -811,11 +814,12 @@ const OrderManager: React.FC = () => {
     setIsColumnConfigOpen(false);
   }, []);
 
-  const searchFieldOptions: { value: 'id' | 'customerName' | 'buyerName' | 'productName'; label: string; placeholder: string }[] = [
+  const searchFieldOptions: { value: 'id' | 'customerName' | 'buyerName' | 'productName' | 'licensee'; label: string; placeholder: string }[] = [
     { value: 'id',           label: '订单编号', placeholder: '搜索订单编号…' },
     { value: 'customerName', label: '客户名称', placeholder: '搜索客户名称…' },
     { value: 'buyerName',    label: '买方名称', placeholder: '搜索买方名称…' },
     { value: 'productName',  label: '产品名称', placeholder: '搜索产品名称…' },
+    { value: 'licensee',     label: '被授权方', placeholder: '搜索被授权方…' },
   ];
   const currentSearchOption = searchFieldOptions.find(o => o.value === searchField)!;
 
@@ -825,12 +829,16 @@ const OrderManager: React.FC = () => {
       source: 100, buyerType: 100, date: 150, status: 90,
       paymentStatus: 95, stockStatus: 90, total: 125,
       payment: 100, delivery: 100, address: 160, invoice: 140,
-      opportunity: 140, action: 85,
+      licensee: 200, opportunity: 140, action: 85,
   };
+  const orderedVisibleColumns = useMemo(() =>
+      visibleColumns.map(id => allColumns.find(c => c.id === id)!).filter(Boolean),
+      [visibleColumns, allColumns]
+  );
   const tableColGroup = (
       <colgroup>
           <col style={{ width: 52 }} />
-          {allColumns.filter(c => visibleColumns.includes(c.id)).map(col => (
+          {orderedVisibleColumns.map(col => (
               <col key={col.id} style={{ width: colWidthMap[col.id] || 120 }} />
           ))}
           <col style={{ width: 52 }} />
@@ -1047,7 +1055,7 @@ const OrderManager: React.FC = () => {
                             checked={currentOrders.length > 0 && currentOrders.every(o => selectedOrderIds.has(o.id))}
                         />
                     </th>
-                    {allColumns.map(col => visibleColumns.includes(col.id) && (
+                    {orderedVisibleColumns.map(col => (
                         <th key={col.id} className={`px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E] ${
                             col.id === 'id'
                                 ? 'sticky left-[52px] z-10 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.08)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.3)]'
@@ -1085,222 +1093,282 @@ const OrderManager: React.FC = () => {
                           onChange={() => toggleSelectOrder(order.id)}
                       />
                   </td>
-                  {visibleColumns.includes('id') && (
-                      <td className={`px-3 py-2.5 whitespace-nowrap sticky left-[52px] z-20 ${stickyBg} shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors align-middle`}>
-                          <div className="relative">
-                              <span
-                                  className={`text-sm font-semibold cursor-pointer hover:underline ${order.status === OrderStatus.DRAFT ? 'text-amber-500 dark:text-amber-400' : 'text-[#0071E3] dark:text-[#FF2D55]'}`}
-                                  style={{fontVariantNumeric:'tabular-nums'}}
-                                  onClick={() => navigate(`/orders/${order.id}`)}
-                              >
-                                  {order.id}
-                              </span>
-                              <button
-                                  onClick={(e) => handleCopyOrderId(e, order.id)}
-                                  className="absolute left-0 top-full mt-px opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-white/10 text-gray-300 hover:text-gray-500 dark:hover:text-gray-300 transition-all"
-                                  title="复制订单编号"
-                              >
-                                  {copiedOrderId === order.id
-                                      ? <Check className="w-3 h-3 text-green-500" />
-                                      : <Copy className="w-3 h-3" />}
-                              </button>
-                          </div>
-                      </td>
-                  )}
-                  {visibleColumns.includes('customer') && (
-                      <td className="px-3 py-2.5 max-w-[180px]">
-                        <div 
-                            className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline transition-colors break-words cursor-pointer"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/customers/${order.customerId}`);
-                            }}
-                        >
-                            {order.customerName}
-                        </div>
-                      </td>
-                  )}
-                  {visibleColumns.includes('buyer') && (
-                      <td className="px-3 py-2.5 max-w-[180px]">
-                        {order.buyerType === 'Channel' ? (
+                  {orderedVisibleColumns.map(col => {
+                    const colId = col.id;
+                    switch (colId) {
+                      case 'id':
+                        return (
+                          <td key={colId} className={`px-3 py-2.5 whitespace-nowrap sticky left-[52px] z-20 ${stickyBg} shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors align-middle`}>
+                              <div className="relative">
+                                  <span
+                                      className={`text-sm font-semibold cursor-pointer hover:underline ${order.status === OrderStatus.DRAFT ? 'text-amber-500 dark:text-amber-400' : 'text-[#0071E3] dark:text-[#FF2D55]'}`}
+                                      style={{fontVariantNumeric:'tabular-nums'}}
+                                      onClick={() => navigate(`/orders/${order.id}`)}
+                                  >
+                                      {order.id}
+                                  </span>
+                                  <button
+                                      onClick={(e) => handleCopyOrderId(e, order.id)}
+                                      className="absolute left-0 top-full mt-px opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-white/10 text-gray-300 hover:text-gray-500 dark:hover:text-gray-300 transition-all"
+                                      title="复制订单编号"
+                                  >
+                                      {copiedOrderId === order.id
+                                          ? <Check className="w-3 h-3 text-green-500" />
+                                          : <Copy className="w-3 h-3" />}
+                                  </button>
+                              </div>
+                          </td>
+                        );
+                      case 'customer':
+                        return (
+                          <td key={colId} className="px-3 py-2.5 max-w-[180px]">
                             <div 
-                                className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer break-words"
+                                className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline transition-colors break-words cursor-pointer"
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    const channelId = order.buyerId || channels.find(c => c.name === order.buyerName)?.id;
-                                    if (channelId) navigate(`/channels/${channelId}`);
+                                    navigate(`/customers/${order.customerId}`);
                                 }}
                             >
-                                {order.buyerName}
-                            </div>
-                        ) : (
-                            <div className="text-gray-500 dark:text-gray-400 break-words">
                                 {order.customerName}
                             </div>
-                        )}
-                      </td>
-                  )}
-                  {visibleColumns.includes('products') && (
-                      <td className="px-3 py-2.5">
-                          <div className="flex flex-col gap-1 max-w-[220px]">
-                              {/* 只展示第一个产品 */}
-                              {order.items.slice(0, 1).map((item, idx) => (
-                                  <div key={idx} className="flex flex-col">
-                                      <div className="flex items-center justify-between gap-2">
-                                          <div className="relative group/pname min-w-0 flex-1">
-                                              <div className="truncate font-medium text-gray-700 dark:text-gray-300">{item.productName}</div>
-                                              <div className="absolute left-0 top-full mt-1.5 z-[9999] hidden group-hover/pname:block pointer-events-none">
-                                                  <div className="px-3 py-2 bg-gray-900/95 dark:bg-gray-100/95 text-white dark:text-gray-900 text-xs leading-relaxed rounded-lg shadow-lg max-w-xs whitespace-normal break-words animate-[tooltipIn_0.15s_ease-out]">{item.productName}</div>
+                          </td>
+                        );
+                      case 'buyer':
+                        return (
+                          <td key={colId} className="px-3 py-2.5 max-w-[180px]">
+                            {order.buyerType === 'Channel' ? (
+                                <div 
+                                    className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer break-words"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        const channelId = order.buyerId || channels.find(c => c.name === order.buyerName)?.id;
+                                        if (channelId) navigate(`/channels/${channelId}`);
+                                    }}
+                                >
+                                    {order.buyerName}
+                                </div>
+                            ) : (
+                                <div className="text-gray-500 dark:text-gray-400 break-words">
+                                    {order.customerName}
+                                </div>
+                            )}
+                          </td>
+                        );
+                      case 'products':
+                        return (
+                          <td key={colId} className="px-3 py-2.5">
+                              <div className="flex flex-col gap-1 max-w-[220px]">
+                                  {order.items.slice(0, 1).map((item, idx) => (
+                                      <div key={idx} className="flex flex-col">
+                                          <div className="flex items-center justify-between gap-2">
+                                              <div className="relative group/pname min-w-0 flex-1">
+                                                  <div className="truncate font-medium text-gray-700 dark:text-gray-300">{item.productName}</div>
+                                                  <div className="absolute left-0 top-full mt-1.5 z-[9999] hidden group-hover/pname:block pointer-events-none">
+                                                      <div className="px-3 py-2 bg-gray-900/95 dark:bg-gray-100/95 text-white dark:text-gray-900 text-xs leading-relaxed rounded-lg shadow-lg max-w-xs whitespace-normal break-words animate-[tooltipIn_0.15s_ease-out]">{item.productName}</div>
+                                                  </div>
                                               </div>
+                                              <span className="text-gray-400 shrink-0">×{item.quantity}</span>
                                           </div>
-                                          <span className="text-gray-400 shrink-0">×{item.quantity}</span>
+                                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                              {item.skuName && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">{item.skuName}</span>}
+                                              {item.licenseType && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg">{item.licenseType}</span>}
+                                          </div>
                                       </div>
-                                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                          {item.skuName && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">{item.skuName}</span>}
-                                          {item.licenseType && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg">{item.licenseType}</span>}
+                                  ))}
+                                  {order.items.length > 1 && (
+                                      <div className="mt-1 self-end" ref={productPopoverId === order.id ? productPopoverRef : undefined}>
+                                          <button
+                                              onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  if (productPopoverId === order.id) {
+                                                      setProductPopoverId(null);
+                                                      setPopoverPos(null);
+                                                  } else {
+                                                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                      const popoverWidth = 288;
+                                                      const left = Math.max(4, rect.left - popoverWidth - 6);
+                                                      const top = rect.top - 8;
+                                                      setPopoverPos({ top, left });
+                                                      setProductPopoverId(order.id);
+                                                  }
+                                              }}
+                                              className="text-[10px] font-semibold text-[#0071E3] dark:text-[#0A84FF] bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-100 dark:border-blue-800 px-1.5 py-px rounded-full transition"
+                                          >
+                                              +{order.items.length - 1} 更多
+                                          </button>
                                       </div>
-                                  </div>
-                              ))}
-                              {/* 更多按钮 + 气泡弹窗 */}
-                              {order.items.length > 1 && (
-                                  <div className="mt-1 self-end" ref={productPopoverId === order.id ? productPopoverRef : undefined}>
-                                      <button
-                                          onClick={(e) => {
-                                              e.stopPropagation();
-                                              if (productPopoverId === order.id) {
-                                                  setProductPopoverId(null);
-                                                  setPopoverPos(null);
-                                              } else {
-                                                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                                  const popoverWidth = 288;
-                                                  // Always expand to the left; clamp so it doesn't go off-screen
-                                                  const left = Math.max(4, rect.left - popoverWidth - 6);
-                                                  const top = rect.top - 8;
-                                                  setPopoverPos({ top, left });
-                                                  setProductPopoverId(order.id);
-                                              }
-                                          }}
-                                          className="text-[10px] font-semibold text-[#0071E3] dark:text-[#0A84FF] bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-100 dark:border-blue-800 px-1.5 py-px rounded-full transition"
-                                      >
-                                          +{order.items.length - 1} 更多
-                                      </button>
-                                  </div>
-                              )}
-                          </div>
-                      </td>
-                  )}
-                  {visibleColumns.includes('sales') && (
-                      <td className="px-3 py-2.5 whitespace-nowrap">
-                          {(() => {
-                              const user = users.find(u => u.id === order.salesRepId);
-                              const rawName = order.salesRepName || '未分配';
-                              const displayName = rawName.replace(/\s*\(.*\)\s*$/, '');
-                              const initials = displayName.slice(0, 1);
-                              return (
-                                  <div className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 rounded-lg transition-all group/user" onClick={(e) => { e.stopPropagation(); if (user) { setDetailsUser(user); setIsDrawerOpen(true); } }}>
-                                      <div className="relative shrink-0">
-                                          <img src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${rawName}`} className="w-7 h-7 rounded-full object-cover bg-gray-100 border border-gray-200 dark:border-white/10 transition-transform group-hover/user:scale-110" alt={displayName}
-                                              onError={(e) => { const t = e.currentTarget; t.style.display='none'; const f = t.nextElementSibling as HTMLElement; if(f) f.style.display='flex'; }} />
-                                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 items-center justify-center text-white text-[10px] font-bold" style={{display:'none'}}>{initials}</div>
-                                          {user?.status === 'Active' && <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 border-2 border-white dark:border-[#1C1C1E] rounded-full"></div>}
+                                  )}
+                              </div>
+                          </td>
+                        );
+                      case 'sales':
+                        return (
+                          <td key={colId} className="px-3 py-2.5 whitespace-nowrap">
+                              {(() => {
+                                  const user = users.find(u => u.id === order.salesRepId);
+                                  const rawName = order.salesRepName || '未分配';
+                                  const displayName = rawName.replace(/\s*\(.*\)\s*$/, '');
+                                  const initials = displayName.slice(0, 1);
+                                  return (
+                                      <div className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 rounded-lg transition-all group/user" onClick={(e) => { e.stopPropagation(); if (user) { setDetailsUser(user); setIsDrawerOpen(true); } }}>
+                                          <div className="relative shrink-0">
+                                              <img src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${rawName}`} className="w-7 h-7 rounded-full object-cover bg-gray-100 border border-gray-200 dark:border-white/10 transition-transform group-hover/user:scale-110" alt={displayName}
+                                                  onError={(e) => { const t = e.currentTarget; t.style.display='none'; const f = t.nextElementSibling as HTMLElement; if(f) f.style.display='flex'; }} />
+                                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 items-center justify-center text-white text-[10px] font-bold" style={{display:'none'}}>{initials}</div>
+                                              {user?.status === 'Active' && <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 border-2 border-white dark:border-[#1C1C1E] rounded-full"></div>}
+                                          </div>
+                                          <span className="font-semibold text-gray-900 dark:text-white group-hover/user:text-blue-600 transition-colors whitespace-nowrap">{displayName}</span>
                                       </div>
-                                      <span className="font-semibold text-gray-900 dark:text-white group-hover/user:text-blue-600 transition-colors whitespace-nowrap">{displayName}</span>
-                                  </div>
-                              );
-                          })()}
-                      </td>
-                  )}
-                  {visibleColumns.includes('businessManager') && (
-                      <td className="px-3 py-2.5 whitespace-nowrap">
-                          {(() => {
-                              const user = users.find(u => u.id === order.businessManagerId);
-                              const rawName = order.businessManagerName || '未分配';
-                              const displayName = rawName.replace(/\s*\(.*\)\s*$/, '');
-                              const initials = displayName.slice(0, 1);
-                              return (
-                                  <div className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 rounded-lg transition-all group/user" onClick={(e) => { e.stopPropagation(); if (user) { setDetailsUser(user); setIsDrawerOpen(true); } }}>
-                                      <div className="relative shrink-0">
-                                          <img src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${rawName}`} className="w-7 h-7 rounded-full object-cover bg-gray-100 border border-gray-200 dark:border-white/10 transition-transform group-hover/user:scale-110" alt={displayName}
-                                              onError={(e) => { const t = e.currentTarget; t.style.display='none'; const f = t.nextElementSibling as HTMLElement; if(f) f.style.display='flex'; }} />
-                                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 items-center justify-center text-white text-[10px] font-bold" style={{display:'none'}}>{initials}</div>
-                                          {user?.status === 'Active' && <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 border-2 border-white dark:border-[#1C1C1E] rounded-full"></div>}
+                                  );
+                              })()}
+                          </td>
+                        );
+                      case 'businessManager':
+                        return (
+                          <td key={colId} className="px-3 py-2.5 whitespace-nowrap">
+                              {(() => {
+                                  const user = users.find(u => u.id === order.businessManagerId);
+                                  const rawName = order.businessManagerName || '未分配';
+                                  const displayName = rawName.replace(/\s*\(.*\)\s*$/, '');
+                                  const initials = displayName.slice(0, 1);
+                                  return (
+                                      <div className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 rounded-lg transition-all group/user" onClick={(e) => { e.stopPropagation(); if (user) { setDetailsUser(user); setIsDrawerOpen(true); } }}>
+                                          <div className="relative shrink-0">
+                                              <img src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${rawName}`} className="w-7 h-7 rounded-full object-cover bg-gray-100 border border-gray-200 dark:border-white/10 transition-transform group-hover/user:scale-110" alt={displayName}
+                                                  onError={(e) => { const t = e.currentTarget; t.style.display='none'; const f = t.nextElementSibling as HTMLElement; if(f) f.style.display='flex'; }} />
+                                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 items-center justify-center text-white text-[10px] font-bold" style={{display:'none'}}>{initials}</div>
+                                              {user?.status === 'Active' && <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 border-2 border-white dark:border-[#1C1C1E] rounded-full"></div>}
+                                          </div>
+                                          <span className="font-semibold text-gray-900 dark:text-white group-hover/user:text-blue-600 transition-colors whitespace-nowrap">{displayName}</span>
                                       </div>
-                                      <span className="font-semibold text-gray-900 dark:text-white group-hover/user:text-blue-600 transition-colors whitespace-nowrap">{displayName}</span>
-                                  </div>
-                              );
-                          })()}
-                      </td>
-                  )}
-                  {visibleColumns.includes('department') && (
-                      <td className="px-3 py-2.5">
-                          {(() => {
-                              const user = users.find(u => u.id === order.salesRepId);
-                              const fullPath = getDepartmentPath(user?.departmentId);
-                              if (fullPath === '-') return <span className="text-gray-400">-</span>;
-                              const parts = fullPath.split(' / ');
-                              return (
-                                  <div className="flex items-start gap-1 flex-wrap leading-snug">
-                                      {parts.map((part, idx) => (
-                                          <span key={idx} className="flex items-center gap-1">
-                                              {idx > 0 && <span className="text-gray-300 dark:text-gray-600 text-[10px]">/</span>}
-                                              <span className={`text-xs font-medium ${idx === parts.length - 1 ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>{part}</span>
+                                  );
+                              })()}
+                          </td>
+                        );
+                      case 'department':
+                        return (
+                          <td key={colId} className="px-3 py-2.5">
+                              {(() => {
+                                  const user = users.find(u => u.id === order.salesRepId);
+                                  const fullPath = getDepartmentPath(user?.departmentId);
+                                  if (fullPath === '-') return <span className="text-gray-400">-</span>;
+                                  const parts = fullPath.split(' / ');
+                                  return (
+                                      <div className="flex items-start gap-1 flex-wrap leading-snug">
+                                          {parts.map((part, idx) => (
+                                              <span key={idx} className="flex items-center gap-1">
+                                                  {idx > 0 && <span className="text-gray-300 dark:text-gray-600 text-[10px]">/</span>}
+                                                  <span className={`text-xs font-medium ${idx === parts.length - 1 ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>{part}</span>
+                                              </span>
+                                          ))}
+                                      </div>
+                                  );
+                              })()}
+                          </td>
+                        );
+                      case 'source':
+                        return <td key={colId} className="px-3 py-2.5 whitespace-nowrap">{getSourceBadge(order.source)}</td>;
+                      case 'buyerType':
+                        return (
+                          <td key={colId} className="px-3 py-2.5 whitespace-nowrap">
+                              {order.buyerType === 'Channel'    && <span className="unified-tag-indigo">{buyerTypeMap['Channel']}</span>}
+                              {order.buyerType === 'SelfDeal'   && <span className="unified-tag-orange">{buyerTypeMap['SelfDeal']}</span>}
+                              {order.buyerType === 'RedeemCode' && <span className="unified-tag-purple">{buyerTypeMap['RedeemCode']}</span>}
+                              {order.buyerType === 'Customer'   && <span className="unified-tag-blue">{buyerTypeMap['Customer']}</span>}
+                              {!order.buyerType                 && <span className="unified-tag-gray">{buyerTypeMap['Customer']}</span>}
+                          </td>
+                        );
+                      case 'date':
+                        return <td key={colId} className="px-3 py-2.5 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap" style={{fontVariantNumeric:'tabular-nums'}}>{new Date(order.date).toLocaleString('zh-CN', { hour12: false })}</td>;
+                      case 'status':
+                        return <td key={colId} className="px-3 py-2.5 whitespace-nowrap">{getStatusBadge(order.status)}</td>;
+                      case 'paymentStatus':
+                        return <td key={colId} className="px-3 py-2.5 whitespace-nowrap">{getPaymentStatusBadge(order.isPaid)}</td>;
+                      case 'stockStatus':
+                        return <td key={colId} className="px-3 py-2.5 whitespace-nowrap">{getStockStatusBadge(order)}</td>;
+                      case 'total':
+                        return <td key={colId} className="px-3 py-2.5 text-right font-bold text-red-600 dark:text-red-400 whitespace-nowrap" style={{fontVariantNumeric:'tabular-nums'}}>¥{order.total.toLocaleString()}</td>;
+                      case 'payment':
+                        return (
+                          <td key={colId} className="px-3 py-2.5 text-gray-600 dark:text-gray-300">
+                              {order.paymentMethod ? paymentMethodMap[order.paymentMethod] : '-'}
+                          </td>
+                        );
+                      case 'delivery':
+                        return (
+                          <td key={colId} className="px-3 py-2.5">
+                              {order.deliveryMethod ? (
+                                  <span className={`unified-tag ${
+                                      order.deliveryMethod === 'Online'  ? 'unified-tag-blue' :
+                                      order.deliveryMethod === 'Offline' ? 'unified-tag-orange' : 'unified-tag-indigo'
+                                  }`}>{deliveryMethodMap[order.deliveryMethod]}</span>
+                              ) : <span className="text-gray-400">-</span>}
+                          </td>
+                        );
+                      case 'address':
+                        return (
+                          <td key={colId} className="px-3 py-2.5 text-gray-500 dark:text-gray-400 max-w-[180px] truncate" title={order.shippingAddress}>
+                              {order.shippingAddress || '-'}
+                          </td>
+                        );
+                      case 'invoice':
+                        return (
+                          <td key={colId} className="px-3 py-2.5 text-gray-500 dark:text-gray-400 max-w-[150px] truncate" title={order.invoiceInfo?.title}>
+                              {order.invoiceInfo?.title || '-'}
+                          </td>
+                        );
+                      case 'licensee':
+                        return (
+                          <td key={colId} className="px-3 py-2.5 max-w-[200px]">
+                              {(() => {
+                                  const licensees = [...new Set(order.items.map(i => i.licensee).filter(Boolean))];
+                                  if (licensees.length === 0) return <span className="text-gray-400">-</span>;
+                                  return (
+                                    <div className="flex flex-col gap-1">
+                                      <div className="relative group/lic">
+                                        <div className="truncate text-sm font-medium text-gray-700 dark:text-gray-300">{licensees[0]}</div>
+                                        <div className="absolute left-0 top-full mt-1.5 z-[9999] hidden group-hover/lic:block pointer-events-none">
+                                          <div className="px-3 py-2 bg-gray-900/95 dark:bg-gray-100/95 text-white dark:text-gray-900 text-xs leading-relaxed rounded-lg shadow-lg max-w-xs whitespace-normal break-words animate-[tooltipIn_0.15s_ease-out]">{licensees[0]}</div>
+                                        </div>
+                                      </div>
+                                      {licensees.length > 1 && (
+                                        <div className="relative group/licmore self-start">
+                                          <span className="text-[10px] font-semibold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800 px-1.5 py-px rounded-full cursor-default">
+                                            +{licensees.length - 1} 被授权方
                                           </span>
-                                      ))}
-                                  </div>
-                              );
-                          })()}
-                      </td>
-                  )}
-                  {visibleColumns.includes('source') && <td className="px-3 py-2.5 whitespace-nowrap">{getSourceBadge(order.source)}</td>}
-                  {visibleColumns.includes('buyerType') && (
-                      <td className="px-3 py-2.5 whitespace-nowrap">
-                          {order.buyerType === 'Channel'    && <span className="unified-tag-indigo">{buyerTypeMap['Channel']}</span>}
-                          {order.buyerType === 'SelfDeal'   && <span className="unified-tag-orange">{buyerTypeMap['SelfDeal']}</span>}
-                          {order.buyerType === 'RedeemCode' && <span className="unified-tag-purple">{buyerTypeMap['RedeemCode']}</span>}
-                          {order.buyerType === 'Customer'   && <span className="unified-tag-blue">{buyerTypeMap['Customer']}</span>}
-                          {!order.buyerType                 && <span className="unified-tag-gray">{buyerTypeMap['Customer']}</span>}
-                      </td>
-                  )}
-                  {visibleColumns.includes('date') && <td className="px-3 py-2.5 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap" style={{fontVariantNumeric:'tabular-nums'}}>{new Date(order.date).toLocaleString('zh-CN', { hour12: false })}</td>}
-                  {visibleColumns.includes('status') && <td className="px-3 py-2.5 whitespace-nowrap">{getStatusBadge(order.status)}</td>}
-                  {visibleColumns.includes('paymentStatus') && <td className="px-3 py-2.5 whitespace-nowrap">{getPaymentStatusBadge(order.isPaid)}</td>}
-                  {visibleColumns.includes('stockStatus') && <td className="px-3 py-2.5 whitespace-nowrap">{getStockStatusBadge(order)}</td>}
-                  {visibleColumns.includes('total') && <td className="px-3 py-2.5 text-right font-bold text-red-600 dark:text-red-400 whitespace-nowrap" style={{fontVariantNumeric:'tabular-nums'}}>¥{order.total.toLocaleString()}</td>}
-                  {visibleColumns.includes('payment') && (
-                      <td className="px-3 py-2.5 text-gray-600 dark:text-gray-300">
-                          {order.paymentMethod ? paymentMethodMap[order.paymentMethod] : '-'}
-                      </td>
-                  )}
-                  {visibleColumns.includes('delivery') && (
-                      <td className="px-3 py-2.5">
-                          {order.deliveryMethod ? (
-                              <span className={`unified-tag ${
-                                  order.deliveryMethod === 'Online'  ? 'unified-tag-blue' :
-                                  order.deliveryMethod === 'Offline' ? 'unified-tag-orange' : 'unified-tag-indigo'
-                              }`}>{deliveryMethodMap[order.deliveryMethod]}</span>
-                          ) : <span className="text-gray-400">-</span>}
-                      </td>
-                  )}
-                  {visibleColumns.includes('address') && (
-                      <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 max-w-[180px] truncate" title={order.shippingAddress}>
-                          {order.shippingAddress || '-'}
-                      </td>
-                  )}
-                  {visibleColumns.includes('invoice') && (
-                      <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 max-w-[150px] truncate" title={order.invoiceInfo?.title}>
-                          {order.invoiceInfo?.title || '-'}
-                      </td>
-                  )}
-                  {visibleColumns.includes('opportunity') && (
-                      <td className="px-3 py-2.5 text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer max-w-[150px] truncate" title={order.opportunityName} onClick={(e) => { e.stopPropagation(); if (order.opportunityId) navigate(`/opportunities/${order.opportunityId}`); }}>
-                          {order.opportunityName || '-'}
-                      </td>
-                  )}
-                  {visibleColumns.includes('action') && (
-                      <td className={`px-3 py-2.5 text-right whitespace-nowrap sticky right-[52px] z-20 ${stickyBg} shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors overflow-visible`}>
-                          {getAction(order)}
-                      </td>
-                  )}
+                                          <div className="absolute left-0 top-full mt-1.5 z-[9999] hidden group-hover/licmore:block">
+                                            <div className="px-3 py-2.5 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl min-w-[180px] max-w-xs">
+                                              <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">全部被授权方（{licensees.length}）</div>
+                                              <div className="space-y-1">
+                                                {licensees.map((lic, li) => (
+                                                  <div key={li} className="text-xs text-gray-700 dark:text-gray-300 leading-snug break-words">{lic}</div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                              })()}
+                          </td>
+                        );
+                      case 'opportunity':
+                        return (
+                          <td key={colId} className="px-3 py-2.5 text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer max-w-[150px] truncate" title={order.opportunityName} onClick={(e) => { e.stopPropagation(); if (order.opportunityId) navigate(`/opportunities/${order.opportunityId}`); }}>
+                              {order.opportunityName || '-'}
+                          </td>
+                        );
+                      case 'action':
+                        return (
+                          <td key={colId} className={`px-3 py-2.5 text-right whitespace-nowrap sticky right-[52px] z-20 ${stickyBg} shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors overflow-visible`}>
+                              {getAction(order)}
+                          </td>
+                        );
+                      default:
+                        return <td key={colId} className="px-3 py-2.5 text-gray-400">-</td>;
+                    }
+                  })}
                   <td className={`px-3 py-2.5 sticky right-0 z-10 w-[52px] min-w-[52px] ${stickyBg} transition-colors`} />
                 </tr>
                 );

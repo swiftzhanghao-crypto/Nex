@@ -26,6 +26,7 @@ import InvoiceManager from './components/order/InvoiceManager';
 import PerformanceManager from './components/performance/PerformanceManager';
 import AuthorizationManager from './components/order/AuthorizationManager';
 import DeliveryInfoManager from './components/order/DeliveryInfoManager';
+import AcceptanceManager from './components/order/AcceptanceManager';
 import OperationsManager from './components/operations/OperationsManager';
 import OpsEnterpriseManager from './components/operations/OpsEnterpriseManager';
 import OpsDashboard from './components/operations/OpsDashboard';
@@ -78,6 +79,7 @@ function AppRoutes() {
         <Route path="/performance" element={<PerformanceManager />} />
         <Route path="/authorizations" element={<AuthorizationManager />} />
         <Route path="/delivery-info" element={<DeliveryInfoManager />} />
+        <Route path="/acceptances" element={<AcceptanceManager />} />
 
         <Route path="/leads" element={<LeadsManager />} />
 

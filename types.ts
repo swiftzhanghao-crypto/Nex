@@ -86,6 +86,10 @@ export interface OrderItem extends MerchandiseItem {
 
     // After-sale info
     afterSaleWarrantyPeriod?: string;
+
+    // Sub-unit authorization (per item level)
+    subUnitAuthMode?: SubUnitAuthMode;
+    subUnits?: SubUnit[];
 }
 
 export type PurchaseNature = 'New' | 'Renewal' | 'AddOn' | 'Upgrade';
@@ -287,7 +291,7 @@ export type UserRole = 'Admin' | 'Sales' | 'Business' | 'Technical' | 'Logistics
 export type UserType = 'Internal' | 'External';
 
 export type PermissionResource = 'Order' | 'Customer' | 'Opportunity' | 'Product';
-export type PermissionDimension = 'departmentId' | 'productId' | 'customerIndustry' | 'customerLevel' | 'channelId' | 'buyerType' | 'industryLine' | 'province' | 'directChannelId' | 'orderType' | 'salesRep' | 'businessManager' | 'creator';
+export type PermissionDimension = 'departmentId' | 'productId' | 'customerIndustry' | 'customerLevel' | 'channelId' | 'buyerType' | 'industryLine' | 'province' | 'directChannelId' | 'orderType' | 'orderSource' | 'orderStatus' | 'salesRep' | 'businessManager' | 'creator';
 
 export type PermissionOperator = 'equals' | 'contains';
 
@@ -597,6 +601,37 @@ export interface Order {
     installmentPlans?: { amount: number; expectedDate: string; actualDate: string; paidAmount: number }[];
 
     serialNumbers?: SerialNumber[];
+
+    onlineDeliveries?: OnlineDeliveryEntry[];
+}
+
+export interface OnlineDeliveryEntry {
+    id: string;
+    receivingParty: string;
+    receivingCompany: string;
+    email: string;
+    phone?: string;
+    productItemIndex?: number;
+}
+
+export type SubUnitAuthMode =
+    | 'separate_auth_separate_eid'
+    | 'separate_auth_unified_eid'
+    | 'unified_auth_with_list'
+    | 'none';
+
+export interface SubUnit {
+    id: string;
+    unitName: string;
+    enterpriseId: string;
+    enterpriseName: string;
+    authCount: string;
+    itContact: string;
+    phone: string;
+    email: string;
+    customerType: string;
+    industryLine: string;
+    sellerContact: string;
 }
 
 export interface SerialNumber {
@@ -757,6 +792,7 @@ export interface OrderDraft {
     shippingAddress: string;
     shippingPhone: string;
     shippingEmail: string;
+    onlineDeliveries?: OnlineDeliveryEntry[];
     acceptanceForm: AcceptanceInfo;
     acceptanceType: AcceptanceType;
     phaseDrafts: { name: string; percentage: number }[];
@@ -768,4 +804,6 @@ export interface OrderDraft {
     agentCode?: string;
     settlementMethod?: 'cash' | 'credit' | '';
     expectedPaymentDate?: string;
+    serialNumberRequirement?: '生成新序列号' | '沿用正式序列号' | '沿用测试序列号';
+    reuseSerialNumber?: string;
 }

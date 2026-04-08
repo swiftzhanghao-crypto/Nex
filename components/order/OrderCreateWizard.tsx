@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Order, OrderStatus, OrderItem, ActivationMethod, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, DeliveryMethod, OrderDraft, ConversionOrder, CustomerContact, PurchaseNature } from '../../types';
+import { Order, OrderStatus, OrderItem, ActivationMethod, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, DeliveryMethod, OrderDraft, ConversionOrder, CustomerContact, PurchaseNature, SubUnitAuthMode, OnlineDeliveryEntry } from '../../types';
 import { initialConversionOrders, ALL_INSTALL_PKG_ROWS } from '../../data/staticData';
 import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Network, Globe, Radio, RefreshCcw, Wallet, Zap, Box, Settings, MapPin, Briefcase, XCircle, Search, Save, ScrollText, Phone, Mail, Users, Banknote, Calendar, Check, ChevronRight, ChevronDown, Pencil, Key, Building2 } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
@@ -162,6 +162,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const [shippingAddress, setShippingAddress] = useState('');
   const [shippingPhone, setShippingPhone] = useState('');
   const [shippingEmail, setShippingEmail] = useState('');
+  const [onlineDeliveries, setOnlineDeliveries] = useState<OnlineDeliveryEntry[]>([
+      { id: crypto.randomUUID(), receivingParty: '买方', receivingCompany: '', email: '', phone: '' },
+  ]);
 
   const [acceptanceForm, setAcceptanceForm] = useState<AcceptanceInfo>({
       contactName: '',
@@ -190,8 +193,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const [expectedPaymentDate, setExpectedPaymentDate] = useState('');
   const [installmentPlans, setInstallmentPlans] = useState<{amount: number; expectedDate: string; actualDate: string; paidAmount: number}[]>([]);
   const [serialNumberRequirement, setSerialNumberRequirement] = useState<'生成新序列号' | '沿用正式序列号' | '沿用测试序列号'>('生成新序列号');
+  const [reuseSerialNumber, setReuseSerialNumber] = useState('');
 
-  type SubUnit = {
+  type SubUnitLocal = {
     id: string;
     unitName: string;
     enterpriseId: string;
@@ -204,24 +208,29 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     industryLine: string;
     sellerContact: string;
   };
-  const [enableSubUnitAuth, setEnableSubUnitAuth] = useState(false);
-  const [subUnits, setSubUnits] = useState<SubUnit[]>([]);
+  const [expandedSubUnitIdx, setExpandedSubUnitIdx] = useState<number | null>(null);
 
-  const addSubUnit = () => {
-    setSubUnits(prev => [...prev, {
-      id: `su_${Date.now()}`,
-      unitName: '', enterpriseId: '', enterpriseName: '-',
-      authCount: '', itContact: '', phone: '', email: '',
-      customerType: '-', industryLine: '-', sellerContact: '-',
-    }]);
+  const updateItemSubUnitMode = (itemIdx: number, mode: SubUnitAuthMode) => {
+    setNewOrderItems(prev => prev.map((it, i) => i === itemIdx ? { ...it, subUnitAuthMode: mode, subUnits: mode === 'none' ? undefined : (it.subUnits || []) } : it));
   };
-
-  const updateSubUnit = (id: string, field: keyof SubUnit, value: string) => {
-    setSubUnits(prev => prev.map(u => u.id === id ? { ...u, [field]: value } : u));
+  const addItemSubUnit = (itemIdx: number) => {
+    setNewOrderItems(prev => prev.map((it, i) => {
+      if (i !== itemIdx) return it;
+      const subs: SubUnitLocal[] = (it.subUnits as SubUnitLocal[] || []);
+      return { ...it, subUnits: [...subs, { id: `su_${Date.now()}`, unitName: '', enterpriseId: '', enterpriseName: '-', authCount: '', itContact: '', phone: '', email: '', customerType: '-', industryLine: '-', sellerContact: '-' }] };
+    }));
   };
-
-  const removeSubUnit = (id: string) => {
-    setSubUnits(prev => prev.filter(u => u.id !== id));
+  const updateItemSubUnit = (itemIdx: number, unitId: string, field: keyof SubUnitLocal, value: string) => {
+    setNewOrderItems(prev => prev.map((it, i) => {
+      if (i !== itemIdx) return it;
+      return { ...it, subUnits: (it.subUnits as SubUnitLocal[] || []).map(u => u.id === unitId ? { ...u, [field]: value } : u) };
+    }));
+  };
+  const removeItemSubUnit = (itemIdx: number, unitId: string) => {
+    setNewOrderItems(prev => prev.map((it, i) => {
+      if (i !== itemIdx) return it;
+      return { ...it, subUnits: (it.subUnits as SubUnitLocal[] || []).filter(u => u.id !== unitId) };
+    }));
   };
 
   const wizardSteps = [
@@ -377,6 +386,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setShippingAddress('');
       setShippingPhone('');
       setShippingEmail('');
+      setOnlineDeliveries([{ id: crypto.randomUUID(), receivingParty: '买方', receivingCompany: '', email: '', phone: '' }]);
       setAcceptanceForm({ contactName: '', contactPhone: '', method: 'Remote', email: '' });
       setAcceptanceType('OneTime');
       setPhaseDrafts([{ name: '第一阶段验收', percentage: 30 }, { name: '最终验收', percentage: 70 }]);
@@ -517,10 +527,6 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const handleAddItem = () => {
     if (!selectedProduct || !selectedSku || tempQuantity <= 0) return;
 
-    if (editingItemIndex === null && enableSubUnitAuth && newOrderItems.length >= 1) {
-        alert('下级单位授权模式下仅允许添加一个产品明细，请先移除已有产品或关闭下级单位授权。');
-        return;
-    }
     
     if (selectedSku.pricingOptions && selectedSku.pricingOptions.length > 0 && !selectedOption) {
         alert("请选择授权类型 (Pricing Option)");
@@ -758,13 +764,14 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       orderEnterpriseId, isAgentOrder, agentCode, selectedChannelId, directChannel, terminalChannel, salesRepId, businessManagerId,
       newOrderItems, tempCategory, enableConversion, selectedConversionIds, sellerName, sellerContact,
       invoiceForm,
-      deliveryMethod, receivingParty, receivingCompany, receivingMethod, shippingAddress, shippingPhone, shippingEmail,
+      deliveryMethod, receivingParty, receivingCompany, receivingMethod, shippingAddress, shippingPhone, shippingEmail, onlineDeliveries,
       acceptanceForm, acceptanceType, phaseDrafts,
       purchasingContactId: selectedPurchasingContactId,
       itContactId: selectedItContactId,
       settlementMethod,
       expectedPaymentDate,
       serialNumberRequirement,
+      reuseSerialNumber,
     };
     setOrderDrafts(prev => {
       const exists = prev.findIndex(d => d.id === orderId);
@@ -813,6 +820,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     setShippingAddress(d.shippingAddress);
     setShippingPhone(d.shippingPhone || '');
     setShippingEmail(d.shippingEmail || '');
+    if (d.onlineDeliveries && d.onlineDeliveries.length > 0) setOnlineDeliveries(d.onlineDeliveries);
     setAcceptanceForm(d.acceptanceForm);
     setAcceptanceType(d.acceptanceType);
     setPhaseDrafts(d.phaseDrafts);
@@ -822,6 +830,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     setSettlementMethod(d.settlementMethod || '');
     setExpectedPaymentDate(d.expectedPaymentDate || '');
     setSerialNumberRequirement(d.serialNumberRequirement || '生成新序列号');
+    setReuseSerialNumber(d.reuseSerialNumber || '');
     // 恢复可选联系人列表
     const cust = customers.find(c => c.id === d.newOrderCustomer);
     if (cust) {
@@ -839,6 +848,45 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     if (selfDealMissingEnterprise || otherMissingCustomer || newOrderItems.length === 0 || !buyerType) {
         alert(selfDealMissingEnterprise ? '请选择企业 ID。' : '请完善订单信息：客户、产品或订单类型未填写。');
         return;
+    }
+    const invalidItem = newOrderItems.find(it => !it.quantity || it.quantity <= 0 || it.priceAtPurchase < 0);
+    if (invalidItem) {
+        alert(`产品"${invalidItem.productName}"的数量或价格无效，请检查后再提交。`);
+        return;
+    }
+    if (serialNumberRequirement !== '生成新序列号' && reuseSerialNumber.length !== 20) {
+        alert(`选择"${serialNumberRequirement}"时需要填写 20 位序列号（当前 ${reuseSerialNumber.length} 位），请补全后再提交。`);
+        return;
+    }
+    if (settlementMethod === 'credit' && settlementType === 'installment' && installmentPlans.length < 2) {
+        alert('分期付款至少需要 2 期，请添加更多分期计划。');
+        return;
+    }
+    for (let pi = 0; pi < newOrderItems.length; pi++) {
+        const rows = productAcceptanceRows.filter(r => r.productIdx === pi);
+        if (rows.some(r => r.method === '分期验收')) {
+            const totalPct = rows.reduce((s, r) => s + r.percentage, 0);
+            if (Math.abs(totalPct - 100) > 0.01) {
+                alert(`产品"${newOrderItems[pi].productName}"的分期验收比例合计为 ${totalPct}%，必须等于 100%，请调整后再提交。`);
+                return;
+            }
+        }
+    }
+    for (let pi = 0; pi < newOrderItems.length; pi++) {
+        const item = newOrderItems[pi];
+        if (item.subUnitAuthMode && item.subUnitAuthMode !== 'none' && item.subUnits && item.subUnits.length > 0) {
+            const subs = item.subUnits as SubUnitLocal[];
+            const subTotal = subs.reduce((s, u) => s + (parseInt(u.authCount) || 0), 0);
+            if (subTotal !== item.quantity) {
+                alert(`产品"${item.productName}"的下级单位授权数量合计 (${subTotal}) 与该明细数量 (${item.quantity}) 不一致，请调整后再提交。`);
+                return;
+            }
+            const emptyUnit = subs.find(u => !u.unitName || !u.enterpriseId || !u.authCount || !u.itContact || !u.phone);
+            if (emptyUnit) {
+                alert(`产品"${item.productName}"中下级单位"${emptyUnit.unitName || '(未命名)'}"存在未填写的必填字段，请补充完整。`);
+                return;
+            }
+        }
     }
     const customer = customers.find(c => c.id === newOrderCustomer);
     const salesUser = users.find(u => u.id === salesRepId);
@@ -858,12 +906,19 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     for (let i = 0; i < newOrderItems.length; i++) {
         const rows = productAcceptanceRows.filter(r => r.productIdx === i);
         const itemAmount = newOrderItems[i].priceAtPurchase * newOrderItems[i].quantity;
-        for (const row of rows) {
+        let allocatedAmount = 0;
+        for (let ri = 0; ri < rows.length; ri++) {
+            const row = rows[ri];
+            const isLast = ri === rows.length - 1;
+            const amount = isLast
+                ? Math.round((itemAmount - allocatedAmount) * 100) / 100
+                : Math.round(itemAmount * row.percentage / 100 * 100) / 100;
+            allocatedAmount += amount;
             phases.push({
                 id: `ph-${Date.now()}-${phaseIdx++}`,
-                name: `${newOrderItems[i].productName}${rows.length > 1 ? ` (${rows.indexOf(row) + 1}/${rows.length})` : ''}`,
+                name: `${newOrderItems[i].productName}${rows.length > 1 ? ` (${ri + 1}/${rows.length})` : ''}`,
                 percentage: row.percentage,
-                amount: Math.round(itemAmount * row.percentage / 100 * 100) / 100,
+                amount,
                 status: 'Pending',
             });
         }
@@ -889,9 +944,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         shippingAddress: shippingAddress || (customer ? customer.address : ''),
         shippingPhone: shippingPhone || undefined,
         shippingEmail: shippingEmail || undefined,
+        onlineDeliveries: (deliveryMethod === 'Online' || deliveryMethod === 'Hybrid') && onlineDeliveries.length > 0 ? onlineDeliveries : undefined,
         isPaid: false, 
-        isPackageConfirmed: deliveryMethod === 'Online', 
-        isCDBurned: deliveryMethod === 'Online', 
+        isPackageConfirmed: deliveryMethod === 'Online' || deliveryMethod === 'Hybrid', 
+        isCDBurned: deliveryMethod === 'Online' || deliveryMethod === 'Hybrid', 
         approval: { salesApproved: false, businessApproved: false, financeApproved: false },
         approvalRecords: [], salesRepId: salesRepId, salesRepName: salesUser?.name, 
         businessManagerId: businessManagerId, businessManagerName: businessUser?.name,
@@ -1593,7 +1649,6 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                     <ShoppingBag className="w-4 h-4 text-blue-500"/> 订单产品明细
                                     {newOrderItems.length > 0 && <span className="text-xs font-mono bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full ml-1">{newOrderItems.length}</span>}
-                                    {enableSubUnitAuth && <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full">下级单位授权模式·仅限1个产品</span>}
                                 </h4>
                                 <div className="flex items-center gap-3">
                                     {newOrderItems.length > 0 && (
@@ -1601,9 +1656,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     )}
                                     <button
                                         onClick={() => { setEditingItemIndex(null); setShowAddProductModal(true); }}
-                                        disabled={enableSubUnitAuth && newOrderItems.length >= 1}
-                                        title={enableSubUnitAuth && newOrderItems.length >= 1 ? '下级单位授权模式下仅允许一个产品明细' : undefined}
-                                        className="flex items-center gap-1.5 px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-xl text-xs font-bold transition shadow-apple disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#0071E3]"
+                                        className="flex items-center gap-1.5 px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-xl text-xs font-bold transition shadow-apple"
                                     >
                                         <Plus className="w-3.5 h-3.5"/> 添加产品
                                     </button>
@@ -1615,8 +1668,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         <tr><th className="p-3 pl-4">产品/规格</th><th className="p-3">订购性质</th><th className="p-3">增续类型</th><th className="p-3">365订购性质</th><th className="p-3">授权类型</th><th className="p-3 text-center">数量</th><th className="p-3 text-center">授权/服务期限</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-3">激活方式</th>}<th className="p-3">安装包</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-3">关联企业</th>}<th className="p-3 text-right">单价</th><th className="p-3 text-right">小计</th><th className="p-3 text-center">操作</th></tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                                        {newOrderItems.map((item, idx) => (
-                                            <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                        {newOrderItems.map((item, idx) => (<React.Fragment key={idx}>
+                                            <tr className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                                 <td className="p-3 pl-4"><div className="font-bold text-gray-900 dark:text-white text-sm">{item.productName}</div><div className="text-xs text-gray-500 mt-0.5">{item.skuName}</div></td>
                                                 <td className="p-3">
                                                     <select value={item.purchaseNature || 'New'} onChange={e => { handleUpdateItem(idx, 'purchaseNature', e.target.value); handleUpdateItem(idx, 'renewalSubType', ''); }} className="text-xs font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] outline-none transition cursor-pointer">
@@ -1693,12 +1746,107 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                     <input type="number" min={0} step={0.01} value={item.priceAtPurchase} onChange={e => handleUpdateItem(idx, 'priceAtPurchase', Math.max(0, parseFloat(e.target.value) || 0))} className="w-24 text-right text-sm font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] dark:focus:border-[#FF2D55] outline-none transition"/>
                                                 </td>
                                                 <td className="p-3 text-right font-bold text-red-600 dark:text-red-400">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
-                                                <td className="p-3 text-center flex items-center justify-center gap-1">
+                                                <td className="p-3 text-center">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                    <button onClick={() => setExpandedSubUnitIdx(expandedSubUnitIdx === idx ? null : idx)} className={`p-1.5 rounded-full transition ${expandedSubUnitIdx === idx ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'}`} title="下级单位授权"><Building2 className="w-3.5 h-3.5"/></button>
                                                     <button onClick={() => handleEditItem(idx)} className="text-gray-400 hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20 transition" title="编辑"><Pencil className="w-3.5 h-3.5"/></button>
                                                     <button onClick={() => handleRemoveItem(idx)} className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="删除"><Trash2 className="w-3.5 h-3.5"/></button>
+                                                    </div>
+                                                    {item.subUnitAuthMode && item.subUnitAuthMode !== 'none' && item.subUnits && item.subUnits.length > 0 && (
+                                                        <div className="text-[10px] text-indigo-500 dark:text-indigo-400 mt-1 font-bold">{item.subUnits.length} 个下级单位</div>
+                                                    )}
                                                 </td>
                                             </tr>
-                                        ))}
+                                            {expandedSubUnitIdx === idx && (
+                                            <tr>
+                                                <td colSpan={20} className="p-0">
+                                                    <div className="bg-indigo-50/50 dark:bg-indigo-900/10 border-t border-b border-indigo-100 dark:border-indigo-800/30">
+                                                        <div className="px-5 py-3 flex items-center justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-sm font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5"><Building2 className="w-4 h-4"/> 下级单位授权 — {item.productName}</span>
+                                                            </div>
+                                                            <select
+                                                                value={item.subUnitAuthMode || 'none'}
+                                                                onChange={e => updateItemSubUnitMode(idx, e.target.value as SubUnitAuthMode)}
+                                                                className="px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-[#1C1C1E] text-xs font-medium text-gray-700 dark:text-gray-300 outline-none focus:border-indigo-400 transition min-w-[240px]"
+                                                            >
+                                                                <option value="none">无下级单位</option>
+                                                                <option value="separate_auth_separate_eid">授权分别呈现，企业ID分别管理</option>
+                                                                <option value="separate_auth_unified_eid">授权分别呈现，企业ID统一管理</option>
+                                                                <option value="unified_auth_with_list">授权和企业ID统一管理并提供下级清单</option>
+                                                            </select>
+                                                        </div>
+                                                        {item.subUnitAuthMode && item.subUnitAuthMode !== 'none' && (() => {
+                                                            const subs = (item.subUnits || []) as SubUnitLocal[];
+                                                            const subTotal = subs.reduce((s, u) => s + (parseInt(u.authCount) || 0), 0);
+                                                            const matched = subs.length > 0 && subTotal === item.quantity;
+                                                            const hasSubData = subs.length > 0 && subs.some(u => u.authCount);
+                                                            return (
+                                                            <div>
+                                                                <div className="px-5 pb-2 flex items-center justify-between gap-3">
+                                                                    <button onClick={() => addItemSubUnit(idx)} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition">
+                                                                        <Plus className="w-3 h-3"/> 新增下级单位
+                                                                    </button>
+                                                                    {hasSubData && (
+                                                                        <div className={`flex items-center gap-2 text-[11px] font-bold px-2.5 py-1 rounded-lg border ${matched ? 'bg-green-50 dark:bg-green-900/20 text-green-600 border-green-200' : 'bg-red-50 dark:bg-red-900/20 text-red-600 border-red-200'}`}>
+                                                                            <span>合计: {subTotal}</span>
+                                                                            <span className="text-gray-300">|</span>
+                                                                            <span>明细数量: {item.quantity}</span>
+                                                                            <span className="text-gray-300">|</span>
+                                                                            <span>{matched ? '✓ 匹配' : '✗ 不匹配'}</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className="overflow-x-auto">
+                                                                    <table className="w-full text-left text-xs" style={{ minWidth: 1100 }}>
+                                                                        <thead><tr className="bg-indigo-100/60 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300">
+                                                                            <th className="p-2 pl-5 w-8 text-center">#</th>
+                                                                            <th className="p-2 whitespace-nowrap">客户下级单位名称</th>
+                                                                            <th className="p-2 whitespace-nowrap">企业ID</th>
+                                                                            <th className="p-2 whitespace-nowrap">企业名称</th>
+                                                                            <th className="p-2 whitespace-nowrap">授权数量</th>
+                                                                            <th className="p-2 whitespace-nowrap">IT联系人</th>
+                                                                            <th className="p-2 whitespace-nowrap">手机</th>
+                                                                            <th className="p-2 whitespace-nowrap">邮箱</th>
+                                                                            <th className="p-2 whitespace-nowrap">客户类型</th>
+                                                                            <th className="p-2 whitespace-nowrap">行业条线</th>
+                                                                            <th className="p-2 whitespace-nowrap">卖方联系人</th>
+                                                                            <th className="p-2 pr-5 text-center">操作</th>
+                                                                        </tr></thead>
+                                                                        <tbody className="divide-y divide-indigo-100 dark:divide-indigo-800/20">
+                                                                            {subs.map((unit, si) => (
+                                                                            <tr key={unit.id} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-colors align-top">
+                                                                                <td className="p-2 pl-5 text-center text-gray-400 font-mono">{si + 1}</td>
+                                                                                <td className="p-2">
+                                                                                    <select value={unit.unitName} onChange={e => { const cust = customers.find(c => c.companyName === e.target.value); updateItemSubUnit(idx, unit.id, 'unitName', e.target.value); updateItemSubUnit(idx, unit.id, 'enterpriseId', ''); updateItemSubUnit(idx, unit.id, 'enterpriseName', '-'); if (cust) { updateItemSubUnit(idx, unit.id, 'customerType', cust.customerType || '-'); updateItemSubUnit(idx, unit.id, 'industryLine', cust.industryLine || cust.industry || '-'); } }} className={`w-full min-w-[140px] px-2 py-1 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400 ${!unit.unitName ? 'border-red-300' : 'border-gray-200 dark:border-white/10'}`}>
+                                                                                        <option value="">请选择客户</option>
+                                                                                        {customers.filter(c => c.id !== newOrderCustomer).map(c => <option key={c.id} value={c.companyName}>{c.companyName}</option>)}
+                                                                                    </select>
+                                                                                </td>
+                                                                                <td className="p-2">{(() => { const uc = customers.find(c => c.companyName === unit.unitName); const ents = uc?.enterprises; return ents && ents.length > 0 ? (<select value={unit.enterpriseId} onChange={e => { const ent = ents.find(en => en.id === e.target.value); updateItemSubUnit(idx, unit.id, 'enterpriseId', e.target.value); updateItemSubUnit(idx, unit.id, 'enterpriseName', ent?.name || '-'); }} className={`w-full min-w-[90px] px-2 py-1 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400 ${!unit.enterpriseId ? 'border-red-300' : 'border-gray-200 dark:border-white/10'}`}><option value="">选择</option>{ents.map(ent => <option key={ent.id} value={ent.id}>{ent.id} ({ent.name})</option>)}</select>) : <span className="text-[10px] text-gray-400">{unit.unitName ? '无关联企业' : '请先选择'}</span>; })()}</td>
+                                                                                <td className="p-2 text-gray-500">{unit.enterpriseName}</td>
+                                                                                <td className="p-2"><input type="number" min={1} value={unit.authCount} onChange={e => updateItemSubUnit(idx, unit.id, 'authCount', e.target.value)} placeholder="数量" className={`w-full min-w-[60px] px-2 py-1 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400 ${!unit.authCount ? 'border-red-300' : 'border-gray-200 dark:border-white/10'}`}/></td>
+                                                                                <td className="p-2"><input value={unit.itContact} onChange={e => updateItemSubUnit(idx, unit.id, 'itContact', e.target.value)} placeholder="联系人" className="w-full min-w-[80px] px-2 py-1 border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400"/></td>
+                                                                                <td className="p-2"><input value={unit.phone} onChange={e => updateItemSubUnit(idx, unit.id, 'phone', e.target.value)} placeholder="手机号" className="w-full min-w-[90px] px-2 py-1 border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400"/></td>
+                                                                                <td className="p-2"><input type="email" value={unit.email} onChange={e => updateItemSubUnit(idx, unit.id, 'email', e.target.value)} placeholder="邮箱" className={`w-full min-w-[100px] px-2 py-1 border rounded-lg text-xs outline-none bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400 ${!unit.email ? 'border-red-300' : 'border-gray-200 dark:border-white/10'}`}/></td>
+                                                                                <td className="p-2 text-gray-400 whitespace-nowrap">{unit.customerType}</td>
+                                                                                <td className="p-2 text-gray-400 whitespace-nowrap">{unit.industryLine}</td>
+                                                                                <td className="p-2 text-gray-400 whitespace-nowrap">{unit.sellerContact}</td>
+                                                                                <td className="p-2 pr-5 text-center"><button onClick={() => removeItemSubUnit(idx, unit.id)} className="text-red-500 hover:text-red-700 text-xs font-bold hover:underline">删除</button></td>
+                                                                            </tr>
+                                                                            ))}
+                                                                            {subs.length === 0 && <tr><td colSpan={12} className="px-3 py-6 text-center text-gray-400 text-xs">暂无下级单位，请点击"新增下级单位"添加</td></tr>}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </div>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            )}
+                                        </React.Fragment>))}
                                     </tbody>
                                 </table>
                             ) : (
@@ -1766,117 +1914,6 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                         </div>
                         )}
 
-                        {/* 下级单位授权 */}
-                        <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple overflow-hidden">
-                            <div className="px-5 pt-4 pb-3 flex items-center justify-between">
-                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                    <Building2 className="w-4 h-4 text-indigo-500"/> 下级单位授权
-                                </h4>
-                                <div className="flex items-center gap-3">
-                                    <span className="text-sm text-gray-500 dark:text-gray-400">{enableSubUnitAuth ? '按下级单位提供授权' : '不按下级单位提供'}</span>
-                                    <button
-                                        onClick={() => {
-                                            if (!enableSubUnitAuth && newOrderItems.length > 1) {
-                                                alert(`下级单位授权模式下仅允许一个产品明细，当前有 ${newOrderItems.length} 个产品。请先移除多余产品后再开启。`);
-                                                return;
-                                            }
-                                            setEnableSubUnitAuth(!enableSubUnitAuth);
-                                            if (enableSubUnitAuth) setSubUnits([]);
-                                        }}
-                                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${enableSubUnitAuth ? 'bg-[#0071E3]' : 'bg-gray-300 dark:bg-gray-600'}`}
-                                    >
-                                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${enableSubUnitAuth ? 'translate-x-6' : 'translate-x-1'}`} />
-                                    </button>
-                                </div>
-                            </div>
-                            {enableSubUnitAuth && (
-                                <div className="space-y-3">
-                                    <div className="px-5 space-y-1.5">
-                                        <div className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-                                            <span className="shrink-0 mt-0.5">●</span>
-                                            <span>选此方式表示按照"客户下级单位名称"分别在不同的企业ID下呈现电子授权信息；金山将交付邮件分别发送至"客户下级单位名称"对应邮箱</span>
-                                        </div>
-                                        <div className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-                                            <span className="shrink-0 mt-0.5">●</span>
-                                            <span>下级单位【卖方业务联系人】需要与主订单【卖方业务联系人】保持一致，否则存在鉴权可能性</span>
-                                        </div>
-                                    </div>
-                                    <div className="px-5 flex items-center gap-3 pb-2">
-                                        <button onClick={addSubUnit} className="flex items-center gap-1.5 px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-xl text-xs font-bold transition shadow-apple">
-                                            <Plus className="w-3.5 h-3.5"/> 新增下级单位
-                                        </button>
-                                    </div>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left text-sm" style={{ minWidth: 1200 }}>
-                                            <thead className="unified-table-header">
-                                                <tr>
-                                                    <th className="p-3 pl-5 w-10 text-center">#</th>
-                                                    <th className="p-3 whitespace-nowrap">客户下级单位名称</th>
-                                                    <th className="p-3 whitespace-nowrap">企业ID</th>
-                                                    <th className="p-3 whitespace-nowrap">企业名称</th>
-                                                    <th className="p-3 whitespace-nowrap">授权数量</th>
-                                                    <th className="p-3 whitespace-nowrap">IT部/信息部联系人</th>
-                                                    <th className="p-3 whitespace-nowrap">手机</th>
-                                                    <th className="p-3 whitespace-nowrap">邮箱</th>
-                                                    <th className="p-3 whitespace-nowrap">客户类型</th>
-                                                    <th className="p-3 whitespace-nowrap">行业条线</th>
-                                                    <th className="p-3 whitespace-nowrap">卖方业务联系人</th>
-                                                    <th className="p-3 pr-5 whitespace-nowrap text-center">操作</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                                                {subUnits.map((unit, idx) => (
-                                                    <tr key={unit.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors align-top">
-                                                        <td className="p-3 pl-5 text-center text-gray-400 font-mono text-xs">{idx + 1}</td>
-                                                        <td className="p-3">
-                                                            <input value={unit.unitName} onChange={e => updateSubUnit(unit.id, 'unitName', e.target.value)} placeholder="请输入单位名称" className={`w-full min-w-[140px] px-2.5 py-1.5 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-blue-400 ${!unit.unitName ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}/>
-                                                            {!unit.unitName && <div className="text-[10px] text-red-500 mt-1">必填字段</div>}
-                                                        </td>
-                                                        <td className="p-3">
-                                                            {selectedCustomerObj?.enterprises && selectedCustomerObj.enterprises.length > 0 ? (
-                                                                <select value={unit.enterpriseId} onChange={e => { const ent = selectedCustomerObj.enterprises.find(en => en.id === e.target.value); updateSubUnit(unit.id, 'enterpriseId', e.target.value); updateSubUnit(unit.id, 'enterpriseName', ent?.name || '-'); }} className={`w-full min-w-[100px] px-2.5 py-1.5 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white cursor-pointer focus:border-blue-400 ${!unit.enterpriseId ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}>
-                                                                    <option value="">选择</option>
-                                                                    {selectedCustomerObj.enterprises.map(ent => <option key={ent.id} value={ent.id}>{ent.id}</option>)}
-                                                                </select>
-                                                            ) : (
-                                                                <span className="text-xs text-blue-600 dark:text-blue-400 cursor-pointer hover:underline">选择</span>
-                                                            )}
-                                                            {!unit.enterpriseId && <div className="text-[10px] text-red-500 mt-1">必填</div>}
-                                                        </td>
-                                                        <td className="p-3 text-xs text-gray-500 dark:text-gray-400">{unit.enterpriseName}</td>
-                                                        <td className="p-3">
-                                                            <input type="number" min={1} value={unit.authCount} onChange={e => updateSubUnit(unit.id, 'authCount', e.target.value)} placeholder="请输入" className={`w-full min-w-[80px] px-2.5 py-1.5 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-blue-400 ${!unit.authCount ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}/>
-                                                            {!unit.authCount && <div className="text-[10px] text-red-500 mt-1">必填字段</div>}
-                                                        </td>
-                                                        <td className="p-3">
-                                                            <input value={unit.itContact} onChange={e => updateSubUnit(unit.id, 'itContact', e.target.value)} placeholder="请输入" className="w-full min-w-[100px] px-2.5 py-1.5 border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-blue-400"/>
-                                                        </td>
-                                                        <td className="p-3">
-                                                            <input value={unit.phone} onChange={e => updateSubUnit(unit.id, 'phone', e.target.value)} placeholder="请输入" className="w-full min-w-[100px] px-2.5 py-1.5 border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-blue-400"/>
-                                                        </td>
-                                                        <td className="p-3">
-                                                            <input type="email" value={unit.email} onChange={e => updateSubUnit(unit.id, 'email', e.target.value)} placeholder="请输入" className={`w-full min-w-[120px] px-2.5 py-1.5 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-blue-400 ${!unit.email ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}/>
-                                                            {!unit.email && <div className="text-[10px] text-red-500 mt-1">必填字段</div>}
-                                                        </td>
-                                                        <td className="p-3 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{unit.customerType}</td>
-                                                        <td className="p-3 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{unit.industryLine}</td>
-                                                        <td className="p-3 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{unit.sellerContact}</td>
-                                                        <td className="p-3 pr-5 text-center">
-                                                            <button onClick={() => removeSubUnit(unit.id)} className="text-red-500 hover:text-red-700 dark:hover:text-red-400 text-xs font-bold hover:underline transition">删除</button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                                {subUnits.length === 0 && (
-                                                    <tr>
-                                                        <td colSpan={12} className="px-3 py-10 text-center text-gray-300 dark:text-gray-600 text-sm">暂无下级单位，请点击"新增下级单位"添加</td>
-                                                    </tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
 
                         {/* 添加产品抽屉 */}
                         {showAddProductModal && (
@@ -2442,6 +2479,54 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                     <div className="space-y-4 animate-fade-in">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-4">
+                            <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-4">
+                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><Key className="w-4 h-4 text-amber-500"/> 序列号需求</h4>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {(['生成新序列号', '沿用正式序列号', '沿用测试序列号'] as const).map(opt => (
+                                        <button
+                                            key={opt}
+                                            onClick={() => { setSerialNumberRequirement(opt); if (opt === '生成新序列号') setReuseSerialNumber(''); }}
+                                            className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 text-sm font-bold transition-all ${
+                                                serialNumberRequirement === opt
+                                                    ? 'border-amber-500 dark:border-amber-400 bg-amber-50/60 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
+                                                    : 'border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-white/20'
+                                            }`}
+                                        >
+                                            {serialNumberRequirement === opt && <Check className="w-4 h-4 shrink-0" />}
+                                            {opt}
+                                        </button>
+                                    ))}
+                                </div>
+                                {serialNumberRequirement !== '生成新序列号' && (
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                            <Key className="w-3 h-3"/> 请输入沿用的序列号（20位）
+                                        </label>
+                                        <input
+                                            type="text"
+                                            maxLength={20}
+                                            value={reuseSerialNumber}
+                                            onChange={e => setReuseSerialNumber(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase())}
+                                            className={`w-full p-3 bg-gray-50 dark:bg-black border rounded-xl text-sm outline-none dark:text-white font-mono tracking-widest focus:ring-2 transition ${
+                                                reuseSerialNumber.length === 20
+                                                    ? 'border-green-300 dark:border-green-700 focus:ring-green-500/20'
+                                                    : reuseSerialNumber.length > 0
+                                                        ? 'border-amber-300 dark:border-amber-700 focus:ring-amber-500/20'
+                                                        : 'border-gray-200 dark:border-white/10 focus:ring-blue-500/20'
+                                            }`}
+                                            placeholder="例如：A1B2C3D4E5F6G7H8I9J0"
+                                        />
+                                        <div className="flex items-center justify-between text-[10px]">
+                                            <span className={`font-bold ${reuseSerialNumber.length === 20 ? 'text-green-600' : reuseSerialNumber.length > 0 ? 'text-amber-500' : 'text-gray-400'}`}>
+                                                {reuseSerialNumber.length}/20 位
+                                                {reuseSerialNumber.length === 20 && ' ✓'}
+                                            </span>
+                                            <span className="text-gray-400">仅支持字母和数字</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             {/* 结算方式 */}
                             <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-4">
                                 <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><Banknote className="w-4 h-4 text-emerald-500"/> 结算方式</h4>
@@ -2501,7 +2586,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                 一次性付款
                                             </button>
                                             <button
-                                                onClick={() => { setSettlementType('installment'); setExpectedPaymentDate(''); if (installmentPlans.length === 0) { const total = calculateNewOrderTotal(); setInstallmentPlans([{ amount: total, expectedDate: '', actualDate: '', paidAmount: 0 }]); } }}
+                                                onClick={() => { setSettlementType('installment'); setExpectedPaymentDate(''); if (installmentPlans.length < 2) { const total = calculateNewOrderTotal(); const half = Math.round(total / 2 * 100) / 100; setInstallmentPlans([{ amount: half, expectedDate: '', actualDate: '', paidAmount: 0 }, { amount: Math.round((total - half) * 100) / 100, expectedDate: '', actualDate: '', paidAmount: 0 }]); } }}
                                                 className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${settlementType === 'installment' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}
                                             >
                                                 分期付款
@@ -2557,7 +2642,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                                         />
                                                                     </td>
                                                                     <td className="px-4 py-2.5">
-                                                                        {installmentPlans.length > 1 && (
+                                                                        {installmentPlans.length > 2 && (
                                                                             <button onClick={() => setInstallmentPlans(installmentPlans.filter((_, i) => i !== idx))} className="text-gray-400 hover:text-red-500 p-1 transition"><X className="w-3.5 h-3.5"/></button>
                                                                         )}
                                                                     </td>
@@ -2589,81 +2674,162 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                         <div className="space-y-4">
                             <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-4">
                                 <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><MapPin className="w-4 h-4 text-red-500"/> 收货信息</h4>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">收货方</label>
-                                        <select 
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
-                                            value={receivingParty}
-                                            onChange={e => setReceivingParty(e.target.value)}
-                                        >
-                                            <option value="买方">买方</option>
-                                            <option value="代理商">代理商</option>
-                                            <option value="最终用户">最终用户</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">收货单位名称</label>
-                                        <input 
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20" 
-                                            value={receivingCompany} 
-                                            onChange={e => setReceivingCompany(e.target.value)}
-                                            placeholder="请输入收货单位全称..."
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">联系电话</label>
-                                            <input 
-                                                type="tel"
-                                                className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20" 
-                                                value={shippingPhone} 
-                                                onChange={e => setShippingPhone(e.target.value)}
-                                                placeholder="请输入收货联系电话..."
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">联系邮箱</label>
-                                            <input 
-                                                type="email"
-                                                className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20" 
-                                                value={shippingEmail} 
-                                                onChange={e => setShippingEmail(e.target.value)}
-                                                placeholder="请输入收货联系邮箱..."
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">收货地址</label>
-                                        <textarea 
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20 h-20 resize-none" 
-                                            value={shippingAddress} 
-                                            onChange={e => setShippingAddress(e.target.value)}
-                                            placeholder="请输入详细收货地址..."
-                                        />
-                                    </div>
+
+                                {/* 发货方式切换 */}
+                                <div className="flex bg-gray-100 dark:bg-white/10 p-1.5 rounded-xl">
+                                    <button
+                                        onClick={() => setDeliveryMethod('Online')}
+                                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${deliveryMethod === 'Online' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}
+                                    >
+                                        <Mail className="w-3.5 h-3.5"/> 线上发货
+                                    </button>
+                                    <button
+                                        onClick={() => setDeliveryMethod('Offline')}
+                                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${deliveryMethod === 'Offline' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}
+                                    >
+                                        <Truck className="w-3.5 h-3.5"/> 线下发货
+                                    </button>
+                                    <button
+                                        onClick={() => setDeliveryMethod('Hybrid')}
+                                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${deliveryMethod === 'Hybrid' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}
+                                    >
+                                        <Layers className="w-3.5 h-3.5"/> 混合发货
+                                    </button>
                                 </div>
+
+                                {/* 线上发货 - 多条记录 */}
+                                {(deliveryMethod === 'Online' || deliveryMethod === 'Hybrid') && (
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-bold text-blue-500 uppercase flex items-center gap-1"><Mail className="w-3 h-3"/> 线上发货信息</span>
+                                            <span className="text-[10px] text-gray-400">{onlineDeliveries.length} 条记录</span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {onlineDeliveries.map((entry, idx) => (
+                                                <div key={entry.id} className="relative p-4 bg-blue-50/40 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-800/30 space-y-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[11px] font-bold text-blue-500">#{idx + 1}</span>
+                                                        {onlineDeliveries.length > 1 && (
+                                                            <button onClick={() => setOnlineDeliveries(onlineDeliveries.filter(e => e.id !== entry.id))} className="text-gray-400 hover:text-red-500 p-0.5 transition"><X className="w-3.5 h-3.5"/></button>
+                                                        )}
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <label className="text-[10px] font-bold text-gray-400 block mb-1">收货方</label>
+                                                            <select
+                                                                className="w-full p-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
+                                                                value={entry.receivingParty}
+                                                                onChange={e => { const next = [...onlineDeliveries]; next[idx] = { ...next[idx], receivingParty: e.target.value }; setOnlineDeliveries(next); }}
+                                                            >
+                                                                <option value="买方">买方</option>
+                                                                <option value="代理商">代理商</option>
+                                                                <option value="最终用户">最终用户</option>
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] font-bold text-gray-400 block mb-1">收货单位名称</label>
+                                                            <input
+                                                                className="w-full p-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
+                                                                value={entry.receivingCompany}
+                                                                onChange={e => { const next = [...onlineDeliveries]; next[idx] = { ...next[idx], receivingCompany: e.target.value }; setOnlineDeliveries(next); }}
+                                                                placeholder="收货单位全称..."
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] font-bold text-gray-400 block mb-1">收货邮箱 <span className="text-red-400">*</span></label>
+                                                            <input
+                                                                type="email"
+                                                                className="w-full p-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
+                                                                value={entry.email}
+                                                                onChange={e => { const next = [...onlineDeliveries]; next[idx] = { ...next[idx], email: e.target.value }; setOnlineDeliveries(next); }}
+                                                                placeholder="接收开通通知的邮箱..."
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] font-bold text-gray-400 block mb-1">联系电话</label>
+                                                            <input
+                                                                type="tel"
+                                                                className="w-full p-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
+                                                                value={entry.phone || ''}
+                                                                onChange={e => { const next = [...onlineDeliveries]; next[idx] = { ...next[idx], phone: e.target.value }; setOnlineDeliveries(next); }}
+                                                                placeholder="联系电话..."
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <button
+                                            onClick={() => setOnlineDeliveries([...onlineDeliveries, { id: crypto.randomUUID(), receivingParty: '买方', receivingCompany: '', email: '', phone: '' }])}
+                                            className="flex items-center gap-1.5 text-xs font-bold text-blue-500 hover:text-blue-700 transition"
+                                        >
+                                            <Plus className="w-3.5 h-3.5"/> 添加线上发货记录
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* 线下发货 - 单条收货信息 */}
+                                {(deliveryMethod === 'Offline' || deliveryMethod === 'Hybrid') && (
+                                    <div className="space-y-3">
+                                        {deliveryMethod === 'Hybrid' && (
+                                            <span className="text-xs font-bold text-orange-500 uppercase flex items-center gap-1"><Truck className="w-3 h-3"/> 线下发货信息</span>
+                                        )}
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 block mb-1">收货方</label>
+                                            <select
+                                                className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
+                                                value={receivingParty}
+                                                onChange={e => setReceivingParty(e.target.value)}
+                                            >
+                                                <option value="买方">买方</option>
+                                                <option value="代理商">代理商</option>
+                                                <option value="最终用户">最终用户</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 block mb-1">收货单位名称</label>
+                                            <input
+                                                className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
+                                                value={receivingCompany}
+                                                onChange={e => setReceivingCompany(e.target.value)}
+                                                placeholder="请输入收货单位全称..."
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-gray-400 block mb-1">联系电话</label>
+                                                <input
+                                                    type="tel"
+                                                    className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
+                                                    value={shippingPhone}
+                                                    onChange={e => setShippingPhone(e.target.value)}
+                                                    placeholder="请输入收货联系电话..."
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-gray-400 block mb-1">联系邮箱</label>
+                                                <input
+                                                    type="email"
+                                                    className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
+                                                    value={shippingEmail}
+                                                    onChange={e => setShippingEmail(e.target.value)}
+                                                    placeholder="请输入收货联系邮箱..."
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 block mb-1">收货地址</label>
+                                            <textarea
+                                                className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20 h-20 resize-none"
+                                                value={shippingAddress}
+                                                onChange={e => setShippingAddress(e.target.value)}
+                                                placeholder="请输入详细收货地址..."
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
-                            <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-4">
-                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><Key className="w-4 h-4 text-amber-500"/> 序列号需求</h4>
-                                <div className="grid grid-cols-3 gap-3">
-                                    {(['生成新序列号', '沿用正式序列号', '沿用测试序列号'] as const).map(opt => (
-                                        <button
-                                            key={opt}
-                                            onClick={() => setSerialNumberRequirement(opt)}
-                                            className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 text-sm font-bold transition-all ${
-                                                serialNumberRequirement === opt
-                                                    ? 'border-amber-500 dark:border-amber-400 bg-amber-50/60 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
-                                                    : 'border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-white/20'
-                                            }`}
-                                        >
-                                            {serialNumberRequirement === opt && <Check className="w-4 h-4 shrink-0" />}
-                                            {opt}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
                         </div>
                     </div>
 
