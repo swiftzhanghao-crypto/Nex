@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
+import { checkPermission } from '../rbac.ts';
 
 const router = Router();
 router.use(authMiddleware);
@@ -16,9 +17,20 @@ function toOpportunity(row: any) {
   };
 }
 
+function safePagination(page: string, size: string) {
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const limit = Math.min(Math.max(1, parseInt(size) || 50), 200);
+  return { limit, offset: (pageNum - 1) * limit, pageNum };
+}
+
+function getUserName(db: any, userId: string): string {
+  const row = db.prepare('SELECT name FROM users WHERE id = ?').get(userId) as any;
+  return row?.name || '';
+}
+
 const VALID_STAGES = ['需求判断', '方案报价', '商务谈判', '赢单', '输单'];
 
-router.get('/', (req, res) => {
+router.get('/', checkPermission('opportunity', 'list'), (req, res) => {
   const { customerId, stage, ownerId, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM opportunities WHERE 1=1';
@@ -32,20 +44,20 @@ router.get('/', (req, res) => {
   const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
   const { total } = db.prepare(countSql).get(...params) as { total: number };
 
+  const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY close_date DESC LIMIT ? OFFSET ?';
-  const limit = Math.min(parseInt(size), 200);
-  params.push(limit, (parseInt(page) - 1) * limit);
+  params.push(limit, offset);
 
-  res.json({ data: db.prepare(sql).all(...params).map(toOpportunity), total, page: parseInt(page), size: limit });
+  res.json({ data: db.prepare(sql).all(...params).map(toOpportunity), total, page: pageNum, size: limit });
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', checkPermission('opportunity', 'read'), (req, res) => {
   const row = getDb().prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
   if (!row) { res.status(404).json({ error: '商机不存在' }); return; }
   res.json(toOpportunity(row));
 });
 
-router.post('/', (req: AuthRequest, res) => {
+router.post('/', checkPermission('opportunity', 'create'), (req: AuthRequest, res) => {
   const db = getDb();
   const o = req.body;
   const id = o.id || `OPP-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -63,14 +75,15 @@ router.post('/', (req: AuthRequest, res) => {
     o.amount ?? null, o.expectedRevenue ?? 0, o.finalUserRevenue ?? null,
     o.closeDate, o.ownerId, o.ownerName, new Date().toISOString());
 
+  const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'CREATE', 'Opportunity', id, `创建商机 ${o.name}`);
+    .run(req.user!.userId, userName, 'CREATE', 'Opportunity', id, `创建商机 ${o.name}`);
 
   const row = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(id);
   res.status(201).json(toOpportunity(row));
 });
 
-router.put('/:id', (req: AuthRequest, res) => {
+router.put('/:id', checkPermission('opportunity', 'update'), (req: AuthRequest, res) => {
   const db = getDb();
   const o = req.body;
   const id = req.params.id;
@@ -91,14 +104,15 @@ router.put('/:id', (req: AuthRequest, res) => {
     o.amount ?? null, o.expectedRevenue ?? 0, o.finalUserRevenue ?? null,
     o.closeDate, o.ownerId, o.ownerName, id);
 
+  const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'UPDATE', 'Opportunity', id, `更新商机 ${o.name}，阶段: ${o.stage}`);
+    .run(req.user!.userId, userName, 'UPDATE', 'Opportunity', id, `更新商机 ${o.name}，阶段: ${o.stage}`);
 
   const row = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(id);
   res.json(toOpportunity(row));
 });
 
-router.delete('/:id', (req: AuthRequest, res) => {
+router.delete('/:id', checkPermission('opportunity', 'delete'), (req: AuthRequest, res) => {
   const db = getDb();
   const existing = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id) as any;
   if (!existing) { res.status(404).json({ error: '商机不存在' }); return; }
@@ -109,9 +123,9 @@ router.delete('/:id', (req: AuthRequest, res) => {
   }
 
   db.prepare('DELETE FROM opportunities WHERE id = ?').run(req.params.id);
-
+  const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'DELETE', 'Opportunity', req.params.id, `删除商机 ${existing.name}`);
+    .run(req.user!.userId, userName, 'DELETE', 'Opportunity', req.params.id, `删除商机 ${existing.name}`);
   res.json({ ok: true });
 });
 

@@ -24,7 +24,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [activeTopNav, setActiveTopNav] = useState<'DASHBOARD' | 'ORDER_CENTER' | 'CONTRACT_CENTER' | 'PRODUCT_CENTER' | 'PERFORMANCE_CENTER' | 'CHANNEL_CENTER' | 'LEADS_CENTER' | 'OPERATIONS_CENTER' | 'SYSTEM_CONFIG'>('DASHBOARD');
+  const [activeTopNav, setActiveTopNav] = useState<'DASHBOARD' | 'ORDER_CENTER' | 'PRODUCT_CENTER' | 'PERFORMANCE_CENTER' | 'CHANNEL_CENTER' | 'LEADS_CENTER' | 'OPERATIONS_CENTER' | 'SYSTEM_CONFIG'>('DASHBOARD');
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
         const saved = localStorage.getItem('theme');
@@ -184,9 +184,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         setActiveTopNav('OPERATIONS_CENTER');
     } else if (location.pathname.startsWith('/channels')) {
         setActiveTopNav('CHANNEL_CENTER');
-    } else if (location.pathname.startsWith('/contracts')) {
-        setActiveTopNav('CONTRACT_CENTER');
-    } else if (location.pathname.startsWith('/customers') || location.pathname.startsWith('/opportunities') || location.pathname.startsWith('/remittances') || location.pathname.startsWith('/invoices') || location.pathname.startsWith('/authorizations') || location.pathname.startsWith('/delivery-info') || location.pathname.startsWith('/acceptances')) {
+    } else if (location.pathname.startsWith('/contracts') || location.pathname.startsWith('/customers') || location.pathname.startsWith('/opportunities') || location.pathname.startsWith('/remittances') || location.pathname.startsWith('/invoices') || location.pathname.startsWith('/authorizations') || location.pathname.startsWith('/delivery-info') || location.pathname.startsWith('/acceptances')) {
         setActiveTopNav('ORDER_CENTER');
     } else if (location.pathname.startsWith('/organization') || location.pathname.startsWith('/users') || location.pathname.startsWith('/roles') || location.pathname.startsWith('/system/')) {
           setActiveTopNav('SYSTEM_CONFIG');
@@ -237,10 +235,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const topNavItems = [
       { id: 'DASHBOARD', label: '数据看板', path: '/', permissions: ['dashboard_view'] },
-      { id: 'ORDER_CENTER', label: '订单中心', path: '/orders', permissions: ['order_list_view', 'order_view_all', 'order_view_pending_approval', 'order_view_pending_confirm', 'order_view_auth_confirm', 'order_view_stock_pkg', 'order_view_stock_ship', 'order_view_stock_cd', 'order_view_payment', 'order_view_shipped', 'order_view_completed', 'remittance_view', 'invoice_manage', 'authorization_view', 'delivery_info_view', 'acceptance_view'] },
+      { id: 'ORDER_CENTER', label: '订单中心', path: '/orders', permissions: ['order_list_view', 'order_view_all', 'order_view_pending_approval', 'order_view_pending_confirm', 'order_view_auth_confirm', 'order_view_stock_pkg', 'order_view_stock_ship', 'order_view_stock_cd', 'order_view_payment', 'order_view_shipped', 'order_view_completed', 'remittance_view', 'invoice_manage', 'authorization_view', 'delivery_info_view', 'acceptance_view', 'contract_view'] },
       { id: 'PRODUCT_CENTER', label: '产品中心', path: '/product-center', permissions: ['product_display_view', 'product_display_preview', 'product_view', 'merchandise_view', 'product_msrp_view', 'product_channel_price_view', 'product_component_pool_view', 'product_package_view', 'product_license_template_view', 'product_attr_config_view'] },
       { id: 'CHANNEL_CENTER', label: '渠道中心', path: '/channels', permissions: ['channel_view'] },
-      { id: 'CONTRACT_CENTER', label: '合同中心', path: '/contracts', permissions: ['contract_view'] },
       { id: 'PERFORMANCE_CENTER', label: '业绩中心', path: '/performance', permissions: ['performance_view'] },
       { id: 'LEADS_CENTER', label: '线索中心', path: '/leads', permissions: ['leads_view'] },
       { id: 'OPERATIONS_CENTER', label: '运营中心', path: '/wps-ops', permissions: ['wps_ops_view'] },
@@ -483,12 +480,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           </>,
                           ['customer_view', 'opportunity_manage']
                         )}
-                      </>
-                    )}
-
-                    {activeTopNav === 'CONTRACT_CENTER' && (
-                      <>
-                        {renderSectionGroup('contract_main', '合同中心',
+                        {renderSectionGroup('contract_mgmt', '合同管理',
                           <>
                             <NavItem to="/contracts" icon={FileBadge} label="合同信息" permission="contract_view" />
                           </>,

@@ -1,9 +1,21 @@
 import { Router } from 'express';
 import { getDb } from '../db.ts';
-import { authMiddleware, requireRole, type AuthRequest } from '../auth.ts';
+import { authMiddleware, type AuthRequest } from '../auth.ts';
+import { checkPermission } from '../rbac.ts';
 
 const router = Router();
 router.use(authMiddleware);
+
+function safePagination(page: string, size: string) {
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const limit = Math.min(Math.max(1, parseInt(size) || 50), 200);
+  return { limit, offset: (pageNum - 1) * limit, pageNum };
+}
+
+function getUserName(db: any, userId: string): string {
+  const row = db.prepare('SELECT name FROM users WHERE id = ?').get(userId) as any;
+  return row?.name || '';
+}
 
 function toChannel(row: any) {
   return {
@@ -14,7 +26,7 @@ function toChannel(row: any) {
   };
 }
 
-router.get('/', (req, res) => {
+router.get('/', checkPermission('channel', 'list'), (req, res) => {
   const { type, level, status, region, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM channels WHERE 1=1';
@@ -29,20 +41,20 @@ router.get('/', (req, res) => {
   const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
   const { total } = db.prepare(countSql).get(...params) as { total: number };
 
+  const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY name LIMIT ? OFFSET ?';
-  const limit = Math.min(parseInt(size), 200);
-  params.push(limit, (parseInt(page) - 1) * limit);
+  params.push(limit, offset);
 
-  res.json({ data: db.prepare(sql).all(...params).map(toChannel), total, page: parseInt(page), size: limit });
+  res.json({ data: db.prepare(sql).all(...params).map(toChannel), total, page: pageNum, size: limit });
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', checkPermission('channel', 'read'), (req, res) => {
   const row = getDb().prepare('SELECT * FROM channels WHERE id = ?').get(req.params.id);
   if (!row) { res.status(404).json({ error: '渠道不存在' }); return; }
   res.json(toChannel(row));
 });
 
-router.post('/', requireRole('Admin', 'ChannelManager'), (req: AuthRequest, res) => {
+router.post('/', checkPermission('channel', 'create'), (req: AuthRequest, res) => {
   const db = getDb();
   const c = req.body;
   const id = c.id || `CH-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -52,14 +64,15 @@ router.post('/', requireRole('Admin', 'ChannelManager'), (req: AuthRequest, res)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, c.name, c.type, c.level, c.contactName, c.contactPhone, c.email, c.region, c.status || 'Active', c.agreementDate);
 
+  const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'CREATE', 'Channel', id, `创建渠道 ${c.name}`);
+    .run(req.user!.userId, userName, 'CREATE', 'Channel', id, `创建渠道 ${c.name}`);
 
   const row = db.prepare('SELECT * FROM channels WHERE id = ?').get(id);
   res.status(201).json(toChannel(row));
 });
 
-router.put('/:id', requireRole('Admin', 'ChannelManager'), (req: AuthRequest, res) => {
+router.put('/:id', checkPermission('channel', 'update'), (req: AuthRequest, res) => {
   const db = getDb();
   const c = req.body;
   const id = req.params.id;
@@ -72,20 +85,22 @@ router.put('/:id', requireRole('Admin', 'ChannelManager'), (req: AuthRequest, re
     WHERE id=?
   `).run(c.name, c.type, c.level, c.contactName, c.contactPhone, c.email, c.region, c.status, c.agreementDate, id);
 
+  const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'UPDATE', 'Channel', id, `更新渠道 ${c.name}`);
+    .run(req.user!.userId, userName, 'UPDATE', 'Channel', id, `更新渠道 ${c.name}`);
 
   const row = db.prepare('SELECT * FROM channels WHERE id = ?').get(id);
   res.json(toChannel(row));
 });
 
-router.delete('/:id', requireRole('Admin', 'ChannelManager'), (req: AuthRequest, res) => {
+router.delete('/:id', checkPermission('channel', 'delete'), (req: AuthRequest, res) => {
   const db = getDb();
   const { changes } = db.prepare('DELETE FROM channels WHERE id = ?').run(req.params.id);
   if (!changes) { res.status(404).json({ error: '渠道不存在' }); return; }
 
+  const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'DELETE', 'Channel', req.params.id, `删除渠道 ${req.params.id}`);
+    .run(req.user!.userId, userName, 'DELETE', 'Channel', req.params.id, `删除渠道 ${req.params.id}`);
   res.json({ ok: true });
 });
 

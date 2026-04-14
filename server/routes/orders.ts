@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getDb } from '../db.ts';
-import { authMiddleware, requireRole, type AuthRequest } from '../auth.ts';
+import { authMiddleware, type AuthRequest } from '../auth.ts';
+import { checkPermission } from '../rbac.ts';
 
 const router = Router();
 router.use(authMiddleware);
@@ -21,29 +22,46 @@ const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
 
 function validateStatusTransition(from: string, to: string): boolean {
   const allowed = ORDER_STATUS_TRANSITIONS[from];
-  if (!allowed) return true;
+  if (!allowed) return false;
   return allowed.includes(to);
 }
 
+function safeJsonParse(str: string | null | undefined, fallback: any = {}) {
+  if (!str) return fallback;
+  try { return JSON.parse(str); }
+  catch { return fallback; }
+}
+
+function safePagination(page: string, size: string): { limit: number; offset: number; pageNum: number } {
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const limit = Math.min(Math.max(1, parseInt(size) || 50), 200);
+  return { limit, offset: (pageNum - 1) * limit, pageNum };
+}
+
+function getUserName(db: any, userId: string): string {
+  const row = db.prepare('SELECT name FROM users WHERE id = ?').get(userId) as any;
+  return row?.name || '';
+}
+
 function toOrder(row: any) {
-  const extra = JSON.parse(row.extra || '{}');
+  const extra = safeJsonParse(row.extra, {});
   return {
     id: row.id, customerId: row.customer_id, customerName: row.customer_name,
     customerType: row.customer_type, customerLevel: row.customer_level,
     customerIndustry: row.customer_industry, customerRegion: row.customer_region,
-    date: row.date, status: row.status, total: row.total,
-    items: JSON.parse(row.items), source: row.source,
+    date: row.date, status: row.status, total: row.total ?? 0,
+    items: safeJsonParse(row.items, []), source: row.source,
     buyerType: row.buyer_type, buyerName: row.buyer_name, buyerId: row.buyer_id,
     shippingAddress: row.shipping_address, deliveryMethod: row.delivery_method,
     isPaid: !!row.is_paid, paymentDate: row.payment_date,
     paymentMethod: row.payment_method, paymentTerms: row.payment_terms,
-    paymentRecord: row.payment_record ? JSON.parse(row.payment_record) : undefined,
-    approval: JSON.parse(row.approval), approvalRecords: JSON.parse(row.approval_records),
+    paymentRecord: row.payment_record ? safeJsonParse(row.payment_record) : undefined,
+    approval: safeJsonParse(row.approval, {}), approvalRecords: safeJsonParse(row.approval_records, []),
     salesRepId: row.sales_rep_id, salesRepName: row.sales_rep_name,
     businessManagerId: row.biz_manager_id, businessManagerName: row.biz_manager_name,
-    invoiceInfo: row.invoice_info ? JSON.parse(row.invoice_info) : undefined,
-    acceptanceInfo: row.acceptance_info ? JSON.parse(row.acceptance_info) : undefined,
-    acceptanceConfig: row.acceptance_config ? JSON.parse(row.acceptance_config) : undefined,
+    invoiceInfo: row.invoice_info ? safeJsonParse(row.invoice_info) : undefined,
+    acceptanceInfo: row.acceptance_info ? safeJsonParse(row.acceptance_info) : undefined,
+    acceptanceConfig: row.acceptance_config ? safeJsonParse(row.acceptance_config) : undefined,
     opportunityId: row.opportunity_id, opportunityName: row.opportunity_name,
     originalOrderId: row.original_order_id,
     refundReason: row.refund_reason, refundAmount: row.refund_amount,
@@ -51,7 +69,7 @@ function toOrder(row: any) {
   };
 }
 
-router.get('/', (req, res) => {
+router.get('/', checkPermission('order', 'list'), (req, res) => {
   const db = getDb();
   const { status, customerId, source, page = '1', size = '50' } = req.query as Record<string, string>;
   let sql = 'SELECT * FROM orders WHERE 1=1';
@@ -64,22 +82,21 @@ router.get('/', (req, res) => {
   const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
   const { total } = db.prepare(countSql).get(...params) as { total: number };
 
+  const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY date DESC LIMIT ? OFFSET ?';
-  const limit = Math.min(parseInt(size), 200);
-  const offset = (parseInt(page) - 1) * limit;
   params.push(limit, offset);
 
   const rows = db.prepare(sql).all(...params);
-  res.json({ data: rows.map(toOrder), total, page: parseInt(page), size: limit });
+  res.json({ data: rows.map(toOrder), total, page: pageNum, size: limit });
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', checkPermission('order', 'read'), (req, res) => {
   const row = getDb().prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
   if (!row) { res.status(404).json({ error: '订单不存在' }); return; }
   res.json(toOrder(row));
 });
 
-router.post('/', (req: AuthRequest, res) => {
+router.post('/', checkPermission('order', 'create'), (req: AuthRequest, res) => {
   const db = getDb();
   const o = req.body;
   const id = o.id || `ORD-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -112,21 +129,29 @@ router.post('/', (req: AuthRequest, res) => {
     o.opportunityId ?? null, o.opportunityName ?? null, o.originalOrderId ?? null, extra
   );
 
-  // Audit log
+  const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'CREATE', 'Order', id, `创建订单 ${id}`);
+    .run(req.user!.userId, userName, 'CREATE', 'Order', id, `创建订单 ${id}`);
 
   const row = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
   res.status(201).json(toOrder(row));
 });
 
-router.put('/:id', (req: AuthRequest, res) => {
+router.put('/:id', checkPermission('order', 'update'), (req: AuthRequest, res) => {
   const db = getDb();
   const o = req.body;
   const id = req.params.id;
 
   const existing = db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as any;
   if (!existing) { res.status(404).json({ error: '订单不存在' }); return; }
+
+  const isAdmin = req.user!.role === 'Admin';
+  const isOwner = existing.sales_rep_id === req.user!.userId;
+  const isManager = ['Business', 'Finance', 'Commerce'].includes(req.user!.role);
+  if (!isAdmin && !isOwner && !isManager) {
+    res.status(403).json({ error: '无权修改此订单' });
+    return;
+  }
 
   if (o.status && o.status !== existing.status) {
     if (!validateStatusTransition(existing.status, o.status)) {
@@ -170,42 +195,44 @@ router.put('/:id', (req: AuthRequest, res) => {
     o.refundReason ?? null, o.refundAmount ?? null, extra, id
   );
 
+  const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'UPDATE', 'Order', id, `更新订单 ${id}，状态: ${o.status}`);
+    .run(req.user!.userId, userName, 'UPDATE', 'Order', id, `更新订单 ${id}，状态: ${o.status}`);
 
   const row = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
   res.json(toOrder(row));
 });
 
-// --- Order approval ---
-router.post('/:id/approve', requireRole('Admin', 'BusinessManager', 'Finance'), (req: AuthRequest, res) => {
+// --- Order approval (approverRole derived from JWT, not request body) ---
+router.post('/:id/approve', checkPermission('order', 'approve'), (req: AuthRequest, res) => {
   const db = getDb();
   const id = req.params.id;
-  const { action, remark, role: approverRole } = req.body as { action: 'approve' | 'reject'; remark?: string; role?: string };
+  const { action, remark } = req.body as { action: 'approve' | 'reject'; remark?: string };
 
   const existing = db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as any;
   if (!existing) { res.status(404).json({ error: '订单不存在' }); return; }
 
-  if (action === 'approve' && existing.status !== 'PENDING_APPROVAL') {
-    res.status(400).json({ error: `当前状态 ${existing.status} 不允许审批` });
-    return;
-  }
-  if (action === 'reject' && existing.status !== 'PENDING_APPROVAL') {
-    res.status(400).json({ error: `当前状态 ${existing.status} 不允许驳回` });
+  if (existing.status !== 'PENDING_APPROVAL') {
+    res.status(400).json({ error: `当前状态 ${existing.status} 不允许审批操作` });
     return;
   }
 
-  const approval = JSON.parse(existing.approval || '{}');
-  const records = JSON.parse(existing.approval_records || '[]');
+  const approval = safeJsonParse(existing.approval, {});
+  const records = safeJsonParse(existing.approval_records, []);
 
-  const roleKey = approverRole || req.user!.role;
+  const roleKey = req.user!.role;
   const approvalFieldMap: Record<string, string> = {
     'Sales': 'salesApproved',
-    'BusinessManager': 'businessApproved',
+    'Business': 'businessApproved',
+    'Commerce': 'businessApproved',
     'Finance': 'financeApproved',
     'Admin': 'financeApproved',
   };
-  const field = approvalFieldMap[roleKey] || 'salesApproved';
+  const field = approvalFieldMap[roleKey];
+  if (!field) {
+    res.status(403).json({ error: '当前角色无审批字段映射' });
+    return;
+  }
 
   if (action === 'approve') {
     approval[field] = true;
@@ -228,8 +255,9 @@ router.post('/:id/approve', requireRole('Admin', 'BusinessManager', 'Finance'), 
   db.prepare(`UPDATE orders SET status=?, approval=?, approval_records=?, updated_at=datetime('now') WHERE id=?`)
     .run(newStatus, JSON.stringify(approval), JSON.stringify(records), id);
 
+  const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', action === 'approve' ? 'APPROVE' : 'REJECT', 'Order', id,
+    .run(req.user!.userId, userName, action === 'approve' ? 'APPROVE' : 'REJECT', 'Order', id,
       `${action === 'approve' ? '审批通过' : '驳回'}订单 ${id}${remark ? '，备注: ' + remark : ''}`);
 
   const row = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
@@ -237,7 +265,7 @@ router.post('/:id/approve', requireRole('Admin', 'BusinessManager', 'Finance'), 
 });
 
 // --- Submit order for approval ---
-router.post('/:id/submit', (req: AuthRequest, res) => {
+router.post('/:id/submit', checkPermission('order', 'submit'), (req: AuthRequest, res) => {
   const db = getDb();
   const id = req.params.id;
 
@@ -253,19 +281,35 @@ router.post('/:id/submit', (req: AuthRequest, res) => {
   db.prepare(`UPDATE orders SET status='PENDING_APPROVAL', approval=?, updated_at=datetime('now') WHERE id=?`)
     .run(approval, id);
 
+  const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'SUBMIT', 'Order', id, `提交订单 ${id} 至审批`);
+    .run(req.user!.userId, userName, 'SUBMIT', 'Order', id, `提交订单 ${id} 至审批`);
 
   const row = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
   res.json(toOrder(row));
 });
 
-router.delete('/:id', (req: AuthRequest, res) => {
+router.delete('/:id', checkPermission('order', 'delete'), (req: AuthRequest, res) => {
   const db = getDb();
-  const { changes } = db.prepare('DELETE FROM orders WHERE id = ?').run(req.params.id);
-  if (!changes) { res.status(404).json({ error: '订单不存在' }); return; }
+  const existing = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id) as any;
+  if (!existing) { res.status(404).json({ error: '订单不存在' }); return; }
+
+  const isAdmin = req.user!.role === 'Admin';
+  const isOwner = existing.sales_rep_id === req.user!.userId;
+  if (!isAdmin && !isOwner) {
+    res.status(403).json({ error: '只有管理员或订单归属销售可以删除订单' });
+    return;
+  }
+
+  if (!['DRAFT', 'CANCELLED'].includes(existing.status) && !isAdmin) {
+    res.status(400).json({ error: '只有草稿或已取消的订单可以被删除' });
+    return;
+  }
+
+  db.prepare('DELETE FROM orders WHERE id = ?').run(req.params.id);
+  const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'DELETE', 'Order', req.params.id, `删除订单 ${req.params.id}`);
+    .run(req.user!.userId, userName, 'DELETE', 'Order', req.params.id, `删除订单 ${req.params.id}`);
   res.json({ ok: true });
 });
 

@@ -5,7 +5,7 @@ import { User, UserType, RoleDefinition, PermissionDimension, RowPermissionRule,
 import { Search, Plus, Shield, User as UserIcon, Briefcase, Truck, Edit, Building2, X, Mail, Phone, CheckCircle, Calendar, Hash, Lock, CheckSquare, Settings, Save, Trash2, Database, Check, ChevronDown, ChevronRight, Columns, Copy, Globe } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
-import { columnConfig, permissionTree, permissionModules, resourceConfig, PermSubgroup, PermGroup, resourceFunctionalPermMap, getRequiredPermIdsForResource } from './permissionConfig';
+import { columnConfig, permissionTree, permissionModules, resourceConfig, PermSubgroup, PermGroup, PermCategory, resourceFunctionalPermMap, getRequiredPermIdsForResource, getSubgroupPermIds, getSubgroupPermItems } from './permissionConfig';
 
 interface UserManagerProps {
   defaultTab?: 'USERS' | 'ROLES';
@@ -39,7 +39,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   const [selectedResource, setSelectedResource] = useState<PermissionResource>('Order');
   const [roleConfigTab, setRoleConfigTab] = useState<'FUNCTIONAL' | 'ROW' | 'COLUMN'>('FUNCTIONAL');
   const [selectedColumnResource, setSelectedColumnResource] = useState<PermissionResource>('Order');
-  const [roleDetailTab, setRoleDetailTab] = useState<'MEMBERS' | 'PERMISSIONS'>('MEMBERS');
+  const [roleDetailTab, setRoleDetailTab] = useState<'MEMBERS' | 'FUNCTIONAL' | 'ROW' | 'COLUMN'>('MEMBERS');
   const [openDimDropdown, setOpenDimDropdown] = useState<string | null>(null);
   const [openDimPicker, setOpenDimPicker] = useState<string | null>(null);
   const [dropdownPos, setDropdownPos] = useState<{top: number; left: number; width: number; openUp: boolean; type: 'dim' | 'val'} | null>(null);
@@ -136,15 +136,20 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  const [expandedGroups,    setExpandedGroups]    = useState<string[]>(permissionTree.map(g => g.id));
-  const [expandedSubgroups, setExpandedSubgroups] = useState<string[]>(permissionTree.flatMap(g => g.subgroups.map(sg => sg.id)));
+  const [expandedGroups,     setExpandedGroups]     = useState<string[]>(permissionTree.map(g => g.id));
+  const [expandedSubgroups,  setExpandedSubgroups]  = useState<string[]>(permissionTree.flatMap(g => g.subgroups.map(sg => sg.id)));
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(
+      permissionTree.flatMap(g => g.subgroups.flatMap(sg => (sg.categories || []).map(c => c.id)))
+  );
   const [expandedModules, setExpandedModules] = useState<string[]>(permissionModules.map(m => m.id));
 
   const toggleGroupExpand    = (id: string) => setExpandedGroups(prev    => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const toggleSubgroupExpand = (id: string) => setExpandedSubgroups(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleCategoryExpand = (id: string) => setExpandedCategories(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
-  const allPermsInSubgroup = (sg: PermSubgroup) => sg.permissions.map(p => p.id);
-  const allPermsInGroup    = (g:  PermGroup)    => g.subgroups.flatMap(sg => sg.permissions.map(p => p.id));
+  const allPermsInSubgroup = (sg: PermSubgroup) => getSubgroupPermIds(sg);
+  const allPermsInGroup    = (g:  PermGroup)    => g.subgroups.flatMap(sg => getSubgroupPermIds(sg));
+  const allPermsInCategory = (cat: PermCategory) => cat.permissions.map(p => p.id);
 
   const getCheckState = (permIds: string[], current: string[]): 'all' | 'some' | 'none' => {
       const checked = permIds.filter(id => current.includes(id)).length;
@@ -155,6 +160,14 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
 
   const toggleSubgroupPerms = (sg: PermSubgroup) => {
       const ids = allPermsInSubgroup(sg);
+      const current = roleForm.permissions || [];
+      const state = getCheckState(ids, current);
+      if (state === 'all') setRoleForm({ ...roleForm, permissions: current.filter(p => !ids.includes(p)) });
+      else                 setRoleForm({ ...roleForm, permissions: Array.from(new Set([...current, ...ids])) });
+  };
+
+  const toggleCategoryPerms = (cat: PermCategory) => {
+      const ids = allPermsInCategory(cat);
       const current = roleForm.permissions || [];
       const state = getCheckState(ids, current);
       if (state === 'all') setRoleForm({ ...roleForm, permissions: current.filter(p => !ids.includes(p)) });
@@ -322,7 +335,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       return permissionTree.flatMap(g =>
           g.subgroups
               .filter(sg => sg.dependsOn === parentPermId)
-              .flatMap(sg => sg.permissions.map(p => p.id))
+              .flatMap(sg => getSubgroupPermIds(sg))
       );
   };
 
@@ -642,11 +655,10 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       }
       if (dim === 'orderSource') {
           return [
-              { value: 'Sales', label: '销售创建' },
+              { value: 'Sales', label: '后台下单' },
               { value: 'ChannelPortal', label: '渠道来源' },
               { value: 'OnlineStore', label: '官网' },
-              { value: 'APISync', label: 'API 同步' },
-              { value: 'Renewal', label: '续费' },
+              { value: 'APISync', label: '三方平台' },
           ];
       }
       if (dim === 'orderStatus') {
@@ -892,17 +904,18 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                               onClick={() => {
                                                   setExpandedGroups(permissionTree.map(g => g.id));
                                                   setExpandedSubgroups(permissionTree.flatMap(g => g.subgroups.map(sg => sg.id)));
+                                                  setExpandedCategories(permissionTree.flatMap(g => g.subgroups.flatMap(sg => (sg.categories || []).map(c => c.id))));
                                               }}
                                               className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:underline"
                                           >展开全部</button>
                                           <span className="text-gray-300 dark:text-gray-600">|</span>
                                           <button
-                                              onClick={() => { setExpandedGroups([]); setExpandedSubgroups([]); }}
+                                              onClick={() => { setExpandedGroups([]); setExpandedSubgroups([]); setExpandedCategories([]); }}
                                               className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:underline"
                                           >折叠全部</button>
                                           <span className="text-gray-300 dark:text-gray-600">|</span>
                                           <button
-                                              onClick={() => setRoleForm({ ...roleForm, permissions: permissionTree.flatMap(g => g.subgroups.flatMap(sg => sg.permissions.map(p => p.id))) })}
+                                              onClick={() => setRoleForm({ ...roleForm, permissions: permissionTree.flatMap(g => g.subgroups.flatMap(sg => getSubgroupPermIds(sg))) })}
                                               className="text-xs text-[#0071E3] hover:underline"
                                           >全选</button>
                                           <span className="text-gray-300 dark:text-gray-600">|</span>
@@ -992,8 +1005,74 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                               </div>
                                                           </div>
 
-                                                          {/* ── 三级：权限点 ── */}
-                                                          {isSgOpen && sg.permissions.map(perm => {
+                                                          {/* ── 三级/四级：功能分类 + 权限点 ── */}
+                                                          {isSgOpen && sg.categories && sg.categories.map(cat => {
+                                                              const catPerms  = allPermsInCategory(cat);
+                                                              const catState  = getCheckState(catPerms, current);
+                                                              const isCatOpen = expandedCategories.includes(cat.id);
+                                                              return (
+                                                                  <div key={cat.id}>
+                                                                      <div
+                                                                          className={`flex items-center gap-2 py-1.5 pr-4 select-none transition-colors ${catState !== 'none' ? 'bg-blue-50/20 dark:bg-blue-900/5' : 'hover:bg-gray-50/50 dark:hover:bg-white/[0.02]'}`}
+                                                                          style={{ paddingLeft: 68 }}
+                                                                      >
+                                                                          <div className="w-px h-3.5 bg-gray-200 dark:bg-white/10 -ml-[1px] mr-0.5 shrink-0"/>
+                                                                          <button
+                                                                              onClick={() => toggleCategoryExpand(cat.id)}
+                                                                              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
+                                                                          >
+                                                                              {isCatOpen
+                                                                                  ? <ChevronDown className="w-3 h-3"/>
+                                                                                  : <ChevronRight className="w-3 h-3"/>
+                                                                              }
+                                                                          </button>
+                                                                          <div
+                                                                              onClick={() => toggleCategoryPerms(cat)}
+                                                                              className="flex items-center gap-1.5 flex-1 cursor-pointer group"
+                                                                          >
+                                                                              <div className={`w-3 h-3 rounded border flex items-center justify-center transition-colors shrink-0
+                                                                                  ${catState === 'all'  ? 'bg-blue-600 border-blue-600' :
+                                                                                    catState === 'some' ? 'bg-blue-400/60 border-blue-400' :
+                                                                                    'border-gray-300 bg-white dark:bg-transparent dark:border-gray-600 group-hover:border-blue-400'}`}>
+                                                                                  {catState !== 'none' && <Check className="w-2 h-2 text-white"/>}
+                                                                              </div>
+                                                                              <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">{cat.label}</span>
+                                                                              <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">
+                                                                                  {catPerms.filter(id => current.includes(id)).length}/{catPerms.length}
+                                                                              </span>
+                                                                          </div>
+                                                                      </div>
+                                                                      {isCatOpen && cat.permissions.map(perm => {
+                                                                          const isChecked = current.includes(perm.id);
+                                                                          return (
+                                                                              <div
+                                                                                  key={perm.id}
+                                                                                  onClick={() => togglePermission(perm.id)}
+                                                                                  className={`flex items-center gap-2.5 py-1.5 pr-4 cursor-pointer select-none transition-colors ${isChecked ? 'bg-blue-50/20 dark:bg-blue-900/5' : 'hover:bg-gray-50/50 dark:hover:bg-white/[0.02]'}`}
+                                                                                  style={{ paddingLeft: 96 }}
+                                                                              >
+                                                                                  <div className="w-px h-3.5 bg-gray-200 dark:bg-white/10 -ml-[1px] mr-1 shrink-0"/>
+                                                                                  <div className={`w-3 h-3 rounded border flex items-center justify-center transition-colors shrink-0
+                                                                                      ${isChecked
+                                                                                          ? 'bg-blue-600 border-blue-600'
+                                                                                          : 'border-gray-300 bg-white dark:bg-transparent dark:border-gray-600'
+                                                                                      }`}>
+                                                                                      {isChecked && <Check className="w-2 h-2 text-white"/>}
+                                                                                  </div>
+                                                                                  <span className={`text-xs flex-1 ${isChecked ? 'text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-600 dark:text-gray-400'}`}>
+                                                                                      {perm.label}
+                                                                                  </span>
+                                                                                  {perm.desc && (
+                                                                                      <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[180px]">{perm.desc}</span>
+                                                                                  )}
+                                                                              </div>
+                                                                          );
+                                                                      })}
+                                                                  </div>
+                                                              );
+                                                          })}
+                                                          {/* 无分类的扁平权限点（兼容旧结构） */}
+                                                          {isSgOpen && !sg.categories && sg.permissions && sg.permissions.map(perm => {
                                                               const isChecked = current.includes(perm.id);
                                                               return (
                                                                   <div
@@ -1595,7 +1674,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                                       } else {
                                                                           setRoleForm(prev => ({
                                                                               ...prev,
-                                                                              columnPermissions: [...currentRules, { resource: selectedColumnResource, allowedColumns: allColIds }]
+                                                                              columnPermissions: [...currentRules, { id: `colperm-${Date.now()}`, resource: selectedColumnResource, allowedColumns: allColIds }]
                                                                           }));
                                                                       }
                                                                   }}
@@ -1670,21 +1749,22 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                               </div>
                               
                               {/* Tab 切换 */}
-                              <div className="flex border-b border-gray-100 dark:border-white/10 px-6">
-                                  <button
-                                      onClick={() => setRoleDetailTab('MEMBERS')}
-                                      className={`px-4 py-3 text-sm font-bold transition-colors relative ${roleDetailTab === 'MEMBERS' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'}`}
-                                  >
-                                      <div className="flex items-center gap-2"><UserIcon className="w-4 h-4"/> 角色成员 <span className="text-xs font-normal text-gray-400">({users.filter(u => u.role === selectedRoleId).length})</span></div>
-                                      {roleDetailTab === 'MEMBERS' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-t-full" />}
-                                  </button>
-                                  <button
-                                      onClick={() => setRoleDetailTab('PERMISSIONS')}
-                                      className={`px-4 py-3 text-sm font-bold transition-colors relative ${roleDetailTab === 'PERMISSIONS' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'}`}
-                                  >
-                                      <div className="flex items-center gap-2"><Shield className="w-4 h-4"/> 权限配置 <span className="text-xs font-normal text-gray-400">({(roleForm.permissions || []).length})</span></div>
-                                      {roleDetailTab === 'PERMISSIONS' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-t-full" />}
-                                  </button>
+                              <div className="flex border-b border-gray-100 dark:border-white/10 px-6 overflow-x-auto">
+                                  {([
+                                      { id: 'MEMBERS' as const, icon: <UserIcon className="w-4 h-4"/>, label: '角色成员', badge: String(users.filter(u => u.role === selectedRoleId).length) },
+                                      { id: 'FUNCTIONAL' as const, icon: <CheckSquare className="w-4 h-4"/>, label: '功能权限', badge: String((roleForm.permissions || []).length) },
+                                      { id: 'ROW' as const, icon: <Database className="w-4 h-4"/>, label: '数据行权限', badge: String((roleForm.rowPermissions || []).length) },
+                                      { id: 'COLUMN' as const, icon: <Columns className="w-4 h-4"/>, label: '数据列权限', badge: String((roleForm.columnPermissions || []).length) },
+                                  ]).map(tab => (
+                                      <button
+                                          key={tab.id}
+                                          onClick={() => setRoleDetailTab(tab.id)}
+                                          className={`px-4 py-3 text-sm font-bold transition-colors relative whitespace-nowrap ${roleDetailTab === tab.id ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                                      >
+                                          <div className="flex items-center gap-2">{tab.icon} {tab.label} <span className="text-xs font-normal text-gray-400">({tab.badge})</span></div>
+                                          {roleDetailTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-t-full" />}
+                                      </button>
+                                  ))}
                               </div>
 
                               <div className="flex-1 overflow-auto p-6 space-y-6">
@@ -1723,213 +1803,234 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                   </div>
                                   )}
 
-                                  {/* ===== 权限配置 Tab ===== */}
-                                  {roleDetailTab === 'PERMISSIONS' && (
-                                  <div className="animate-fade-in space-y-6">
-                                      {/* 功能权限 */}
-                                      <div>
-                                          <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 mb-3">
-                                              <CheckSquare className="w-4 h-4"/> 功能权限
-                                              <span className="text-xs font-normal text-gray-400 ml-1">
-                                                  ({(roleForm.permissions || []).length} 个权限点)
-                                              </span>
-                                          </h3>
-                                          {(roleForm.permissions || []).length === 0 ? (
-                                              <div className="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-lg">暂未配置任何功能权限</div>
-                                          ) : (
-                                              <div className="border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden bg-white dark:bg-[#1C1C1E]">
-                                              {permissionTree.map((group, gIdx) => {
-                                                  const current    = roleForm.permissions || [];
-                                                  const groupPerms = allPermsInGroup(group);
-                                                  const groupState = getCheckState(groupPerms, current);
-                                                  if (groupState === 'none') return null;
-                                                  return (
-                                                      <div key={group.id} className={gIdx > 0 ? 'border-t border-gray-100 dark:border-white/10' : ''}>
-                                                          <div className="flex items-center gap-2.5 px-4 py-2 bg-blue-50/50 dark:bg-blue-900/10">
-                                                              <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${groupState === 'all' ? 'bg-blue-600 border-blue-600' : 'bg-blue-400/60 border-blue-400'}`}>
-                                                                  <Check className="w-2.5 h-2.5 text-white"/>
-                                                              </div>
-                                                              <span className="font-bold text-sm text-gray-800 dark:text-gray-100">{group.label}</span>
-                                                              <span className="text-[11px] text-blue-500 dark:text-blue-400 ml-auto font-mono">
-                                                                  {groupPerms.filter(id => current.includes(id)).length}/{groupPerms.length}
-                                                              </span>
+                                  {/* ===== 功能权限 Tab ===== */}
+                                  {roleDetailTab === 'FUNCTIONAL' && (
+                                  <div className="animate-fade-in">
+                                      {(roleForm.permissions || []).length === 0 ? (
+                                          <div className="text-center py-10 text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-lg">
+                                              <CheckSquare className="w-8 h-8 mx-auto mb-2 opacity-30"/>
+                                              暂未配置任何功能权限
+                                          </div>
+                                      ) : (
+                                          <div className="border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden bg-white dark:bg-[#1C1C1E]">
+                                          {permissionTree.map((group, gIdx) => {
+                                              const current    = roleForm.permissions || [];
+                                              const groupPerms = allPermsInGroup(group);
+                                              const groupState = getCheckState(groupPerms, current);
+                                              if (groupState === 'none') return null;
+                                              return (
+                                                  <div key={group.id} className={gIdx > 0 ? 'border-t border-gray-100 dark:border-white/10' : ''}>
+                                                      <div className="flex items-center gap-2.5 px-4 py-2 bg-blue-50/50 dark:bg-blue-900/10">
+                                                          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${groupState === 'all' ? 'bg-blue-600 border-blue-600' : 'bg-blue-400/60 border-blue-400'}`}>
+                                                              <Check className="w-2.5 h-2.5 text-white"/>
                                                           </div>
-                                                          {group.subgroups.map(sg => {
-                                                              const sgPerms = allPermsInSubgroup(sg);
-                                                              const sgState = getCheckState(sgPerms, current);
-                                                              if (sgState === 'none') return null;
-                                                              return (
-                                                                  <div key={sg.id}>
-                                                                      <div className="flex items-center gap-2.5 py-1.5 pr-4" style={{ paddingLeft: 36 }}>
-                                                                          <div className="w-px h-4 bg-gray-200 dark:bg-white/10 -ml-[1px] mr-1 shrink-0"/>
-                                                                          <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${sgState === 'all' ? 'bg-blue-600 border-blue-600' : 'bg-blue-400/60 border-blue-400'}`}>
+                                                          <span className="font-bold text-sm text-gray-800 dark:text-gray-100">{group.label}</span>
+                                                          <span className="text-[11px] text-blue-500 dark:text-blue-400 ml-auto font-mono">
+                                                              {groupPerms.filter(id => current.includes(id)).length}/{groupPerms.length}
+                                                          </span>
+                                                      </div>
+                                                      {group.subgroups.map(sg => {
+                                                          const sgPerms = allPermsInSubgroup(sg);
+                                                          const sgState = getCheckState(sgPerms, current);
+                                                          if (sgState === 'none') return null;
+                                                          return (
+                                                              <div key={sg.id}>
+                                                                  <div className="flex items-center gap-2.5 py-1.5 pr-4" style={{ paddingLeft: 36 }}>
+                                                                      <div className="w-px h-4 bg-gray-200 dark:bg-white/10 -ml-[1px] mr-1 shrink-0"/>
+                                                                      <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${sgState === 'all' ? 'bg-blue-600 border-blue-600' : 'bg-blue-400/60 border-blue-400'}`}>
+                                                                          <Check className="w-2 h-2 text-white"/>
+                                                                      </div>
+                                                                      <span className="text-[13px] font-semibold text-gray-700 dark:text-gray-300">{sg.label}</span>
+                                                                      <span className="text-[11px] text-gray-400 dark:text-gray-500 font-mono">
+                                                                          {sgPerms.filter(id => current.includes(id)).length}/{sgPerms.length}
+                                                                      </span>
+                                                                  </div>
+                                                                  {sg.categories && sg.categories.map(cat => {
+                                                                      const catPermIds = allPermsInCategory(cat);
+                                                                      const catState = getCheckState(catPermIds, current);
+                                                                      if (catState === 'none') return null;
+                                                                      return (
+                                                                          <div key={cat.id}>
+                                                                              <div className="flex items-center gap-2 py-1 pr-4" style={{ paddingLeft: 56 }}>
+                                                                                  <div className="w-px h-3 bg-gray-200 dark:bg-white/10 -ml-[1px] mr-0.5 shrink-0"/>
+                                                                                  <div className={`w-2.5 h-2.5 rounded border flex items-center justify-center shrink-0 ${catState === 'all' ? 'bg-blue-600 border-blue-600' : 'bg-blue-400/60 border-blue-400'}`}>
+                                                                                      <Check className="w-1.5 h-1.5 text-white"/>
+                                                                                  </div>
+                                                                                  <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">{cat.label}</span>
+                                                                                  <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">
+                                                                                      {catPermIds.filter(id => current.includes(id)).length}/{catPermIds.length}
+                                                                                  </span>
+                                                                              </div>
+                                                                              {cat.permissions.filter(p => current.includes(p.id)).map(perm => (
+                                                                                  <div key={perm.id} className="flex items-center gap-2.5 py-0.5 pr-4" style={{ paddingLeft: 76 }}>
+                                                                                      <div className="w-px h-3 bg-gray-200 dark:bg-white/10 -ml-[1px] mr-1 shrink-0"/>
+                                                                                      <div className="w-2.5 h-2.5 rounded border bg-blue-600 border-blue-600 flex items-center justify-center shrink-0">
+                                                                                          <Check className="w-1.5 h-1.5 text-white"/>
+                                                                                      </div>
+                                                                                      <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">{perm.label}</span>
+                                                                                  </div>
+                                                                              ))}
+                                                                          </div>
+                                                                      );
+                                                                  })}
+                                                                  {!sg.categories && sg.permissions && sg.permissions.filter(p => current.includes(p.id)).map(perm => (
+                                                                      <div key={perm.id} className="flex items-center gap-2.5 py-1 pr-4" style={{ paddingLeft: 64 }}>
+                                                                          <div className="w-px h-3.5 bg-gray-200 dark:bg-white/10 -ml-[1px] mr-1 shrink-0"/>
+                                                                          <div className="w-3 h-3 rounded border bg-blue-600 border-blue-600 flex items-center justify-center shrink-0">
                                                                               <Check className="w-2 h-2 text-white"/>
                                                                           </div>
-                                                                          <span className="text-[13px] font-semibold text-gray-700 dark:text-gray-300">{sg.label}</span>
-                                                                          <span className="text-[11px] text-gray-400 dark:text-gray-500 font-mono">
-                                                                              {sgPerms.filter(id => current.includes(id)).length}/{sgPerms.length}
-                                                                          </span>
+                                                                          <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">{perm.label}</span>
                                                                       </div>
-                                                                      {sg.permissions.filter(p => current.includes(p.id)).map(perm => (
-                                                                          <div key={perm.id} className="flex items-center gap-2.5 py-1 pr-4" style={{ paddingLeft: 64 }}>
-                                                                              <div className="w-px h-3.5 bg-gray-200 dark:bg-white/10 -ml-[1px] mr-1 shrink-0"/>
-                                                                              <div className="w-3 h-3 rounded border bg-blue-600 border-blue-600 flex items-center justify-center shrink-0">
-                                                                                  <Check className="w-2 h-2 text-white"/>
-                                                                              </div>
-                                                                              <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">{perm.label}</span>
-                                                                          </div>
-                                                                      ))}
+                                                                  ))}
+                                                              </div>
+                                                          );
+                                                      })}
+                                                  </div>
+                                              );
+                                          })}
+                                          </div>
+                                      )}
+                                  </div>
+                                  )}
+
+                                  {/* ===== 数据行权限 Tab ===== */}
+                                  {roleDetailTab === 'ROW' && (
+                                  <div className="animate-fade-in">
+                                      <div className="mb-3 flex items-center gap-2">
+                                          <span className="text-xs font-bold text-gray-500 dark:text-gray-400">基础范围：</span>
+                                          {(roleForm.rowPermissions && roleForm.rowPermissions.length > 0) ? (
+                                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-700/30">
+                                                  自定义维度过滤
+                                              </span>
+                                          ) : (
+                                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-700/30">
+                                                  全部数据
+                                              </span>
+                                          )}
+                                          <span className="text-xs text-gray-400">
+                                              {(roleForm.rowPermissions && roleForm.rowPermissions.length > 0) ? '按维度过滤可见数据' : '可见所有数据'}
+                                          </span>
+                                      </div>
+                                      {(roleForm.rowPermissions && roleForm.rowPermissions.length > 0) ? (
+                                          <div className="space-y-3">
+                                              {resourceConfig.map(res => {
+                                                  const rules = roleForm.rowPermissions?.filter(r => r.resource === res.id) || [];
+                                                  if (rules.length === 0) return null;
+                                                  const formula = buildFormulaDisplay(res.id);
+                                                  return (
+                                                      <div key={res.id} className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
+                                                          <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50/60 dark:bg-amber-900/10">
+                                                              <Database className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400"/>
+                                                              <span className="font-bold text-sm text-gray-800 dark:text-gray-100">{res.label}</span>
+                                                              <span className="text-xs text-amber-500 dark:text-amber-400 ml-auto">{rules.length} 条规则</span>
+                                                          </div>
+                                                          {rules.length >= 2 && formula && (
+                                                              <div className="px-4 py-2 bg-gradient-to-r from-blue-50/80 via-indigo-50/80 to-purple-50/80 dark:from-blue-900/10 dark:via-indigo-900/10 dark:to-purple-900/10 border-b border-gray-100 dark:border-white/10">
+                                                                  <div className="flex items-center gap-2 flex-wrap">
+                                                                      <span className="text-[10px] font-bold text-blue-500 dark:text-blue-400 uppercase tracking-wider shrink-0">公式</span>
+                                                                      <div className="text-[11px] font-mono font-semibold flex flex-wrap items-center gap-x-1 gap-y-0.5">
+                                                                          {formula.split(/(\(|\)|AND|OR)/).filter(Boolean).map((token, ti) => {
+                                                                              const trimmed = token.trim();
+                                                                              if (!trimmed) return null;
+                                                                              if (trimmed === '(' || trimmed === ')') {
+                                                                                  return <span key={ti} className="text-sm font-extrabold text-indigo-500 dark:text-indigo-400 mx-0.5 leading-none">{trimmed}</span>;
+                                                                              }
+                                                                              if (trimmed === 'AND') {
+                                                                                  return <span key={ti} className="px-1 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[9px] font-extrabold tracking-wider">{trimmed}</span>;
+                                                                              }
+                                                                              if (trimmed === 'OR') {
+                                                                                  return <span key={ti} className="px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[9px] font-extrabold tracking-wider">{trimmed}</span>;
+                                                                              }
+                                                                              return <span key={ti} className="text-indigo-700 dark:text-indigo-300">{trimmed}</span>;
+                                                                          })}
+                                                                      </div>
                                                                   </div>
-                                                              );
-                                                          })}
+                                                              </div>
+                                                          )}
+                                                          <div className="bg-white dark:bg-[#1C1C1E]">
+                                                              {rules.map((rule, ruleIdx) => {
+                                                                  const dimCfg = res.dimensions.find(d => d.id === rule.dimension);
+                                                                  const op = ruleIdx > 0 ? getDimOperator(res.id, rule.id) : null;
+                                                                  const detailGrpIdx = getRuleGroupIndex(res.id, rule.id);
+                                                                  const detailGrpColor = detailGrpIdx >= 0 ? GROUP_COLORS[detailGrpIdx % GROUP_COLORS.length] : null;
+                                                                  return (
+                                                                      <React.Fragment key={rule.id}>
+                                                                          {op && (
+                                                                              <div className="flex items-center gap-2 px-4 py-0.5">
+                                                                                  <div className="flex-1 border-t border-dashed border-gray-200 dark:border-white/10"/>
+                                                                                  <span className={`text-[10px] font-extrabold tracking-wider ${op === 'OR' ? 'text-amber-500 dark:text-amber-400' : 'text-blue-500 dark:text-blue-400'}`}>{op}</span>
+                                                                                  <div className="flex-1 border-t border-dashed border-gray-200 dark:border-white/10"/>
+                                                                              </div>
+                                                                          )}
+                                                                          <div className={`flex items-center gap-3 px-4 py-2.5 ${detailGrpColor ? `border-l-[3px] ${detailGrpColor.border} ${detailGrpColor.bg}` : ''}`}>
+                                                                              {detailGrpColor && <span className={`text-[9px] font-extrabold ${detailGrpColor.text}`}>{detailGrpColor.label}</span>}
+                                                                              <span className="text-xs font-bold text-gray-500 dark:text-gray-400 min-w-[64px]">{dimCfg?.label || rule.dimension}</span>
+                                                                              <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded">等于</span>
+                                                                              <div className="flex flex-wrap gap-1.5">
+                                                                                  {rule.values.length > 0 ? rule.values.map(v => (
+                                                                                      <span key={v} className="px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 text-xs font-medium border border-amber-100 dark:border-amber-800/30">
+                                                                                          {getReadableValue(rule.dimension, v)}
+                                                                                      </span>
+                                                                                  )) : (
+                                                                                      <span className="text-xs text-gray-400 italic">未指定具体值</span>
+                                                                                  )}
+                                                                              </div>
+                                                                          </div>
+                                                                      </React.Fragment>
+                                                                  );
+                                                              })}
+                                                          </div>
                                                       </div>
                                                   );
                                               })}
-                                              </div>
-                                          )}
-                                      </div>
-
-                                      {/* 数据行权限 */}
-                                      <div>
-                                          <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 mb-3">
-                                              <Database className="w-4 h-4"/> 数据行权限
-                                          </h3>
-                                          {/* 基础行权限展示 */}
-                                          <div className="mb-3 flex items-center gap-2">
-                                              <span className="text-xs font-bold text-gray-500 dark:text-gray-400">基础范围：</span>
-                                              {(roleForm.rowPermissions && roleForm.rowPermissions.length > 0) ? (
-                                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-700/30">
-                                                      自定义维度过滤
-                                                  </span>
-                                              ) : (
-                                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-700/30">
-                                                      🌐 全部数据
-                                                  </span>
-                                              )}
-                                              <span className="text-xs text-gray-400">
-                                                  {(roleForm.rowPermissions && roleForm.rowPermissions.length > 0) ? '按维度过滤可见数据' : '可见所有数据'}
-                                              </span>
                                           </div>
-                                          {(roleForm.rowPermissions && roleForm.rowPermissions.length > 0) ? (
-                                              <div className="space-y-3">
-                                                  {resourceConfig.map(res => {
-                                                      const rules = roleForm.rowPermissions?.filter(r => r.resource === res.id) || [];
-                                                      if (rules.length === 0) return null;
-                                                      const formula = buildFormulaDisplay(res.id);
-                                                      return (
-                                                          <div key={res.id} className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
-                                                              <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50/60 dark:bg-amber-900/10">
-                                                                  <Database className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400"/>
-                                                                  <span className="font-bold text-sm text-gray-800 dark:text-gray-100">{res.label}</span>
-                                                                  <span className="text-xs text-amber-500 dark:text-amber-400 ml-auto">{rules.length} 条规则</span>
-                                                              </div>
-                                                              {rules.length >= 2 && formula && (
-                                                                  <div className="px-4 py-2 bg-gradient-to-r from-blue-50/80 via-indigo-50/80 to-purple-50/80 dark:from-blue-900/10 dark:via-indigo-900/10 dark:to-purple-900/10 border-b border-gray-100 dark:border-white/10">
-                                                                      <div className="flex items-center gap-2 flex-wrap">
-                                                                          <span className="text-[10px] font-bold text-blue-500 dark:text-blue-400 uppercase tracking-wider shrink-0">公式</span>
-                                                                          <div className="text-[11px] font-mono font-semibold flex flex-wrap items-center gap-x-1 gap-y-0.5">
-                                                                              {formula.split(/(\(|\)|AND|OR)/).filter(Boolean).map((token, ti) => {
-                                                                                  const trimmed = token.trim();
-                                                                                  if (!trimmed) return null;
-                                                                                  if (trimmed === '(' || trimmed === ')') {
-                                                                                      return <span key={ti} className="text-sm font-extrabold text-indigo-500 dark:text-indigo-400 mx-0.5 leading-none">{trimmed}</span>;
-                                                                                  }
-                                                                                  if (trimmed === 'AND') {
-                                                                                      return <span key={ti} className="px-1 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[9px] font-extrabold tracking-wider">{trimmed}</span>;
-                                                                                  }
-                                                                                  if (trimmed === 'OR') {
-                                                                                      return <span key={ti} className="px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[9px] font-extrabold tracking-wider">{trimmed}</span>;
-                                                                                  }
-                                                                                  return <span key={ti} className="text-indigo-700 dark:text-indigo-300">{trimmed}</span>;
-                                                                              })}
-                                                                          </div>
-                                                                      </div>
-                                                                  </div>
-                                                              )}
-                                                              <div className="bg-white dark:bg-[#1C1C1E]">
-                                                                  {rules.map((rule, ruleIdx) => {
-                                                                      const dimCfg = res.dimensions.find(d => d.id === rule.dimension);
-                                                                      const op = ruleIdx > 0 ? getDimOperator(res.id, rule.id) : null;
-                                                                      const detailGrpIdx = getRuleGroupIndex(res.id, rule.id);
-                                                                      const detailGrpColor = detailGrpIdx >= 0 ? GROUP_COLORS[detailGrpIdx % GROUP_COLORS.length] : null;
-                                                                      return (
-                                                                          <React.Fragment key={rule.id}>
-                                                                              {op && (
-                                                                                  <div className="flex items-center gap-2 px-4 py-0.5">
-                                                                                      <div className="flex-1 border-t border-dashed border-gray-200 dark:border-white/10"/>
-                                                                                      <span className={`text-[10px] font-extrabold tracking-wider ${op === 'OR' ? 'text-amber-500 dark:text-amber-400' : 'text-blue-500 dark:text-blue-400'}`}>{op}</span>
-                                                                                      <div className="flex-1 border-t border-dashed border-gray-200 dark:border-white/10"/>
-                                                                                  </div>
-                                                                              )}
-                                                                              <div className={`flex items-center gap-3 px-4 py-2.5 ${detailGrpColor ? `border-l-[3px] ${detailGrpColor.border} ${detailGrpColor.bg}` : ''}`}>
-                                                                                  {detailGrpColor && <span className={`text-[9px] font-extrabold ${detailGrpColor.text}`}>{detailGrpColor.label}</span>}
-                                                                                  <span className="text-xs font-bold text-gray-500 dark:text-gray-400 min-w-[64px]">{dimCfg?.label || rule.dimension}</span>
-                                                                                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded">等于</span>
-                                                                                  <div className="flex flex-wrap gap-1.5">
-                                                                                      {rule.values.length > 0 ? rule.values.map(v => (
-                                                                                          <span key={v} className="px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 text-xs font-medium border border-amber-100 dark:border-amber-800/30">
-                                                                                              {getReadableValue(rule.dimension, v)}
-                                                                                          </span>
-                                                                                      )) : (
-                                                                                          <span className="text-xs text-gray-400 italic">未指定具体值</span>
-                                                                                      )}
-                                                                                  </div>
-                                                                              </div>
-                                                                          </React.Fragment>
-                                                                      );
-                                                                  })}
-                                                              </div>
-                                                          </div>
-                                                      );
-                                                  })}
-                                              </div>
-                                          ) : (
-                                              <div className="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-lg">
-                                                  未配置数据行权限，默认可见所有数据行
-                                              </div>
-                                          )}
-                                      </div>
+                                      ) : (
+                                          <div className="text-center py-10 text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-lg">
+                                              <Database className="w-8 h-8 mx-auto mb-2 opacity-30"/>
+                                              未配置数据行权限，默认可见所有数据行
+                                          </div>
+                                      )}
+                                  </div>
+                                  )}
 
-                                      {/* 数据列权限 */}
-                                      <div>
-                                          <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 mb-3">
-                                              <Columns className="w-4 h-4"/> 数据列权限
-                                          </h3>
-                                          {(roleForm.columnPermissions && roleForm.columnPermissions.length > 0) ? (
-                                              <div className="space-y-2">
-                                                  {roleForm.columnPermissions.map((rule, idx) => {
-                                                      const resConfig = columnConfig.find(r => r.id === rule.resource);
-                                                      if (!resConfig) return null;
-                                                      return (
-                                                          <div key={idx} className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
-                                                              <div className="flex items-center gap-2 px-4 py-2.5 bg-purple-50/60 dark:bg-purple-900/10">
-                                                                  <Columns className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400"/>
-                                                                  <span className="font-bold text-sm text-gray-800 dark:text-gray-100">{resConfig.label}</span>
-                                                                  <span className="text-xs text-purple-500 dark:text-purple-400 ml-auto">{rule.allowedColumns.length}/{resConfig.columns.length} 列可见</span>
-                                                              </div>
-                                                              <div className="px-4 py-3 bg-white dark:bg-[#1C1C1E] flex flex-wrap gap-1.5">
-                                                                  {resConfig.columns.map(col => {
-                                                                      const allowed = rule.allowedColumns.includes(col.id);
-                                                                      return (
-                                                                          <span key={col.id} className={`px-2 py-0.5 rounded-full text-xs font-medium border ${allowed
-                                                                              ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-800/30'
-                                                                              : 'bg-gray-50 dark:bg-white/5 text-gray-400 dark:text-gray-500 border-gray-100 dark:border-white/10 line-through'
-                                                                          }`}>
-                                                                              {col.label}
-                                                                          </span>
-                                                                      );
-                                                                  })}
-                                                              </div>
+                                  {/* ===== 数据列权限 Tab ===== */}
+                                  {roleDetailTab === 'COLUMN' && (
+                                  <div className="animate-fade-in">
+                                      {(roleForm.columnPermissions && roleForm.columnPermissions.length > 0) ? (
+                                          <div className="space-y-2">
+                                              {roleForm.columnPermissions.map((rule, idx) => {
+                                                  const resConfig = columnConfig.find(r => r.id === rule.resource);
+                                                  if (!resConfig) return null;
+                                                  return (
+                                                      <div key={idx} className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
+                                                          <div className="flex items-center gap-2 px-4 py-2.5 bg-purple-50/60 dark:bg-purple-900/10">
+                                                              <Columns className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400"/>
+                                                              <span className="font-bold text-sm text-gray-800 dark:text-gray-100">{resConfig.label}</span>
+                                                              <span className="text-xs text-purple-500 dark:text-purple-400 ml-auto">{rule.allowedColumns.length}/{resConfig.columns.length} 列可见</span>
                                                           </div>
-                                                      );
-                                                  })}
-                                              </div>
-                                          ) : (
-                                              <div className="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-lg">
-                                                  未配置数据列权限，默认可见所有基础列
-                                              </div>
-                                          )}
-                                      </div>
+                                                          <div className="px-4 py-3 bg-white dark:bg-[#1C1C1E] flex flex-wrap gap-1.5">
+                                                              {resConfig.columns.map(col => {
+                                                                  const allowed = rule.allowedColumns.includes(col.id);
+                                                                  return (
+                                                                      <span key={col.id} className={`px-2 py-0.5 rounded-full text-xs font-medium border ${allowed
+                                                                          ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-800/30'
+                                                                          : 'bg-gray-50 dark:bg-white/5 text-gray-400 dark:text-gray-500 border-gray-100 dark:border-white/10 line-through'
+                                                                      }`}>
+                                                                          {col.label}
+                                                                      </span>
+                                                                  );
+                                                              })}
+                                                          </div>
+                                                      </div>
+                                                  );
+                                              })}
+                                          </div>
+                                      ) : (
+                                          <div className="text-center py-10 text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-lg">
+                                              <Columns className="w-8 h-8 mx-auto mb-2 opacity-30"/>
+                                              未配置数据列权限，默认可见所有基础列
+                                          </div>
+                                      )}
                                   </div>
                                   )}
                               </div>

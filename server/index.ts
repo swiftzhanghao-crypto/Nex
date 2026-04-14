@@ -14,7 +14,21 @@ import opportunityRoutes from './routes/opportunities.ts';
 const PORT = parseInt(process.env.PORT || '3001');
 const app = express();
 
-app.use(cors());
+const ALLOWED_ORIGINS = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+  : ['http://localhost:4173', 'http://localhost:5173', 'http://127.0.0.1:4173', 'http://127.0.0.1:5173'];
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`[cors] blocked origin: ${origin}`);
+      callback(null, false);
+    }
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '10mb' }));
 
 app.use((req, _res, next) => {

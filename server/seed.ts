@@ -10,10 +10,10 @@ import {
   generateContracts, generateRemittances, generateInvoices,
   generatePerformances, generateAuthorizations, generateDeliveryInfos,
 } from '../data/generators.ts';
-import crypto from 'crypto';
+import { hashPassword } from './auth.ts';
 
 function hash(password: string): string {
-  return crypto.createHash('sha256').update(password).digest('hex');
+  return hashPassword(password);
 }
 
 export function seedDatabase() {

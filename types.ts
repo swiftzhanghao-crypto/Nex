@@ -185,11 +185,30 @@ export interface Product {
     maintenanceStandard?: string;
     hasUpgradeWarranty?: boolean;
     hasAfterSalesService?: boolean;
+    internationalName?: string;
+    afterSalesServiceDefault?: string;
     salesOrgId?: string;
     salesOrgName?: string;
     businessDeliveryName?: string;
     taxRefundType?: string;
     linkedServices?: LinkedService[];
+    salesScope?: SalesScopeRow[];
+}
+
+export interface SalesScopeRow {
+    salesOrg: string;
+    materialType: string;
+    authMaterialName: string;
+    mediaMaterialName: string;
+    supplyOrg: string;
+    status: 'listed' | 'unlisted';
+    billingStatus: 'maintained' | 'unmaintained';
+    billingTaxRefundType?: string;
+    billingInvoiceName?: string;
+    billingTaxRate?: string;
+    billingModelSpec?: string;
+    billingProductCode?: string;
+    billingUnit?: string;
 }
 
 export interface LinkedService {

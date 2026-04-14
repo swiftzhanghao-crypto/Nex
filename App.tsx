@@ -3,6 +3,7 @@ import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './contexts/AppContext';
 import Layout from './components/layout/Layout';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import ProductManager from './components/product/ProductManager';
 import OrderManager from './components/order/OrderManager';
 import CustomerManager from './components/crm/CustomerManager';
@@ -54,8 +55,8 @@ function AppRoutes() {
         <Route path="/products/:id" element={<ProductDetails />} />
         <Route path="/merchandises/:id" element={<MerchandiseDetails />} />
 
-        <Route path="/orders" element={<OrderManager />} />
-        <Route path="/orders/:id" element={<OrderDetails />} />
+        <Route path="/orders" element={<ErrorBoundary fallbackTitle="订单列表加载异常"><OrderManager /></ErrorBoundary>} />
+        <Route path="/orders/:id" element={<ErrorBoundary fallbackTitle="订单详情加载异常"><OrderDetails /></ErrorBoundary>} />
 
         <Route path="/customers" element={<CustomerManager />} />
         <Route path="/customers/:id" element={<CustomerDetails />} />

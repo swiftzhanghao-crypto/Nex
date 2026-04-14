@@ -1,0 +1,124 @@
+import type { AuthRequest } from './auth.ts';
+import type { Response, NextFunction } from 'express';
+
+/**
+ * Centralized RBAC permission matrix.
+ * Maps resource:action to the list of role IDs allowed.
+ *
+ * Role IDs must match those in data/staticData.ts initialRoles:
+ *   Admin, Sales, Business, Finance, Technical, Logistics, Executive, Commerce
+ */
+const PERMISSION_MATRIX: Record<string, string[]> = {
+  // --- Users ---
+  'user:list':           ['Admin', 'Sales', 'Business', 'Finance', 'Technical', 'Executive', 'Commerce'],
+  'user:read':           ['Admin', 'Sales', 'Business', 'Finance', 'Technical', 'Executive', 'Commerce'],
+  'user:update':         ['Admin'],
+  'role:create':         ['Admin'],
+  'role:update':         ['Admin'],
+  'role:delete':         ['Admin'],
+  'role:copy':           ['Admin'],
+
+  // --- Orders ---
+  'order:list':          ['Admin', 'Sales', 'Business', 'Finance', 'Executive', 'Commerce'],
+  'order:read':          ['Admin', 'Sales', 'Business', 'Finance', 'Executive', 'Commerce'],
+  'order:create':        ['Admin', 'Sales', 'Business'],
+  'order:update':        ['Admin', 'Sales', 'Business', 'Finance'],
+  'order:delete':        ['Admin', 'Sales'],
+  'order:approve':       ['Admin', 'Business', 'Finance', 'Commerce'],
+  'order:submit':        ['Admin', 'Sales', 'Business'],
+
+  // --- Customers ---
+  'customer:list':       ['Admin', 'Sales', 'Business', 'Finance', 'Executive', 'Commerce'],
+  'customer:read':       ['Admin', 'Sales', 'Business', 'Finance', 'Executive', 'Commerce'],
+  'customer:create':     ['Admin', 'Sales', 'Business'],
+  'customer:update':     ['Admin', 'Sales', 'Business'],
+  'customer:delete':     ['Admin', 'Sales', 'Business'],
+
+  // --- Products ---
+  'product:list':        ['Admin', 'Sales', 'Business', 'Finance', 'Technical', 'Executive', 'Commerce'],
+  'product:read':        ['Admin', 'Sales', 'Business', 'Finance', 'Technical', 'Executive', 'Commerce'],
+  'product:create':      ['Admin'],
+  'product:update':      ['Admin'],
+  'product:delete':      ['Admin'],
+
+  // --- Channels ---
+  'channel:list':        ['Admin', 'Sales', 'Business', 'Executive', 'Commerce'],
+  'channel:read':        ['Admin', 'Sales', 'Business', 'Executive', 'Commerce'],
+  'channel:create':      ['Admin'],
+  'channel:update':      ['Admin'],
+  'channel:delete':      ['Admin'],
+
+  // --- Finance: Contracts ---
+  'contract:list':       ['Admin', 'Finance', 'Business', 'Sales', 'Executive', 'Commerce'],
+  'contract:read':       ['Admin', 'Finance', 'Business', 'Sales', 'Executive', 'Commerce'],
+  'contract:create':     ['Admin', 'Finance', 'Business', 'Commerce'],
+  'contract:update':     ['Admin', 'Finance', 'Business', 'Commerce'],
+  'contract:delete':     ['Admin', 'Finance'],
+
+  // --- Finance: Remittances ---
+  'remittance:list':     ['Admin', 'Finance', 'Business', 'Executive', 'Commerce'],
+  'remittance:read':     ['Admin', 'Finance', 'Business', 'Executive', 'Commerce'],
+  'remittance:create':   ['Admin', 'Finance'],
+  'remittance:update':   ['Admin', 'Finance'],
+  'remittance:delete':   ['Admin', 'Finance'],
+
+  // --- Finance: Invoices ---
+  'invoice:list':        ['Admin', 'Finance', 'Sales', 'Business', 'Executive', 'Commerce'],
+  'invoice:read':        ['Admin', 'Finance', 'Sales', 'Business', 'Executive', 'Commerce'],
+  'invoice:create':      ['Admin', 'Finance'],
+  'invoice:update':      ['Admin', 'Finance'],
+  'invoice:delete':      ['Admin', 'Finance'],
+
+  // --- Finance: Performances ---
+  'performance:list':    ['Admin', 'Finance', 'Sales', 'Business', 'Executive', 'Commerce'],
+  'performance:read':    ['Admin', 'Finance', 'Sales', 'Business', 'Executive', 'Commerce'],
+
+  // --- Finance: Authorizations ---
+  'authorization:list':  ['Admin', 'Finance', 'Business', 'Sales', 'Technical', 'Executive', 'Commerce'],
+  'authorization:read':  ['Admin', 'Finance', 'Business', 'Sales', 'Technical', 'Executive', 'Commerce'],
+  'authorization:create':['Admin', 'Finance', 'Business'],
+
+  // --- Finance: Delivery Infos ---
+  'delivery:list':       ['Admin', 'Finance', 'Business', 'Sales', 'Technical', 'Executive', 'Commerce'],
+  'delivery:read':       ['Admin', 'Finance', 'Business', 'Sales', 'Technical', 'Executive', 'Commerce'],
+  'delivery:create':     ['Admin', 'Finance', 'Business'],
+
+  // --- Finance: Audit Logs ---
+  'auditlog:list':       ['Admin', 'Finance', 'Business'],
+
+  // --- Opportunities ---
+  'opportunity:list':    ['Admin', 'Sales', 'Business', 'Executive', 'Commerce'],
+  'opportunity:read':    ['Admin', 'Sales', 'Business', 'Executive', 'Commerce'],
+  'opportunity:create':  ['Admin', 'Sales', 'Business'],
+  'opportunity:update':  ['Admin', 'Sales', 'Business'],
+  'opportunity:delete':  ['Admin', 'Sales', 'Business'],
+};
+
+export function checkPermission(resource: string, action: string): (req: AuthRequest, res: Response, next: NextFunction) => void {
+  const key = `${resource}:${action}`;
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      res.status(401).json({ error: '未认证' });
+      return;
+    }
+    const allowedRoles = PERMISSION_MATRIX[key];
+    if (!allowedRoles) {
+      console.warn(`[rbac] unknown permission key: ${key}, denying access`);
+      res.status(403).json({ error: '权限未定义' });
+      return;
+    }
+    if (allowedRoles.includes(req.user.role)) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: `权限不足 (需要: ${allowedRoles.join('/')})` });
+  };
+}
+
+export function hasPermission(role: string, resource: string, action: string): boolean {
+  const key = `${resource}:${action}`;
+  const allowedRoles = PERMISSION_MATRIX[key];
+  return !!allowedRoles && allowedRoles.includes(role);
+}
+
+export { PERMISSION_MATRIX };

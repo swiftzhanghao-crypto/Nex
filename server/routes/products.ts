@@ -1,23 +1,35 @@
 import { Router } from 'express';
 import { getDb } from '../db.ts';
-import { authMiddleware, requireRole, type AuthRequest } from '../auth.ts';
+import { authMiddleware, type AuthRequest } from '../auth.ts';
+import { checkPermission } from '../rbac.ts';
 
 const router = Router();
 router.use(authMiddleware);
+
+function safeJsonParse(str: string | null | undefined, fallback: any = {}) {
+  if (!str) return fallback;
+  try { return JSON.parse(str); }
+  catch { return fallback; }
+}
+
+function getUserName(db: any, userId: string): string {
+  const row = db.prepare('SELECT name FROM users WHERE id = ?').get(userId) as any;
+  return row?.name || '';
+}
 
 function toProduct(row: any) {
   return {
     id: row.id, name: row.name, category: row.category,
     subCategory: row.sub_category, description: row.description,
-    status: row.status, tags: JSON.parse(row.tags || '[]'),
-    skus: JSON.parse(row.skus || '[]'),
-    composition: JSON.parse(row.composition || '[]'),
-    installPackages: JSON.parse(row.install_pkgs || '[]'),
-    licenseTemplate: row.license_tpl ? JSON.parse(row.license_tpl) : undefined,
+    status: row.status, tags: safeJsonParse(row.tags, []),
+    skus: safeJsonParse(row.skus, []),
+    composition: safeJsonParse(row.composition, []),
+    installPackages: safeJsonParse(row.install_pkgs, []),
+    licenseTemplate: row.license_tpl ? safeJsonParse(row.license_tpl) : undefined,
   };
 }
 
-router.get('/', (req, res) => {
+router.get('/', checkPermission('product', 'list'), (req, res) => {
   const { category, status, search } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM products WHERE 1=1';
@@ -31,59 +43,6 @@ router.get('/', (req, res) => {
   res.json(db.prepare(sql).all(...params).map(toProduct));
 });
 
-router.get('/:id', (req, res) => {
-  const row = getDb().prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
-  if (!row) { res.status(404).json({ error: '产品不存在' }); return; }
-  res.json(toProduct(row));
-});
-
-router.post('/', requireRole('Admin', 'ProductManager'), (req: AuthRequest, res) => {
-  const db = getDb();
-  const p = req.body;
-  const id = p.id || `PROD-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-
-  db.prepare(`
-    INSERT INTO products (id, name, category, sub_category, description, status, tags, skus, composition, install_pkgs, license_tpl)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, p.name, p.category, p.subCategory ?? null, p.description ?? null,
-    p.status || 'OnShelf', JSON.stringify(p.tags || []), JSON.stringify(p.skus || []),
-    JSON.stringify(p.composition || []), JSON.stringify(p.installPackages || []),
-    p.licenseTemplate ? JSON.stringify(p.licenseTemplate) : null);
-
-  db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'CREATE', 'Product', id, `创建产品 ${p.name}`);
-
-  const row = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
-  res.status(201).json(toProduct(row));
-});
-
-router.put('/:id', (req, res) => {
-  const db = getDb();
-  const p = req.body;
-  db.prepare(`
-    UPDATE products SET name=?, category=?, sub_category=?, description=?, status=?,
-    tags=?, skus=?, composition=?, install_pkgs=?, license_tpl=?
-    WHERE id=?
-  `).run(p.name, p.category, p.subCategory ?? null, p.description ?? null, p.status,
-    JSON.stringify(p.tags || []), JSON.stringify(p.skus || []),
-    JSON.stringify(p.composition || []), JSON.stringify(p.installPackages || []),
-    p.licenseTemplate ? JSON.stringify(p.licenseTemplate) : null, req.params.id);
-
-  const row = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
-  res.json(toProduct(row));
-});
-
-router.delete('/:id', requireRole('Admin', 'ProductManager'), (req: AuthRequest, res) => {
-  const db = getDb();
-  const { changes } = db.prepare('DELETE FROM products WHERE id = ?').run(req.params.id);
-  if (!changes) { res.status(404).json({ error: '产品不存在' }); return; }
-
-  db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'DELETE', 'Product', req.params.id, `删除产品 ${req.params.id}`);
-  res.json({ ok: true });
-});
-
-// --- Legacy meta endpoints (kept for backward compatibility) ---
 router.get('/meta/channels', (_req, res) => {
   const rows = getDb().prepare('SELECT * FROM channels ORDER BY name').all() as any[];
   res.json(rows.map(r => ({
@@ -104,6 +63,64 @@ router.get('/meta/opportunities', (_req, res) => {
     closeDate: r.close_date, ownerId: r.owner_id, ownerName: r.owner_name,
     createdAt: r.created_at,
   })));
+});
+
+router.get('/:id', checkPermission('product', 'read'), (req, res) => {
+  const row = getDb().prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
+  if (!row) { res.status(404).json({ error: '产品不存在' }); return; }
+  res.json(toProduct(row));
+});
+
+router.post('/', checkPermission('product', 'create'), (req: AuthRequest, res) => {
+  const db = getDb();
+  const p = req.body;
+  const id = p.id || `PROD-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+  db.prepare(`
+    INSERT INTO products (id, name, category, sub_category, description, status, tags, skus, composition, install_pkgs, license_tpl)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, p.name, p.category, p.subCategory ?? null, p.description ?? null,
+    p.status || 'OnShelf', JSON.stringify(p.tags || []), JSON.stringify(p.skus || []),
+    JSON.stringify(p.composition || []), JSON.stringify(p.installPackages || []),
+    p.licenseTemplate ? JSON.stringify(p.licenseTemplate) : null);
+
+  const userName = getUserName(db, req.user!.userId);
+  db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(req.user!.userId, userName, 'CREATE', 'Product', id, `创建产品 ${p.name}`);
+
+  const row = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
+  res.status(201).json(toProduct(row));
+});
+
+router.put('/:id', checkPermission('product', 'update'), (req: AuthRequest, res) => {
+  const db = getDb();
+  const p = req.body;
+  db.prepare(`
+    UPDATE products SET name=?, category=?, sub_category=?, description=?, status=?,
+    tags=?, skus=?, composition=?, install_pkgs=?, license_tpl=?
+    WHERE id=?
+  `).run(p.name, p.category, p.subCategory ?? null, p.description ?? null, p.status,
+    JSON.stringify(p.tags || []), JSON.stringify(p.skus || []),
+    JSON.stringify(p.composition || []), JSON.stringify(p.installPackages || []),
+    p.licenseTemplate ? JSON.stringify(p.licenseTemplate) : null, req.params.id);
+
+  const userName = getUserName(db, req.user!.userId);
+  db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(req.user!.userId, userName, 'UPDATE', 'Product', req.params.id, `更新产品 ${p.name}`);
+
+  const row = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
+  res.json(toProduct(row));
+});
+
+router.delete('/:id', checkPermission('product', 'delete'), (req: AuthRequest, res) => {
+  const db = getDb();
+  const { changes } = db.prepare('DELETE FROM products WHERE id = ?').run(req.params.id);
+  if (!changes) { res.status(404).json({ error: '产品不存在' }); return; }
+
+  const userName = getUserName(db, req.user!.userId);
+  db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(req.user!.userId, userName, 'DELETE', 'Product', req.params.id, `删除产品 ${req.params.id}`);
+  res.json({ ok: true });
 });
 
 export default router;

@@ -1,9 +1,21 @@
 import { Router } from 'express';
 import { getDb } from '../db.ts';
-import { authMiddleware, requireRole, type AuthRequest } from '../auth.ts';
+import { authMiddleware, type AuthRequest } from '../auth.ts';
+import { checkPermission } from '../rbac.ts';
 
 const router = Router();
 router.use(authMiddleware);
+
+function safePagination(page: string, size: string) {
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const limit = Math.min(Math.max(1, parseInt(size) || 50), 200);
+  return { limit, offset: (pageNum - 1) * limit, pageNum };
+}
+
+function getUserName(db: any, userId: string): string {
+  const row = db.prepare('SELECT name FROM users WHERE id = ?').get(userId) as any;
+  return row?.name || '';
+}
 
 // ======================== Contracts ========================
 
@@ -19,7 +31,7 @@ function toContract(row: any) {
 
 const VALID_VERIFY_STATUS = ['PENDING_BUSINESS', 'PENDING', 'VERIFIED', 'APPROVED', 'REJECTED'];
 
-router.get('/contracts', (req, res) => {
+router.get('/contracts', checkPermission('contract', 'list'), (req, res) => {
   const { status, orderId, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM contracts WHERE 1=1';
@@ -29,20 +41,20 @@ router.get('/contracts', (req, res) => {
   if (search) { sql += ' AND (name LIKE ? OR code LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
   const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
   const { total } = db.prepare(countSql).get(...params) as { total: number };
+  const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-  const limit = Math.min(parseInt(size), 200);
-  params.push(limit, (parseInt(page) - 1) * limit);
+  params.push(limit, offset);
   const rows = db.prepare(sql).all(...params) as any[];
-  res.json({ data: rows.map(toContract), total, page: parseInt(page), size: limit });
+  res.json({ data: rows.map(toContract), total, page: pageNum, size: limit });
 });
 
-router.get('/contracts/:id', (req, res) => {
+router.get('/contracts/:id', checkPermission('contract', 'read'), (req, res) => {
   const row = getDb().prepare('SELECT * FROM contracts WHERE id = ?').get(req.params.id);
   if (!row) { res.status(404).json({ error: '合同不存在' }); return; }
   res.json(toContract(row));
 });
 
-router.post('/contracts', (req: AuthRequest, res) => {
+router.post('/contracts', checkPermission('contract', 'create'), (req: AuthRequest, res) => {
   const db = getDb();
   const c = req.body;
   const id = c.id || `CON-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -61,13 +73,13 @@ router.post('/contracts', (req: AuthRequest, res) => {
     c.orderId ?? null, c.customerId ?? null, new Date().toISOString());
 
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'CREATE', 'Contract', id, `创建合同 ${c.name}`);
+    .run(req.user!.userId, getUserName(db, req.user!.userId), 'CREATE', 'Contract', id, `创建合同 ${c.name}`);
 
   const row = db.prepare('SELECT * FROM contracts WHERE id = ?').get(id);
   res.status(201).json(toContract(row));
 });
 
-router.put('/contracts/:id', (req: AuthRequest, res) => {
+router.put('/contracts/:id', checkPermission('contract', 'update'), (req: AuthRequest, res) => {
   const db = getDb();
   const c = req.body;
   const id = req.params.id;
@@ -89,13 +101,13 @@ router.put('/contracts/:id', (req: AuthRequest, res) => {
     c.amount ?? null, c.signDate ?? null, c.orderId ?? null, c.customerId ?? null, id);
 
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'UPDATE', 'Contract', id, `更新合同 ${c.name}，状态: ${c.verifyStatus}`);
+    .run(req.user!.userId, getUserName(db, req.user!.userId), 'UPDATE', 'Contract', id, `更新合同 ${c.name}，状态: ${c.verifyStatus}`);
 
   const row = db.prepare('SELECT * FROM contracts WHERE id = ?').get(id);
   res.json(toContract(row));
 });
 
-router.delete('/contracts/:id', requireRole('Admin', 'Finance'), (req: AuthRequest, res) => {
+router.delete('/contracts/:id', checkPermission('contract', 'delete'), (req: AuthRequest, res) => {
   const db = getDb();
   const existing = db.prepare('SELECT * FROM contracts WHERE id = ?').get(req.params.id) as any;
   if (!existing) { res.status(404).json({ error: '合同不存在' }); return; }
@@ -107,7 +119,7 @@ router.delete('/contracts/:id', requireRole('Admin', 'Finance'), (req: AuthReque
 
   db.prepare('DELETE FROM contracts WHERE id = ?').run(req.params.id);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'DELETE', 'Contract', req.params.id, `删除合同 ${existing.name}`);
+    .run(req.user!.userId, getUserName(db, req.user!.userId), 'DELETE', 'Contract', req.params.id, `删除合同 ${existing.name}`);
   res.json({ ok: true });
 });
 
@@ -123,7 +135,7 @@ function toRemittance(row: any) {
   };
 }
 
-router.get('/remittances', (req, res) => {
+router.get('/remittances', checkPermission('remittance', 'list'), (req, res) => {
   const { type, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM remittances WHERE 1=1';
@@ -132,20 +144,20 @@ router.get('/remittances', (req, res) => {
   if (search) { sql += ' AND (remitter_name LIKE ? OR receiver_name LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
   const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
   const { total } = db.prepare(countSql).get(...params) as { total: number };
+  const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY payment_time DESC LIMIT ? OFFSET ?';
-  const limit = Math.min(parseInt(size), 200);
-  params.push(limit, (parseInt(page) - 1) * limit);
+  params.push(limit, offset);
   const rows = db.prepare(sql).all(...params) as any[];
-  res.json({ data: rows.map(toRemittance), total, page: parseInt(page), size: limit });
+  res.json({ data: rows.map(toRemittance), total, page: pageNum, size: limit });
 });
 
-router.get('/remittances/:id', (req, res) => {
+router.get('/remittances/:id', checkPermission('remittance', 'read'), (req, res) => {
   const row = getDb().prepare('SELECT * FROM remittances WHERE id = ?').get(req.params.id);
   if (!row) { res.status(404).json({ error: '回款记录不存在' }); return; }
   res.json(toRemittance(row));
 });
 
-router.post('/remittances', (req: AuthRequest, res) => {
+router.post('/remittances', checkPermission('remittance', 'create'), (req: AuthRequest, res) => {
   const db = getDb();
   const r = req.body;
   const id = r.id || `REM-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -158,13 +170,13 @@ router.post('/remittances', (req: AuthRequest, res) => {
     r.receiverName, r.receiverAccount ?? null, r.paymentTime);
 
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'CREATE', 'Remittance', id, `创建回款 ${r.remitterName} ¥${r.amount}`);
+    .run(req.user!.userId, getUserName(db, req.user!.userId), 'CREATE', 'Remittance', id, `创建回款 ${r.remitterName} ¥${r.amount}`);
 
   const row = db.prepare('SELECT * FROM remittances WHERE id = ?').get(id);
   res.status(201).json(toRemittance(row));
 });
 
-router.put('/remittances/:id', (req: AuthRequest, res) => {
+router.put('/remittances/:id', checkPermission('remittance', 'update'), (req: AuthRequest, res) => {
   const db = getDb();
   const r = req.body;
   const id = req.params.id;
@@ -181,19 +193,19 @@ router.put('/remittances/:id', (req: AuthRequest, res) => {
     r.receiverName, r.receiverAccount ?? null, r.paymentTime, id);
 
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'UPDATE', 'Remittance', id, `更新回款 ${id}`);
+    .run(req.user!.userId, getUserName(db, req.user!.userId), 'UPDATE', 'Remittance', id, `更新回款 ${id}`);
 
   const row = db.prepare('SELECT * FROM remittances WHERE id = ?').get(id);
   res.json(toRemittance(row));
 });
 
-router.delete('/remittances/:id', requireRole('Admin', 'Finance'), (req: AuthRequest, res) => {
+router.delete('/remittances/:id', checkPermission('remittance', 'delete'), (req: AuthRequest, res) => {
   const db = getDb();
   const { changes } = db.prepare('DELETE FROM remittances WHERE id = ?').run(req.params.id);
   if (!changes) { res.status(404).json({ error: '回款记录不存在' }); return; }
 
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'DELETE', 'Remittance', req.params.id, `删除回款 ${req.params.id}`);
+    .run(req.user!.userId, getUserName(db, req.user!.userId), 'DELETE', 'Remittance', req.params.id, `删除回款 ${req.params.id}`);
   res.json({ ok: true });
 });
 
@@ -209,7 +221,7 @@ function toInvoice(row: any) {
 
 const VALID_INVOICE_STATUS = ['PENDING', 'APPROVED', 'ISSUED', 'REJECTED', 'CANCELLED'];
 
-router.get('/invoices', (req, res) => {
+router.get('/invoices', checkPermission('invoice', 'list'), (req, res) => {
   const { status, orderId, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM invoices WHERE 1=1';
@@ -219,38 +231,45 @@ router.get('/invoices', (req, res) => {
   if (search) { sql += ' AND invoice_title LIKE ?'; params.push(`%${search}%`); }
   const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
   const { total } = db.prepare(countSql).get(...params) as { total: number };
+  const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY apply_time DESC LIMIT ? OFFSET ?';
-  const limit = Math.min(parseInt(size), 200);
-  params.push(limit, (parseInt(page) - 1) * limit);
+  params.push(limit, offset);
   const rows = db.prepare(sql).all(...params) as any[];
-  res.json({ data: rows.map(toInvoice), total, page: parseInt(page), size: limit });
+  res.json({ data: rows.map(toInvoice), total, page: pageNum, size: limit });
 });
 
-router.get('/invoices/:id', (req, res) => {
+router.get('/invoices/:id', checkPermission('invoice', 'read'), (req, res) => {
   const row = getDb().prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
   if (!row) { res.status(404).json({ error: '发票不存在' }); return; }
   res.json(toInvoice(row));
 });
 
-router.post('/invoices', (req: AuthRequest, res) => {
+router.post('/invoices', checkPermission('invoice', 'create'), (req: AuthRequest, res) => {
   const db = getDb();
   const i = req.body;
   const id = i.id || `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+  const invoiceStatus = i.status || 'PENDING';
+  if (!VALID_INVOICE_STATUS.includes(invoiceStatus)) {
+    res.status(400).json({ error: `无效的发票状态: ${invoiceStatus}` });
+    return;
+  }
 
   db.prepare(`
     INSERT INTO invoices (id, invoice_title, amount, apply_time, apply_type, status, order_id, tax_id, remark)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, i.invoiceTitle, i.amount, i.applyTime || new Date().toISOString(),
-    i.applyType, i.status || 'PENDING', i.orderId ?? null, i.taxId ?? null, i.remark ?? null);
+    i.applyType, invoiceStatus, i.orderId ?? null, i.taxId ?? null, i.remark ?? null);
 
+  const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'CREATE', 'Invoice', id, `创建发票 ${i.invoiceTitle} ¥${i.amount}`);
+    .run(req.user!.userId, userName, 'CREATE', 'Invoice', id, `创建发票 ${i.invoiceTitle} ¥${i.amount}`);
 
   const row = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id);
   res.status(201).json(toInvoice(row));
 });
 
-router.put('/invoices/:id', (req: AuthRequest, res) => {
+router.put('/invoices/:id', checkPermission('invoice', 'update'), (req: AuthRequest, res) => {
   const db = getDb();
   const i = req.body;
   const id = req.params.id;
@@ -275,13 +294,13 @@ router.put('/invoices/:id', (req: AuthRequest, res) => {
     i.orderId ?? null, i.taxId ?? null, i.remark ?? null, id);
 
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'UPDATE', 'Invoice', id, `更新发票 ${id}，状态: ${i.status}`);
+    .run(req.user!.userId, getUserName(db, req.user!.userId), 'UPDATE', 'Invoice', id, `更新发票 ${id}，状态: ${i.status}`);
 
   const row = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id);
   res.json(toInvoice(row));
 });
 
-router.delete('/invoices/:id', requireRole('Admin', 'Finance'), (req: AuthRequest, res) => {
+router.delete('/invoices/:id', checkPermission('invoice', 'delete'), (req: AuthRequest, res) => {
   const db = getDb();
   const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id) as any;
   if (!existing) { res.status(404).json({ error: '发票不存在' }); return; }
@@ -293,7 +312,7 @@ router.delete('/invoices/:id', requireRole('Admin', 'Finance'), (req: AuthReques
 
   db.prepare('DELETE FROM invoices WHERE id = ?').run(req.params.id);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'DELETE', 'Invoice', req.params.id, `删除发票 ${req.params.id}`);
+    .run(req.user!.userId, getUserName(db, req.user!.userId), 'DELETE', 'Invoice', req.params.id, `删除发票 ${req.params.id}`);
   res.json({ ok: true });
 });
 
@@ -314,7 +333,7 @@ function toPerformance(row: any) {
   };
 }
 
-router.get('/performances', (req, res) => {
+router.get('/performances', checkPermission('performance', 'list'), (req, res) => {
   const { orderId, owner, serviceType, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM performances WHERE 1=1';
@@ -325,14 +344,14 @@ router.get('/performances', (req, res) => {
   if (search) { sql += ' AND (id LIKE ? OR order_id LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
   const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
   const { total } = db.prepare(countSql).get(...params) as { total: number };
+  const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY id DESC LIMIT ? OFFSET ?';
-  const limit = Math.min(parseInt(size), 200);
-  params.push(limit, (parseInt(page) - 1) * limit);
+  params.push(limit, offset);
   const rows = db.prepare(sql).all(...params) as any[];
-  res.json({ data: rows.map(toPerformance), total, page: parseInt(page), size: limit });
+  res.json({ data: rows.map(toPerformance), total, page: pageNum, size: limit });
 });
 
-router.get('/performances/:id', (req, res) => {
+router.get('/performances/:id', checkPermission('performance', 'read'), (req, res) => {
   const row = getDb().prepare('SELECT * FROM performances WHERE id = ?').get(req.params.id);
   if (!row) { res.status(404).json({ error: '业绩记录不存在' }); return; }
   res.json(toPerformance(row));
@@ -350,7 +369,7 @@ function toAuthorization(row: any) {
   };
 }
 
-router.get('/authorizations', (req, res) => {
+router.get('/authorizations', checkPermission('authorization', 'list'), (req, res) => {
   const { customerId, orderId, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM authorizations WHERE 1=1';
@@ -360,20 +379,20 @@ router.get('/authorizations', (req, res) => {
   if (search) { sql += ' AND (customer_name LIKE ? OR product_name LIKE ? OR licensee LIKE ?)'; params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
   const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
   const { total } = db.prepare(countSql).get(...params) as { total: number };
+  const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY auth_start_date DESC LIMIT ? OFFSET ?';
-  const limit = Math.min(parseInt(size), 200);
-  params.push(limit, (parseInt(page) - 1) * limit);
+  params.push(limit, offset);
   const rows = db.prepare(sql).all(...params) as any[];
-  res.json({ data: rows.map(toAuthorization), total, page: parseInt(page), size: limit });
+  res.json({ data: rows.map(toAuthorization), total, page: pageNum, size: limit });
 });
 
-router.get('/authorizations/:id', (req, res) => {
+router.get('/authorizations/:id', checkPermission('authorization', 'read'), (req, res) => {
   const row = getDb().prepare('SELECT * FROM authorizations WHERE id = ?').get(req.params.id);
   if (!row) { res.status(404).json({ error: '授权记录不存在' }); return; }
   res.json(toAuthorization(row));
 });
 
-router.post('/authorizations', (req: AuthRequest, res) => {
+router.post('/authorizations', checkPermission('authorization', 'create'), (req: AuthRequest, res) => {
   const db = getDb();
   const a = req.body;
   const id = a.id || `AUTH-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -386,7 +405,7 @@ router.post('/authorizations', (req: AuthRequest, res) => {
     a.serviceStartDate ?? null, a.serviceEndDate ?? null);
 
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'CREATE', 'Authorization', id, `创建授权 ${a.licensee} - ${a.productName}`);
+    .run(req.user!.userId, getUserName(db, req.user!.userId), 'CREATE', 'Authorization', id, `创建授权 ${a.licensee} - ${a.productName}`);
 
   const row = db.prepare('SELECT * FROM authorizations WHERE id = ?').get(id);
   res.status(201).json(toAuthorization(row));
@@ -405,7 +424,7 @@ function toDeliveryInfo(row: any) {
   };
 }
 
-router.get('/delivery-infos', (req, res) => {
+router.get('/delivery-infos', checkPermission('delivery', 'list'), (req, res) => {
   const { customerId, orderId, deliveryType, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM delivery_infos WHERE 1=1';
@@ -416,20 +435,20 @@ router.get('/delivery-infos', (req, res) => {
   if (search) { sql += ' AND (customer_name LIKE ? OR licensee LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
   const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
   const { total } = db.prepare(countSql).get(...params) as { total: number };
+  const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY id DESC LIMIT ? OFFSET ?';
-  const limit = Math.min(parseInt(size), 200);
-  params.push(limit, (parseInt(page) - 1) * limit);
+  params.push(limit, offset);
   const rows = db.prepare(sql).all(...params) as any[];
-  res.json({ data: rows.map(toDeliveryInfo), total, page: parseInt(page), size: limit });
+  res.json({ data: rows.map(toDeliveryInfo), total, page: pageNum, size: limit });
 });
 
-router.get('/delivery-infos/:id', (req, res) => {
+router.get('/delivery-infos/:id', checkPermission('delivery', 'read'), (req, res) => {
   const row = getDb().prepare('SELECT * FROM delivery_infos WHERE id = ?').get(req.params.id);
   if (!row) { res.status(404).json({ error: '交付信息不存在' }); return; }
   res.json(toDeliveryInfo(row));
 });
 
-router.post('/delivery-infos', (req: AuthRequest, res) => {
+router.post('/delivery-infos', checkPermission('delivery', 'create'), (req: AuthRequest, res) => {
   const db = getDb();
   const d = req.body;
   const id = d.id || `DLV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -444,7 +463,7 @@ router.post('/delivery-infos', (req: AuthRequest, res) => {
     d.serviceStartDate ?? null, d.serviceEndDate ?? null);
 
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, '', 'CREATE', 'DeliveryInfo', id, `创建交付信息 ${d.licensee}`);
+    .run(req.user!.userId, getUserName(db, req.user!.userId), 'CREATE', 'DeliveryInfo', id, `创建交付信息 ${d.licensee}`);
 
   const row = db.prepare('SELECT * FROM delivery_infos WHERE id = ?').get(id);
   res.status(201).json(toDeliveryInfo(row));
@@ -452,7 +471,7 @@ router.post('/delivery-infos', (req: AuthRequest, res) => {
 
 // ======================== Audit Logs ========================
 
-router.get('/audit-logs', (req, res) => {
+router.get('/audit-logs', checkPermission('auditlog', 'list'), (req, res) => {
   const { resource, resourceId, userId, action, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM audit_logs WHERE 1=1';
@@ -463,16 +482,16 @@ router.get('/audit-logs', (req, res) => {
   if (action) { sql += ' AND action = ?'; params.push(action); }
   const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
   const { total } = db.prepare(countSql).get(...params) as { total: number };
+  const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-  const limit = Math.min(parseInt(size), 200);
-  params.push(limit, (parseInt(page) - 1) * limit);
+  params.push(limit, offset);
   const rows = db.prepare(sql).all(...params) as any[];
   res.json({
     data: rows.map(r => ({
       id: r.id, userId: r.user_id, userName: r.user_name,
       action: r.action, resource: r.resource, resourceId: r.resource_id,
-      detail: r.detail, ip: r.ip, createdAt: r.created_at,
-    })), total, page: parseInt(page), size: limit,
+      detail: r.detail, createdAt: r.created_at,
+    })), total, page: pageNum, size: limit,
   });
 });
 

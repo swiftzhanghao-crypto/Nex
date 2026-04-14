@@ -34,11 +34,10 @@ const availableFilterFields = [
 ];
 
 const orderSourceLabelMap: Record<string, string> = {
-    Sales: '销售创建',
+    Sales: '后台下单',
     ChannelPortal: '渠道来源',
     OnlineStore: '官网',
-    APISync: 'API 同步',
-    Renewal: '续费',
+    APISync: '三方平台',
 };
 
 
@@ -75,7 +74,7 @@ const paymentMethodMap: Record<string, string> = {
 };
 
 const OrderManager: React.FC = () => {
-  const { orders, setOrders, products, customers, currentUser, users, departments, opportunities, channels, roles, standaloneEnterprises, orderDrafts, setOrderDrafts } = useAppContext();
+  const { orders, setOrders, products, customers, currentUser, users, departments, opportunities, channels, roles, standaloneEnterprises, orderDrafts, setOrderDrafts, apiMode, refreshOrders } = useAppContext();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -335,7 +334,7 @@ const OrderManager: React.FC = () => {
               case 'id': return o.id;
               case 'customer': return o.customerName;
               case 'buyer': return o.buyerName || o.customerName;
-              case 'products': return o.items.map(it => `${it.productName}${it.skuName ? '/' + it.skuName : ''}${it.licenseType ? '/' + it.licenseType : ''} ×${it.quantity}`).join('; ');
+              case 'products': return (o.items || []).map(it => `${it.productName || ''}${it.skuName ? '/' + it.skuName : ''}${it.licenseType ? '/' + it.licenseType : ''} ×${it.quantity}`).join('; ');
               case 'sales': return o.salesRepName || '-';
               case 'businessManager': return o.businessManagerName || '-';
               case 'department': { const u = users.find(uu => uu.id === o.salesRepId); return getDepartmentPath(u?.departmentId); }
@@ -345,12 +344,12 @@ const OrderManager: React.FC = () => {
               case 'status': return statusMap[o.status] || o.status;
               case 'paymentStatus': return o.isPaid ? '已付款' : '未付款';
               case 'stockStatus': return o.status === OrderStatus.SHIPPED || o.status === OrderStatus.DELIVERED ? '已发货' : '待备货';
-              case 'total': return o.total.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              case 'total': return (o.total ?? 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
               case 'payment': return o.paymentMethod || '-';
               case 'delivery': return o.deliveryMethod || '-';
               case 'address': return o.shippingAddress || '-';
               case 'invoice': return o.invoiceInfo?.title || '-';
-              case 'licensee': return [...new Set(o.items.map(i => i.licensee).filter(Boolean))].join('、') || '-';
+              case 'licensee': return [...new Set((o.items || []).map(i => i.licensee).filter(Boolean))].join('、') || '-';
               case 'opportunity': return o.opportunityId || '-';
               default: return '-';
           }
@@ -530,12 +529,13 @@ const OrderManager: React.FC = () => {
     if (filterStatus === 'STOCK_CD') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && order.isShippingConfirmed && !order.isCDBurned;
 
     const searchLower = searchTerm.toLowerCase();
+    const safeItems = order.items || [];
     const matchesSearch = !searchTerm || (
-        searchField === 'id'           ? order.id.toLowerCase().includes(searchLower) :
-        searchField === 'customerName' ? order.customerName.toLowerCase().includes(searchLower) :
-        searchField === 'productName'  ? order.items.some(item => item.productName.toLowerCase().includes(searchLower)) :
-        searchField === 'licensee'     ? order.items.some(item => (item.licensee || '').toLowerCase().includes(searchLower)) :
-        (order.buyerName || order.customerName).toLowerCase().includes(searchLower)
+        searchField === 'id'           ? (order.id || '').toLowerCase().includes(searchLower) :
+        searchField === 'customerName' ? (order.customerName || '').toLowerCase().includes(searchLower) :
+        searchField === 'productName'  ? safeItems.some(item => (item.productName || '').toLowerCase().includes(searchLower)) :
+        searchField === 'licensee'     ? safeItems.some(item => (item.licensee || '').toLowerCase().includes(searchLower)) :
+        (order.buyerName || order.customerName || '').toLowerCase().includes(searchLower)
     );
     const matchesSource = filterSource === 'All' || order.source === filterSource;
     const matchesDate = (!filterDateStart || new Date(order.date) >= new Date(filterDateStart)) &&
@@ -674,38 +674,35 @@ const OrderManager: React.FC = () => {
       };
   };
 
-  const handleBatchConfirm = () => {
+  const handleBatchConfirm = async () => {
       const selectedList = orders.filter(o => selectedOrderIds.has(o.id));
       const eligible = selectedList.filter(o => o.status === OrderStatus.PENDING_CONFIRM);
       if (eligible.length === 0) return alert('未选中任何“待确认”状态的订单。');
-      if (confirm(`确定批量确认 ${eligible.length} 个订单吗？`)) {
-          const now = new Date().toISOString();
+      if (!confirm(`确定批量确认 ${eligible.length} 个订单吗？`)) return;
+      const now = new Date().toISOString();
+      if (apiMode) {
+          try {
+              const { orderApi } = await import('../../services/api');
+              await Promise.all(eligible.map(o => orderApi.update(o.id, { ...o, status: OrderStatus.PROCESSING_PROD })));
+              await refreshOrders();
+          } catch (e) { alert((e as any).message || '批量确认失败'); return; }
+      } else {
           const updatedOrders = orders.map(o => {
               if (selectedOrderIds.has(o.id) && o.status === OrderStatus.PENDING_CONFIRM) {
-                  return {
-                      ...o,
-                      status: OrderStatus.PROCESSING_PROD,
-                      confirmedDate: now,
-                      approvalRecords: [{
-                          id: `op-batch-${Date.now()}-${o.id}`,
-                          operatorId: currentUser.id,
-                          operatorName: currentUser.name,
-                          operatorRole: currentUser.role,
-                          actionType: 'Batch Confirm',
-                          result: 'Confirmed',
-                          timestamp: now,
-                          comment: '批量确认操作'
-                      }, ...o.approvalRecords]
-                  };
+                  return { ...o, status: OrderStatus.PROCESSING_PROD, confirmedDate: now,
+                      approvalRecords: [{ id: `op-batch-${Date.now()}-${o.id}`, operatorId: currentUser.id,
+                          operatorName: currentUser.name, operatorRole: currentUser.role,
+                          actionType: 'Batch Confirm', result: 'Confirmed', timestamp: now, comment: '批量确认操作'
+                      }, ...(o.approvalRecords || [])] };
               }
               return o;
           });
           setOrders(updatedOrders);
-          setSelectedOrderIds(new Set());
       }
+      setSelectedOrderIds(new Set());
   };
 
-  const handleBatchShip = () => {
+  const handleBatchShip = async () => {
       const selectedList = orders.filter(o => selectedOrderIds.has(o.id));
       const eligible = selectedList.filter(o => o.status === OrderStatus.PROCESSING_PROD);
       if (eligible.length === 0) return alert('未选中任何“备货中”状态的订单。');
@@ -716,32 +713,29 @@ const OrderManager: React.FC = () => {
           if(!confirm(`确定批量发货 ${eligible.length} 个订单吗？`)) return;
       }
       const now = new Date().toISOString();
-      const updatedOrders = orders.map(o => {
-          if (selectedOrderIds.has(o.id) && o.status === OrderStatus.PROCESSING_PROD) {
-              const isPhysical = o.deliveryMethod !== 'Online';
-              return {
-                  ...o,
-                  status: OrderStatus.SHIPPED,
-                  shippedDate: now,
-                  carrier: isPhysical ? (o.carrier || 'Batch Ship') : undefined,
-                  trackingNumber: isPhysical ? (o.trackingNumber || `BATCH-${Date.now()}`) : undefined,
-                  isPackageConfirmed: true,
-                  isCDBurned: true,
-                  approvalRecords: [{
-                      id: `op-batch-ship-${Date.now()}-${o.id}`,
-                      operatorId: currentUser.id,
-                      operatorName: currentUser.name,
-                      operatorRole: currentUser.role,
-                      actionType: 'Batch Ship',
-                      result: 'Shipped',
-                      timestamp: now,
-                      comment: '批量发货操作'
-                  }, ...o.approvalRecords]
-              };
-          }
-          return o;
-      });
-      setOrders(updatedOrders);
+      if (apiMode) {
+          try {
+              const { orderApi } = await import('../../services/api');
+              await Promise.all(eligible.map(o => orderApi.update(o.id, { ...o, status: OrderStatus.SHIPPED, shippedDate: now })));
+              await refreshOrders();
+          } catch (e) { alert((e as any).message || '批量发货失败'); return; }
+      } else {
+          const updatedOrders = orders.map(o => {
+              if (selectedOrderIds.has(o.id) && o.status === OrderStatus.PROCESSING_PROD) {
+                  const isPhysical = o.deliveryMethod !== 'Online';
+                  return { ...o, status: OrderStatus.SHIPPED, shippedDate: now,
+                      carrier: isPhysical ? (o.carrier || 'Batch Ship') : undefined,
+                      trackingNumber: isPhysical ? (o.trackingNumber || `BATCH-${Date.now()}`) : undefined,
+                      isPackageConfirmed: true, isCDBurned: true,
+                      approvalRecords: [{ id: `op-batch-ship-${Date.now()}-${o.id}`, operatorId: currentUser.id,
+                          operatorName: currentUser.name, operatorRole: currentUser.role,
+                          actionType: 'Batch Ship', result: 'Shipped', timestamp: now, comment: '批量发货操作'
+                      }, ...(o.approvalRecords || [])] };
+              }
+              return o;
+          });
+          setOrders(updatedOrders);
+      }
       setSelectedOrderIds(new Set());
   };
 
@@ -750,14 +744,17 @@ const OrderManager: React.FC = () => {
       e.stopPropagation();
       setConfirmDeleteId(orderId);
   };
-  const confirmDelete = useCallback(() => {
+  const confirmDelete = useCallback(async () => {
       setConfirmDeleteId(prev => {
           if (!prev) return prev;
           setOrderDrafts(drafts => drafts.filter(d => d.id !== prev));
+          if (apiMode) {
+              import('../../services/api').then(({ orderApi }) => orderApi.delete(prev)).then(() => refreshOrders()).catch(() => {});
+          }
           setOrders(ords => ords.filter(o => o.id !== prev));
           return null;
       });
-  }, [setOrderDrafts, setOrders]);
+  }, [setOrderDrafts, setOrders, apiMode, refreshOrders]);
 
   const getAction = (order: Order) => {
       const navigateToStep = (step: string) => navigate(`/orders/${order.id}`, { state: { openAction: step } });
@@ -999,8 +996,11 @@ const OrderManager: React.FC = () => {
                                                     继续 <ChevronRight className="w-3 h-3"/>
                                                 </button>
                                                 <button
-                                                    onClick={() => {
+                                                    onClick={async () => {
                                                         setOrderDrafts(prev => prev.filter(d => d.id !== draft.id));
+                                                        if (apiMode) {
+                                                            try { const { orderApi } = await import('../../services/api'); await orderApi.delete(draft.id); } catch {}
+                                                        }
                                                         setOrders(prev => prev.filter(o => o.id !== draft.id));
                                                     }}
                                                     className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"
@@ -1158,7 +1158,7 @@ const OrderManager: React.FC = () => {
                         return (
                           <td key={colId} className="px-3 py-2.5">
                               <div className="flex flex-col gap-1 max-w-[220px]">
-                                  {order.items.slice(0, 1).map((item, idx) => (
+                                  {(order.items || []).slice(0, 1).map((item, idx) => (
                                       <div key={idx} className="flex flex-col">
                                           <div className="flex items-center justify-between gap-2">
                                               <div className="relative group/pname min-w-0 flex-1">
@@ -1175,7 +1175,7 @@ const OrderManager: React.FC = () => {
                                           </div>
                                       </div>
                                   ))}
-                                  {order.items.length > 1 && (
+                                  {(order.items || []).length > 1 && (
                                       <div className="mt-1 self-end" ref={productPopoverId === order.id ? productPopoverRef : undefined}>
                                           <button
                                               onClick={(e) => {
@@ -1194,7 +1194,7 @@ const OrderManager: React.FC = () => {
                                               }}
                                               className="text-[10px] font-semibold text-[#0071E3] dark:text-[#0A84FF] bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-100 dark:border-blue-800 px-1.5 py-px rounded-full transition"
                                           >
-                                              +{order.items.length - 1} 更多
+                                              +{(order.items || []).length - 1} 更多
                                           </button>
                                       </div>
                                   )}
@@ -1287,7 +1287,7 @@ const OrderManager: React.FC = () => {
                       case 'stockStatus':
                         return <td key={colId} className="px-3 py-2.5 whitespace-nowrap">{getStockStatusBadge(order)}</td>;
                       case 'total':
-                        return <td key={colId} className="px-3 py-2.5 text-right font-bold text-red-600 dark:text-red-400 whitespace-nowrap" style={{fontVariantNumeric:'tabular-nums'}}>¥{order.total.toLocaleString()}</td>;
+                        return <td key={colId} className="px-3 py-2.5 text-right font-bold text-red-600 dark:text-red-400 whitespace-nowrap" style={{fontVariantNumeric:'tabular-nums'}}>¥{(order.total ?? 0).toLocaleString()}</td>;
                       case 'payment':
                         return (
                           <td key={colId} className="px-3 py-2.5 text-gray-600 dark:text-gray-300">
@@ -1321,7 +1321,7 @@ const OrderManager: React.FC = () => {
                         return (
                           <td key={colId} className="px-3 py-2.5 max-w-[200px]">
                               {(() => {
-                                  const licensees = [...new Set(order.items.map(i => i.licensee).filter(Boolean))];
+                                  const licensees = [...new Set((order.items || []).map(i => i.licensee).filter(Boolean))];
                                   if (licensees.length === 0) return <span className="text-gray-400">-</span>;
                                   return (
                                     <div className="flex flex-col gap-1">
@@ -1430,13 +1430,13 @@ const OrderManager: React.FC = () => {
                   onClick={e => e.stopPropagation()}
               >
                   <div className="px-4 py-2.5 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
-                      <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">全部产品（{order.items.length}）</span>
+                      <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">全部产品（{(order.items || []).length}）</span>
                       <button onClick={() => { setProductPopoverId(null); setPopoverPos(null); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition">
                           <X className="w-3.5 h-3.5" />
                       </button>
                   </div>
                   <div className="p-3 space-y-2.5 max-h-96 overflow-y-auto custom-scrollbar">
-                      {order.items.map((item, idx) => (
+                      {(order.items || []).map((item, idx) => (
                           <div key={idx} className="flex flex-col gap-1 pb-2.5 border-b border-gray-50 dark:border-white/5 last:border-0 last:pb-0">
                               <div className="flex items-center justify-between gap-2">
                                   <span className="text-sm font-medium text-gray-800 dark:text-gray-200 leading-snug">{item.productName}</span>

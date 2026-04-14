@@ -31,14 +31,25 @@ const USE_API = import.meta.env.VITE_API_MODE === 'true';
 
 // --- Mock data fallback (bump version when schema changes to force refresh) ---
 const MOCK_DATA_VERSION = 9;
-const mockCustomers = generateCustomers(initialUsers);
-const mockOpportunities = generateOpportunities(mockCustomers);
-const mockContracts = generateContracts(mockCustomers);
-const mockOrders = generateOrders({
-    customers: mockCustomers, products: initialProducts, users: initialUsers,
-    merchandises: initialMerchandises, opportunities: mockOpportunities, channels: initialChannels,
-    contracts: mockContracts,
-});
+
+function safeGenerateMockData() {
+    try {
+        const customers = generateCustomers(initialUsers);
+        const opportunities = generateOpportunities(customers);
+        const contracts = generateContracts(customers);
+        const orders = generateOrders({
+            customers, products: initialProducts, users: initialUsers,
+            merchandises: initialMerchandises, opportunities, channels: initialChannels,
+            contracts,
+        });
+        return { customers, opportunities, contracts, orders };
+    } catch (e) {
+        console.error('[MockData] Failed to generate mock data, using empty fallback:', e);
+        return { customers: [] as Customer[], opportunities: [] as Opportunity[], contracts: [] as Contract[], orders: [] as Order[] };
+    }
+}
+
+const { customers: mockCustomers, opportunities: mockOpportunities, contracts: mockContracts, orders: mockOrders } = safeGenerateMockData();
 
 // ---------- Context shape ----------
 interface AppContextType {
@@ -86,6 +97,9 @@ interface AppContextType {
 
     refreshOrders: () => Promise<void>;
     refreshCustomers: () => Promise<void>;
+
+    loading: boolean;
+    error: string | null;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -97,6 +111,9 @@ export function useAppContext(): AppContextType {
 }
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [loading, setLoading] = useState(USE_API);
+    const [error, setError] = useState<string | null>(null);
+
     // --- Product domain ---
     const [products, setProducts] = useState(() => {
         const salesOrgs = ['珠海金山办公有限公司', '北京金山办公有限公司', '武汉金山办公有限公司'];
@@ -128,9 +145,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [contracts, setContracts] = useState<Contract[]>(() => USE_API ? [] : mockContracts);
     const [remittances, setRemittances] = useState<Remittance[]>(() => USE_API ? [] : generateRemittances());
     const [invoices, setInvoices] = useState<Invoice[]>(() => USE_API ? [] : generateInvoices());
-    const [performances] = useState<Performance[]>(() => generatePerformances());
-    const [authorizations] = useState<Authorization[]>(() => generateAuthorizations());
-    const [deliveryInfos] = useState<DeliveryInfo[]>(() => generateDeliveryInfos());
+    const [performances, setPerformances] = useState<Performance[]>(() =>
+        USE_API ? [] : generatePerformances());
+    const [authorizations, setAuthorizations] = useState<Authorization[]>(() =>
+        USE_API ? [] : generateAuthorizations());
+    const [deliveryInfos, setDeliveryInfos] = useState<DeliveryInfo[]>(() =>
+        USE_API ? [] : generateDeliveryInfos());
 
     // --- Mock data version check: refresh stale data after HMR ---
     useEffect(() => {
@@ -143,6 +163,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setCustomers(mockCustomers);
             setOpportunities(mockOpportunities);
             setContracts(mockContracts);
+            setRemittances(generateRemittances());
+            setInvoices(generateInvoices());
+            setPerformances(generatePerformances());
+            setAuthorizations(generateAuthorizations());
+            setDeliveryInfos(generateDeliveryInfos());
         }
     }, []);
 
@@ -168,15 +193,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         const token = getToken();
         if (!token) {
-            console.log('[API] No auth token, falling back to mock data');
-            setCustomers(mockCustomers);
-            setOpportunities(mockOpportunities);
-            setContracts(mockContracts);
-            setOrders(mockOrders);
+            console.log('[API] No auth token; CRM/订单/财务数据保持为空，请登录后刷新页面加载后端数据');
+            setCustomers([]);
+            setOpportunities([]);
+            setContracts([]);
+            setOrders([]);
+            setRemittances([]);
+            setInvoices([]);
+            setPerformances([]);
+            setAuthorizations([]);
+            setDeliveryInfos([]);
+            setLoading(false);
+            setError('未登录，请先登录');
             return;
         }
 
         (async () => {
+            setLoading(true);
+            setError(null);
             try {
                 const [me, userList, deptList, roleList, prodList, channelList, oppList] = await Promise.all([
                     authApi.me(),
@@ -198,18 +232,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 await refreshOrders();
                 await refreshCustomers();
 
-                const [contractRes, remittanceRes, invoiceRes] = await Promise.all([
+                const [
+                    contractRes, remittanceRes, invoiceRes,
+                    performanceRes, authorizationRes, deliveryRes,
+                ] = await Promise.all([
                     financeApi.contracts({ size: '500' }),
                     financeApi.remittances({ size: '500' }),
                     financeApi.invoices({ size: '500' }),
+                    financeApi.performances({ size: '500' }),
+                    financeApi.authorizations({ size: '500' }),
+                    financeApi.deliveryInfos({ size: '500' }),
                 ]);
                 setContracts(contractRes.data);
                 setRemittances(remittanceRes.data);
                 setInvoices(invoiceRes.data);
+                setPerformances(performanceRes.data);
+                setAuthorizations(authorizationRes.data);
+                setDeliveryInfos(deliveryRes.data);
 
                 console.log('[API] All data loaded from backend');
-            } catch (e) {
+            } catch (e: any) {
                 console.error('[API] Initialization failed:', e);
+                setError(e.message || '数据加载失败');
+            } finally {
+                setLoading(false);
             }
         })();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -245,6 +291,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         refreshOrders,
         refreshCustomers,
+
+        loading,
+        error,
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

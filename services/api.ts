@@ -103,6 +103,18 @@ export const financeApi = {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     return request<PaginatedResult<any>>(`/finance/invoices${qs}`);
   },
+  performances: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<PaginatedResult<any>>(`/finance/performances${qs}`);
+  },
+  authorizations: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<PaginatedResult<any>>(`/finance/authorizations${qs}`);
+  },
+  deliveryInfos: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<PaginatedResult<any>>(`/finance/delivery-infos${qs}`);
+  },
 };
 
 // ---- Health check ----

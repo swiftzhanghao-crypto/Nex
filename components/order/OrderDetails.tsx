@@ -6,7 +6,7 @@ import {
     ArrowLeft, Box, Printer, Award, X, Lock, CheckCircle, Truck, ClipboardCheck, 
     UploadCloud, AlertOctagon, RefreshCcw, Key, Package, Disc, Receipt, FileText, 
     Briefcase, History, Eye, CheckSquare, CreditCard, ShieldCheck, User as UserIcon, Building,
-    AlertCircle, Clock, MapPin, Target, Users, Paperclip, Scroll, Camera, ScrollText, Copy, Check, Phone, Mail, Download, Banknote, Edit3, Wallet
+    AlertCircle, Clock, MapPin, Target, Users, Paperclip, Scroll, Camera, ScrollText, Copy, Check, Phone, Mail, Download, Banknote, Edit3, Wallet, ChevronDown, Hash
 } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
@@ -29,7 +29,7 @@ const statusMap: Record<string, string> = {
 };
 
 const OrderDetails: React.FC = () => {
-  const { orders, setOrders, products, customers, currentUser, users, departments, opportunities, contracts, roles } = useAppContext();
+  const { orders, setOrders, products, customers, currentUser, users, departments, opportunities, contracts, roles, apiMode, refreshOrders } = useAppContext();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -38,7 +38,16 @@ const OrderDetails: React.FC = () => {
   const permissions = currentUserRole?.permissions || [];
   const hasPermission = (perm: string) => permissions.includes('all') || permissions.includes(perm);
 
-  const selectedOrder = useMemo(() => orders.find(o => o.id === id), [orders, id]);
+  const selectedOrder = useMemo(() => {
+      const o = orders.find(o => o.id === id);
+      if (!o) return undefined;
+      return {
+          ...o,
+          items: o.items || [],
+          total: typeof o.total === 'number' ? o.total : 0,
+          approvalRecords: o.approvalRecords || [],
+      };
+  }, [orders, id]);
 
   // States
   const [activeStepModal, setActiveStepModal] = useState<string | null>(null);
@@ -68,12 +77,16 @@ const OrderDetails: React.FC = () => {
 
   const [fulfillmentItemIndex, setFulfillmentItemIndex] = useState<number | null>(null);
   const [fulfillmentContent, setFulfillmentContent] = useState('');
-  const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'FULFILLMENT' | 'EMAIL' | 'SERIAL'>('MANAGEMENT');
+  const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'FULFILLMENT' | 'EMAIL'>('MANAGEMENT');
   const [isContractPreviewOpen, setIsContractPreviewOpen] = useState(false);
   const [contractZoom, setContractZoom] = useState(100);
   const [expandedContractIds, setExpandedContractIds] = useState<Set<string>>(new Set());
   const [previewContractId, setPreviewContractId] = useState<string | null>(null);
   const [selectedDeliveryNo, setSelectedDeliveryNo] = useState<string | null>(null);
+
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const toggleSection = (key: string) => setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
+  const isSectionCollapsed = (key: string) => !!collapsedSections[key];
 
   // Step specific forms
   const [shippingCarrier, setShippingCarrier] = useState('');
@@ -101,8 +114,20 @@ const OrderDetails: React.FC = () => {
   const salesUser = users.find(u => u.id === selectedOrder.salesRepId);
   const salesDept = departments.find(d => d.id === salesUser?.departmentId);
 
-  const updateOrder = (updatedOrder: Order) => {
-      setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+  const updateOrder = async (updatedOrder: Order) => {
+      if (apiMode) {
+          try {
+              const { orderApi } = await import('../../services/api');
+              await orderApi.update(updatedOrder.id, updatedOrder);
+              await refreshOrders();
+          } catch (e: any) {
+              console.error('[API] Failed to update order:', e);
+              alert(e.message || '订单更新失败');
+              return;
+          }
+      } else {
+          setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+      }
   };
 
   const createOperationRecord = (actionType: string, result: string, comment?: string): ApprovalRecord => ({
@@ -634,13 +659,12 @@ const OrderDetails: React.FC = () => {
           <div className="flex gap-1 overflow-x-auto no-scrollbar pt-2 border-b border-gray-200 dark:border-white/10">
               {([
                   { id: 'MANAGEMENT', label: '订单信息', permission: undefined },
-                  { id: 'SERIAL', label: '序列号', permission: undefined },
-                  { id: 'EMAIL', label: '发货记录', permission: 'order_detail_shipping' },
                   { id: 'FULFILLMENT', label: '订单交付', permission: 'order_detail_delivery' },
+                  { id: 'EMAIL', label: '发货记录', permission: 'order_detail_shipping' },
               ] as { id: string; label: string; permission?: string; hidden?: boolean }[]).filter(tab => !tab.hidden && (!tab.permission || hasPermission(tab.permission))).map(tab => (
                   <button
                       key={tab.id}
-                      onClick={() => setActiveTab(tab.id as 'MANAGEMENT' | 'FULFILLMENT' | 'EMAIL' | 'SERIAL')}
+                      onClick={() => setActiveTab(tab.id as 'MANAGEMENT' | 'FULFILLMENT' | 'EMAIL')}
                       className={`relative px-5 py-2 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 -mb-px ${
                           activeTab === tab.id
                           ? 'text-[#0071E3] dark:text-[#0A84FF] border-[#0071E3] dark:border-[#0A84FF]'
@@ -698,11 +722,12 @@ const OrderDetails: React.FC = () => {
           {/* Order Items Table + Summary Side-by-Side */}
           {hasPermission('order_detail_product') && (
           <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
-              <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+              <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 cursor-pointer select-none" onClick={() => toggleSection('product')}>
                   <Package className="w-5 h-5 text-orange-500" />
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">订单产品明细</h3>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white flex-1">订单产品明细</h3>
+                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('product') ? '-rotate-90' : ''}`} />
               </div>
-              {(
+              {!isSectionCollapsed('product') && (
               <div className="flex items-stretch">
                   <div className="flex-1 min-w-0 overflow-x-auto border-r border-gray-100 dark:border-white/10">
                       <table className="w-full text-left min-w-[520px]">
@@ -850,12 +875,13 @@ const OrderDetails: React.FC = () => {
               const stageClass = opp.stage === '赢单' ? 'unified-tag-green !rounded-full' : opp.stage === '输单' ? 'unified-tag-gray !rounded-full' : opp.stage === '需求判断' ? 'unified-tag-blue !rounded-full' : opp.stage === '确认商机' ? 'unified-tag-indigo !rounded-full' : opp.stage === '确认渠道' ? 'unified-tag-purple !rounded-full' : 'unified-tag-yellow !rounded-full';
               return (
                   <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
-                      <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                      <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 cursor-pointer select-none" onClick={() => toggleSection('opportunity')}>
                           <Target className="w-5 h-5 text-orange-500" />
-                          <h3 className="text-base font-semibold text-gray-900 dark:text-white">商机信息</h3>
+                          <h3 className="text-base font-semibold text-gray-900 dark:text-white flex-1">商机信息</h3>
+                          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('opportunity') ? '-rotate-90' : ''}`} />
                       </div>
-                      <div className="p-5">
-                          <div className="grid grid-cols-2 gap-x-6">
+                      {!isSectionCollapsed('opportunity') && <div className="p-5">
+                          <div className="grid grid-cols-3 gap-x-6">
                               {[
                                   { label: '商机名称', value: opp.name },
                                   { label: '商机编号', value: opp.id, mono: true },
@@ -866,20 +892,20 @@ const OrderDetails: React.FC = () => {
                                   { label: '商机金额', value: `¥${(opp.amount || opp.expectedRevenue || 0).toLocaleString()}`, isAmount: true },
                                   { label: '结单日期', value: opp.closeDate ? new Date(opp.closeDate).toLocaleDateString('zh-CN') : '-', mono: true },
                               ].map((f, idx) => (
-                                  <div key={idx} className="flex items-center gap-8 py-3.5 border-b border-gray-50 dark:border-white/5 last:border-0">
-                                      <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-24 shrink-0 whitespace-nowrap">{f.label}</span>
+                                  <div key={idx} className="flex items-center gap-3 py-3.5 border-b border-gray-50 dark:border-white/5 last:border-0">
+                                      <span className="text-[13px] font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-20 shrink-0 whitespace-nowrap">{f.label}</span>
                                       {f.tag ? (
-                                          <span className={stageClass}>{opp.stage}</span>
+                                          <span className={`${stageClass} text-[13px]`}>{opp.stage}</span>
                                       ) : (
-                                          <span className={`text-sm font-medium flex-1 truncate ${f.isAmount ? 'font-mono font-bold text-red-600 dark:text-red-400' : f.mono ? 'font-mono text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'}`} title={f.value}>{f.value}</span>
+                                          <span className={`text-[13px] font-medium flex-1 truncate ${f.isAmount ? 'font-mono font-bold text-red-600 dark:text-red-400' : f.mono ? 'font-mono text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'}`} title={f.value}>{f.value}</span>
                                       )}
                                   </div>
                               ))}
                           </div>
                           {opp.products && opp.products.length > 0 && (
                               <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/10">
-                                  <div className="flex items-center gap-8">
-                                      <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-24 shrink-0 whitespace-nowrap">产品信息</span>
+                                  <div className="flex items-center gap-3">
+                                      <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-20 shrink-0 whitespace-nowrap">产品信息</span>
                                       <div className="flex-1 flex flex-col gap-2">
                                           {opp.products.map((p, pi) => (
                                               <div key={pi} className="flex flex-col">
@@ -899,7 +925,7 @@ const OrderDetails: React.FC = () => {
                                   </div>
                               </div>
                           )}
-                      </div>
+                      </div>}
                   </div>
               );
           })()}
@@ -908,11 +934,12 @@ const OrderDetails: React.FC = () => {
               {/* 客户信息 (1/3 卡片，含订单联系人) */}
               {hasPermission('order_detail_customer') && (
               <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col">
-                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 shrink-0">
+                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 shrink-0 cursor-pointer select-none" onClick={() => toggleSection('customer')}>
                       <Building className="w-5 h-5 text-[#0071E3]" />
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">客户信息</h3>
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white flex-1">客户信息</h3>
+                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('customer') ? '-rotate-90' : ''}`} />
                   </div>
-                  <div className="p-5 flex-1">
+                  {!isSectionCollapsed('customer') && <div className="p-5 flex-1">
                       <div className="divide-y divide-gray-50 dark:divide-white/5">
                           {[
                               { label: '客户名称', value: selectedOrder.customerName, link: `/customers/${selectedOrder.customerId}` },
@@ -922,10 +949,10 @@ const OrderDetails: React.FC = () => {
                               { label: '报备标签', value: selectedOrder.reportTag },
                               { label: '授权覆盖客户', value: selectedOrder.customerStatus },
                           ].map((item, idx) => (
-                              <div key={idx} className="flex items-center gap-8 py-3.5">
-                                  <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-32 shrink-0 whitespace-nowrap">{item.label}</span>
+                              <div key={idx} className="flex items-center gap-3 py-3.5">
+                                  <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-24 shrink-0 whitespace-nowrap">{item.label}</span>
                                   {item.link ? (
-                                      <button onClick={() => navigate(item.link!)} className="text-sm font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline truncate flex-1" title={item.value || '-'}>
+                                      <button onClick={() => navigate(item.link!)} className="text-sm font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline truncate flex-1 text-left" title={item.value || '-'}>
                                           {item.value || '-'}
                                       </button>
                                   ) : (
@@ -970,18 +997,19 @@ const OrderDetails: React.FC = () => {
                               </div>
                           );
                       })()}
-                  </div>
+                  </div>}
               </div>
               )}
 
               {/* 交易双方信息 (1/3 卡片) */}
               {hasPermission('order_detail_trader') && (
               <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col">
-                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 shrink-0">
+                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 shrink-0 cursor-pointer select-none" onClick={() => toggleSection('trader')}>
                       <Users className="w-5 h-5 text-indigo-500" />
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">交易双方信息</h3>
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white flex-1">交易双方信息</h3>
+                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('trader') ? '-rotate-90' : ''}`} />
                   </div>
-                  <div className="p-5 flex-1">
+                  {!isSectionCollapsed('trader') && <div className="p-5 flex-1">
                       <div className="divide-y divide-gray-50 dark:divide-white/5">
                           {[
                               { label: '买方名称', value: selectedOrder.buyerName },
@@ -990,43 +1018,45 @@ const OrderDetails: React.FC = () => {
                               { label: '终端渠道', value: selectedOrder.terminalChannel },
                               { label: '渠道服务', value: selectedOrder.channelService },
                           ].map((item, idx) => (
-                              <div key={idx} className="flex items-center gap-8 py-3.5">
-                                  <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-32 shrink-0 whitespace-nowrap">{item.label}</span>
+                              <div key={idx} className="flex items-center gap-3 py-3.5">
+                                  <span className="text-sm font-bold tracking-wider text-gray-400 dark:text-gray-500 text-right w-24 shrink-0 whitespace-nowrap">{item.label}</span>
                                   <span className="text-sm font-medium text-gray-900 dark:text-white truncate flex-1" title={item.value || '-'}>{item.value || '-'}</span>
                               </div>
                           ))}
                       </div>
-                  </div>
+                  </div>}
               </div>
               )}
 
               {/* 订单备注 (1/3 卡片) */}
-              <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col">
-                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 shrink-0">
+              {hasPermission('order_detail_remark') && <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col">
+                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 shrink-0 cursor-pointer select-none" onClick={() => toggleSection('remark')}>
                       <FileText className="w-4 h-4 text-amber-500" />
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">订单备注</h3>
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white flex-1">订单备注</h3>
+                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('remark') ? '-rotate-90' : ''}`} />
                   </div>
-                  <div className="px-4 py-3 flex-1 overflow-y-auto">
+                  {!isSectionCollapsed('remark') && <div className="px-4 py-3 flex-1 overflow-y-auto">
                       {selectedOrder.orderRemark ? (
                           <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap break-words">{selectedOrder.orderRemark}</p>
                       ) : (
                           <p className="text-sm text-gray-400 dark:text-gray-500 italic">暂无备注</p>
                       )}
-                  </div>
-              </div>
+                  </div>}
+              </div>}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* 合同信息 (moved before original order) */}
               <div className="unified-card md:col-span-2 dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
-                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 cursor-pointer select-none" onClick={() => toggleSection('contract')}>
                       <Scroll className="w-5 h-5 text-blue-500" />
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">合同信息</h3>
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white flex-1">合同信息</h3>
                       {(selectedOrder.linkedContractIds?.length ?? 0) > 0 && (
                           <span className="text-xs text-gray-400 font-mono">({selectedOrder.linkedContractIds!.length})</span>
                       )}
+                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('contract') ? '-rotate-90' : ''}`} />
                   </div>
-                  {(() => {
+                  {!isSectionCollapsed('contract') && (() => {
                       const ids = selectedOrder.linkedContractIds;
                       if (!ids || ids.length === 0) return (
                           <div className="p-5"><p className="text-sm text-gray-400 dark:text-gray-500 italic">暂未关联合同</p></div>
@@ -1078,10 +1108,11 @@ const OrderDetails: React.FC = () => {
               {/* Original Order Numbers (small card) */}
               {hasPermission('order_detail_original') && (
               <div className="unified-card md:col-span-1 dark:bg-[#1C1C1E] p-4 border-gray-100/50 dark:border-white/10 space-y-3">
-                  <div className="border-b border-gray-100 dark:border-white/10 pb-2.5">
-                      <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2"><History className="w-5 h-5 text-purple-500"/> 原订单编号</h4>
+                  <div className="border-b border-gray-100 dark:border-white/10 pb-2.5 cursor-pointer select-none flex items-center" onClick={() => toggleSection('originalOrder')}>
+                      <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2 flex-1"><History className="w-5 h-5 text-purple-500"/> 原订单编号</h4>
+                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('originalOrder') ? '-rotate-90' : ''}`} />
                   </div>
-                  <div className="divide-y divide-gray-50 dark:divide-white/5">
+                  {!isSectionCollapsed('originalOrder') && <div className="divide-y divide-gray-50 dark:divide-white/5">
                       {[
                           { label: 'SMS订单编号', value: selectedOrder.smsOriginalOrderId || 'S00713162' },
                           { label: 'SaaS订单编号', value: selectedOrder.saasOriginalOrderId || 'P20260303195755000001' },
@@ -1091,19 +1122,20 @@ const OrderDetails: React.FC = () => {
                               <span className="text-sm font-medium font-mono text-gray-900 dark:text-white flex-1 break-all">{item.value}</span>
                           </div>
                       ))}
-                  </div>
+                  </div>}
               </div>
               )}
             </div>
 
             {/* Settlement Method */}
-            {selectedOrder.settlementMethod && (
+            {hasPermission('order_detail_settlement') && selectedOrder.settlementMethod && (
             <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
-                <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 cursor-pointer select-none" onClick={() => toggleSection('settlement')}>
                     <Banknote className="w-5 h-5 text-emerald-500" />
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">结算方式</h3>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white flex-1">结算方式</h3>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('settlement') ? '-rotate-90' : ''}`} />
                 </div>
-                <div className="px-5 py-4 space-y-4">
+                {!isSectionCollapsed('settlement') && <div className="px-5 py-4 space-y-4">
                     <div className="flex items-center gap-3 flex-wrap">
                         <div className="flex items-center gap-2">
                             <span className="text-sm text-gray-500 dark:text-gray-400">结算方式：</span>
@@ -1163,14 +1195,14 @@ const OrderDetails: React.FC = () => {
                             </table>
                         </div>
                     )}
-                </div>
+                </div>}
             </div>
             )}
 
             {/* Acceptance Information Table */}
             {hasPermission('order_detail_acceptance') && (
             <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
-                    <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                    <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between cursor-pointer select-none" onClick={() => toggleSection('acceptance')}>
                         <div className="flex items-center gap-2">
                             <ClipboardCheck className="w-5 h-5 text-green-500" />
                             <h3 className="text-base font-semibold text-gray-900 dark:text-white">验收信息</h3>
@@ -1188,8 +1220,9 @@ const OrderDetails: React.FC = () => {
                                 {selectedOrder.acceptanceConfig.status === 'Completed' ? '已完成' : selectedOrder.acceptanceConfig.status === 'In Progress' ? '进行中' : '待验收'}
                             </span>
                         )}
+                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ml-2 ${isSectionCollapsed('acceptance') ? '-rotate-90' : ''}`} />
                     </div>
-                    <div className="overflow-x-auto">
+                    {!isSectionCollapsed('acceptance') && <><div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
                             <thead className="unified-table-header">
                                 <tr>
@@ -1269,67 +1302,12 @@ const OrderDetails: React.FC = () => {
                             </span>
                         </div>
                     )}
+                </>}
                 </div>
             )}
 
           </>
         )}
-
-          {activeTab === 'SERIAL' && (
-            <div className="unified-card overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-separate border-spacing-0">
-                        <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E]">
-                            <tr>
-                                <th className="pl-6 px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">序列号</th>
-                                <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">序列号来源</th>
-                                <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">序列号生成方式</th>
-                                <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">序列号生成明组</th>
-                                <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">序列号类型</th>
-                                <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">序列号状态</th>
-                                <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">序列号生成时间</th>
-                                <th className="px-3 py-2.5 pr-6 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">序列号截止时间</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-white/5 text-sm">
-                            {selectedOrder.serialNumbers && selectedOrder.serialNumbers.length > 0 ? selectedOrder.serialNumbers.map((sn, idx) => (
-                                <tr key={idx} className="group hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors border-b border-gray-100/50 dark:border-white/5 last:border-0">
-                                    <td className="pl-6 px-3 py-2.5">
-                                        <span className="font-mono font-semibold text-gray-900 dark:text-white">{sn.serialNo}</span>
-                                    </td>
-                                    <td className="px-3 py-2.5 text-gray-600 dark:text-gray-300">{sn.source}</td>
-                                    <td className="px-3 py-2.5 text-gray-600 dark:text-gray-300">{sn.generateMethod}</td>
-                                    <td className="px-3 py-2.5 text-gray-600 dark:text-gray-300">{sn.generateGroup}</td>
-                                    <td className="px-3 py-2.5">
-                                        <span className={`text-xs px-2.5 py-1 rounded-lg font-bold border ${
-                                            sn.type === '正式' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-800/30'
-                                            : sn.type === '试用' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-800/30'
-                                            : 'bg-gray-50 dark:bg-gray-800/20 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700/30'
-                                        }`}>{sn.type}</span>
-                                    </td>
-                                    <td className="px-3 py-2.5">
-                                        <span className={`text-xs px-2.5 py-1 rounded-lg font-bold border ${
-                                            sn.status === '已生效' ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-100 dark:border-green-800/30'
-                                            : sn.status === '待生效' ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-100 dark:border-yellow-800/30'
-                                            : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800/30'
-                                        }`}>{sn.status}</span>
-                                    </td>
-                                    <td className="px-3 py-2.5 text-gray-600 dark:text-gray-300 font-mono text-xs">{sn.generateTime}</td>
-                                    <td className="px-3 py-2.5 pr-6 text-gray-600 dark:text-gray-300 font-mono text-xs">{sn.expireTime}</td>
-                                </tr>
-                            )) : (
-                                <tr>
-                                    <td colSpan={8} className="px-3 py-16 text-center text-gray-400 dark:text-gray-500 text-sm">暂无序列号数据</td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-                <div className="px-6 py-3 border-t border-gray-100 dark:border-white/10 flex items-center text-xs text-gray-400 dark:text-gray-500">
-                    <span>共 {selectedOrder.serialNumbers?.length || 0} 条</span>
-                </div>
-            </div>
-          )}
 
           {activeTab === 'FULFILLMENT' && hasPermission('order_detail_delivery') && (
           <div className="space-y-6">
@@ -1400,6 +1378,63 @@ const OrderDetails: React.FC = () => {
                               </tr>
                               );
                           })}
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+
+          {/* 序列号信息 */}
+          <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
+              <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                  <Hash className="w-5 h-5 text-purple-500" />
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">序列号信息</h3>
+                  <span className="ml-auto text-xs text-gray-400 dark:text-gray-500 font-mono">共 {selectedOrder.serialNumbers?.length || 0} 条</span>
+              </div>
+              <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm min-w-[900px]">
+                      <thead className="unified-table-header">
+                          <tr>
+                              <th className="px-5 py-4 pl-6 whitespace-nowrap">序列号</th>
+                              <th className="px-5 py-4 whitespace-nowrap">序列号来源</th>
+                              <th className="px-5 py-4 whitespace-nowrap">序列号生成方式</th>
+                              <th className="px-5 py-4 whitespace-nowrap">序列号生成明组</th>
+                              <th className="px-5 py-4 whitespace-nowrap">序列号类型</th>
+                              <th className="px-5 py-4 whitespace-nowrap">序列号状态</th>
+                              <th className="px-5 py-4 whitespace-nowrap">序列号生成时间</th>
+                              <th className="px-5 py-4 pr-6 whitespace-nowrap">序列号截止时间</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                          {selectedOrder.serialNumbers && selectedOrder.serialNumbers.length > 0 ? selectedOrder.serialNumbers.map((sn, idx) => (
+                              <tr key={idx} className="group text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                  <td className="px-5 py-4 pl-6">
+                                      <span className="font-mono font-semibold text-gray-900 dark:text-white">{sn.serialNo}</span>
+                                  </td>
+                                  <td className="px-5 py-4 text-gray-600 dark:text-gray-300">{sn.source}</td>
+                                  <td className="px-5 py-4 text-gray-600 dark:text-gray-300">{sn.generateMethod}</td>
+                                  <td className="px-5 py-4 text-gray-600 dark:text-gray-300">{sn.generateGroup}</td>
+                                  <td className="px-5 py-4">
+                                      <span className={`text-xs px-2.5 py-1 rounded-lg font-bold border ${
+                                          sn.type === '正式' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-800/30'
+                                          : sn.type === '试用' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-800/30'
+                                          : 'bg-gray-50 dark:bg-gray-800/20 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700/30'
+                                      }`}>{sn.type}</span>
+                                  </td>
+                                  <td className="px-5 py-4">
+                                      <span className={`text-xs px-2.5 py-1 rounded-lg font-bold border ${
+                                          sn.status === '已生效' ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-100 dark:border-green-800/30'
+                                          : sn.status === '待生效' ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-100 dark:border-yellow-800/30'
+                                          : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800/30'
+                                      }`}>{sn.status}</span>
+                                  </td>
+                                  <td className="px-5 py-4 text-gray-600 dark:text-gray-300 font-mono text-xs">{sn.generateTime}</td>
+                                  <td className="px-5 py-4 pr-6 text-gray-600 dark:text-gray-300 font-mono text-xs">{sn.expireTime}</td>
+                              </tr>
+                          )) : (
+                              <tr>
+                                  <td colSpan={8} className="px-5 py-16 text-center text-gray-400 dark:text-gray-500 text-sm">暂无序列号数据</td>
+                              </tr>
+                          )}
                       </tbody>
                   </table>
               </div>

@@ -1,11 +1,8 @@
 import { Router } from 'express';
-import crypto from 'crypto';
 import { getDb } from '../db.ts';
-import { signToken, authMiddleware, type AuthRequest } from '../auth.ts';
+import { signToken, verifyPassword, hashPassword, authMiddleware, type AuthRequest } from '../auth.ts';
 
 const router = Router();
-
-function hash(pw: string) { return crypto.createHash('sha256').update(pw).digest('hex'); }
 
 router.post('/login', (req, res) => {
   const { email, password } = req.body;
@@ -16,9 +13,15 @@ router.post('/login', (req, res) => {
 
   const db = getDb();
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any;
-  if (!user || user.password_hash !== hash(password)) {
+  if (!user || !verifyPassword(password, user.password_hash)) {
     res.status(401).json({ error: '邮箱或密码错误' });
     return;
+  }
+
+  // Upgrade legacy SHA-256 hash to scrypt on successful login
+  if (!user.password_hash.includes(':')) {
+    const upgraded = hashPassword(password);
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(upgraded, user.id);
   }
 
   const token = signToken({ userId: user.id, role: user.role });

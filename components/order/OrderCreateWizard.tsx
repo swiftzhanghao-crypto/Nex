@@ -7,6 +7,16 @@ import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truc
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
 
+function generateId(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = (Math.random() * 16) | 0;
+        return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+    });
+}
+
 interface OrderCreateWizardProps {
   isOpen: boolean;
   onClose: () => void;
@@ -15,7 +25,7 @@ interface OrderCreateWizardProps {
 }
 
 const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, renewalOrder, initialDraft }) => {
-  const { products, customers, setCustomers, channels, opportunities, contracts, users, orders, setOrders, currentUser, standaloneEnterprises, orderDrafts, setOrderDrafts } = useAppContext();
+  const { products, customers, setCustomers, channels, opportunities, contracts, users, orders, setOrders, currentUser, standaloneEnterprises, orderDrafts, setOrderDrafts, apiMode, refreshOrders } = useAppContext();
   const navigate = useNavigate();
 
   const [currentStep, setCurrentStep] = useState(1); // 1: Type, 2: Info, 3: Products, 4: Delivery
@@ -163,7 +173,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const [shippingPhone, setShippingPhone] = useState('');
   const [shippingEmail, setShippingEmail] = useState('');
   const [onlineDeliveries, setOnlineDeliveries] = useState<OnlineDeliveryEntry[]>([
-      { id: crypto.randomUUID(), receivingParty: '买方', receivingCompany: '', email: '', phone: '' },
+      { id: generateId(), receivingParty: '买方', receivingCompany: '', email: '', phone: '' },
   ]);
 
   const [acceptanceForm, setAcceptanceForm] = useState<AcceptanceInfo>({
@@ -386,7 +396,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setShippingAddress('');
       setShippingPhone('');
       setShippingEmail('');
-      setOnlineDeliveries([{ id: crypto.randomUUID(), receivingParty: '买方', receivingCompany: '', email: '', phone: '' }]);
+      setOnlineDeliveries([{ id: generateId(), receivingParty: '买方', receivingCompany: '', email: '', phone: '' }]);
       setAcceptanceForm({ contactName: '', contactPhone: '', method: 'Remote', email: '' });
       setAcceptanceType('OneTime');
       setPhaseDrafts([{ name: '第一阶段验收', percentage: 30 }, { name: '最终验收', percentage: 70 }]);
@@ -513,6 +523,14 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       createdAt: new Date().toISOString(),
     };
     setCustomers(prev => prev.map(c => c.id === newOrderCustomer ? { ...c, contacts: [...c.contacts, newContact] } : c));
+    if (apiMode) {
+        const cust = customers.find(c => c.id === newOrderCustomer);
+        if (cust) {
+            import('../../services/api').then(({ customerApi }) =>
+                customerApi.update(cust.id, { ...cust, contacts: [...cust.contacts, newContact] })
+            ).catch(() => {});
+        }
+    }
     if (role === 'Purchasing') {
       setPurchasingContacts(prev => [...prev, newContact]);
       setSelectedPurchasingContactId(newContact.id);
@@ -842,7 +860,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     requestAnimationFrame(() => { isRestoringDraftRef.current = false; });
   }, [initialDraft]);
 
-  const handleCreateOrder = () => {
+  const handleCreateOrder = async () => {
     const selfDealMissingEnterprise = buyerType === 'SelfDeal' && !orderEnterpriseId;
     const otherMissingCustomer = buyerType !== 'SelfDeal' && !newOrderCustomer;
     if (selfDealMissingEnterprise || otherMissingCustomer || newOrderItems.length === 0 || !buyerType) {
@@ -978,14 +996,23 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         isAgentOrder: buyerType === 'SelfDeal' && isAgentOrder ? true : undefined,
         agentCode: buyerType === 'SelfDeal' && isAgentOrder && agentCode ? agentCode : undefined,
     };
-    if (currentDraftId) {
-        // Replace the draft order entry with the final order
-        setOrders(prev => prev.map(o => o.id === currentDraftId ? newOrder : o));
-        setOrderDrafts(prev => prev.filter(d => d.id !== currentDraftId));
+    if (apiMode) {
+        try {
+            const { orderApi } = await import('../../services/api');
+            const created = await orderApi.create(newOrder);
+            if (currentDraftId) setOrderDrafts(prev => prev.filter(d => d.id !== currentDraftId));
+            await refreshOrders();
+            onClose(); resetCreateForm(); navigate(`/orders/${created.id}`);
+        } catch (e: any) { alert(e.message || '创建订单失败'); return; }
     } else {
-        setOrders([newOrder, ...orders]);
+        if (currentDraftId) {
+            setOrders(prev => prev.map(o => o.id === currentDraftId ? newOrder : o));
+            setOrderDrafts(prev => prev.filter(d => d.id !== currentDraftId));
+        } else {
+            setOrders([newOrder, ...orders]);
+        }
+        onClose(); resetCreateForm(); navigate(`/orders/${newOrder.id}`);
     }
-    onClose(); resetCreateForm(); navigate(`/orders/${newOrder.id}`);
   };
 
   // --- Handle Renewal Initialization ---
@@ -2760,7 +2787,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             ))}
                                         </div>
                                         <button
-                                            onClick={() => setOnlineDeliveries([...onlineDeliveries, { id: crypto.randomUUID(), receivingParty: '买方', receivingCompany: '', email: '', phone: '' }])}
+                                            onClick={() => setOnlineDeliveries([...onlineDeliveries, { id: generateId(), receivingParty: '买方', receivingCompany: '', email: '', phone: '' }])}
                                             className="flex items-center gap-1.5 text-xs font-bold text-blue-500 hover:text-blue-700 transition"
                                         >
                                             <Plus className="w-3.5 h-3.5"/> 添加线上发货记录
