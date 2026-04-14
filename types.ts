@@ -821,6 +821,7 @@ export interface OrderDraft {
     itContactId: string;
     isAgentOrder?: boolean;
     agentCode?: string;
+    buyerNameId?: string;
     settlementMethod?: 'cash' | 'credit' | '';
     expectedPaymentDate?: string;
     serialNumberRequirement?: '生成新序列号' | '沿用正式序列号' | '沿用测试序列号';

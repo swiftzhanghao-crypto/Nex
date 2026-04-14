@@ -59,6 +59,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const [orderEnterpriseId, setOrderEnterpriseId] = useState('');
   const [isAgentOrder, setIsAgentOrder] = useState(false);
   const [agentCode, setAgentCode] = useState('');
+  const [selectedBuyerNameId, setSelectedBuyerNameId] = useState('');
   // 可选联系人列表 & 选中的联系人 ID
   const [purchasingContacts, setPurchasingContacts] = useState<typeof customers[0]['contacts']>([]);
   const [itContacts, setItContacts] = useState<typeof customers[0]['contacts']>([]);
@@ -299,6 +300,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setIsAgentOrder(false);
       setAgentCode('');
     }
+    if (buyerType === 'Customer') {
+      setHasOpportunity('yes');
+    }
+    setSelectedBuyerNameId('');
   }, [buyerType]);
 
   // When toggling hasOpportunity, reset related fields
@@ -779,7 +784,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       currentStep,
       buyerType, orderSource, orderRemark, linkedContractIds, creatorId, originalOrderId,
       hasOpportunity, linkedOpportunityId, newOrderCustomer,
-      orderEnterpriseId, isAgentOrder, agentCode, selectedChannelId, directChannel, terminalChannel, salesRepId, businessManagerId,
+      orderEnterpriseId, isAgentOrder, agentCode, selectedChannelId, directChannel, terminalChannel, salesRepId, businessManagerId, buyerNameId: selectedBuyerNameId,
       newOrderItems, tempCategory, enableConversion, selectedConversionIds, sellerName, sellerContact,
       invoiceForm,
       deliveryMethod, receivingParty, receivingCompany, receivingMethod, shippingAddress, shippingPhone, shippingEmail, onlineDeliveries,
@@ -819,6 +824,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     setOrderEnterpriseId(d.orderEnterpriseId);
     setIsAgentOrder(d.isAgentOrder || false);
     setAgentCode(d.agentCode || '');
+    setSelectedBuyerNameId(d.buyerNameId || '');
     setSelectedChannelId(d.selectedChannelId);
     setDirectChannel(d.directChannel || '');
     setTerminalChannel(d.terminalChannel || '');
@@ -855,8 +861,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setPurchasingContacts(cust.contacts.filter(c => c.roles.includes('Purchasing')));
       setItContacts(cust.contacts.filter(c => c.roles.includes('IT')));
     }
-    // Allow cascading effects to see the flag during the same commit,
-    // then clear it after React has flushed all synchronous effects.
+    if (d.buyerType === 'Customer') {
+      setHasOpportunity('yes');
+    }
     requestAnimationFrame(() => { isRestoringDraftRef.current = false; });
   }, [initialDraft]);
 
@@ -972,7 +979,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         creatorId: creatorUser.id, creatorName: creatorUser.name.replace(/\s*\(.*?\)/g, ''), creatorPhone: creatorUser.phone,
         buyerType,
         buyerId: buyerType === 'Channel' ? selectedChannelId : (buyerType === 'Customer' ? newOrderCustomer : undefined),
-        buyerName: buyerType === 'Channel' ? channels.find(c => c.id === selectedChannelId)?.name : customer?.companyName,
+        buyerName: selectedBuyerNameId
+            ? (buyerType === 'Channel' ? channels.find(c => c.id === selectedBuyerNameId)?.name : customers.find(c => c.id === selectedBuyerNameId)?.companyName)
+            : (buyerType === 'Channel' ? channels.find(c => c.id === selectedChannelId)?.name : customer?.companyName),
         directChannel: buyerType === 'Channel' && directChannel ? directChannel : undefined,
         terminalChannel: buyerType === 'Channel' && terminalChannel ? terminalChannel : undefined,
         invoiceInfo: invoiceForm, 
@@ -1236,9 +1245,11 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     <button onClick={() => setHasOpportunity('yes')} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${hasOpportunity === 'yes' ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 shadow-sm' : 'border-gray-200 dark:border-white/10 text-gray-400 hover:border-gray-300 dark:hover:border-white/20'}`}>
                                         <CheckCircle className="w-3.5 h-3.5"/>有商机
                                     </button>
+                                    {buyerType !== 'Customer' && (
                                     <button onClick={() => setHasOpportunity('no')} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${hasOpportunity === 'no' ? 'border-gray-500 bg-gray-100 dark:bg-gray-700/40 text-gray-700 dark:text-gray-200 shadow-sm' : 'border-gray-200 dark:border-white/10 text-gray-400 hover:border-gray-300 dark:hover:border-white/20'}`}>
                                         <XCircle className="w-3.5 h-3.5"/>无商机
                                     </button>
+                                    )}
                                 </div>
                             </div>
 
@@ -1431,10 +1442,24 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 </>
                                 )}
 
+                                {buyerType === 'Customer' && (
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">买方名称（客户）</label>
+                                    <select
+                                        className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm"
+                                        value={selectedBuyerNameId}
+                                        onChange={e => setSelectedBuyerNameId(e.target.value)}
+                                    >
+                                        <option value="">-- 请选择买方 --</option>
+                                        {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
+                                    </select>
+                                </div>
+                                )}
+
                                 {buyerType === 'Channel' && (
                                     <>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">选择代理商 (买方) <span className="text-red-500">*</span></label>
+                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">买方名称（代理商） <span className="text-red-500">*</span></label>
                                         <select className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={selectedChannelId} onChange={e => setSelectedChannelId(e.target.value)}>
                                             <option value="">-- 选择渠道商 --</option>
                                             {channels.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -3010,6 +3035,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 (currentStep === 1 && !buyerType) ||
                                 (currentStep === 2 && (
                                     buyerType === 'SelfDeal' ? !orderEnterpriseId
+                                    : buyerType === 'Customer' ? (!linkedOpportunityId || !newOrderCustomer)
                                     : !hasOpportunity || (hasOpportunity === 'yes' ? (!linkedOpportunityId || !newOrderCustomer) : !newOrderCustomer)
                                        || (buyerType === 'Channel' && !selectedChannelId)
                                 )) ||
