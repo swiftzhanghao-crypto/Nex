@@ -243,23 +243,6 @@ const ProductDetails: React.FC = () => {
               </div>
 
               <div className="flex-1"></div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                  <button
-                      onClick={() => navigate(`/catalog/${productForm.id}/preview`)}
-                      className="unified-button-secondary whitespace-nowrap shrink-0 flex items-center gap-1.5"
-                  >
-                      <BookOpen className="w-3.5 h-3.5" />
-                      产品目录详情
-                  </button>
-                  <button
-                      onClick={isEditingProduct ? handleSaveProduct : () => setIsEditingProduct(true)}
-                      className={`unified-button-secondary whitespace-nowrap shrink-0 ${isEditingProduct ? '!bg-[#0071E3] dark:!bg-[#FF2D55] !text-white !border-transparent' : ''}`}
-                  >
-                      {isEditingProduct ? <Save className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
-                      {isEditingProduct ? '保存' : '编辑'}
-                  </button>
-              </div>
           </div>
 
               <div className="flex gap-1 overflow-x-auto no-scrollbar pt-2 border-b border-gray-200 dark:border-white/10">
@@ -298,15 +281,7 @@ const ProductDetails: React.FC = () => {
                 </div>
                 {isEditingProduct ? (
                   <div className="px-6 py-5 space-y-5">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
-                      <div>
-                        <label className="text-xs text-gray-500 dark:text-gray-400 mb-1.5 block font-medium">产品类型</label>
-                        <input
-                          value={productForm.category || ''}
-                          onChange={e => setProductForm({ ...productForm, category: e.target.value })}
-                          className="w-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 p-2.5 rounded-lg text-sm dark:text-white outline-none focus:border-blue-400 transition"
-                        />
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                       <div>
                         <label className="text-xs text-gray-500 dark:text-gray-400 mb-1.5 block font-medium">产品名称</label>
                         <input
@@ -316,12 +291,11 @@ const ProductDetails: React.FC = () => {
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500 dark:text-gray-400 mb-1.5 block font-medium">国际名称</label>
+                        <label className="text-xs text-gray-500 dark:text-gray-400 mb-1.5 block font-medium">规格名称</label>
                         <input
                           value={productForm.internationalName || ''}
                           onChange={e => setProductForm({ ...productForm, internationalName: e.target.value })}
                           className="w-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 p-2.5 rounded-lg text-sm dark:text-white outline-none focus:border-blue-400 transition"
-                          placeholder="International Name"
                         />
                       </div>
                     </div>
@@ -361,17 +335,13 @@ const ProductDetails: React.FC = () => {
                   </div>
                 ) : (
                   <div className="px-6 py-5">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
-                      <div>
-                        <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1.5 leading-none">产品类型</div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">{productForm.category || '—'}</div>
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                       <div>
                         <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1.5 leading-none">产品名称</div>
                         <div className="text-sm font-medium text-gray-900 dark:text-white">{productForm.name || '—'}</div>
                       </div>
                       <div>
-                        <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1.5 leading-none">国际名称</div>
+                        <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1.5 leading-none">规格名称</div>
                         <div className="text-sm font-medium text-gray-900 dark:text-white">{productForm.internationalName || '—'}</div>
                       </div>
                     </div>
@@ -973,64 +943,16 @@ const ProductDetails: React.FC = () => {
               </div>
               )}
 
-              {/* 权益信息 */}
               {detailTab === 'benefits' && (
               <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
                 <div className="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                   <Gift className="w-4 h-4 text-blue-500" />
                   <h3 className="text-sm font-bold text-gray-900 dark:text-white">权益信息</h3>
                 </div>
-                {(() => {
-                  const primarySku = productForm.skus?.[0];
-                  const pricingOptions = primarySku?.pricingOptions || [];
-                  const benefits = pricingOptions.map(opt => ({
-                    name: opt.title,
-                    type: opt.license.type === 'Subscription' ? '订阅' : opt.license.type === 'Perpetual' ? '永久' : opt.license.type === 'PerUser' ? '按用户' : '固定',
-                    period: opt.license.periodUnit === 'Forever' ? '永久' : `${opt.license.period} ${opt.license.periodUnit === 'Year' ? '年' : opt.license.periodUnit === 'Month' ? '月' : '天'}`,
-                    scope: opt.license.scope,
-                    price: opt.price,
-                  }));
-                  return benefits.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left min-w-[800px]">
-                        <thead className="unified-table-header">
-                          <tr>
-                            <th className="px-5 py-3 w-10">#</th>
-                            <th className="px-5 py-3">权益名称</th>
-                            <th className="px-5 py-3">授权类型</th>
-                            <th className="px-5 py-3">有效期</th>
-                            <th className="px-5 py-3">授权范围</th>
-                            <th className="px-5 py-3 text-right">基准价格</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                          {benefits.map((b, idx) => (
-                            <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors">
-                              <td className="px-6 py-3.5 text-xs text-gray-400 font-mono">{idx + 1}</td>
-                              <td className="px-6 py-3.5 text-sm font-medium text-gray-900 dark:text-white">{b.name}</td>
-                              <td className="px-6 py-3.5 text-xs">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  b.type === '订阅' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                                    : b.type === '永久' ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'
-                                    : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400'
-                                }`}>{b.type}</span>
-                              </td>
-                              <td className="px-6 py-3.5 text-xs text-gray-600 dark:text-gray-400">{b.period}</td>
-                              <td className="px-6 py-3.5 text-xs text-gray-600 dark:text-gray-400">{b.scope}</td>
-                              <td className="px-6 py-3.5 text-sm font-bold text-gray-900 dark:text-white text-right">¥{b.price.toLocaleString()}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="p-12 text-center">
-                      <Gift className="w-10 h-10 text-gray-200 dark:text-gray-700 mx-auto mb-3" />
-                      <div className="text-sm text-gray-400 dark:text-gray-500 mb-1">暂无权益信息</div>
-                      <div className="text-xs text-gray-400 dark:text-gray-500">配置产品的授权方案后，此处将自动展示权益信息</div>
-                    </div>
-                  );
-                })()}
+                <div className="p-12 text-center">
+                  <Gift className="w-10 h-10 text-gray-200 dark:text-gray-700 mx-auto mb-3" />
+                  <div className="text-sm text-gray-400 dark:text-gray-500">暂无权益信息</div>
+                </div>
               </div>
               )}
 
@@ -1281,7 +1203,7 @@ const ProductDetails: React.FC = () => {
               </div>
               <div className="space-y-5">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">产品类型</label>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">产品一级分类</label>
                   <select
                     value={classificationForm.category}
                     onChange={e => setClassificationForm(prev => ({ ...prev, category: e.target.value }))}

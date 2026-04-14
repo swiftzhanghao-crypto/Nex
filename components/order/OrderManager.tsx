@@ -857,145 +857,43 @@ const OrderManager: React.FC = () => {
 
   return (
     <div className="p-4 lg:p-6 max-w-[2400px] mx-auto space-y-4 animate-page-enter pb-2">
-      <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
-        {/* Left: title */}
-        <div className="flex items-center gap-4 w-full lg:w-auto">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">订单管理</h1>
             <a href="https://365.kdocs.cn/latest" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline shrink-0"><FileText className="w-3.5 h-3.5" />使用说明</a>
         </div>
-
-        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
-            {/* Search bar */}
-            <div className="flex items-stretch h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] w-full sm:w-[320px] focus-within:border-blue-400 dark:focus-within:border-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)] transition shadow-apple">
-                {/* Field selector */}
-                <div className="relative flex-shrink-0">
-                    <button
-                        onClick={() => setIsSearchFieldOpen(v => !v)}
-                        className="h-full flex items-center gap-1.5 pl-3 pr-2.5 text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-white/5 rounded-l-lg border-r border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none whitespace-nowrap"
-                    >
-                        {currentSearchOption.label}
-                        <ChevronDown className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform duration-150 ${isSearchFieldOpen ? 'rotate-180' : ''}`} />
+        <div className="flex items-center gap-2">
+            {hasPermission('order_create') && orderDrafts.length > 0 && (
+                <div className="relative group">
+                    <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-100 dark:hover:bg-amber-900/40 transition">
+                        <Save className="w-3.5 h-3.5"/>
+                        草稿箱
+                        <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">{orderDrafts.length}</span>
                     </button>
-                    {isSearchFieldOpen && (
-                        <>
-                            <div className="fixed inset-0 z-40" onClick={() => setIsSearchFieldOpen(false)} />
-                            <div className="absolute left-0 top-full mt-1.5 w-28 bg-white dark:bg-[#2C2C2E] border border-gray-100 dark:border-white/10 rounded-xl shadow-xl z-50 py-1 animate-fade-in">
-                                {searchFieldOptions.map(opt => (
-                                    <button
-                                        key={opt.value}
-                                        onClick={() => { setSearchField(opt.value); setSearchTerm(''); setIsSearchFieldOpen(false); }}
-                                        className={`w-full text-left px-3 py-2 text-sm font-medium transition-colors ${searchField === opt.value ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'}`}
-                                    >
-                                        {opt.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </>
-                    )}
-                </div>
-                {/* Input */}
-                <div className="relative flex-1 flex items-center min-w-0">
-                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 pointer-events-none shrink-0" />
-                    <input
-                        type="text"
-                        placeholder={currentSearchOption.placeholder}
-                        className="w-full h-full pl-8 pr-8 bg-transparent text-sm outline-none text-gray-900 dark:text-white placeholder:text-gray-400"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    {searchTerm && (
-                        <button onClick={() => setSearchTerm('')} className="absolute right-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-0.5 rounded">
-                            <X className="w-3.5 h-3.5" />
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {/* 筛选按钮（原设置字段位置） */}
-            <button 
-                onClick={() => {
-                    if (!isAdvancedFilterOpen && advancedFilters.length === 0) {
-                        const defaults = availableFilterFields.map((field, idx) => ({
-                            id: String(idx + 1),
-                            fieldId: field.id,
-                            mode: field.defaultMode,
-                            value: initValueForField(field.id, field.defaultMode),
-                        }));
-                        setAdvancedFilters(defaults);
-                    }
-                    setIsAdvancedFilterOpen(!isAdvancedFilterOpen);
-                }}
-                className={`p-2 rounded-lg border transition shadow-apple ${isAdvancedFilterOpen ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
-                title="高级筛选"
-            >
-                <Filter className="w-4 h-4" />
-            </button>
-
-            {/* 重置按钮 */}
-            <button
-                onClick={() => {
-                    setSearchTerm('');
-                    setFilterStatus('All');
-                    setFilterDateStart('');
-                    setFilterDateEnd('');
-                    setFilterAmountMin('');
-                    setFilterAmountMax('');
-                    setFilterSource('All');
-                    setAdvancedFilters([]);
-                }}
-                className="p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-500 dark:text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:border-red-800 dark:hover:text-red-400 transition shadow-apple"
-                title="重置所有筛选"
-            >
-                <RotateCcw className="w-4 h-4" />
-            </button>
-
-            {/* 设置字段按钮 */}
-            {hasPermission('order_column_config') && (
-            <button
-                onClick={openColumnConfig}
-                className={`p-2 rounded-lg border transition shadow-apple ${isColumnConfigOpen ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
-                title="配置列"
-            >
-                <Settings className="w-4 h-4" />
-            </button>
-            )}
-
-            <div className="w-px h-6 bg-gray-200 dark:bg-white/10 mx-1 hidden sm:block"></div>
-
-            {hasPermission('order_create') && (
-                <div className="flex items-center gap-2">
-                    {orderDrafts.length > 0 && (
-                        <div className="relative group">
-                            <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-100 dark:hover:bg-amber-900/40 transition">
-                                <Save className="w-3.5 h-3.5"/>
-                                草稿箱
-                                <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">{orderDrafts.length}</span>
-                            </button>
-                            {/* Draft dropdown */}
-                            <div className="absolute right-0 top-full mt-1 w-80 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden hidden group-focus-within:block group-hover:block">
-                                <div className="p-3 border-b border-gray-100 dark:border-white/10 flex justify-between items-center">
-                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">暂存草稿</span>
-                                    <span className="text-xs text-gray-400">{orderDrafts.length} 条</span>
-                                </div>
-                                <div className="max-h-64 overflow-y-auto">
-                                    {orderDrafts.map(draft => (
-                                        <div key={draft.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-white/5 transition group/item border-b border-gray-50 dark:border-white/5 last:border-0">
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-xs text-gray-500 dark:text-gray-400" style={{fontVariantNumeric:'tabular-nums'}}>{draft.id}</div>
-                                                <div className="text-xs text-gray-400 mt-0.5">
-                                                    第 {draft.currentStep} 步 · {draft.buyerType || '未选类型'}
-                                                    {draft.newOrderItems.length > 0 && ` · ${draft.newOrderItems.length} 个产品`}
-                                                </div>
-                                                <div className="text-[10px] text-gray-300 dark:text-gray-600 mt-0.5">{new Date(draft.savedAt).toLocaleString('zh-CN')}</div>
-                                            </div>
-                                            <div className="flex items-center gap-1 shrink-0">
-                                                <button
-                                                    onClick={() => { setResumeDraft(draft); setIsCreateOpen(true); }}
-                                                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-[#0071E3] dark:text-[#FF2D55] bg-blue-50 dark:bg-white/5 rounded-lg hover:bg-blue-100 dark:hover:bg-white/10 transition"
-                                                >
-                                                    继续 <ChevronRight className="w-3 h-3"/>
-                                                </button>
-                                                <button
+                    <div className="absolute right-0 top-full mt-1 w-80 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden hidden group-focus-within:block group-hover:block">
+                        <div className="p-3 border-b border-gray-100 dark:border-white/10 flex justify-between items-center">
+                            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">暂存草稿</span>
+                            <span className="text-xs text-gray-400">{orderDrafts.length} 条</span>
+                        </div>
+                        <div className="max-h-64 overflow-y-auto">
+                            {orderDrafts.map(draft => (
+                                <div key={draft.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-white/5 transition group/item border-b border-gray-50 dark:border-white/5 last:border-0">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-xs text-gray-500 dark:text-gray-400" style={{fontVariantNumeric:'tabular-nums'}}>{draft.id}</div>
+                                        <div className="text-xs text-gray-400 mt-0.5">
+                                            第 {draft.currentStep} 步 · {draft.buyerType || '未选类型'}
+                                            {draft.newOrderItems.length > 0 && ` · ${draft.newOrderItems.length} 个产品`}
+                                        </div>
+                                        <div className="text-[10px] text-gray-300 dark:text-gray-600 mt-0.5">{new Date(draft.savedAt).toLocaleString('zh-CN')}</div>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                            onClick={() => { setResumeDraft(draft); setIsCreateOpen(true); }}
+                                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-[#0071E3] dark:text-[#FF2D55] bg-blue-50 dark:bg-white/5 rounded-lg hover:bg-blue-100 dark:hover:bg-white/10 transition"
+                                        >
+                                            继续 <ChevronRight className="w-3 h-3"/>
+                                        </button>
+                                        <button
                                                     onClick={async () => {
                                                         setOrderDrafts(prev => prev.filter(d => d.id !== draft.id));
                                                         if (apiMode) {
@@ -1014,30 +912,153 @@ const OrderManager: React.FC = () => {
                             </div>
                         </div>
                     )}
-                    <button onClick={() => { setResumeDraft(undefined); setIsCreateOpen(true); }} className="unified-button-primary">
-                        <Plus className="w-4 h-4" /> 新建订单
-                    </button>
-                </div>
-            )}
+                    {hasPermission('order_create') && (
+                        <button onClick={() => { setResumeDraft(undefined); setIsCreateOpen(true); }} className="unified-button-primary">
+                            <Plus className="w-4 h-4" /> 新建订单
+                        </button>
+                    )}
         </div>
       </div>
 
-      <div className="space-y-6">
-        {/* Status Cards Grid */}
-        <div className="flex overflow-x-auto gap-2 pb-2 custom-scrollbar no-scrollbar scroll-smooth snap-x snap-mandatory">
-            {hasPermission('order_view_all') && (
-                <StatusFilterCard id="All" label="全部订单" icon={Layers} count={orders.length} isActive={filterStatus === 'All'} onClick={() => setFilterStatus('All')} />
-            )}
-            {pipelineStatuses.filter(step => hasPermission(step.permission)).map((step) => (
-                <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} onClick={() => setFilterStatus(step.id)} />
-            ))}
-            {exceptionStatuses.filter(step => hasPermission(step.permission)).map((step) => (
-                <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} variant={step.id === OrderStatus.CANCELLED ? 'muted' : 'danger'} onClick={() => setFilterStatus(step.id)} />
-            ))}
-        </div>
+      <div className="unified-card overflow-hidden">
+          {/* ── Status Pills + Search Toolbar (fused into card header) ── */}
+          <div className="border-b border-gray-200/60 dark:border-white/10 px-4 lg:px-5">
+              {/* Row 1: Status filter pills */}
+              <div className="flex items-center gap-2 pt-3 pb-2 overflow-x-auto no-scrollbar">
+                  {hasPermission('order_view_all') && (
+                      <button
+                          onClick={() => setFilterStatus('All')}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors shrink-0 ${
+                              filterStatus === 'All'
+                                  ? 'bg-[#0071E3] dark:bg-[#0A84FF] text-white shadow-sm'
+                                  : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/15'
+                          }`}
+                      >
+                          全部 <span className={`${filterStatus === 'All' ? 'text-white/80' : 'text-gray-400 dark:text-gray-500'}`}>{orders.length}</span>
+                      </button>
+                  )}
+                  {pipelineStatuses.filter(step => hasPermission(step.permission)).map((step) => (
+                      <button
+                          key={step.id}
+                          onClick={() => setFilterStatus(step.id)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors shrink-0 ${
+                              filterStatus === step.id
+                                  ? 'bg-[#0071E3] dark:bg-[#0A84FF] text-white shadow-sm'
+                                  : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/15'
+                          }`}
+                      >
+                          {step.label} <span className={`${filterStatus === step.id ? 'text-white/80' : 'text-gray-400 dark:text-gray-500'}`}>{statusCounts[step.id] || 0}</span>
+                      </button>
+                  ))}
+                  {exceptionStatuses.filter(step => hasPermission(step.permission)).map((step) => (
+                      <button
+                          key={step.id}
+                          onClick={() => setFilterStatus(step.id)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors shrink-0 ${
+                              filterStatus === step.id
+                                  ? (step.id === OrderStatus.CANCELLED ? 'bg-gray-500 text-white' : 'bg-red-500 text-white')
+                                  : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/15'
+                          }`}
+                      >
+                          {step.label} <span className={`${filterStatus === step.id ? 'text-white/80' : 'text-gray-400 dark:text-gray-500'}`}>{statusCounts[step.id] || 0}</span>
+                      </button>
+                  ))}
+              </div>
+              {/* Row 2: Search + filter tools */}
+              <div className="flex items-center justify-end gap-2.5 pb-3">
+                  {/* Search bar */}
+                  <div className="flex items-stretch h-8 rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 w-full sm:w-[320px] focus-within:border-blue-400 dark:focus-within:border-blue-500/60 focus-within:bg-white dark:focus-within:bg-[#1C1C1E] transition">
+                      <div className="relative flex-shrink-0">
+                          <button
+                              onClick={() => setIsSearchFieldOpen(v => !v)}
+                              className="h-full flex items-center gap-1 pl-2.5 pr-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-transparent rounded-l-lg border-r border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none whitespace-nowrap"
+                          >
+                              {currentSearchOption.label}
+                              <ChevronDown className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform duration-150 ${isSearchFieldOpen ? 'rotate-180' : ''}`} />
+                          </button>
+                          {isSearchFieldOpen && (
+                              <>
+                                  <div className="fixed inset-0 z-40" onClick={() => setIsSearchFieldOpen(false)} />
+                                  <div className="absolute left-0 top-full mt-1.5 w-28 bg-white dark:bg-[#2C2C2E] border border-gray-100 dark:border-white/10 rounded-xl shadow-xl z-50 py-1 animate-fade-in">
+                                      {searchFieldOptions.map(opt => (
+                                          <button
+                                              key={opt.value}
+                                              onClick={() => { setSearchField(opt.value); setSearchTerm(''); setIsSearchFieldOpen(false); }}
+                                              className={`w-full text-left px-3 py-2 text-sm font-medium transition-colors ${searchField === opt.value ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                          >
+                                              {opt.label}
+                                          </button>
+                                      ))}
+                                  </div>
+                              </>
+                          )}
+                      </div>
+                      <div className="relative flex-1 flex items-center min-w-0">
+                          <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 pointer-events-none shrink-0" />
+                          <input
+                              type="text"
+                              placeholder={currentSearchOption.placeholder}
+                              className="w-full h-full pl-8 pr-7 bg-transparent text-sm outline-none text-gray-900 dark:text-white placeholder:text-gray-400"
+                              value={searchTerm}
+                              onChange={(e) => setSearchTerm(e.target.value)}
+                          />
+                          {searchTerm && (
+                              <button onClick={() => setSearchTerm('')} className="absolute right-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-0.5 rounded">
+                                  <X className="w-3 h-3" />
+                              </button>
+                          )}
+                      </div>
+                  </div>
+                  {/* Advanced filter */}
+                  <button
+                      onClick={() => {
+                          if (!isAdvancedFilterOpen && advancedFilters.length === 0) {
+                              const defaults = availableFilterFields.map((field, idx) => ({
+                                  id: String(idx + 1),
+                                  fieldId: field.id,
+                                  mode: field.defaultMode,
+                                  value: initValueForField(field.id, field.defaultMode),
+                              }));
+                              setAdvancedFilters(defaults);
+                          }
+                          setIsAdvancedFilterOpen(!isAdvancedFilterOpen);
+                      }}
+                      className={`p-1.5 rounded-lg transition ${isAdvancedFilterOpen ? 'bg-blue-50 text-[#0071E3] dark:bg-blue-900/20 dark:text-blue-400' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-white/10 dark:hover:text-gray-300'}`}
+                      title="高级筛选"
+                  >
+                      <Filter className="w-3.5 h-3.5" />
+                  </button>
+                  {/* Column config */}
+                  {hasPermission('order_column_config') && (
+                      <button
+                          onClick={openColumnConfig}
+                          className={`p-1.5 rounded-lg transition ${isColumnConfigOpen ? 'bg-blue-50 text-[#0071E3] dark:bg-blue-900/20 dark:text-blue-400' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-white/10 dark:hover:text-gray-300'}`}
+                          title="配置列"
+                      >
+                          <Settings className="w-3.5 h-3.5" />
+                      </button>
+                  )}
+                  {/* Reset */}
+                  <button
+                      onClick={() => {
+                          setSearchTerm('');
+                          setFilterStatus('All');
+                          setFilterDateStart('');
+                          setFilterDateEnd('');
+                          setFilterAmountMin('');
+                          setFilterAmountMax('');
+                          setFilterSource('All');
+                          setAdvancedFilters([]);
+                      }}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition"
+                      title="重置筛选"
+                  >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+              </div>
+          </div>
 
-        <div className="unified-card overflow-hidden">
-            {/* ── 固定表头（不在滚动容器内，滚动条不延伸至此） ── */}
+            {/* ── 固定表头 ── */}
             <div
                 ref={headerScrollRef}
                 className="overflow-x-auto no-scrollbar"
@@ -1072,7 +1093,7 @@ const OrderManager: React.FC = () => {
             {/* ── 可滚动表体（滚动条只在此区域） ── */}
             <div
                 ref={bodyScrollRef}
-                className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-370px)] custom-scrollbar"
+                className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-340px)] custom-scrollbar"
                 onScroll={(e) => { if (headerScrollRef.current) headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
             >
           <table className="w-full text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed' }}>
@@ -1416,7 +1437,6 @@ const OrderManager: React.FC = () => {
             </div>
         </div>
       </div>
-    </div>
 
       {/* Product Popover — fixed to viewport, avoids table clipping */}
       {productPopoverId && popoverPos && (() => {

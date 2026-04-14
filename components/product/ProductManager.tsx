@@ -39,6 +39,12 @@ const ProductManager: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'All' | 'OnShelf' | 'OffShelf'>('All');
   const [tableCopied, setTableCopied] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filterProductLine, setFilterProductLine] = useState('');
+  const [filterProductType, setFilterProductType] = useState('');
+  const [filterProductId, setFilterProductId] = useState('');
+  const [filterProductName, setFilterProductName] = useState('');
+  const hasActiveFilters = !!(filterProductLine || filterProductType || filterProductId || filterProductName);
   
   const [tempPrice, setTempPrice] = useState<number>(0);
   const [tempStock, setTempStock] = useState<number>(0);
@@ -164,17 +170,26 @@ const ProductManager: React.FC = () => {
 
   type SalesRow = { salesCode: string; productId: string; productName: string; skuNames: string; salesOrg: string };
 
+  const productLineOptions = useMemo(() => [...new Set(products.map(p => p.productLine).filter(Boolean))].sort(), [products]);
+  const productTypeOptions = useMemo(() => [...new Set(products.map(p => p.category).filter(Boolean))].sort(), [products]);
+
   const filteredItems = useMemo(() => {
       if (activeTab === 'SPU') {
           return products.filter(p => {
-              const matchSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.category.toLowerCase().includes(searchTerm.toLowerCase()) || p.id.toLowerCase().includes(searchTerm.toLowerCase());
+              const matchSearch = !searchTerm || p.id.toLowerCase().includes(searchTerm.toLowerCase()) || p.name.toLowerCase().includes(searchTerm.toLowerCase());
               const matchStatus = statusFilter === 'All' || p.status === statusFilter;
-              return matchSearch && matchStatus;
+              const matchLine = !filterProductLine || p.productLine === filterProductLine;
+              const matchType = !filterProductType || p.category === filterProductType;
+              const matchId = !filterProductId || p.id.toLowerCase().includes(filterProductId.toLowerCase());
+              const matchName = !filterProductName || p.name.toLowerCase().includes(filterProductName.toLowerCase());
+              return matchSearch && matchStatus && matchLine && matchType && matchId && matchName;
           });
       }
       if (activeTab === 'SKU') {
           const allSkus = products.flatMap(p => p.skus.map(s => ({ ...s, parentName: p.name, parentId: p.id })));
-          return allSkus.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.code.toLowerCase().includes(searchTerm.toLowerCase()));
+          if (!searchTerm) return allSkus;
+          const q = searchTerm.toLowerCase();
+          return allSkus.filter(s => s.code.toLowerCase().includes(q) || s.parentId.toLowerCase().includes(q) || s.parentName.toLowerCase().includes(q));
       }
       if (activeTab === 'SALES') {
           const rows: SalesRow[] = products
@@ -188,7 +203,7 @@ const ProductManager: React.FC = () => {
               }));
           if (!searchTerm) return rows;
           const q = searchTerm.toLowerCase();
-          return rows.filter(r => r.productId.toLowerCase().includes(q) || r.productName.toLowerCase().includes(q) || r.salesOrg.toLowerCase().includes(q));
+          return rows.filter(r => r.salesCode.toLowerCase().includes(q) || r.productId.toLowerCase().includes(q) || r.productName.toLowerCase().includes(q));
       }
       return [];
   }, [activeTab, products, searchTerm, statusFilter]);
@@ -202,7 +217,7 @@ const ProductManager: React.FC = () => {
 
   React.useEffect(() => {
       setCurrentPage(1);
-  }, [searchTerm, activeTab, statusFilter]);
+  }, [searchTerm, activeTab, statusFilter, filterProductLine, filterProductType, filterProductId, filterProductName]);
 
   const handleCopyTable = useCallback(() => {
       const headers = ['产品业务编码', '产品名称', '产品规格', '产品一级分类', '产品二级分类', '产品条线', '产品类型'];
@@ -263,7 +278,7 @@ const ProductManager: React.FC = () => {
                               <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 pointer-events-none shrink-0" />
                               <input
                                   type="text"
-                                  placeholder={activeTab === 'SPU' ? '搜索编号、名称、分类…' : activeTab === 'SKU' ? '搜索规格编码、名称…' : '搜索编号、名称、销售组织…'}
+                                  placeholder={activeTab === 'SPU' ? '搜索产品业务编码、产品名称…' : activeTab === 'SKU' ? '搜索SKU编码、产品业务编码、产品名称…' : '搜索销售编码、产品业务编码、产品名称…'}
                                   className="w-full h-full pl-8 pr-7 bg-transparent text-sm outline-none text-gray-900 dark:text-white placeholder:text-gray-400"
                                   value={searchTerm}
                                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -288,8 +303,80 @@ const ProductManager: React.FC = () => {
                               ))}
                           </div>
                       )}
+                      {activeTab === 'SPU' && (
+                          <div className="relative">
+                              <button
+                                  onClick={() => setIsFilterOpen(v => !v)}
+                                  className={`p-1.5 rounded-lg transition relative ${isFilterOpen || hasActiveFilters ? 'bg-blue-50 text-[#0071E3] dark:bg-blue-900/20 dark:text-blue-400' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-white/10 dark:hover:text-gray-300'}`}
+                                  title="筛选"
+                              >
+                                  <Filter className="w-3.5 h-3.5" />
+                                  {hasActiveFilters && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-[#0071E3] dark:bg-[#0A84FF] rounded-full" />}
+                              </button>
+                              {isFilterOpen && (
+                                  <>
+                                      <div className="fixed inset-0 z-40" onClick={() => setIsFilterOpen(false)} />
+                                      <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl z-50 animate-fade-in">
+                                          <div className="p-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                                              <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">筛选条件</span>
+                                              {hasActiveFilters && (
+                                                  <button
+                                                      onClick={() => { setFilterProductLine(''); setFilterProductType(''); setFilterProductId(''); setFilterProductName(''); }}
+                                                      className="text-[10px] font-medium text-red-500 hover:text-red-600 transition"
+                                                  >清除全部</button>
+                                              )}
+                                          </div>
+                                          <div className="p-3 space-y-3">
+                                              <div>
+                                                  <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">产品业务编码</label>
+                                                  <input
+                                                      type="text"
+                                                      value={filterProductId}
+                                                      onChange={e => setFilterProductId(e.target.value)}
+                                                      placeholder="输入编码筛选…"
+                                                      className="w-full h-7 px-2.5 text-xs rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-blue-400 transition"
+                                                  />
+                                              </div>
+                                              <div>
+                                                  <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">产品名称</label>
+                                                  <input
+                                                      type="text"
+                                                      value={filterProductName}
+                                                      onChange={e => setFilterProductName(e.target.value)}
+                                                      placeholder="输入名称筛选…"
+                                                      className="w-full h-7 px-2.5 text-xs rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-blue-400 transition"
+                                                  />
+                                              </div>
+                                              <div>
+                                                  <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">产品条线</label>
+                                                  <select
+                                                      value={filterProductLine}
+                                                      onChange={e => setFilterProductLine(e.target.value)}
+                                                      className="w-full h-7 px-2 text-xs rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 text-gray-900 dark:text-white outline-none focus:border-blue-400 transition appearance-none cursor-pointer"
+                                                  >
+                                                      <option value="">全部</option>
+                                                      {productLineOptions.map(v => <option key={v} value={v}>{v}</option>)}
+                                                  </select>
+                                              </div>
+                                              <div>
+                                                  <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">产品类型</label>
+                                                  <select
+                                                      value={filterProductType}
+                                                      onChange={e => setFilterProductType(e.target.value)}
+                                                      className="w-full h-7 px-2 text-xs rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 text-gray-900 dark:text-white outline-none focus:border-blue-400 transition appearance-none cursor-pointer"
+                                                  >
+                                                      <option value="">全部</option>
+                                                      {productTypeOptions.map(v => <option key={v} value={v}>{v}</option>)}
+                                                  </select>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </>
+                              )}
+                          </div>
+                      )}
                       <button
-                          onClick={() => { setSearchTerm(''); setStatusFilter('All'); }}
+                          onClick={() => { setSearchTerm(''); setStatusFilter('All'); setFilterProductLine(''); setFilterProductType(''); setFilterProductId(''); setFilterProductName(''); }}
                           className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition"
                           title="重置筛选"
                       >
@@ -308,10 +395,10 @@ const ProductManager: React.FC = () => {
                         <col style={{ width: 44 }} />
                         <col style={{ width: 280 }} />
                         <col style={{ width: 160 }} />
+                        <col style={{ width: 90 }} />
                         <col style={{ width: 120 }} />
                         <col style={{ width: 120 }} />
                         <col style={{ width: 140 }} />
-                        <col style={{ width: 100 }} />
                         <col style={{ width: 100 }} />
                     </colgroup>
                     <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E]">
@@ -334,19 +421,17 @@ const ProductManager: React.FC = () => {
                         </th>
                         <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品业务编码 / 产品名称</th>
                         <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品规格</th>
+                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">状态</th>
                         <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品一级分类</th>
                         <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品二级分类</th>
                         <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品条线</th>
                         <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品类型</th>
-                        <th className="px-3 py-2.5 whitespace-nowrap text-right sticky right-0 z-10 bg-gray-50 dark:bg-[#1C1C1E] border-b border-gray-200/50 dark:border-white/10 shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.08)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.3)]">操作</th>
                     </tr>
                     </thead>
                     <tbody className="text-sm">
                     {(pageItems as Product[]).length === 0 ? (
                         <tr><td colSpan={8} className="p-12 text-center text-gray-400 dark:text-gray-500 text-sm">暂无匹配的产品数据</td></tr>
-                    ) : (pageItems as Product[]).map((product) => {
-                        const stickyBg = 'bg-white dark:bg-[#1C1C1E] group-hover:bg-gray-50 dark:group-hover:bg-white/[0.03]';
-                        return (
+                    ) : (pageItems as Product[]).map((product) => (
                         <tr key={product.id} className={`group cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors border-b border-gray-100/50 dark:border-white/5 last:border-0 ${product.status === 'OffShelf' ? 'opacity-60' : ''}`}>
                         <td className="pl-6 pr-2 py-2.5" onClick={e => e.stopPropagation()}>
                             <input
@@ -371,47 +456,17 @@ const ProductManager: React.FC = () => {
                             <span className="text-gray-500 dark:text-gray-400 truncate block" title={product.skus.map(s => s.name).join('、') || undefined}>{product.skus.map(s => s.name).join('、') || '—'}</span>
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap">
-                            {product.productCategory ? (
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                    product.productCategory === '云服务产品' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                                    : product.productCategory === '编辑软件' ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400'
-                                    : product.productCategory === '单品授权' ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400'
-                                    : 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400'
-                                }`}>{product.productCategory}</span>
-                            ) : <span className="text-gray-400">—</span>}
+                            {product.status === 'OnShelf'
+                                ? <span className="unified-tag-green !rounded-full">已上架</span>
+                                : <span className="unified-tag-gray !rounded-full">已下架</span>
+                            }
                         </td>
+                        <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">{product.productCategory || '—'}</td>
                         <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">{product.subCategory || '—'}</td>
                         <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap truncate" title={product.productLine || undefined}>{product.productLine || '—'}</td>
-                        <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">{product.category || '—'}
-                        </td>
-                        <td className={`px-3 py-2.5 text-right whitespace-nowrap sticky right-0 z-20 ${stickyBg} shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors`}>
-                            <div className="flex justify-end gap-1.5">
-                            <button
-                                onClick={(e) => { e.stopPropagation(); handleToggleStatus(product); }}
-                                className="px-1 py-0.5 text-[#0071E3] dark:text-[#0A84FF] hover:text-[#0060C0] dark:hover:text-[#007AEB] text-xs font-medium whitespace-nowrap transition"
-                            >
-                                {product.status === 'OnShelf' ? '下架' : '上架'}
-                            </button>
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    const newId = `PROD-${Date.now().toString().slice(-6)}`;
-                                    const cloned: Product = JSON.parse(JSON.stringify(product));
-                                    cloned.id = newId;
-                                    cloned.name = `${product.name} (副本)`;
-                                    cloned.status = 'OffShelf';
-                                    cloned.skus = cloned.skus.map(s => ({...s, id: `${s.id}-copy`}));
-                                    setProducts(prev => [...prev, cloned]);
-                                }}
-                                className="px-1 py-0.5 text-gray-500 dark:text-gray-400 hover:text-[#0071E3] dark:hover:text-[#0A84FF] text-xs font-medium whitespace-nowrap transition"
-                            >
-                                复制
-                            </button>
-                            </div>
-                        </td>
+                        <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">{product.category || '—'}</td>
                         </tr>
-                        );
-                    })}
+                    ))}
                     </tbody>
                 </table>
                 </div>
@@ -424,40 +479,31 @@ const ProductManager: React.FC = () => {
                   <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] custom-scrollbar">
                   <table className="w-full text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed' }}>
                       <colgroup>
-                          <col style={{ width: 160 }} />
+                          <col style={{ width: 180 }} />
+                          <col style={{ width: 280 }} />
                           <col style={{ width: 200 }} />
-                          <col style={{ width: 240 }} />
-                          <col style={{ width: 120 }} />
-                          <col style={{ width: 140 }} />
-                          <col style={{ width: 100 }} />
+                          <col style={{ width: 200 }} />
                       </colgroup>
                       <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E]">
                           <tr>
-                              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">规格编码</th>
-                              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">规格名称</th>
-                              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">所属产品</th>
-                              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">授权类型数</th>
-                              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">基准价格</th>
-                              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">库存</th>
+                              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">SKU编码</th>
+                              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品业务编码 / 产品名称</th>
+                              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">规格</th>
+                              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">授权类型</th>
                           </tr>
                       </thead>
                       <tbody className="text-sm">
                           {(pageItems as (ProductSku & { parentName: string; parentId: string })[]).length === 0 ? (
-                              <tr><td colSpan={6} className="py-20 text-center text-gray-400 dark:text-gray-500 text-sm">暂无匹配的规格数据</td></tr>
+                              <tr><td colSpan={4} className="py-20 text-center text-gray-400 dark:text-gray-500 text-sm">暂无匹配的规格数据</td></tr>
                           ) : (pageItems as (ProductSku & { parentName: string; parentId: string })[]).map(sku => (
                               <tr key={sku.id} className="group hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors border-b border-gray-100/50 dark:border-white/5 last:border-0">
                                   <td className="px-3 py-2.5 font-mono font-bold text-gray-500 dark:text-gray-400">{sku.code}</td>
+                                  <td className="px-3 py-2.5 max-w-[260px]" onClick={() => navigate(`/products/${sku.parentId}`)}>
+                                      <div className="font-mono text-xs text-gray-400 dark:text-gray-500 leading-none mb-1">{sku.parentId}</div>
+                                      <span className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline cursor-pointer truncate block leading-snug" title={sku.parentName}>{sku.parentName}</span>
+                                  </td>
                                   <td className="px-3 py-2.5 font-medium text-gray-900 dark:text-white">{sku.name}</td>
-                                  <td className="px-3 py-2.5">
-                                      <span className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline cursor-pointer" onClick={() => navigate(`/products/${sku.parentId}`)} title={sku.parentName}>{sku.parentName}</span>
-                                  </td>
-                                  <td className="px-3 py-2.5">
-                                      <span className="unified-tag-gray !rounded-full">
-                                          {sku.pricingOptions?.length || 0} 种定价
-                                      </span>
-                                  </td>
-                                  <td className="px-3 py-2.5 font-bold text-red-600 dark:text-red-400 font-mono">¥{sku.price.toLocaleString()}</td>
-                                  <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300">{sku.stock}</td>
+                                  <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300">{sku.pricingOptions?.map(o => o.title).join('、') || '—'}</td>
                               </tr>
                           ))}
                       </tbody>
