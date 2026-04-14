@@ -6,12 +6,12 @@ import type { Response, NextFunction } from 'express';
  * Maps resource:action to the list of role IDs allowed.
  *
  * Role IDs must match those in data/staticData.ts initialRoles:
- *   Admin, Sales, Business, Finance, Technical, Logistics, Executive, Commerce
+ *   Admin, Sales, Business, Technical, Executive, Commerce
  */
 const PERMISSION_MATRIX: Record<string, string[]> = {
   // --- Users ---
-  'user:list':           ['Admin', 'Sales', 'Business', 'Finance', 'Technical', 'Executive', 'Commerce'],
-  'user:read':           ['Admin', 'Sales', 'Business', 'Finance', 'Technical', 'Executive', 'Commerce'],
+  'user:list':           ['Admin', 'Sales', 'Business', 'Technical', 'Executive', 'Commerce'],
+  'user:read':           ['Admin', 'Sales', 'Business', 'Technical', 'Executive', 'Commerce'],
   'user:update':         ['Admin'],
   'role:create':         ['Admin'],
   'role:update':         ['Admin'],
@@ -19,24 +19,24 @@ const PERMISSION_MATRIX: Record<string, string[]> = {
   'role:copy':           ['Admin'],
 
   // --- Orders ---
-  'order:list':          ['Admin', 'Sales', 'Business', 'Finance', 'Executive', 'Commerce'],
-  'order:read':          ['Admin', 'Sales', 'Business', 'Finance', 'Executive', 'Commerce'],
+  'order:list':          ['Admin', 'Sales', 'Business', 'Executive', 'Commerce'],
+  'order:read':          ['Admin', 'Sales', 'Business', 'Executive', 'Commerce'],
   'order:create':        ['Admin', 'Sales', 'Business'],
-  'order:update':        ['Admin', 'Sales', 'Business', 'Finance'],
+  'order:update':        ['Admin', 'Sales', 'Business'],
   'order:delete':        ['Admin', 'Sales'],
-  'order:approve':       ['Admin', 'Business', 'Finance', 'Commerce'],
+  'order:approve':       ['Admin', 'Business', 'Commerce'],
   'order:submit':        ['Admin', 'Sales', 'Business'],
 
   // --- Customers ---
-  'customer:list':       ['Admin', 'Sales', 'Business', 'Finance', 'Executive', 'Commerce'],
-  'customer:read':       ['Admin', 'Sales', 'Business', 'Finance', 'Executive', 'Commerce'],
+  'customer:list':       ['Admin', 'Sales', 'Business', 'Executive', 'Commerce'],
+  'customer:read':       ['Admin', 'Sales', 'Business', 'Executive', 'Commerce'],
   'customer:create':     ['Admin', 'Sales', 'Business'],
   'customer:update':     ['Admin', 'Sales', 'Business'],
   'customer:delete':     ['Admin', 'Sales', 'Business'],
 
   // --- Products ---
-  'product:list':        ['Admin', 'Sales', 'Business', 'Finance', 'Technical', 'Executive', 'Commerce'],
-  'product:read':        ['Admin', 'Sales', 'Business', 'Finance', 'Technical', 'Executive', 'Commerce'],
+  'product:list':        ['Admin', 'Sales', 'Business', 'Technical', 'Executive', 'Commerce'],
+  'product:read':        ['Admin', 'Sales', 'Business', 'Technical', 'Executive', 'Commerce'],
   'product:create':      ['Admin'],
   'product:update':      ['Admin'],
   'product:delete':      ['Admin'],
@@ -49,42 +49,42 @@ const PERMISSION_MATRIX: Record<string, string[]> = {
   'channel:delete':      ['Admin'],
 
   // --- Finance: Contracts ---
-  'contract:list':       ['Admin', 'Finance', 'Business', 'Sales', 'Executive', 'Commerce'],
-  'contract:read':       ['Admin', 'Finance', 'Business', 'Sales', 'Executive', 'Commerce'],
-  'contract:create':     ['Admin', 'Finance', 'Business', 'Commerce'],
-  'contract:update':     ['Admin', 'Finance', 'Business', 'Commerce'],
-  'contract:delete':     ['Admin', 'Finance'],
+  'contract:list':       ['Admin', 'Business', 'Sales', 'Executive', 'Commerce'],
+  'contract:read':       ['Admin', 'Business', 'Sales', 'Executive', 'Commerce'],
+  'contract:create':     ['Admin', 'Business', 'Commerce'],
+  'contract:update':     ['Admin', 'Business', 'Commerce'],
+  'contract:delete':     ['Admin', 'Business'],
 
   // --- Finance: Remittances ---
-  'remittance:list':     ['Admin', 'Finance', 'Business', 'Executive', 'Commerce'],
-  'remittance:read':     ['Admin', 'Finance', 'Business', 'Executive', 'Commerce'],
-  'remittance:create':   ['Admin', 'Finance'],
-  'remittance:update':   ['Admin', 'Finance'],
-  'remittance:delete':   ['Admin', 'Finance'],
+  'remittance:list':     ['Admin', 'Business', 'Executive', 'Commerce'],
+  'remittance:read':     ['Admin', 'Business', 'Executive', 'Commerce'],
+  'remittance:create':   ['Admin', 'Business'],
+  'remittance:update':   ['Admin', 'Business'],
+  'remittance:delete':   ['Admin', 'Business'],
 
   // --- Finance: Invoices ---
-  'invoice:list':        ['Admin', 'Finance', 'Sales', 'Business', 'Executive', 'Commerce'],
-  'invoice:read':        ['Admin', 'Finance', 'Sales', 'Business', 'Executive', 'Commerce'],
-  'invoice:create':      ['Admin', 'Finance'],
-  'invoice:update':      ['Admin', 'Finance'],
-  'invoice:delete':      ['Admin', 'Finance'],
+  'invoice:list':        ['Admin', 'Sales', 'Business', 'Executive', 'Commerce'],
+  'invoice:read':        ['Admin', 'Sales', 'Business', 'Executive', 'Commerce'],
+  'invoice:create':      ['Admin', 'Business'],
+  'invoice:update':      ['Admin', 'Business'],
+  'invoice:delete':      ['Admin', 'Business'],
 
   // --- Finance: Performances ---
-  'performance:list':    ['Admin', 'Finance', 'Sales', 'Business', 'Executive', 'Commerce'],
-  'performance:read':    ['Admin', 'Finance', 'Sales', 'Business', 'Executive', 'Commerce'],
+  'performance:list':    ['Admin', 'Sales', 'Business', 'Executive', 'Commerce'],
+  'performance:read':    ['Admin', 'Sales', 'Business', 'Executive', 'Commerce'],
 
   // --- Finance: Authorizations ---
-  'authorization:list':  ['Admin', 'Finance', 'Business', 'Sales', 'Technical', 'Executive', 'Commerce'],
-  'authorization:read':  ['Admin', 'Finance', 'Business', 'Sales', 'Technical', 'Executive', 'Commerce'],
-  'authorization:create':['Admin', 'Finance', 'Business'],
+  'authorization:list':  ['Admin', 'Business', 'Sales', 'Technical', 'Executive', 'Commerce'],
+  'authorization:read':  ['Admin', 'Business', 'Sales', 'Technical', 'Executive', 'Commerce'],
+  'authorization:create':['Admin', 'Business'],
 
   // --- Finance: Delivery Infos ---
-  'delivery:list':       ['Admin', 'Finance', 'Business', 'Sales', 'Technical', 'Executive', 'Commerce'],
-  'delivery:read':       ['Admin', 'Finance', 'Business', 'Sales', 'Technical', 'Executive', 'Commerce'],
-  'delivery:create':     ['Admin', 'Finance', 'Business'],
+  'delivery:list':       ['Admin', 'Business', 'Sales', 'Technical', 'Executive', 'Commerce'],
+  'delivery:read':       ['Admin', 'Business', 'Sales', 'Technical', 'Executive', 'Commerce'],
+  'delivery:create':     ['Admin', 'Business'],
 
   // --- Finance: Audit Logs ---
-  'auditlog:list':       ['Admin', 'Finance', 'Business'],
+  'auditlog:list':       ['Admin', 'Business'],
 
   // --- Opportunities ---
   'opportunity:list':    ['Admin', 'Sales', 'Business', 'Executive', 'Commerce'],
