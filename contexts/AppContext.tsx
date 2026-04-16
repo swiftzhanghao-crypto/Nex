@@ -1,11 +1,11 @@
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type {
     Product, SalesMerchandise, AtomicCapability,
     AuthTypeData, Customer, Opportunity, Order,
     User, Department, RoleDefinition, Channel, Enterprise,
     Contract, Remittance, Invoice, Performance, Authorization, DeliveryInfo,
-    OrderDraft,
+    OrderDraft, Subscription,
 } from '../types';
 
 import {
@@ -19,6 +19,7 @@ import {
     generateCustomers, generateOpportunities, generateOrders,
     generateContracts, generateRemittances, generateInvoices,
     generatePerformances, generateAuthorizations, generateDeliveryInfos,
+    generateSubscriptionChainOrders, buildSubscriptionsFromOrders,
 } from '../data/generators';
 
 import {
@@ -30,18 +31,30 @@ import {
 const USE_API = import.meta.env.VITE_API_MODE === 'true';
 
 // --- Mock data fallback (bump version when schema changes to force refresh) ---
-const MOCK_DATA_VERSION = 9;
+const MOCK_DATA_VERSION = 23;
 
 function safeGenerateMockData() {
     try {
         const customers = generateCustomers(initialUsers);
         const opportunities = generateOpportunities(customers);
         const contracts = generateContracts(customers);
-        const orders = generateOrders({
-            customers, products: initialProducts, users: initialUsers,
-            merchandises: initialMerchandises, opportunities, channels: initialChannels,
+        const chainOrders = generateSubscriptionChainOrders({
+            customers,
+            products: initialProducts,
+            users: initialUsers,
+        });
+        const baseOrders = generateOrders({
+            customers,
+            products: initialProducts,
+            users: initialUsers,
+            merchandises: initialMerchandises,
+            opportunities,
+            channels: initialChannels,
             contracts,
         });
+        const orders = [...chainOrders, ...baseOrders].sort(
+            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+        );
         return { customers, opportunities, contracts, orders };
     } catch (e) {
         console.error('[MockData] Failed to generate mock data, using empty fallback:', e);
@@ -94,6 +107,7 @@ interface AppContextType {
     performances: Performance[];
     authorizations: Authorization[];
     deliveryInfos: DeliveryInfo[];
+    subscriptions: Subscription[];
 
     refreshOrders: () => Promise<void>;
     refreshCustomers: () => Promise<void>;
@@ -151,6 +165,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         USE_API ? [] : generateAuthorizations());
     const [deliveryInfos, setDeliveryInfos] = useState<DeliveryInfo[]>(() =>
         USE_API ? [] : generateDeliveryInfos());
+
+    /** 聚合 orderRemark 为订阅链标记的演示单（订单号格式与普通订单一致）；无此类订单时列表为空 */
+    const subscriptions = useMemo(
+        () => buildSubscriptionsFromOrders(orders, customers, products),
+        [orders, customers, products],
+    );
 
     // --- Mock data version check: refresh stale data after HMR ---
     useEffect(() => {
@@ -288,6 +308,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         performances,
         authorizations,
         deliveryInfos,
+        subscriptions,
 
         refreshOrders,
         refreshCustomers,

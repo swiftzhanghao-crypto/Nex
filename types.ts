@@ -81,8 +81,9 @@ export interface OrderItem extends MerchandiseItem {
 
     // Purchase nature
     purchaseNature?: PurchaseNature;
-    renewalSubType?: string;
     purchaseNature365?: PurchaseNature;
+    /** 授权开始日（与 licenseEndDate 成对使用，如来自订阅续费/增购） */
+    licenseStartDate?: string;
 
     // After-sale info
     afterSaleWarrantyPeriod?: string;
@@ -826,4 +827,65 @@ export interface OrderDraft {
     expectedPaymentDate?: string;
     serialNumberRequirement?: '生成新序列号' | '沿用正式序列号' | '沿用测试序列号';
     reuseSerialNumber?: string;
+}
+
+// ─── 续费管理 ───────────────────────────────────────────────
+
+export type SubscriptionStatus = 'Active' | 'ExpiringSoon' | 'GracePeriod' | 'Expired';
+
+/** 订阅关联的单笔订单引用（同一「客户+产品线」下按时间排列的订单节点，可对应不同在售产品） */
+export interface SubscriptionOrderRef {
+    orderId: string;
+    orderDate: string;
+    purchaseNature: PurchaseNature;
+    quantity: number;
+    amount: number;
+    /**
+     * 业务承接关系（非简单时间相邻）：
+     * - 新购：无
+     * - 续费 / 升级：指向上一笔「主干」订单（新购/续费/升级）
+     * - 增购：指向被增购所挂靠的主干订单（新购/续费/升级），与续费同级主干分离
+     */
+    relatesToOrderId?: string;
+    /** 本行授权生效起始日 YYYY-MM-DD（与订单行授权周期一致） */
+    licenseStartDate?: string;
+    /** 本行授权到期日 YYYY-MM-DD */
+    licenseEndDate?: string;
+    /** 本节点对应的产品编码 / 名称（同产品线多产品共用一条链） */
+    productId: string;
+    productName: string;
+    skuName: string;
+    licenseType: string;
+}
+
+/**
+ * 续费/增购入口：从该产品在「客户+产品线」订单序列中的节点还原的当前授权快照。
+ */
+export interface SubscriptionLineProductSnapshot {
+    productCode: string;
+    productName: string;
+    skuName: string;
+    licenseType: string;
+    currentQuantity: number;
+    startDate: string;
+    endDate: string;
+    status: SubscriptionStatus;
+    /** 该产品在链上最后一笔关联订单号（用于原单承接等） */
+    lastOrderId: string;
+}
+
+/**
+ * 一批订阅 = 客户 + 产品线；relatedOrders 为该线下的订单时间序列（可含多个 AB 产品的新购/续费/增购等）。
+ * 列表汇总用 subscriptionRollup*。
+ */
+export interface Subscription {
+    id: string;
+    customerId: string;
+    customerName: string;
+    /** 产品线：WPS365公有云 / WPS365私有云 / 端 */
+    productLine: string;
+    /** 该产品线下的订阅相关订单，按时间正序 */
+    relatedOrders: SubscriptionOrderRef[];
+    salesRepName?: string;
+    region?: string;
 }

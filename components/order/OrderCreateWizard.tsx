@@ -1,11 +1,16 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Order, OrderStatus, OrderItem, ActivationMethod, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, DeliveryMethod, OrderDraft, ConversionOrder, CustomerContact, PurchaseNature, SubUnitAuthMode, OnlineDeliveryEntry } from '../../types';
+import { Order, OrderStatus, OrderItem, ActivationMethod, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, DeliveryMethod, OrderDraft, ConversionOrder, CustomerContact, PurchaseNature, SubUnitAuthMode, OnlineDeliveryEntry, Subscription, SubscriptionLineProductSnapshot } from '../../types';
 import { initialConversionOrders, ALL_INSTALL_PKG_ROWS } from '../../data/staticData';
-import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Network, Globe, Radio, RefreshCcw, Wallet, Zap, Box, Settings, MapPin, Briefcase, XCircle, Search, Save, ScrollText, Phone, Mail, Users, Banknote, Calendar, Check, ChevronRight, ChevronDown, Pencil, Key, Building2 } from 'lucide-react';
+import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Network, Globe, Radio, RefreshCcw, Wallet, Zap, Box, Settings, MapPin, Briefcase, XCircle, Search, Save, ScrollText, Phone, Mail, Users, Banknote, Calendar, Check, ChevronRight, ChevronDown, Pencil, Key, Building2, Sparkles } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
+import {
+  inferOrderLinePurchaseNatureFromSubscription,
+  purchaseNatureDisplay,
+  subscriptionStatusLabel,
+} from './inferOrderLinePurchaseNatureFromSubscription';
 
 function generateId(): string {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -21,11 +26,37 @@ interface OrderCreateWizardProps {
   isOpen: boolean;
   onClose: () => void;
   renewalOrder?: Order;
+  /** 从续费管理「续费/增购」进入：预填客户与产品并锁定部分字段 */
+  subscriptionCheckout?: { subscription: Subscription; lineProduct: SubscriptionLineProductSnapshot; mode: 'renew' | 'addon' } | null;
   initialDraft?: OrderDraft;
 }
 
-const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, renewalOrder, initialDraft }) => {
-  const { products, customers, setCustomers, channels, opportunities, contracts, users, orders, setOrders, currentUser, standaloneEnterprises, orderDrafts, setOrderDrafts, apiMode, refreshOrders } = useAppContext();
+function subscriptionLicensePeriodLabel(start: string, end: string, opt?: { license: { period: number; periodUnit: string } }): string {
+  if (opt?.license?.periodUnit === 'Forever') return '永久';
+  const s = new Date(start + 'T00:00:00');
+  const e = new Date(end + 'T00:00:00');
+  const months = Math.max(1, Math.round((e.getTime() - s.getTime()) / (30.44 * 86400000)));
+  const years = Math.max(1, Math.round(months / 12));
+  return `${years}年`;
+}
+
+function purchaseNatureBadgeClass(nature: PurchaseNature): string {
+  switch (nature) {
+    case 'New':
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200';
+    case 'Renewal':
+      return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200';
+    case 'AddOn':
+      return 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200';
+    case 'Upgrade':
+      return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200';
+    default:
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-800/40 dark:text-gray-200';
+  }
+}
+
+const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, renewalOrder, subscriptionCheckout, initialDraft }) => {
+  const { products, customers, setCustomers, channels, opportunities, contracts, users, orders, setOrders, currentUser, standaloneEnterprises, orderDrafts, setOrderDrafts, apiMode, refreshOrders, subscriptions } = useAppContext();
   const navigate = useNavigate();
 
   const [currentStep, setCurrentStep] = useState(1); // 1: Type, 2: Info, 3: Products, 4: Delivery
@@ -82,9 +113,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const [tempQuantity, setTempQuantity] = useState(1);
   const [tempActivationMethod, setTempActivationMethod] = useState<ActivationMethod>('Account');
   const [tempMediaCount, setTempMediaCount] = useState<number | ''>(1);
-  const [tempPurchaseNature, setTempPurchaseNature] = useState<PurchaseNature>('New');
-  const [tempRenewalSubType, setTempRenewalSubType] = useState('');
-  const [tempPurchaseNature365, setTempPurchaseNature365] = useState<PurchaseNature>('New');
+  /** 来自续费管理订阅入口时锁定客户/产品（增购时另锁定授权时间与单价） */
+  const [subscriptionLock, setSubscriptionLock] = useState<null | { mode: 'renew' | 'addon'; lineProduct: SubscriptionLineProductSnapshot }>(null);
+  /** 用户手动改过订购性质/365 的行号，自动推断不再覆盖该行，直至授权或产品变更清空 */
+  const [purchaseNatureManualByRow, setPurchaseNatureManualByRow] = useState<Record<number, boolean>>({});
   const [tempLicensePeriod, setTempLicensePeriod] = useState('');
   const [tempLicensePeriodNum, setTempLicensePeriodNum] = useState<number | ''>('');
   const [tempLicensePeriodUnit, setTempLicensePeriodUnit] = useState<'年' | '月' | '日'>('年');
@@ -380,6 +412,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setBusinessManagerId('');
       setCreatorId(currentUser.id);
       setNewOrderItems([]);
+      setPurchaseNatureManualByRow({});
+      setSubscriptionLock(null);
       setTempCategory('');
       setTempProductId('');
       setTempSkuId('');
@@ -476,6 +510,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
   const handleCustomerChange = (customerId: string) => {
       setNewOrderCustomer(customerId);
+      setPurchaseNatureManualByRow({});
       setOrderEnterpriseId(''); // Reset enterprise selection
       setPurchasingContacts([]);
       setItContacts([]);
@@ -584,7 +619,15 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     const isPermanent = selectedOption ? selectedOption.license.periodUnit === 'Forever' : true;
     const needsManualPeriod = !isPermanent;
 
-    const newItem: OrderItem = {
+    const endCustomerId = (buyerType === 'Customer' || buyerType === 'Channel') ? newOrderCustomer : undefined;
+    const withInferredPurchaseNature = (base: OrderItem): OrderItem => {
+      if (!endCustomerId) return { ...base, purchaseNature: 'New', purchaseNature365: 'New' };
+      const inf = inferOrderLinePurchaseNatureFromSubscription(base, endCustomerId, subscriptions);
+      const pn = inf.purchaseNature ?? 'New';
+      return { ...base, purchaseNature: pn, purchaseNature365: pn };
+    };
+
+    let newItem: OrderItem = {
         productId: selectedProduct.id,
         productName: selectedProduct.name,
         skuId: selectedSku.id,
@@ -598,9 +641,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         licensePeriod: isPermanent ? '永久' : (needsManualPeriod && tempLicensePeriodNum ? `${tempLicensePeriodNum}${tempLicensePeriodUnit}` : undefined),
         activationMethod: tempActivationMethod,
         mediaCount: typeof tempMediaCount === 'number' ? tempMediaCount : undefined,
-        purchaseNature: tempPurchaseNature,
-        renewalSubType: tempRenewalSubType || undefined,
-        purchaseNature365: tempPurchaseNature365,
+        purchaseNature: 'New',
+        purchaseNature365: 'New',
         licensee: tempLicensee || undefined,
         installPackageName: resolvedInstallPackageName,
         installPackageType: tempPkgType || undefined,
@@ -609,6 +651,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         enterpriseName: enterpriseName,
         capabilitiesSnapshot
     };
+    newItem = withInferredPurchaseNature(newItem);
 
     const itemsToAdd: OrderItem[] = [newItem];
 
@@ -627,7 +670,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         const svcOption = svcSku.pricingOptions && svcSku.pricingOptions.length > 0 ? svcSku.pricingOptions[0] : undefined;
         const svcPrice = svcOption ? svcOption.price : svcSku.price;
         const svcIsPermanent = svcOption ? svcOption.license.periodUnit === 'Forever' : true;
-        itemsToAdd.push({
+        itemsToAdd.push(withInferredPurchaseNature({
           productId: svcProduct.id,
           productName: svcProduct.name,
           skuId: svcSku.id,
@@ -640,10 +683,12 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
           licenseType: svcOption?.title || undefined,
           licensePeriod: svcIsPermanent ? '永久' : undefined,
           activationMethod: tempActivationMethod,
+          purchaseNature: 'New',
+          purchaseNature365: 'New',
           enterpriseId: resolvedEntId || undefined,
           enterpriseName: enterpriseName,
           capabilitiesSnapshot: svcProduct.composition?.map(c => c.name) || [],
-        });
+        }));
       }
     }
 
@@ -681,22 +726,34 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     setShowAddProductModal(false);
   };
 
-  const handleRemoveItem = (index: number) => setNewOrderItems(prev => prev.filter((_, i) => i !== index));
+  const handleRemoveItem = (index: number) => {
+    if (subscriptionLock && index === 0) return;
+    setPurchaseNatureManualByRow({});
+    setNewOrderItems(prev => prev.filter((_, i) => i !== index));
+  };
   const handleUpdateItem = (index: number, field: keyof OrderItem, value: any) => {
+      if (field === 'purchaseNature' || field === 'purchaseNature365') {
+        setPurchaseNatureManualByRow(prev => ({ ...prev, [index]: true }));
+      }
+      if (field === 'licensePeriod' || field === 'licenseStartDate' || field === 'licenseEndDate' || field === 'productId' || field === 'skuId') {
+        setPurchaseNatureManualByRow(prev => {
+          const next = { ...prev };
+          delete next[index];
+          return next;
+        });
+      }
       setNewOrderItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
   };
   const handleEditItem = (index: number) => {
       const item = newOrderItems[index];
       if (!item) return;
+      if (subscriptionLock && index === 0) return;
       setTempProductId(item.productId);
       setTempSkuId(item.skuId);
       setTempPricingOptionId(item.pricingOptionId || '');
       setTempQuantity(item.quantity);
       setTempActivationMethod(item.activationMethod || 'Account');
       setTempMediaCount(item.mediaCount ?? 1);
-      setTempPurchaseNature((item.purchaseNature as PurchaseNature) || 'New');
-      setTempRenewalSubType(item.renewalSubType || '');
-      setTempPurchaseNature365((item.purchaseNature365 as PurchaseNature) || 'New');
       setNegotiatedPrice(item.priceAtPurchase);
       setTempEnterpriseId(item.enterpriseId || '');
       setTempLicensee(item.licensee || '');
@@ -721,6 +778,52 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   };
 
   const calculateNewOrderTotal = () => newOrderItems.reduce((acc, item) => acc + (item.priceAtPurchase * item.quantity), 0);
+
+  const orderLinesNatureSourceKey = useMemo(
+    () =>
+      JSON.stringify(
+        newOrderItems.map(i => ({
+          productId: i.productId,
+          licensePeriod: i.licensePeriod,
+          ls: i.licenseStartDate,
+          le: i.licenseEndDate,
+        })),
+      ),
+    [newOrderItems],
+  );
+
+  /** 根据续费管理订阅 + 客户/产品/授权时间，自动写入订购性质（尊重用户手动修改） */
+  useEffect(() => {
+    if (currentStep !== 3) return;
+    if (!newOrderCustomer || (buyerType !== 'Customer' && buyerType !== 'Channel')) return;
+    if (renewalOrder || subscriptionCheckout) return;
+
+    setNewOrderItems(prev => {
+      let changed = false;
+      const next = prev.map((item, idx) => {
+        if (subscriptionLock && idx === 0) return item;
+        if (purchaseNatureManualByRow[idx]) return item;
+        if (item.purchaseNature === 'Upgrade') return item;
+        const inf = inferOrderLinePurchaseNatureFromSubscription(item, newOrderCustomer, subscriptions);
+        if (!inf.purchaseNature) return item;
+        const cur365 = item.purchaseNature365 ?? 'New';
+        if (item.purchaseNature === inf.purchaseNature && cur365 === inf.purchaseNature) return item;
+        changed = true;
+        return { ...item, purchaseNature: inf.purchaseNature, purchaseNature365: inf.purchaseNature };
+      });
+      return changed ? next : prev;
+    });
+  }, [
+    orderLinesNatureSourceKey,
+    currentStep,
+    newOrderCustomer,
+    buyerType,
+    renewalOrder,
+    subscriptionCheckout,
+    subscriptions,
+    subscriptionLock,
+    purchaseNatureManualByRow,
+  ]);
 
   // Sync productAcceptanceRows when items change
   useEffect(() => {
@@ -1047,6 +1150,69 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setCurrentStep(3);
   }, [renewalOrder]);
 
+  // --- 从续费管理订阅发起续费/增购 ---
+  useEffect(() => {
+    if (!subscriptionCheckout) return;
+    const { subscription, lineProduct, mode } = subscriptionCheckout;
+    resetCreateForm();
+    setSubscriptionLock({ mode, lineProduct });
+
+    const customerObj = customers.find(c => c.id === subscription.customerId);
+    const product = products.find(p => p.id === lineProduct.productCode)
+      || products.find(p => p.name === lineProduct.productName);
+    if (!customerObj || !product) {
+      alert(!customerObj ? '未找到订阅关联客户，请检查客户主数据。' : '未找到订阅关联在售产品，请检查产品编码。');
+      setSubscriptionLock(null);
+      return;
+    }
+    const sku = product.skus.find(s => s.name === lineProduct.skuName && s.status === 'Active')
+      || product.skus.find(s => s.status === 'Active');
+    if (!sku) {
+      alert('未找到匹配的 SKU 规格');
+      setSubscriptionLock(null);
+      return;
+    }
+    const opt = sku.pricingOptions?.find(o => o.title === lineProduct.licenseType)
+      || sku.pricingOptions?.[0];
+    const price = opt?.price ?? sku.price;
+    const isPermanent = opt ? opt.license.periodUnit === 'Forever' : false;
+    const licensePeriod = isPermanent ? '永久' : subscriptionLicensePeriodLabel(lineProduct.startDate, lineProduct.endDate, opt);
+
+    const item: OrderItem = {
+      productId: product.id,
+      productName: product.name,
+      skuId: sku.id,
+      skuName: sku.name,
+      skuCode: sku.code,
+      quantity: Math.max(1, lineProduct.currentQuantity),
+      priceAtPurchase: price,
+      pricingOptionId: opt?.id,
+      pricingOptionName: opt?.title,
+      licenseType: opt?.title ?? lineProduct.licenseType,
+      licensePeriod,
+      licenseStartDate: lineProduct.startDate,
+      licenseEndDate: lineProduct.endDate,
+      activationMethod: 'Account',
+      mediaCount: 1,
+      purchaseNature: mode === 'renew' ? 'Renewal' : 'AddOn',
+      purchaseNature365: mode === 'renew' ? 'Renewal' : 'AddOn',
+      licensee: customerObj.companyName,
+      enterpriseId: customerObj.enterprises?.[0]?.id,
+      enterpriseName: customerObj.enterprises?.[0]?.name,
+      capabilitiesSnapshot: product.composition?.map(c => c.name) || [],
+    };
+
+    setBuyerType('Customer');
+    setOrderSource(mode === 'renew' ? 'Renewal' : 'Sales');
+    setHasOpportunity('no');
+    setOrderRemark(mode === 'renew' ? `【订阅续费】${subscription.id} ${lineProduct.productCode}` : `【订阅增购】${subscription.id} ${lineProduct.productCode}`);
+    if (lineProduct.lastOrderId) setOriginalOrderId(lineProduct.lastOrderId);
+    handleCustomerChange(subscription.customerId);
+    setNewOrderItems([item]);
+    if (product.salesOrgName) setSellerName(product.salesOrgName);
+    setCurrentStep(3);
+  }, [subscriptionCheckout]);
+
 
   if (!isOpen) return null;
 
@@ -1066,7 +1232,12 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                 <div>
                     <h3 className="font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-3" style={{ fontSize: '20px' }}>
                         新建订单
-                        {orderSource === 'Renewal' && (
+                        {subscriptionLock && (
+                            <span className="px-2.5 py-1 bg-violet-100 dark:bg-violet-900/40 text-violet-800 dark:text-violet-200 text-xs font-bold rounded-lg flex items-center gap-1">
+                                <RefreshCcw className="w-3.5 h-3.5"/> {subscriptionLock.mode === 'renew' ? '订阅续费' : '订阅增购'}
+                            </span>
+                        )}
+                        {orderSource === 'Renewal' && !subscriptionLock && (
                             <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg flex items-center gap-1">
                                 <RefreshCcw className="w-3.5 h-3.5"/> 续费模式
                             </span>
@@ -1437,7 +1608,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 <>
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">选择客户 <span className="text-red-500">*</span></label>
-                                    <select className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={newOrderCustomer} onChange={e => handleCustomerChange(e.target.value)}>
+                                    {subscriptionLock && (
+                                        <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-1">来自订阅续费/增购，客户不可更换。</p>
+                                    )}
+                                    <select disabled={!!subscriptionLock} className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm disabled:opacity-60 disabled:cursor-not-allowed" value={newOrderCustomer} onChange={e => handleCustomerChange(e.target.value)}>
                                         <option value="">-- 请选择客户 --</option>
                                         {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
                                     </select>
@@ -1673,7 +1847,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             <span>已从商机自动带入 {newOrderItems.length} 个产品，以下信息需要您补充完善：</span>
                                         </div>
                                         <ul className="list-disc list-inside text-xs space-y-1 ml-6 text-amber-600 dark:text-amber-400">
-                                            <li>订购性质、增续类型、365订购性质 — 请根据实际情况选择</li>
+                                            <li>订购性质 — 系统会结合「续费管理」订阅自动判断，请核对；365 订购性质请按需选择</li>
                                             <li>数量、授权/服务期限 — 请确认或修改</li>
                                             <li>激活方式、安装包类型、介质数量 — 请点击编辑按钮补充</li>
                                         </ul>
@@ -1711,23 +1885,40 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     )}
                                     <button
                                         onClick={() => { setEditingItemIndex(null); setShowAddProductModal(true); }}
-                                        className="flex items-center gap-1.5 px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-xl text-xs font-bold transition shadow-apple"
+                                        disabled={!!subscriptionLock || (enableSubUnitAuth && newOrderItems.length >= 1)}
+                                        title={subscriptionLock ? '订阅续费/增购模式下不可再添加产品' : (enableSubUnitAuth && newOrderItems.length >= 1 ? '下级单位授权模式下仅允许一个产品明细' : undefined)}
+                                        className="flex items-center gap-1.5 px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-xl text-xs font-bold transition shadow-apple disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#0071E3]"
                                     >
                                         <Plus className="w-3.5 h-3.5"/> 添加产品
                                     </button>
                                 </div>
                             </div>
+                            {(buyerType === 'Customer' || buyerType === 'Channel') && newOrderCustomer && !renewalOrder && !subscriptionCheckout && newOrderItems.length > 0 && (
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400 px-5 pb-2 leading-relaxed">
+                                    每条明细<strong>下方</strong>为与「续费管理」订阅的比对结果（<strong>对应订阅</strong>、<strong>订阅基础信息</strong>）；可在上行修改订购性质。
+                                </p>
+                            )}
                             {newOrderItems.length > 0 ? (
                                 <table className="w-full text-left text-sm min-w-[600px]">
                                     <thead className="unified-table-header">
-                                        <tr><th className="p-3 pl-4">产品/规格</th><th className="p-3">订购性质</th><th className="p-3">增续类型</th><th className="p-3">365订购性质</th><th className="p-3">授权类型</th><th className="p-3 text-center">数量</th><th className="p-3 text-center">授权/服务期限</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-3">激活方式</th>}<th className="p-3">安装包</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-3">关联企业</th>}<th className="p-3 text-right">单价</th><th className="p-3 text-right">小计</th><th className="p-3 text-center">操作</th></tr>
+                                        <tr><th className="p-3 pl-4">产品/规格</th><th className="p-3">订购性质</th><th className="p-3">365订购性质</th><th className="p-3">授权类型</th><th className="p-3 text-center">数量</th><th className="p-3 text-center">授权/服务期限</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-3">激活方式</th>}<th className="p-3">安装包</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-3">关联企业</th>}<th className="p-3 text-right">单价</th><th className="p-3 text-right">小计</th><th className="p-3 text-center">操作</th></tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                                        {newOrderItems.map((item, idx) => (<React.Fragment key={idx}>
+                                        {newOrderItems.map((item, idx) => {
+                                            const rowLocked = !!subscriptionLock && idx === 0;
+                                            const addonTimeLocked = rowLocked && subscriptionLock?.mode === 'addon';
+                                            const showLineNatureHint = (buyerType === 'Customer' || buyerType === 'Channel') && !!newOrderCustomer && !renewalOrder && !subscriptionCheckout && !!item.productId;
+                                            const lineInf = showLineNatureHint
+                                                ? inferOrderLinePurchaseNatureFromSubscription(item, newOrderCustomer, subscriptions)
+                                                : null;
+                                            const nature = (item.purchaseNature || 'New') as PurchaseNature;
+                                            const lineColSpan = 10 + (buyerType === 'Customer' || buyerType === 'Channel' ? 2 : 0);
+                                            return (
+                                            <React.Fragment key={idx}>
                                             <tr className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                                <td className="p-3 pl-4"><div className="font-bold text-gray-900 dark:text-white text-sm">{item.productName}</div><div className="text-xs text-gray-500 mt-0.5">{item.skuName}</div></td>
+                                                <td className="p-3 pl-4"><div className="font-bold text-gray-900 dark:text-white text-sm">{item.productName}</div><div className="text-xs text-gray-500 mt-0.5">{item.skuName}</div>{rowLocked && <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">（来自订阅，不可更换产品）</div>}</td>
                                                 <td className="p-3">
-                                                    <select value={item.purchaseNature || 'New'} onChange={e => { handleUpdateItem(idx, 'purchaseNature', e.target.value); handleUpdateItem(idx, 'renewalSubType', ''); }} className="text-xs font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] outline-none transition cursor-pointer">
+                                                    <select value={item.purchaseNature || 'New'} disabled={rowLocked} onChange={e => { handleUpdateItem(idx, 'purchaseNature', e.target.value as PurchaseNature); }} className="text-xs font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] outline-none transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
                                                         <option value="New">新购</option>
                                                         <option value="Renewal">续费</option>
                                                         <option value="AddOn">增购</option>
@@ -1735,28 +1926,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                     </select>
                                                 </td>
                                                 <td className="p-3">
-                                                    {(item.purchaseNature === 'AddOn' || item.purchaseNature === 'Renewal') ? (
-                                                        <select value={item.renewalSubType || ''} onChange={e => handleUpdateItem(idx, 'renewalSubType', e.target.value)} className="text-xs font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] outline-none transition cursor-pointer">
-                                                            <option value="">--</option>
-                                                            {item.purchaseNature === 'AddOn' && <>
-                                                                <option value="产品增购">产品增购</option>
-                                                                <option value="数量增购">数量增购</option>
-                                                                <option value="产品增购-批量">产品增购-批量</option>
-                                                                <option value="数量增购-批量">数量增购-批量</option>
-                                                            </>}
-                                                            {item.purchaseNature === 'Renewal' && <>
-                                                                <option value="普通续费">普通续费</option>
-                                                                <option value="批量续费">批量续费</option>
-                                                                <option value="间隔两年续费">间隔两年续费</option>
-                                                                <option value="间隔两年续费-批量">间隔两年续费-批量</option>
-                                                            </>}
-                                                        </select>
-                                                    ) : (
-                                                        <span className="text-gray-300 dark:text-gray-600 text-xs">-</span>
-                                                    )}
-                                                </td>
-                                                <td className="p-3">
-                                                    <select value={item.purchaseNature365 || 'New'} onChange={e => handleUpdateItem(idx, 'purchaseNature365', e.target.value)} className="text-xs font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] outline-none transition cursor-pointer">
+                                                    <select value={item.purchaseNature365 || 'New'} disabled={rowLocked} onChange={e => handleUpdateItem(idx, 'purchaseNature365', e.target.value)} className="text-xs font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] outline-none transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
                                                         <option value="New">新购</option>
                                                         <option value="Renewal">续费</option>
                                                         <option value="AddOn">增购</option>
@@ -1767,10 +1937,23 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                 <td className="p-3 text-center">
                                                     <input type="number" min={1} value={item.quantity} onChange={e => handleUpdateItem(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))} className="w-16 text-center text-sm font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] dark:focus:border-[#FF2D55] outline-none transition"/>
                                                 </td>
-                                                <td className="p-3 text-center">{item.licensePeriod && item.licensePeriod !== '永久' ? <span className="inline-flex px-2.5 py-1 text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800 rounded-lg">{item.licensePeriod}</span> : <span className="text-gray-300 dark:text-gray-600">-</span>}</td>
+                                                <td className="p-3 text-center">
+                                                    {addonTimeLocked ? (
+                                                        <div className="text-xs text-gray-700 dark:text-gray-300 space-y-1">
+                                                            <div><span className="text-gray-400">起</span> {item.licenseStartDate || '-'}</div>
+                                                            <div><span className="text-gray-400">止</span> {item.licenseEndDate || '-'}</div>
+                                                            <div className="inline-flex px-2 py-0.5 text-[11px] font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-100 dark:border-teal-800">{item.licensePeriod}</div>
+                                                            <div className="text-[10px] text-amber-600 dark:text-amber-400">（与订阅一致，不可改）</div>
+                                                        </div>
+                                                    ) : item.licensePeriod && item.licensePeriod !== '永久' ? (
+                                                        <span className="inline-flex px-2.5 py-1 text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800 rounded-lg">{item.licensePeriod}</span>
+                                                    ) : (
+                                                        <span className="text-gray-300 dark:text-gray-600">-</span>
+                                                    )}
+                                                </td>
                                                 {(buyerType === 'Customer' || buyerType === 'Channel') && (
                                                     <td className="p-3">
-                                                        <select value={item.activationMethod} onChange={e => handleUpdateItem(idx, 'activationMethod', e.target.value)} className="text-xs font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] dark:focus:border-[#FF2D55] outline-none transition cursor-pointer">
+                                                        <select value={item.activationMethod} disabled={addonTimeLocked} onChange={e => handleUpdateItem(idx, 'activationMethod', e.target.value)} className="text-xs font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] dark:focus:border-[#FF2D55] outline-none transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
                                                             <option value="Account">账号激活</option>
                                                             <option value="SerialKey">序列号激活</option>
                                                             <option value="AccountAndSerialKey">账号+序列号</option>
@@ -1798,20 +1981,76 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                     </td>
                                                 )}
                                                 <td className="p-3 text-right">
-                                                    <input type="number" min={0} step={0.01} value={item.priceAtPurchase} onChange={e => handleUpdateItem(idx, 'priceAtPurchase', Math.max(0, parseFloat(e.target.value) || 0))} className="w-24 text-right text-sm font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] dark:focus:border-[#FF2D55] outline-none transition"/>
+                                                    <input type="number" min={0} step={0.01} value={item.priceAtPurchase} disabled={addonTimeLocked} onChange={e => handleUpdateItem(idx, 'priceAtPurchase', Math.max(0, parseFloat(e.target.value) || 0))} className="w-24 text-right text-sm font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 bg-white dark:bg-black/30 dark:text-white focus:border-[#0071E3] dark:focus:border-[#FF2D55] outline-none transition disabled:opacity-60 disabled:cursor-not-allowed"/>
                                                 </td>
                                                 <td className="p-3 text-right font-bold text-red-600 dark:text-red-400">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
                                                 <td className="p-3 text-center">
                                                     <div className="flex items-center justify-center gap-1">
-                                                    <button onClick={() => setExpandedSubUnitIdx(expandedSubUnitIdx === idx ? null : idx)} className={`p-1.5 rounded-full transition ${expandedSubUnitIdx === idx ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'}`} title="下级单位授权"><Building2 className="w-3.5 h-3.5"/></button>
-                                                    <button onClick={() => handleEditItem(idx)} className="text-gray-400 hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20 transition" title="编辑"><Pencil className="w-3.5 h-3.5"/></button>
-                                                    <button onClick={() => handleRemoveItem(idx)} className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="删除"><Trash2 className="w-3.5 h-3.5"/></button>
+                                                    <button type="button" onClick={() => setExpandedSubUnitIdx(expandedSubUnitIdx === idx ? null : idx)} disabled={rowLocked} className={`p-1.5 rounded-full transition ${expandedSubUnitIdx === idx ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'} disabled:opacity-30 disabled:pointer-events-none`} title="下级单位授权"><Building2 className="w-3.5 h-3.5"/></button>
+                                                    <button type="button" onClick={() => handleEditItem(idx)} disabled={rowLocked} className="text-gray-400 hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20 transition disabled:opacity-30 disabled:pointer-events-none" title="编辑"><Pencil className="w-3.5 h-3.5"/></button>
+                                                    <button type="button" onClick={() => handleRemoveItem(idx)} disabled={rowLocked} className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition disabled:opacity-30 disabled:pointer-events-none" title="删除"><Trash2 className="w-3.5 h-3.5"/></button>
                                                     </div>
-                                                    {item.subUnitAuthMode && item.subUnitAuthMode !== 'none' && item.subUnits && item.subUnits.length > 0 && (
+                                                    {!rowLocked && item.subUnitAuthMode && item.subUnitAuthMode !== 'none' && item.subUnits && item.subUnits.length > 0 && (
                                                         <div className="text-[10px] text-indigo-500 dark:text-indigo-400 mt-1 font-bold">{item.subUnits.length} 个下级单位</div>
                                                     )}
                                                 </td>
                                             </tr>
+                                            {showLineNatureHint && lineInf && (
+                                                <tr className="bg-teal-50/25 dark:bg-teal-950/20">
+                                                    <td colSpan={lineColSpan} className="p-0 border-b border-gray-100 dark:border-white/8 align-top">
+                                                        <div className="mx-3 mb-2 border-l-2 border-teal-500/80 pl-3 pr-2 py-3 space-y-2.5 rounded-r-xl bg-white/90 dark:bg-[#252528]/95">
+                                                            <div className="text-[11px] font-bold text-teal-900 dark:text-teal-200">订购性质识别 · 与上一行明细对应</div>
+                                                            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                                                                <span className="text-gray-500">本行当前</span>
+                                                                <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-bold ${purchaseNatureBadgeClass(nature)}`}>{purchaseNatureDisplay(nature)}</span>
+                                                                <span className="text-gray-400">·</span>
+                                                                <span className="text-gray-500">系统推荐</span>
+                                                                {lineInf.purchaseNature ? (
+                                                                    <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-bold ${purchaseNatureBadgeClass(lineInf.purchaseNature)}`}>{purchaseNatureDisplay(lineInf.purchaseNature)}</span>
+                                                                ) : (
+                                                                    <span className="text-[11px] text-gray-500">待完善授权信息后判定</span>
+                                                                )}
+                                                            </div>
+                                                            {lineInf.matchedSubscription && lineInf.matchedProduct && (
+                                                                <div className="rounded-xl border border-teal-100/90 dark:border-teal-800/40 bg-teal-50/40 dark:bg-teal-950/25 px-3 py-2.5 space-y-2 text-xs text-gray-800 dark:text-gray-200">
+                                                                    <div>
+                                                                        <span className="text-gray-500">对应订阅批</span>{' '}
+                                                                        <span className="font-mono font-semibold text-[#0071E3] dark:text-[#0A84FF]">{lineInf.matchedSubscription.id}</span>
+                                                                        <span className="text-gray-400 mx-1">·</span>
+                                                                        <span className="text-gray-500">产品线</span> {lineInf.matchedSubscription.productLine}
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="text-gray-500 mb-1">匹配产品（链上快照）</div>
+                                                                        <div className="grid gap-1.5 sm:grid-cols-2">
+                                                                            <div><span className="text-gray-500">产品</span> {lineInf.matchedProduct.productName}</div>
+                                                                            <div><span className="text-gray-500">编码</span> {lineInf.matchedProduct.productCode}</div>
+                                                                            <div><span className="text-gray-500">SKU</span> {lineInf.matchedProduct.skuName}</div>
+                                                                            <div><span className="text-gray-500">当前数量</span> {lineInf.matchedProduct.currentQuantity}</div>
+                                                                            <div className="sm:col-span-2"><span className="text-gray-500">周期</span> {lineInf.matchedProduct.startDate} ~ {lineInf.matchedProduct.endDate} · {subscriptionStatusLabel(lineInf.matchedProduct.status)}</div>
+                                                                            <div className="sm:col-span-2"><span className="text-gray-500">授权类型</span> {lineInf.matchedProduct.licenseType}</div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {purchaseNatureManualByRow[idx] && (
+                                                                <div className="text-xs rounded-lg bg-amber-50 dark:bg-amber-900/25 text-amber-800 dark:text-amber-200 border border-amber-200/70 dark:border-amber-800/40 px-3 py-2">
+                                                                    本行订购性质由您<strong>手动修改</strong>，系统不再自动覆盖。需要重新识别时可调整本行的<strong>授权/服务期限</strong>或<strong>产品/SKU</strong>。
+                                                                </div>
+                                                            )}
+                                                            {lineInf.headline && (
+                                                                <p className="text-sm font-medium text-gray-900 dark:text-white leading-relaxed">{lineInf.headline}</p>
+                                                            )}
+                                                            {lineInf.bullets.length > 0 && (
+                                                                <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 pl-4 list-disc marker:text-teal-600">
+                                                                    {lineInf.bullets.map((b, bi) => (
+                                                                        <li key={bi} className="leading-relaxed">{b}</li>
+                                                                    ))}
+                                                                </ul>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
                                             {expandedSubUnitIdx === idx && (
                                             <tr>
                                                 <td colSpan={20} className="p-0">
@@ -1901,7 +2140,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                 </td>
                                             </tr>
                                             )}
-                                        </React.Fragment>))}
+                                            </React.Fragment>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             ) : (
@@ -2164,92 +2405,20 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 </div>
                             </div>
 
-                            {/* ═══ 续费信息 ═══ */}
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-white/10">
-                                    <Target className="w-4 h-4 text-green-500"/>
-                                    <span className="text-sm font-bold text-gray-900 dark:text-white">续费信息</span>
+                            {/* 订购性质由系统在添加后根据续费管理订阅自动填写 */}
+                            <div className="rounded-xl border border-teal-100 dark:border-teal-900/40 bg-teal-50/60 dark:bg-teal-950/25 p-3.5 text-xs text-teal-900 dark:text-teal-100/90 space-y-1.5">
+                                <div className="font-bold flex items-center gap-2 text-sm text-teal-950 dark:text-teal-50">
+                                    <Sparkles className="w-4 h-4 shrink-0 text-teal-600 dark:text-teal-300" />
+                                    订购性质与 365 订购性质
                                 </div>
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-green-600 uppercase flex items-center gap-1"><Target className="w-3 h-3"/> 订购性质</label>
-                                        <div className="flex gap-1.5">
-                                            {([
-                                                { id: 'New' as PurchaseNature, label: '新购' },
-                                                { id: 'Renewal' as PurchaseNature, label: '续费' },
-                                                { id: 'AddOn' as PurchaseNature, label: '增购' },
-                                                { id: 'Upgrade' as PurchaseNature, label: '升级' },
-                                            ]).map(opt => (
-                                                <button
-                                                    key={opt.id}
-                                                    type="button"
-                                                    onClick={() => { setTempPurchaseNature(opt.id); setTempRenewalSubType(''); }}
-                                                    className={`flex-1 py-2 px-1.5 rounded-lg text-xs font-bold transition border ${
-                                                        tempPurchaseNature === opt.id
-                                                            ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'
-                                                            : 'border-gray-200 dark:border-white/10 text-gray-500 hover:border-green-300 dark:hover:border-green-700'
-                                                    }`}
-                                                >
-                                                    {opt.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-emerald-500 uppercase flex items-center gap-1"><Layers className="w-3 h-3"/> 增续类型</label>
-                                        {(tempPurchaseNature === 'AddOn' || tempPurchaseNature === 'Renewal') ? (
-                                            <select
-                                                value={tempRenewalSubType}
-                                                onChange={e => setTempRenewalSubType(e.target.value)}
-                                                className="w-full p-2.5 bg-gray-50 dark:bg-black border border-emerald-200 dark:border-emerald-900/30 rounded-xl outline-none focus:ring-2 focus:ring-emerald-200 transition text-xs font-medium text-emerald-700 dark:text-emerald-400"
-                                            >
-                                                <option value="">-- 请选择 --</option>
-                                                {tempPurchaseNature === 'AddOn' && <>
-                                                    <option value="产品增购">产品增购</option>
-                                                    <option value="数量增购">数量增购</option>
-                                                    <option value="产品增购-批量">产品增购-批量</option>
-                                                    <option value="数量增购-批量">数量增购-批量</option>
-                                                </>}
-                                                {tempPurchaseNature === 'Renewal' && <>
-                                                    <option value="普通续费">普通续费</option>
-                                                    <option value="批量续费">批量续费</option>
-                                                    <option value="间隔两年续费">间隔两年续费</option>
-                                                    <option value="间隔两年续费-批量">间隔两年续费-批量</option>
-                                                </>}
-                                            </select>
-                                        ) : (
-                                            <div className="w-full p-2.5 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-400 dark:text-gray-500">
-                                                {tempPurchaseNature === 'New' ? '新购无增续类型' : '升级无增续类型'}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-sky-600 uppercase flex items-center gap-1"><Radio className="w-3 h-3"/> 365 订购性质</label>
-                                        <div className="flex gap-1.5">
-                                            {([
-                                                { id: 'New' as PurchaseNature, label: '新购' },
-                                                { id: 'Renewal' as PurchaseNature, label: '续费' },
-                                                { id: 'AddOn' as PurchaseNature, label: '增购' },
-                                                { id: 'Upgrade' as PurchaseNature, label: '升级' },
-                                            ]).map(opt => (
-                                                <button
-                                                    key={opt.id}
-                                                    type="button"
-                                                    onClick={() => setTempPurchaseNature365(opt.id)}
-                                                    className={`flex-1 py-2 px-1.5 rounded-lg text-xs font-bold transition border ${
-                                                        tempPurchaseNature365 === opt.id
-                                                            ? 'border-sky-400 dark:border-sky-500 bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400'
-                                                            : 'border-gray-200 dark:border-white/10 text-gray-500 hover:border-sky-300 dark:hover:border-sky-700'
-                                                    }`}
-                                                >
-                                                    {opt.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
+                                <p className="leading-relaxed text-teal-900/90 dark:text-teal-100/85">
+                                    无需在此选择。点击「确认添加」后，系统会根据<strong>当前订单客户</strong>、<strong>本产品与授权期限</strong>，对照「续费管理」中的订阅记录，自动写入<strong>新购 / 续费 / 增购</strong>（365 订购性质与订购性质保持一致）。您仍可在下一步产品明细表中修改。
+                                </p>
+                                {(buyerType !== 'Customer' && buyerType !== 'Channel') && (
+                                    <p className="text-amber-800 dark:text-amber-200/90 leading-relaxed border-t border-teal-200/60 dark:border-teal-800/50 pt-2 mt-2">
+                                        当前为自成交等模式，未绑定直签/渠道客户时，将按「新购」写入；后续在明细中可自行调整。
+                                    </p>
+                                )}
                             </div>
 
                             {/* ═══ 交付物信息 ═══ */}

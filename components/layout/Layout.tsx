@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ExternalLink, Minus, Trash2, ClipboardCheck, Radar, Search, List, ArrowLeft, Smartphone } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ExternalLink, Minus, Trash2, ClipboardCheck, Radar, Search, List, ArrowLeft, Smartphone, RefreshCcw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import manualContent from '../../docs/产品说明文档.md?raw';
 import { useAppContext } from '../../contexts/AppContext';
 import WPSLogo from '../common/WPSLogo';
 import MobilePreview from '../mobile/MobilePreview';
+import AIAssistantButton from '../ai/AIAssistantButton';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -47,6 +48,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const staticMap: Record<string, string> = {
       '/': '数据看板',
       '/orders': '订单管理',
+      '/renewals': '续费管理',
       '/customers': '客户信息',
       '/opportunities': '商机信息',
       '/contracts': '合同信息',
@@ -190,7 +192,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         setActiveTopNav('OPERATIONS_CENTER');
     } else if (location.pathname.startsWith('/channels')) {
         setActiveTopNav('CHANNEL_CENTER');
-    } else if (location.pathname.startsWith('/contracts') || location.pathname.startsWith('/customers') || location.pathname.startsWith('/opportunities') || location.pathname.startsWith('/remittances') || location.pathname.startsWith('/invoices') || location.pathname.startsWith('/authorizations') || location.pathname.startsWith('/delivery-info') || location.pathname.startsWith('/acceptances')) {
+    } else if (location.pathname.startsWith('/contracts') || location.pathname.startsWith('/customers') || location.pathname.startsWith('/opportunities') || location.pathname.startsWith('/remittances') || location.pathname.startsWith('/invoices') || location.pathname.startsWith('/authorizations') || location.pathname.startsWith('/delivery-info') || location.pathname.startsWith('/acceptances') || location.pathname.startsWith('/renewals')) {
         setActiveTopNav('ORDER_CENTER');
     } else if (location.pathname.startsWith('/sab-insight')) {
         setActiveTopNav('SAB_CUSTOMER_INSIGHT');
@@ -484,6 +486,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         {renderSectionGroup('order_main', '订单中心',
                           <>
                             <NavItem to="/orders" icon={ShoppingCart} label="订单管理" />
+                            <NavItem to="/renewals" icon={RefreshCcw} label="续费管理" />
                             <NavItem to="/acceptances" icon={ClipboardCheck} label="验收管理" permission="acceptance_view" />
                           </>,
                           ['order_list_view', 'order_view_all', 'order_view_pending_approval', 'order_view_pending_confirm', 'order_view_auth_confirm', 'order_view_stock_pkg', 'order_view_stock_ship', 'order_view_stock_cd', 'order_view_payment', 'order_view_shipped', 'order_view_completed', 'acceptance_view']
@@ -767,6 +770,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </ReactMarkdown>
         </div>
       </div>
+
+      {/* AI 业务助手入口 */}
+      <AIAssistantButton />
 
       {/* Feedback FAB */}
       {!isFeedbackOpen && (

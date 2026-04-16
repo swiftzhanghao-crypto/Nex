@@ -1,22 +1,99 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Building2, Phone, Mail, CreditCard, Building, Users, Plus, X, MapPin, Trash2, FileText, UserCircle, CheckSquare, Pencil } from 'lucide-react';
+import { ArrowLeft, Building2, Phone, Mail, CreditCard, Building, Users, Plus, X, MapPin, Trash2, FileText, UserCircle, CheckSquare, Pencil, RefreshCcw, ChevronDown, ChevronRight, Layers, ExternalLink } from 'lucide-react';
+import type { Subscription, SubscriptionLineProductSnapshot, SubscriptionStatus, PurchaseNature } from '../../types';
 import { CustomerContact, ContactRole } from '../../types';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
+import { SubscriptionOrderChain } from '../common/SubscriptionOrderChain';
+import {
+  subscriptionRollupEndDate,
+  subscriptionRollupStartDate,
+  subscriptionRollupStatus,
+  subscriptionTotalOrderCount,
+} from '../../utils/subscriptionRollup';
+import { subscriptionDistinctProducts, subscriptionProductSnapshot } from '../../utils/subscriptionLineProduct';
+
+const SUB_STATUS_BADGE: Record<SubscriptionStatus, { label: string; cls: string }> = {
+  Active: { label: '活跃', cls: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
+  ExpiringSoon: { label: '即将到期', cls: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+  GracePeriod: { label: '宽限期', cls: 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
+  Expired: { label: '已过期', cls: 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+};
+
+const ORDER_NATURE_BADGE: Record<PurchaseNature, { text: string; cls: string }> = {
+  New: { text: '新购', cls: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+  Renewal: { text: '续费', cls: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
+  AddOn: { text: '增购', cls: 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
+  Upgrade: { text: '升级', cls: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+};
+
+function subscriptionDaysUntil(endDate: string): number {
+  const end = new Date(endDate + 'T00:00:00');
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function renderSubscriptionCountdown(endDate: string) {
+  const days = subscriptionDaysUntil(endDate);
+  if (days < 0) return <span className="text-red-600 dark:text-red-400 font-semibold text-xs whitespace-nowrap">已过期 {Math.abs(days)} 天</span>;
+  if (days <= 7) return <span className="text-red-600 dark:text-red-400 font-semibold text-xs whitespace-nowrap">{days} 天后到期</span>;
+  if (days <= 30) return <span className="text-amber-600 dark:text-amber-400 font-medium text-xs whitespace-nowrap">{days} 天后到期</span>;
+  return <span className="text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">{days} 天</span>;
+}
 
 const CustomerDetails: React.FC = () => {
-  const { customers, setCustomers, users, currentUser } = useAppContext();
+  const { customers, setCustomers, users, currentUser, subscriptions } = useAppContext();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   const customer = customers.find(c => c.id === id);
 
+  const customerSubscriptions = useMemo(() => {
+    if (!id) return [];
+    return subscriptions
+      .filter(s => s.customerId === id)
+      .sort((a, b) => {
+        const ae = subscriptionRollupEndDate(a);
+        const be = subscriptionRollupEndDate(b);
+        return ae < be ? 1 : ae > be ? -1 : a.id.localeCompare(b.id);
+      });
+  }, [subscriptions, id]);
+
+  const toggleSubExpand = useCallback((sid: string) => {
+    setExpandedSubIds(prev => {
+      const next = new Set(prev);
+      if (next.has(sid)) next.delete(sid);
+      else next.add(sid);
+      return next;
+    });
+  }, []);
+
+  const goCreateFromSubscription = useCallback((sub: Subscription, lineProduct: SubscriptionLineProductSnapshot, mode: 'renew' | 'addon') => {
+    navigate('/orders', { state: { initFromSubscription: true, subscription: sub, lineProduct, mode } });
+  }, [navigate]);
+
+  const licenseTypesSummarySub = useCallback((sub: Subscription) => {
+    const u = [...new Set(sub.relatedOrders.map(r => r.licenseType).filter(Boolean))];
+    if (u.length === 0) return '—';
+    if (u.length <= 2) return u.join('、');
+    return `${u.slice(0, 2).join('、')} 等`;
+  }, []);
+
+  const quantitySumSub = useCallback((sub: Subscription) => {
+    return subscriptionDistinctProducts(sub).reduce((n, { productId }) => {
+      const s = subscriptionProductSnapshot(sub, productId);
+      return n + (s?.currentQuantity ?? 0);
+    }, 0);
+  }, []);
+
   const roleLabel = (r: string) =>
       r === 'Purchasing' ? '采购' : r === 'IT' ? 'IT' : r === 'Finance' ? '财务' : r === 'Management' ? '管理' : '其他';
 
-  const [activeTab, setActiveTab] = useState<'info' | 'org' | 'contacts' | 'address' | 'invoice' | 'bank'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'org' | 'contacts' | 'address' | 'invoice' | 'bank' | 'subscriptions'>('info');
+  const [expandedSubIds, setExpandedSubIds] = useState<Set<string>>(() => new Set());
 
   interface ShippingAddress {
       id: string; receiver: string; country: string; province: string; city: string;
@@ -222,6 +299,7 @@ const CustomerDetails: React.FC = () => {
                   { id: 'address' as const, label: '收货地址' },
                   { id: 'invoice' as const, label: '发票信息' },
                   { id: 'bank' as const, label: '银行账号' },
+                  { id: 'subscriptions' as const, label: `客户订阅（${customerSubscriptions.length}）` },
               ]).map(tab => (
                   <button
                       key={tab.id}
@@ -764,6 +842,159 @@ const CustomerDetails: React.FC = () => {
                   </div>
               </div>
               ))}
+          </div>
+          )}
+      </div>
+      )}
+
+      {/* ── Tab: 客户订阅（续费管理数据，字段尽量与订阅表一致） ── */}
+      {activeTab === 'subscriptions' && (
+      <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-[#0071E3]" />
+                  <span className="text-base font-bold text-gray-800 dark:text-white">客户订阅</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">与「续费管理」同源，共 {customerSubscriptions.length} 条</span>
+              </div>
+              <button
+                  type="button"
+                  onClick={() => navigate('/renewals')}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-[#0071E3]/50 hover:text-[#0071E3] dark:hover:text-[#0A84FF] transition shrink-0"
+              >
+                  <ExternalLink className="w-3.5 h-3.5" /> 打开续费管理
+              </button>
+          </div>
+
+          {customerSubscriptions.length === 0 ? (
+              <div className="unified-card dark:bg-[#1C1C1E] p-12 text-center text-sm text-gray-400 dark:text-gray-500">
+                  该客户在续费管理中暂无订阅记录。
+              </div>
+          ) : (
+          <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
+              <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-left text-sm min-w-[1180px] border-separate border-spacing-0">
+                      <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E]">
+                          <tr>
+                              <th className="px-2 py-3 w-10 border-b border-gray-200/50 dark:border-white/10" />
+                              <th className="px-3 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">订阅编号</th>
+                              <th className="px-3 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品线</th>
+                              <th className="px-3 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 min-w-[140px]">产品线订单</th>
+                              <th className="px-3 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">授权类型</th>
+                              <th className="px-3 py-3 whitespace-nowrap text-center border-b border-gray-200/50 dark:border-white/10">数量合计</th>
+                              <th className="px-3 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">最早开通</th>
+                              <th className="px-3 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">最近到期</th>
+                              <th className="px-3 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">订阅状态</th>
+                              <th className="px-3 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">倒计时</th>
+                              <th className="px-3 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">区域</th>
+                              <th className="px-3 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">销售代表</th>
+                              <th className="px-3 py-3 whitespace-nowrap text-center border-b border-gray-200/50 dark:border-white/10">历史订单</th>
+                              <th className="px-3 py-3 whitespace-nowrap text-right border-b border-gray-200/50 dark:border-white/10 min-w-[120px]">操作</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                          {customerSubscriptions.map(sub => {
+                              const rollupSt = subscriptionRollupStatus(sub);
+                              const badge = SUB_STATUS_BADGE[rollupSt];
+                              const expanded = expandedSubIds.has(sub.id);
+                              const rollupEnd = subscriptionRollupEndDate(sub);
+                              const rollupStart = subscriptionRollupStartDate(sub);
+                              return (
+                                  <React.Fragment key={sub.id}>
+                                      <tr className="hover:bg-gray-50/80 dark:hover:bg-white/[0.03]">
+                                          <td className="px-2 py-3 text-center align-top">
+                                              <button type="button" onClick={() => toggleSubExpand(sub.id)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500">
+                                                  {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                              </button>
+                                          </td>
+                                          <td className="px-3 py-3 font-mono text-xs font-bold text-[#0071E3] dark:text-[#0A84FF] align-top whitespace-nowrap">{sub.id}</td>
+                                          <td className="px-3 py-3 text-gray-800 dark:text-gray-200 align-top whitespace-nowrap">{sub.productLine}</td>
+                                          <td className="px-3 py-3 text-gray-900 dark:text-white align-top">
+                                              <div className="font-medium">时间序列</div>
+                                              <div className="text-xs text-gray-500 mt-0.5">{subscriptionDistinctProducts(sub).length} 个产品</div>
+                                          </td>
+                                          <td className="px-3 py-3 text-gray-700 dark:text-gray-300 align-top text-xs leading-snug">{licenseTypesSummarySub(sub)}</td>
+                                          <td className="px-3 py-3 text-center font-semibold text-gray-900 dark:text-white align-top">{quantitySumSub(sub)}</td>
+                                          <td className="px-3 py-3 text-xs text-gray-600 dark:text-gray-400 align-top whitespace-nowrap">{rollupStart}</td>
+                                          <td className="px-3 py-3 text-xs text-gray-600 dark:text-gray-400 align-top whitespace-nowrap">{rollupEnd}</td>
+                                          <td className="px-3 py-3 align-top">
+                                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${badge.cls}`}>{badge.label}</span>
+                                          </td>
+                                          <td className="px-3 py-3 align-top">{renderSubscriptionCountdown(rollupEnd)}</td>
+                                          <td className="px-3 py-3 text-gray-600 dark:text-gray-400 align-top">{sub.region ?? '—'}</td>
+                                          <td className="px-3 py-3 text-gray-700 dark:text-gray-300 align-top">{sub.salesRepName ?? '—'}</td>
+                                          <td className="px-3 py-3 text-center align-top">
+                                              <button type="button" onClick={() => toggleSubExpand(sub.id)} className="text-xs font-semibold text-[#0071E3] dark:text-[#0A84FF] hover:underline">
+                                                  {subscriptionTotalOrderCount(sub)} 笔
+                                              </button>
+                                          </td>
+                                          <td className="px-3 py-3 text-right align-top text-xs text-gray-400">展开后续费</td>
+                                      </tr>
+                                      {expanded && (
+                                          <tr className="bg-blue-50/40 dark:bg-blue-900/10">
+                                              <td colSpan={14} className="px-4 py-4">
+                                                  <div className="ml-2 space-y-3">
+                                                      <div className="text-xs font-semibold text-gray-600 dark:text-gray-400">「{sub.productLine}」订阅订单序列</div>
+                                                      <SubscriptionOrderChain relatedOrders={sub.relatedOrders} onOrderClick={id => navigate(`/orders/${id}`)} />
+                                                      <div className="flex flex-wrap gap-2">
+                                                          {subscriptionDistinctProducts(sub).map(({ productId }) => {
+                                                              const snap = subscriptionProductSnapshot(sub, productId);
+                                                              if (!snap) return null;
+                                                              return (
+                                                                  <div key={productId} className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-gray-200/80 bg-white/80 px-2.5 py-1.5 dark:border-white/10 dark:bg-[#1C1C1E]/90">
+                                                                      <span className="text-xs font-medium text-gray-800 dark:text-gray-200 max-w-[10rem] truncate" title={snap.productName}>{snap.productName}</span>
+                                                                      <button type="button" onClick={() => goCreateFromSubscription(sub, snap, 'renew')} className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-[#0071E3] text-white hover:bg-[#0062CC]">续费</button>
+                                                                      <button type="button" onClick={() => goCreateFromSubscription(sub, snap, 'addon')} className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-violet-600 text-white hover:bg-violet-700">增购</button>
+                                                                  </div>
+                                                              );
+                                                          })}
+                                                      </div>
+                                                      <div className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden bg-white dark:bg-[#1C1C1E]">
+                                                          <table className="w-full text-left text-sm min-w-[640px]">
+                                                              <thead>
+                                                                  <tr className="bg-gray-50/80 dark:bg-white/5 text-xs text-gray-500 dark:text-gray-400">
+                                                                      <th className="px-3 py-2 font-semibold min-w-[100px]">产品</th>
+                                                                      <th className="px-3 py-2 font-semibold">订单编号</th>
+                                                                      <th className="px-3 py-2 font-semibold whitespace-nowrap">授权起</th>
+                                                                      <th className="px-3 py-2 font-semibold whitespace-nowrap">授权止</th>
+                                                                      <th className="px-3 py-2 font-semibold">性质</th>
+                                                                      <th className="px-3 py-2 font-semibold text-right">数量</th>
+                                                                      <th className="px-3 py-2 font-semibold text-right">金额</th>
+                                                                      <th className="px-3 py-2 font-semibold w-[56px]"> </th>
+                                                                  </tr>
+                                                              </thead>
+                                                              <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                                                                  {sub.relatedOrders.map((ref, ri) => {
+                                                                      const nl = ORDER_NATURE_BADGE[ref.purchaseNature];
+                                                                      const isAddOn = ref.purchaseNature === 'AddOn';
+                                                                      return (
+                                                                          <tr key={`${ref.orderId}-${ref.productId}-${ri}`} className={isAddOn ? 'bg-violet-50/40 dark:bg-violet-950/15' : undefined}>
+                                                                              <td className="px-3 py-2 text-xs text-gray-800 dark:text-gray-200 max-w-[140px] truncate" title={ref.productName}>{ref.productName}</td>
+                                                                              <td className={`px-3 py-2 font-mono text-xs font-bold text-[#0071E3] dark:text-[#0A84FF] ${isAddOn ? 'border-l-2 border-violet-400 pl-3' : ''}`}>{ref.orderId}</td>
+                                                                              <td className="px-3 py-2 text-xs tabular-nums text-gray-600 dark:text-gray-400">{ref.licenseStartDate ?? '—'}</td>
+                                                                              <td className="px-3 py-2 text-xs tabular-nums text-gray-600 dark:text-gray-400">{ref.licenseEndDate ?? '—'}</td>
+                                                                              <td className="px-3 py-2"><span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${nl.cls}`}>{nl.text}</span></td>
+                                                                              <td className="px-3 py-2 text-right text-xs font-semibold text-gray-900 dark:text-white">{ref.quantity}</td>
+                                                                              <td className="px-3 py-2 text-right text-xs font-semibold text-gray-900 dark:text-white">¥{ref.amount.toLocaleString()}</td>
+                                                                              <td className="px-3 py-2">
+                                                                                  <button type="button" onClick={() => navigate(`/orders/${ref.orderId}`)} className="text-xs text-[#0071E3] dark:text-[#0A84FF] hover:underline font-medium">查看</button>
+                                                                              </td>
+                                                                          </tr>
+                                                                      );
+                                                                  })}
+                                                              </tbody>
+                                                          </table>
+                                                      </div>
+                                                  </div>
+                                              </td>
+                                          </tr>
+                                      )}
+                                  </React.Fragment>
+                              );
+                          })}
+                      </tbody>
+                  </table>
+              </div>
+              <p className="px-4 py-2 text-[11px] text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-white/10">授权起止按订单行周期推算；主表「首次开通/当前到期」为整条订阅汇总。展开表不展示下单日。表格紫边行为增购。</p>
           </div>
           )}
       </div>

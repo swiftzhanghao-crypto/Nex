@@ -18,13 +18,17 @@ import {
   type Performance,
   type Authorization,
   type DeliveryInfo,
+  type Subscription,
+  type SubscriptionStatus,
+  type SubscriptionOrderRef,
+  type PurchaseNature,
   type Product,
   type SalesMerchandise,
   type Channel,
   type ActivationMethod,
-  type PurchaseNature,
   type SerialNumber,
 } from '../types';
+import { initialProducts } from './staticData';
 
 export function generateLicenseKey(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -498,10 +502,6 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
 
     const activationMethods: ActivationMethod[] = ['Account', 'SerialKey', 'AccountAndSerialKey'];
     const purchaseNatures: PurchaseNature[] = ['New', 'Renewal', 'AddOn', 'Upgrade'];
-    const renewalSubTypeMap: Record<string, string[]> = {
-      AddOn: ['产品增购', '数量增购', '产品增购-批量', '数量增购-批量'],
-      Renewal: ['普通续费', '批量续费', '间隔两年续费', '间隔两年续费-批量'],
-    };
     const supplyOrgs = ['珠海金山办公软件有限公司', '武汉金山办公软件有限公司', '北京金山办公软件有限公司'];
 
     const makeItem = (mItem: { productId: string; productName: string; skuId: string; skuName: string; quantity?: number }, unitPrice: number, idxOffset: number): OrderItem => {
@@ -514,8 +514,6 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
 
       const pn = purchaseNatures[(i + idxOffset) % purchaseNatures.length];
       const pn365 = purchaseNatures[(i + idxOffset + 1) % purchaseNatures.length];
-      const subTypes = renewalSubTypeMap[pn];
-      const rst = subTypes ? subTypes[(i + idxOffset) % subTypes.length] : undefined;
 
       return {
         merchandiseId: merchandise?.id,
@@ -533,7 +531,6 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
         activationMethod: activationMethods[(i + idxOffset) % activationMethods.length],
         mediaCount: ((i + idxOffset) % 5) + 1,
         purchaseNature: pn,
-        renewalSubType: rst,
         purchaseNature365: pn365,
         licensee: (() => {
           const ents = customer.enterprises || [];
@@ -1120,4 +1117,542 @@ export function generateDeliveryInfos(): DeliveryInfo[] {
       serviceEndDate: hasSvc ? fmtDate(endDate) : undefined,
     };
   });
+}
+
+function pickSubscriptionProductMeta(productId: string): { name: string; code: string; skuName: string; licenseType: string } | null {
+  const p = initialProducts.find(x => x.id === productId && x.status === 'OnShelf');
+  if (!p) return null;
+  const sku = p.skus.find(s => s.status === 'Active') || p.skus[0];
+  if (!sku) return null;
+  const opt = sku.pricingOptions?.[0];
+  return {
+    name: p.name,
+    code: p.id,
+    skuName: sku.name,
+    licenseType: opt?.title || '用户年授权',
+  };
+}
+
+/** 产品线（与续费管理、客户订阅 Tab 一致） */
+const PRODUCT_LINE_BY_PRODUCT_ID: Record<string, 'WPS365公有云' | 'WPS365私有云' | '端'> = {
+  AB0002807: 'WPS365私有云', AB0001880: 'WPS365私有云', AB0002790: 'WPS365私有云', AB0002630: 'WPS365私有云',
+  AB0001841: 'WPS365私有云', AB0002622: 'WPS365私有云',
+  AB0000841: 'WPS365公有云', AB0002815: 'WPS365公有云', AB0002901: 'WPS365公有云', AB0000636: 'WPS365公有云', AB0002009: 'WPS365公有云',
+  AB0000765: '端', AB0000772: '端', AB0001879: '端', AB0001927: '端', AB0001721: '端', AB0002003: '端',
+};
+
+function productLineForSubscription(productId: string): 'WPS365公有云' | 'WPS365私有云' | '端' {
+  return PRODUCT_LINE_BY_PRODUCT_ID[productId] || 'WPS365公有云';
+}
+
+function fmtYmd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function licensePeriodAddToDate(from: Date, licensePeriod: string | undefined): Date {
+  const out = new Date(from.getTime());
+  if (!licensePeriod || licensePeriod === '永久') {
+    out.setFullYear(out.getFullYear() + 3);
+    return out;
+  }
+  const m = licensePeriod.trim().match(/^(\d+)(年|月|日)$/);
+  if (!m) {
+    out.setFullYear(out.getFullYear() + 1);
+    return out;
+  }
+  const n = parseInt(m[1], 10);
+  const u = m[2];
+  if (u === '年') out.setFullYear(out.getFullYear() + n);
+  else if (u === '月') out.setMonth(out.getMonth() + n);
+  else out.setDate(out.getDate() + n);
+  return out;
+}
+
+function subscriptionStatusFromEndDate(endDateStr: string): SubscriptionStatus {
+  const end = new Date(endDateStr + 'T00:00:00');
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  const days = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (days < 0) return 'Expired';
+  if (days === 0) return 'GracePeriod';
+  if (days <= 30) return 'ExpiringSoon';
+  return 'Active';
+}
+
+function orderDateYmd(iso: string): string {
+  return iso.slice(0, 10);
+}
+
+/** 与 generateSubscriptionChainOrders 写入的 orderRemark 一致，用于识别订阅链演示单（订单号格式与普通 generateOrders 一致：S+YYMMDD+12位） */
+const SUBSCRIPTION_CHAIN_ORDER_REMARK = '【订阅链】与续费管理订阅同源，勿删';
+
+/** 与 generateOrders 中客户订单 id 规则一致 */
+function makeCustomerOrderIdFromDate(date: Date): string {
+  return `S${date.getFullYear().toString().slice(-2)}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}${Math.floor(Math.random() * 1e12).toString().padStart(12, '0')}`;
+}
+
+/** 仅聚合带订阅链备注的演示订单；同一客户+产品线聚合成一条按时间的订单序列（可含多个 AB 产品） */
+export function buildSubscriptionsFromOrders(orders: Order[], customers: Customer[], products: Product[]): Subscription[] {
+  const chainOrders = orders.filter(
+    o => o.orderRemark === SUBSCRIPTION_CHAIN_ORDER_REMARK && o.buyerType === 'Customer' && Boolean(o.customerId),
+  );
+
+  type FlatEv = {
+    customerId: string;
+    customerName: string;
+    orderId: string;
+    orderDate: string;
+    productId: string;
+    productName: string;
+    skuName: string;
+    licenseType: string;
+    purchaseNature: PurchaseNature;
+    quantity: number;
+    amount: number;
+    licensePeriod?: string;
+  };
+
+  const flat: FlatEv[] = [];
+  for (const o of chainOrders) {
+    if (o.buyerType !== 'Customer' || !o.customerId) continue;
+    const ymd = orderDateYmd(o.date);
+    for (const it of o.items) {
+      flat.push({
+        customerId: o.customerId,
+        customerName: o.customerName || '',
+        orderId: o.id,
+        orderDate: ymd,
+        productId: it.productId,
+        productName: it.productName,
+        skuName: it.skuName,
+        licenseType: it.licenseType || '',
+        purchaseNature: (it.purchaseNature || 'New') as PurchaseNature,
+        quantity: it.quantity,
+        amount: Math.round(it.priceAtPurchase * it.quantity * 100) / 100,
+        licensePeriod: it.licensePeriod,
+      });
+    }
+  }
+
+  const byPortfolio = new Map<string, FlatEv[]>();
+  for (const ev of flat) {
+    const line = productLineForSubscription(ev.productId);
+    const k = `${ev.customerId}::${line}`;
+    const arr = byPortfolio.get(k) || [];
+    arr.push(ev);
+    byPortfolio.set(k, arr);
+  }
+
+  const subs: Subscription[] = [];
+  let subIdx = 201000;
+
+  for (const [, evs] of byPortfolio) {
+    if (evs.length === 0) continue;
+    evs.sort((a, b) =>
+      a.orderDate !== b.orderDate
+        ? a.orderDate.localeCompare(b.orderDate)
+        : a.orderId !== b.orderId
+          ? a.orderId.localeCompare(b.orderId)
+          : a.productId.localeCompare(b.productId),
+    );
+
+    let lastSpineOrderId: string | undefined;
+    const relatedOrders: SubscriptionOrderRef[] = evs.map(e => {
+      let relatesToOrderId: string | undefined;
+      if (e.purchaseNature === 'AddOn') {
+        relatesToOrderId = lastSpineOrderId;
+      } else if (e.purchaseNature === 'New') {
+        relatesToOrderId = undefined;
+        lastSpineOrderId = e.orderId;
+      } else {
+        relatesToOrderId = lastSpineOrderId;
+        lastSpineOrderId = e.orderId;
+      }
+      const licStart = e.orderDate;
+      const licEnd = fmtYmd(licensePeriodAddToDate(new Date(e.orderDate + 'T00:00:00'), e.licensePeriod));
+      return {
+        orderId: e.orderId,
+        orderDate: e.orderDate,
+        purchaseNature: e.purchaseNature,
+        quantity: e.quantity,
+        amount: e.amount,
+        relatesToOrderId,
+        licenseStartDate: licStart,
+        licenseEndDate: licEnd,
+        productId: e.productId,
+        productName: e.productName,
+        skuName: e.skuName,
+        licenseType: e.licenseType,
+      };
+    });
+
+    const firstEv = evs[0]!;
+    const lastEv = evs[evs.length - 1]!;
+    const firstOrder = chainOrders.find(c => c.id === firstEv.orderId);
+    const lastOrder = chainOrders.find(c => c.id === lastEv.orderId);
+    const customerObj = customers.find(c => c.id === firstEv.customerId);
+
+    subs.push({
+      id: `SUB-GRP-${subIdx++}`,
+      customerId: firstEv.customerId,
+      customerName: firstOrder?.customerName || customerObj?.companyName || firstEv.customerName,
+      productLine: productLineForSubscription(lastEv.productId),
+      relatedOrders,
+      salesRepName: lastOrder?.salesRepName,
+      region: customerObj?.region,
+    });
+  }
+
+  subs.sort((a, b) => a.customerId.localeCompare(b.customerId) || a.productLine.localeCompare(b.productLine));
+  return subs;
+}
+
+export interface SubscriptionChainOrderParams {
+  customers: Customer[];
+  products: Product[];
+  users: User[];
+}
+
+/**
+ * 生成与订阅对应的演示订单（订单号规则与 generateOrders 一致：S+YYMMDD+12 位随机数），多包含新购→增购→续费→… 的长链，通过 orderRemark 标记以便聚合订阅。
+ */
+export function generateSubscriptionChainOrders(params: SubscriptionChainOrderParams): Order[] {
+  const { customers, products, users } = params;
+  const orders: Order[] = [];
+  let trackingSeq = 1;
+
+  const productIds = [
+    'AB0000841', 'AB0002815', 'AB0002901', 'AB0000636', 'AB0002009',
+    'AB0002807', 'AB0001841', 'AB0002622', 'AB0000765', 'AB0000772', 'AB0001879', 'AB0001721', 'AB0002003',
+  ];
+
+  const naturePatterns: PurchaseNature[][] = [
+    ['New', 'AddOn', 'Renewal', 'Renewal'],
+    ['New', 'Renewal', 'AddOn', 'Renewal', 'AddOn'],
+    ['New', 'Renewal', 'Renewal', 'Renewal'],
+    ['New', 'Upgrade', 'Renewal', 'AddOn', 'Renewal'],
+    ['New', 'AddOn', 'AddOn', 'Renewal', 'Renewal', 'Renewal'],
+    ['New', 'Renewal', 'AddOn', 'Renewal', 'AddOn', 'Renewal', 'Renewal'],
+    ['New', 'AddOn', 'Renewal', 'AddOn', 'Renewal', 'AddOn', 'Renewal'],
+  ];
+
+  const monthGaps = [0, 5, 6, 8, 10, 12, 7, 9, 11, 4, 6, 12, 10, 8, 14];
+
+  for (let ci = 0; ci < 42; ci++) {
+    const customer = customers[ci % customers.length];
+    const productId = productIds[ci % productIds.length];
+    const product = products.find(p => p.id === productId);
+    if (!product) continue;
+    const sku = product.skus.find(s => s.status === 'Active') || product.skus[0];
+    if (!sku) continue;
+    const opt = sku.pricingOptions?.[0];
+    const unitPrice = opt?.price ?? sku.price;
+    const licenseType = opt?.title || '用户年授权';
+    const pattern = naturePatterns[ci % naturePatterns.length];
+    const maxSteps = Math.min(7, 3 + (ci % 5));
+    const steps: PurchaseNature[] = [];
+    for (let k = 0; k < maxSteps; k++) {
+      steps.push(k < pattern.length ? pattern[k]! : ((ci + k) % 2 === 0 ? 'Renewal' : 'AddOn'));
+    }
+    steps[0] = 'New';
+
+    let cursor = new Date(2023, 2 + (ci % 10), 8 + (ci % 20));
+    const baseQty = 80 + (ci % 12) * 40;
+
+    for (let si = 0; si < steps.length; si++) {
+      const gap = monthGaps[(ci + si) % monthGaps.length];
+      if (si > 0) {
+        cursor = new Date(cursor);
+        cursor.setMonth(cursor.getMonth() + gap);
+      }
+      const nature = steps[si];
+      let qty = baseQty;
+      if (nature === 'AddOn') qty = Math.max(10, Math.round(baseQty * (0.15 + (si % 5) * 0.05)));
+      else if (nature === 'Upgrade') qty = baseQty + 20;
+      else if (nature === 'Renewal') qty = baseQty + Math.round(baseQty * 0.1 * si);
+      const licensePeriod = (si % 3 === 0 ? '2年' : '1年') as string;
+      const dateStr = cursor.toISOString();
+      const total = Math.round(unitPrice * qty * 100) / 100;
+      const salesRep = users.find(u => u.id === customer.ownerId);
+
+      const item: OrderItem = {
+        productId: product.id,
+        productName: product.name,
+        skuId: sku.id,
+        skuName: sku.name,
+        skuCode: sku.code,
+        quantity: qty,
+        priceAtPurchase: unitPrice,
+        pricingOptionId: opt?.id,
+        pricingOptionName: opt?.title,
+        licenseType,
+        licensePeriod,
+        activationMethod: 'Account',
+        mediaCount: 1,
+        purchaseNature: nature,
+        purchaseNature365: nature,
+        licensee: customer.companyName,
+        enterpriseId: customer.enterprises?.[0]?.id,
+        enterpriseName: customer.enterprises?.[0]?.name,
+        capabilitiesSnapshot: product.composition?.map(c => c.name) || [],
+      };
+
+      const approval: OrderApproval = {
+        salesApproved: true,
+        businessApproved: true,
+        financeApproved: true,
+        salesApprovedDate: dateStr,
+        financeApprovedDate: dateStr,
+      };
+
+      orders.push({
+        id: makeCustomerOrderIdFromDate(cursor),
+        customerId: customer.id,
+        customerName: customer.companyName,
+        customerType: customer.customerType,
+        customerLevel: customer.level,
+        customerIndustry: customer.industry,
+        customerRegion: customer.region,
+        buyerType: 'Customer',
+        buyerId: customer.id,
+        buyerName: customer.companyName,
+        source: 'Sales',
+        date: dateStr,
+        status: OrderStatus.DELIVERED,
+        total,
+        items: [item],
+        shippingAddress: customer.address,
+        isPaid: true,
+        paymentDate: orderDateYmd(dateStr),
+        isAuthConfirmed: true,
+        authConfirmedDate: dateStr,
+        isPackageConfirmed: true,
+        packageConfirmedDate: dateStr,
+        isShippingConfirmed: true,
+        shippingConfirmedDate: dateStr,
+        isCDBurned: true,
+        cdBurnedDate: dateStr,
+        shippedDate: orderDateYmd(dateStr),
+        carrier: 'SF Express',
+        trackingNumber: `SF${700000000000 + trackingSeq++}`,
+        approval,
+        approvalRecords: [],
+        salesRepId: salesRep?.id,
+        salesRepName: salesRep?.name?.replace(/\s*\(.*?\)/g, ''),
+        businessManagerId: 'u3',
+        businessManagerName: '王强 (Business)',
+        creatorId: 'u10',
+        creatorName: '苏雪松',
+        creatorPhone: '17610166961',
+        orderRemark: SUBSCRIPTION_CHAIN_ORDER_REMARK,
+      });
+    }
+  }
+
+  // 同一客户横跨多条产品线：首位客户在主循环(ci=0)已有一条「公有云」链(AB0000841)，此处再追加一条「私有云」链，便于续费管理/客户订阅演示。
+  const anchorCustomer = customers[0];
+  const extraLineProductId = 'AB0002807';
+  if (anchorCustomer) {
+    const product = products.find(p => p.id === extraLineProductId);
+    const sku = product?.skus.find(s => s.status === 'Active') || product?.skus[0];
+    if (product && sku) {
+      const opt = sku.pricingOptions?.[0];
+      const unitPrice = opt?.price ?? sku.price;
+      const licenseType = opt?.title || '用户年授权';
+      const salesRep = users.find(u => u.id === anchorCustomer.ownerId);
+      let cursor = new Date(2022, 0, 12);
+      const extraSteps: PurchaseNature[] = ['New', 'AddOn', 'Renewal'];
+      const baseQty = 120;
+      for (let si = 0; si < extraSteps.length; si++) {
+        if (si > 0) {
+          cursor = new Date(cursor);
+          cursor.setMonth(cursor.getMonth() + 5);
+        }
+        const nature = extraSteps[si]!;
+        let qty = baseQty;
+        if (nature === 'AddOn') qty = 36;
+        else if (nature === 'Renewal') qty = Math.round(baseQty * 1.12);
+        const licensePeriod = si === 0 ? '1年' : '2年';
+        const dateStr = cursor.toISOString();
+        const total = Math.round(unitPrice * qty * 100) / 100;
+        const item: OrderItem = {
+          productId: product.id,
+          productName: product.name,
+          skuId: sku.id,
+          skuName: sku.name,
+          skuCode: sku.code,
+          quantity: qty,
+          priceAtPurchase: unitPrice,
+          pricingOptionId: opt?.id,
+          pricingOptionName: opt?.title,
+          licenseType,
+          licensePeriod,
+          activationMethod: 'Account',
+          mediaCount: 1,
+          purchaseNature: nature,
+          purchaseNature365: nature,
+          licensee: anchorCustomer.companyName,
+          enterpriseId: anchorCustomer.enterprises?.[0]?.id,
+          enterpriseName: anchorCustomer.enterprises?.[0]?.name,
+          capabilitiesSnapshot: product.composition?.map(c => c.name) || [],
+        };
+        const approval: OrderApproval = {
+          salesApproved: true,
+          businessApproved: true,
+          financeApproved: true,
+          salesApprovedDate: dateStr,
+          financeApprovedDate: dateStr,
+        };
+        orders.push({
+          id: makeCustomerOrderIdFromDate(cursor),
+          customerId: anchorCustomer.id,
+          customerName: anchorCustomer.companyName,
+          customerType: anchorCustomer.customerType,
+          customerLevel: anchorCustomer.level,
+          customerIndustry: anchorCustomer.industry,
+          customerRegion: anchorCustomer.region,
+          buyerType: 'Customer',
+          buyerId: anchorCustomer.id,
+          buyerName: anchorCustomer.companyName,
+          source: 'Sales',
+          date: dateStr,
+          status: OrderStatus.DELIVERED,
+          total,
+          items: [item],
+          shippingAddress: anchorCustomer.address,
+          isPaid: true,
+          paymentDate: orderDateYmd(dateStr),
+          isAuthConfirmed: true,
+          authConfirmedDate: dateStr,
+          isPackageConfirmed: true,
+          packageConfirmedDate: dateStr,
+          isShippingConfirmed: true,
+          shippingConfirmedDate: dateStr,
+          isCDBurned: true,
+          cdBurnedDate: dateStr,
+          shippedDate: orderDateYmd(dateStr),
+          carrier: 'SF Express',
+          trackingNumber: `SF${700000000000 + trackingSeq++}`,
+          approval,
+          approvalRecords: [],
+          salesRepId: salesRep?.id,
+          salesRepName: salesRep?.name?.replace(/\s*\(.*?\)/g, ''),
+          businessManagerId: 'u3',
+          businessManagerName: '王强 (Business)',
+          creatorId: 'u10',
+          creatorName: '苏雪松',
+          creatorPhone: '17610166961',
+          orderRemark: SUBSCRIPTION_CHAIN_ORDER_REMARK,
+        });
+      }
+    }
+  }
+
+  // 演示：同一客户、同一产品线（公有云）下，两个 AB 产品（AB0000841 / AB0002815）穿插的新购、续费、增购时间序
+  // 使用主循环（ci<42）未分配到的客户，避免与其它「公有云」订阅演示单混成同一条订阅
+  const multiAbCustomer = customers[59];
+  if (multiAbCustomer) {
+    const salesRep = users.find(u => u.id === multiAbCustomer.ownerId);
+    const stepDefs: { productId: string; nature: PurchaseNature; monthsAfterPrev: number; licensePeriod: string }[] = [
+      { productId: 'AB0000841', nature: 'New', monthsAfterPrev: 0, licensePeriod: '1年' },
+      { productId: 'AB0002815', nature: 'New', monthsAfterPrev: 4, licensePeriod: '1年' },
+      { productId: 'AB0000841', nature: 'Renewal', monthsAfterPrev: 5, licensePeriod: '2年' },
+      { productId: 'AB0002815', nature: 'AddOn', monthsAfterPrev: 3, licensePeriod: '1年' },
+      { productId: 'AB0000841', nature: 'AddOn', monthsAfterPrev: 2, licensePeriod: '1年' },
+      { productId: 'AB0002815', nature: 'Renewal', monthsAfterPrev: 6, licensePeriod: '2年' },
+    ];
+    let cursor = new Date(2024, 1, 12);
+    const baseQty = 200;
+    for (let i = 0; i < stepDefs.length; i++) {
+      const st = stepDefs[i]!;
+      if (i > 0) {
+        cursor = new Date(cursor);
+        cursor.setMonth(cursor.getMonth() + st.monthsAfterPrev);
+      }
+      const product = products.find(p => p.id === st.productId);
+      if (!product) continue;
+      const sku = product.skus.find(s => s.status === 'Active') || product.skus[0];
+      if (!sku) continue;
+      const opt = sku.pricingOptions?.[0];
+      const unitPrice = opt?.price ?? sku.price;
+      const licenseType = opt?.title || '用户年授权';
+      let qty = baseQty;
+      if (st.nature === 'AddOn') qty = 42 + i * 6;
+      else if (st.nature === 'Renewal') qty = Math.round(baseQty * (1.06 + i * 0.015));
+      const dateStr = cursor.toISOString();
+      const total = Math.round(unitPrice * qty * 100) / 100;
+      const item: OrderItem = {
+        productId: product.id,
+        productName: product.name,
+        skuId: sku.id,
+        skuName: sku.name,
+        skuCode: sku.code,
+        quantity: qty,
+        priceAtPurchase: unitPrice,
+        pricingOptionId: opt?.id,
+        pricingOptionName: opt?.title,
+        licenseType,
+        licensePeriod: st.licensePeriod,
+        activationMethod: 'Account',
+        mediaCount: 1,
+        purchaseNature: st.nature,
+        purchaseNature365: st.nature,
+        licensee: multiAbCustomer.companyName,
+        enterpriseId: multiAbCustomer.enterprises?.[0]?.id,
+        enterpriseName: multiAbCustomer.enterprises?.[0]?.name,
+        capabilitiesSnapshot: product.composition?.map(c => c.name) || [],
+      };
+      const approval: OrderApproval = {
+        salesApproved: true,
+        businessApproved: true,
+        financeApproved: true,
+        salesApprovedDate: dateStr,
+        financeApprovedDate: dateStr,
+      };
+      orders.push({
+        id: makeCustomerOrderIdFromDate(cursor),
+        customerId: multiAbCustomer.id,
+        customerName: multiAbCustomer.companyName,
+        customerType: multiAbCustomer.customerType,
+        customerLevel: multiAbCustomer.level,
+        customerIndustry: multiAbCustomer.industry,
+        customerRegion: multiAbCustomer.region,
+        buyerType: 'Customer',
+        buyerId: multiAbCustomer.id,
+        buyerName: multiAbCustomer.companyName,
+        source: 'Sales',
+        date: dateStr,
+        status: OrderStatus.DELIVERED,
+        total,
+        items: [item],
+        shippingAddress: multiAbCustomer.address,
+        isPaid: true,
+        paymentDate: orderDateYmd(dateStr),
+        isAuthConfirmed: true,
+        authConfirmedDate: dateStr,
+        isPackageConfirmed: true,
+        packageConfirmedDate: dateStr,
+        isShippingConfirmed: true,
+        shippingConfirmedDate: dateStr,
+        isCDBurned: true,
+        cdBurnedDate: dateStr,
+        shippedDate: orderDateYmd(dateStr),
+        carrier: 'SF Express',
+        trackingNumber: `SF${700000000000 + trackingSeq++}`,
+        approval,
+        approvalRecords: [],
+        salesRepId: salesRep?.id,
+        salesRepName: salesRep?.name?.replace(/\s*\(.*?\)/g, ''),
+        businessManagerId: 'u3',
+        businessManagerName: '王强 (Business)',
+        creatorId: 'u10',
+        creatorName: '苏雪松',
+        creatorPhone: '17610166961',
+        orderRemark: SUBSCRIPTION_CHAIN_ORDER_REMARK,
+      });
+    }
+  }
+
+  return orders;
 }

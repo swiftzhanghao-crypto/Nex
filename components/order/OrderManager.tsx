@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Order, OrderStatus, OrderItem, User, ApprovalRecord, OrderSource, OrderDraft } from '../../types';
+import { Order, OrderStatus, OrderItem, User, ApprovalRecord, OrderSource, OrderDraft, Subscription, SubscriptionLineProductSnapshot } from '../../types';
+import { subscriptionMostUrgentProductSnapshot } from '../../utils/subscriptionLineProduct';
 import { Search, Plus, Trash2, Disc, CheckCircle, FileText, CreditCard, Truck, X, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, FileCheck, CheckSquare, Package, Settings, Filter, ChevronDown, Calendar, Shield, RotateCcw, Save, ChevronRight, Copy, Check } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import OrderCreateWizard from './OrderCreateWizard';
@@ -313,6 +314,11 @@ const OrderManager: React.FC = () => {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [renewalOrder, setRenewalOrder] = useState<Order | undefined>(undefined);
+  const [subscriptionCheckout, setSubscriptionCheckout] = useState<{
+    subscription: Subscription;
+    lineProduct: SubscriptionLineProductSnapshot;
+    mode: 'renew' | 'addon';
+  } | null>(null);
   const [resumeDraft, setResumeDraft] = useState<OrderDraft | undefined>(undefined);
   const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
   const handleCopyOrderId = (e: React.MouseEvent, id: string) => {
@@ -363,9 +369,27 @@ const OrderManager: React.FC = () => {
 
   // --- Handle Renewal / Edit-Draft Initialization from navigation state ---
   useEffect(() => {
-      const state = location.state as { initRenewal?: boolean; originalOrder?: Order; editDraftId?: string } | null;
-      if (state?.initRenewal && state?.originalOrder) {
+      const state = location.state as {
+          initRenewal?: boolean;
+          originalOrder?: Order;
+          editDraftId?: string;
+          initFromSubscription?: boolean;
+          subscription?: Subscription;
+          lineProduct?: SubscriptionLineProductSnapshot;
+          mode?: 'renew' | 'addon';
+      } | null;
+      if (state?.initFromSubscription && state.subscription && state.mode) {
+          const lp = state.lineProduct ?? subscriptionMostUrgentProductSnapshot(state.subscription);
+          if (lp) {
+              setSubscriptionCheckout({ subscription: state.subscription, lineProduct: lp, mode: state.mode });
+              setRenewalOrder(undefined);
+              setResumeDraft(undefined);
+              setIsCreateOpen(true);
+          }
+          window.history.replaceState({}, document.title);
+      } else if (state?.initRenewal && state?.originalOrder) {
           setRenewalOrder(state.originalOrder);
+          setSubscriptionCheckout(null);
           setIsCreateOpen(true);
           window.history.replaceState({}, document.title);
       } else if (state?.editDraftId) {
@@ -1777,8 +1801,9 @@ const OrderManager: React.FC = () => {
       {/* --- Create Order Wizard --- */}
       <OrderCreateWizard
         isOpen={isCreateOpen}
-        onClose={() => { setIsCreateOpen(false); setRenewalOrder(undefined); setResumeDraft(undefined); }}
+        onClose={() => { setIsCreateOpen(false); setRenewalOrder(undefined); setSubscriptionCheckout(null); setResumeDraft(undefined); }}
         renewalOrder={renewalOrder}
+        subscriptionCheckout={subscriptionCheckout}
         initialDraft={resumeDraft}
       />
 

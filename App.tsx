@@ -28,6 +28,7 @@ import PerformanceManager from './components/performance/PerformanceManager';
 import AuthorizationManager from './components/order/AuthorizationManager';
 import DeliveryInfoManager from './components/order/DeliveryInfoManager';
 import AcceptanceManager from './components/order/AcceptanceManager';
+import RenewalManager from './components/order/RenewalManager';
 import OperationsManager from './components/operations/OperationsManager';
 import OpsEnterpriseManager from './components/operations/OpsEnterpriseManager';
 import OpsDashboard from './components/operations/OpsDashboard';
@@ -68,6 +69,7 @@ function AppRoutes() {
 
         <Route path="/orders" element={<ErrorBoundary fallbackTitle="订单列表加载异常"><OrderManager /></ErrorBoundary>} />
         <Route path="/orders/:id" element={<ErrorBoundary fallbackTitle="订单详情加载异常"><OrderDetails /></ErrorBoundary>} />
+        <Route path="/renewals" element={<RenewalManager />} />
 
         <Route path="/customers" element={<CustomerManager />} />
         <Route path="/customers/:id" element={<CustomerDetails />} />

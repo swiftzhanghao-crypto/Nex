@@ -221,7 +221,6 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
                                           })();
                                           const fields = [
                                               { label: '订购性质', value: purchaseNatureLabel },
-                                              { label: '增续类型', value: selectedItemForDetails.renewalSubType || '-' },
                                               { label: '365 订购性质', value: purchaseNature365Label },
                                           ];
                                           return (
