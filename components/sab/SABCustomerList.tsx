@@ -210,7 +210,7 @@ export const SABCustomerList: React.FC = () => {
     [preset, setSearchParams]
   );
 
-  const pageSize = 8;
+  const pageSize = 20;
   const [page, setPage] = useState(1);
   useEffect(() => {
     setPage(1);
@@ -326,7 +326,7 @@ export const SABCustomerList: React.FC = () => {
       `}</style>
 
       <div className="min-h-full bg-[#F5F5F7] dark:bg-black pb-10">
-        <div className="mx-auto max-w-[1600px] px-4 sm:px-6 pt-6">
+        <div className="mx-auto max-w-[2400px] px-4 sm:px-6 pt-6">
           <div className="mb-6">
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#1D1D1F] dark:text-white">客户列表</h1>
             <p className="text-sm text-[#86868B] mt-1">管理与筛选 SAB 企业客户，支持列配置与高级筛选。</p>
@@ -429,19 +429,19 @@ export const SABCustomerList: React.FC = () => {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-black/[0.04] dark:border-white/10 bg-white dark:bg-[#1C1C1E] shadow-apple overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="rounded-2xl border border-black/[0.04] dark:border-white/10 bg-white dark:bg-[#1C1C1E] shadow-apple overflow-hidden flex flex-col" style={{ height: 'calc(100vh - 220px)' }}>
+            <div className="overflow-auto flex-1">
               <table className="min-w-[1100px] w-full text-left text-sm">
-                <thead className="bg-[#F5F5F7] dark:bg-white/5 text-[#86868B] text-xs font-semibold uppercase tracking-wide border-b border-black/[0.06] dark:border-white/10">
+                <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-[#1C1C1E] text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   <tr>
                     {visibleKeys.map((k) => (
-                      <th key={k} className="px-4 py-3 whitespace-nowrap">
+                      <th key={k} className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">
                         {COLUMN_LABELS[k]}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-black/[0.04] dark:divide-white/10">
+                <tbody className="divide-y divide-gray-100 dark:divide-white/5 text-sm">
                   {pageSlice.map((c, idx) => (
                     <tr
                       key={c.id}
@@ -449,7 +449,7 @@ export const SABCustomerList: React.FC = () => {
                       style={{ animation: `sab-fadeIn 0.25s ease-out ${idx * 0.03}s both` }}
                     >
                       {visibleKeys.map((k) => (
-                        <td key={k} className="px-4 py-3 whitespace-nowrap text-[#1D1D1F] dark:text-white/90 align-top">
+                        <td key={k} className="px-3 py-2.5 whitespace-nowrap text-gray-700 dark:text-gray-200 align-middle">
                           {k === 'products' || k === 'name' ? (
                             <div className="max-w-[240px]">{renderCell(c, k)}</div>
                           ) : (
@@ -463,12 +463,12 @@ export const SABCustomerList: React.FC = () => {
               </table>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-t border-black/[0.06] dark:border-white/10 bg-[#F5F5F7]/80 dark:bg-white/5">
-              <p className="text-xs text-[#86868B]">
-                共 <span className="font-semibold text-[#1D1D1F] dark:text-white">{mockCustomers.length}</span> 条客户档案
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-t border-gray-200/50 dark:border-white/10 bg-gray-50/80 dark:bg-white/5 shrink-0">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                共 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF]">{filtered.length}</span> 条
                 {filtered.length !== mockCustomers.length && (
                   <>
-                    ，当前筛选 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF]">{filtered.length}</span> 条
+                    （全部 {mockCustomers.length} 条）
                   </>
                 )}
               </p>
@@ -477,18 +477,18 @@ export const SABCustomerList: React.FC = () => {
                   type="button"
                   disabled={pageClamped <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="h-8 px-3 rounded-lg text-xs font-medium border border-black/[0.08] dark:border-white/10 bg-white dark:bg-[#1C1C1E] disabled:opacity-40"
+                  className="h-8 px-3 rounded-lg text-xs font-medium border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 transition disabled:cursor-not-allowed"
                 >
                   上一页
                 </button>
-                <span className="text-xs text-[#86868B] tabular-nums">
-                  {pageClamped} / {totalPages}
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  第 {pageClamped} / {totalPages} 页
                 </span>
                 <button
                   type="button"
                   disabled={pageClamped >= totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  className="h-8 px-3 rounded-lg text-xs font-medium border border-black/[0.08] dark:border-white/10 bg-white dark:bg-[#1C1C1E] disabled:opacity-40"
+                  className="h-8 px-3 rounded-lg text-xs font-medium border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 transition disabled:cursor-not-allowed"
                 >
                   下一页
                 </button>
