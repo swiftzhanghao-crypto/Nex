@@ -41,6 +41,9 @@ import SalesOrgConfig from './components/system/SalesOrgConfig';
 import ProductMsrpManager from './components/product/ProductMsrpManager';
 import ProductChannelPriceManager from './components/product/ProductChannelPriceManager';
 import ProductPolicyManager from './components/product/ProductPolicyManager';
+import CustomerInsight from './components/sab/CustomerInsight';
+import SABCustomerList from './components/sab/SABCustomerList';
+import SABCustomerDetail from './components/sab/SABCustomerDetail';
 
 function AppRoutes() {
   return (
@@ -99,6 +102,10 @@ function AppRoutes() {
         <Route path="/ops/dashboard" element={<OpsDashboard />} />
         <Route path="/ops/enterprise" element={<OpsEnterpriseManager />} />
         <Route path="/ops/*" element={<OperationsManager />} />
+
+        <Route path="/sab-insight" element={<CustomerInsight />} />
+        <Route path="/sab-insight/customer-list" element={<SABCustomerList />} />
+        <Route path="/sab-insight/customer/:id" element={<SABCustomerDetail />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

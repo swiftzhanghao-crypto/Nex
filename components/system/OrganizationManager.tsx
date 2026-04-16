@@ -163,7 +163,7 @@ const OrganizationManager: React.FC = () => {
   const parentDept = selectedDept && selectedDept.parentId ? departments.find(d => d.id === selectedDept.parentId) : null;
 
   return (
-    <div className="p-6 lg:p-8 max-w-[1600px] mx-auto h-[calc(100vh-64px)] flex flex-col animate-fade-in">
+    <div className="p-4 lg:p-6 max-w-[2400px] mx-auto h-[calc(100vh-64px)] flex flex-col animate-fade-in">
       <div className="flex justify-between items-center shrink-0 mb-6">
         <div>
             <h1 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight">组织架构管理</h1>

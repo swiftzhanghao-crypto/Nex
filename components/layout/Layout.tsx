@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ExternalLink, Minus, Trash2, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ExternalLink, Minus, Trash2, ClipboardCheck, Radar, Search, List, ArrowLeft } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import manualContent from '../../docs/产品说明文档.md?raw';
 import { useAppContext } from '../../contexts/AppContext';
@@ -24,7 +24,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [activeTopNav, setActiveTopNav] = useState<'DASHBOARD' | 'ORDER_CENTER' | 'PRODUCT_CENTER' | 'PERFORMANCE_CENTER' | 'CHANNEL_CENTER' | 'LEADS_CENTER' | 'OPERATIONS_CENTER' | 'SYSTEM_CONFIG'>('DASHBOARD');
+  const [activeTopNav, setActiveTopNav] = useState<'DASHBOARD' | 'ORDER_CENTER' | 'PRODUCT_CENTER' | 'PERFORMANCE_CENTER' | 'CHANNEL_CENTER' | 'LEADS_CENTER' | 'OPERATIONS_CENTER' | 'SAB_CUSTOMER_INSIGHT' | 'SYSTEM_CONFIG'>('DASHBOARD');
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
         const saved = localStorage.getItem('theme');
@@ -75,6 +75,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       '/system/license-types': '授权类型管理',
       '/system/delivery-methods': '产品发货方式配置',
       '/system/sales-org': '销售组织配置',
+      '/sab-insight': '智能查客户',
+      '/sab-insight/customer-list': '客户列表',
     };
     if (staticMap[pathname]) return staticMap[pathname];
     const m = pathname.match(/^\/orders\/(.+)$/);
@@ -85,6 +87,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (p) return `产品详情`;
     const ch = pathname.match(/^\/channels\/(.+)$/);
     if (ch) return `渠道详情`;
+    const sabC = pathname.match(/^\/sab-insight\/customer\/(.+)$/);
+    if (sabC) return '客户详情';
     return '页面';
   };
 
@@ -186,6 +190,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         setActiveTopNav('CHANNEL_CENTER');
     } else if (location.pathname.startsWith('/contracts') || location.pathname.startsWith('/customers') || location.pathname.startsWith('/opportunities') || location.pathname.startsWith('/remittances') || location.pathname.startsWith('/invoices') || location.pathname.startsWith('/authorizations') || location.pathname.startsWith('/delivery-info') || location.pathname.startsWith('/acceptances')) {
         setActiveTopNav('ORDER_CENTER');
+    } else if (location.pathname.startsWith('/sab-insight')) {
+        setActiveTopNav('SAB_CUSTOMER_INSIGHT');
     } else if (location.pathname.startsWith('/organization') || location.pathname.startsWith('/users') || location.pathname.startsWith('/roles') || location.pathname.startsWith('/system/')) {
           setActiveTopNav('SYSTEM_CONFIG');
       } else if (location.pathname.startsWith('/products') || location.pathname.startsWith('/merchandises') || location.pathname.startsWith('/catalog') || location.pathname.startsWith('/product-center') || location.pathname.startsWith('/product-policy') || location.pathname.startsWith('/product-pricing') || location.pathname.startsWith('/product-manage')) {
@@ -241,6 +247,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       { id: 'PERFORMANCE_CENTER', label: '业绩中心', path: '/performance', permissions: ['performance_view'] },
       { id: 'LEADS_CENTER', label: '线索中心', path: '/leads', permissions: ['leads_view'] },
       { id: 'OPERATIONS_CENTER', label: '运营中心', path: '/wps-ops', permissions: ['wps_ops_view'] },
+      { id: 'SAB_CUSTOMER_INSIGHT', label: 'SAB 客户洞察', path: '/sab-insight', permissions: ['dashboard_view'] },
       { id: 'SYSTEM_CONFIG', label: '系统配置', path: '/organization', permissions: ['admin_view', 'user_manage', 'role_manage', 'org_manage', 'license_type_view'] }
   ].filter(item => item.permissions.some(p => hasPermission(p)));
 
@@ -256,11 +263,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   };
 
-  const NavItem = ({ to, icon: Icon, label, alsoMatch, permission }: { to: string; icon: React.ElementType; label: string; alsoMatch?: string[]; permission?: string }) => {
+  const NavItem = ({ to, icon: Icon, label, alsoMatch, permission, exact }: { to: string; icon: React.ElementType; label: string; alsoMatch?: string[]; permission?: string; exact?: boolean }) => {
     if (permission && !hasPermission(permission)) return null;
-    const isActive = location.pathname === to
-      || (to !== '/' && location.pathname.startsWith(to))
-      || (alsoMatch?.some(p => location.pathname.startsWith(p)) ?? false);
+    const isActive = exact
+      ? location.pathname === to
+      : (location.pathname === to
+        || (to !== '/' && location.pathname.startsWith(to))
+        || (alsoMatch?.some(p => location.pathname.startsWith(p)) ?? false));
     return (
       <Link 
         to={to} 
@@ -580,6 +589,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             <NavItem to="/ops/migration" icon={Database} label="数据迁移" />
                             <NavItem to="/ops/connector" icon={LinkIcon} label="连接器" />
                             <NavItem to="/ops/connector-admin" icon={Settings2} label="连接器管理" />
+                          </>
+                        )}
+                      </>
+                    )}
+
+                    {activeTopNav === 'SAB_CUSTOMER_INSIGHT' && (
+                      <>
+                        {renderSectionGroup('sab_main', 'SAB 客户洞察',
+                          <>
+                            <NavItem to="/sab-insight" icon={Search} label="智能查客户" exact />
+                            <NavItem to="/sab-insight/customer-list" icon={List} label="客户列表" />
                           </>
                         )}
                       </>

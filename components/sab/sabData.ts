@@ -1,0 +1,372 @@
+export interface CustomerRow {
+  id: string;
+  name: string;
+  shortName: string;
+  initial: string;
+  avatarClass: string;
+  tags: { label: string; color: string }[];
+  level: string;
+  levelColor: string;
+  industry: string;
+  group: string;
+  province: string;
+  top100: string;
+  dealStatus: string;
+  dealColor: string;
+  authStatus: string;
+  authColor: string;
+  orderAmount: string;
+  opptyAmount: string;
+  mau: string;
+  owner: string;
+  followDate: string;
+  products: string;
+}
+
+export const mockCustomers: CustomerRow[] = [
+  {
+    id: '1', name: '阿里巴巴集团控股有限公司', shortName: '阿里巴巴', initial: '阿',
+    avatarClass: 'bg-orange-50 border-orange-200 text-orange-700',
+    tags: [
+      { label: 'KA', color: 'text-orange-700 bg-orange-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+      { label: '集团', color: 'text-violet-700 bg-violet-50' },
+    ],
+    level: 'S0 公司级战略客户', levelColor: 'bg-blue-50 text-[#0071E3]',
+    industry: '互联网平台', group: '阿里巴巴集团', province: '浙江省',
+    top100: '中国500强', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '8,500 万', opptyAmount: '1,280 万', mau: '26,500',
+    owner: '张伟', followDate: '2026-03-15', products: 'WPS Office、金山文档、WPS 会议',
+  },
+  {
+    id: '2', name: '腾讯控股有限公司', shortName: '腾讯', initial: '腾',
+    avatarClass: 'bg-cyan-50 border-cyan-200 text-cyan-700',
+    tags: [
+      { label: 'CO', color: 'text-cyan-700 bg-cyan-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+      { label: '集团', color: 'text-violet-700 bg-violet-50' },
+    ],
+    level: 'S 行业战略客户', levelColor: 'bg-blue-50 text-blue-600',
+    industry: '互联网社交', group: '腾讯集团', province: '广东省',
+    top100: '--', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '9,200 万', opptyAmount: '1,860 万', mau: '31,800',
+    owner: '李娜', followDate: '2026-03-10', products: 'WPS Office、金山文档、WPS 会议、企业云盘',
+  },
+  {
+    id: '3', name: '中国建设银行股份有限公司', shortName: '建设银行', initial: '建',
+    avatarClass: 'bg-blue-50 border-blue-200 text-blue-700',
+    tags: [
+      { label: 'GA', color: 'text-emerald-700 bg-emerald-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+    ],
+    level: 'A 行业核心客户', levelColor: 'bg-emerald-50 text-emerald-700',
+    industry: '金融银行', group: '-', province: '北京市',
+    top100: '世界500强', dealStatus: '历史成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '未覆盖', authColor: 'text-slate-700 bg-slate-100',
+    orderAmount: '6,350 万', opptyAmount: '680 万', mau: '8,200',
+    owner: '王强', followDate: '2026-03-08', products: 'WPS Office、WPS 会议',
+  },
+  {
+    id: '4', name: '美团科技有限公司', shortName: '美团', initial: '美',
+    avatarClass: 'bg-violet-50 border-violet-200 text-violet-700',
+    tags: [
+      { label: 'EA', color: 'text-sky-700 bg-sky-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+    ],
+    level: 'B 行业标准客户', levelColor: 'bg-slate-100 text-slate-700',
+    industry: '本地生活', group: '-', province: '北京市',
+    top100: '--', dealStatus: '未成交客户', dealColor: 'text-slate-700 bg-slate-100',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '1,260 万', opptyAmount: '950 万', mau: '15,600',
+    owner: '陈晨', followDate: '2026-03-02', products: 'WPS Office、金山文档',
+  },
+  {
+    id: '5', name: '华为技术有限公司', shortName: '华为', initial: '华',
+    avatarClass: 'bg-red-50 border-red-200 text-red-700',
+    tags: [
+      { label: 'KA', color: 'text-orange-700 bg-orange-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '集团', color: 'text-violet-700 bg-violet-50' },
+    ],
+    level: 'S0 公司级战略客户', levelColor: 'bg-blue-50 text-[#0071E3]',
+    industry: '通信设备', group: '华为集团', province: '广东省',
+    top100: '世界500强', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '12,600 万', opptyAmount: '3,200 万', mau: '45,000',
+    owner: '张伟', followDate: '2026-03-20', products: 'WPS Office、金山文档、WPS 会议、企业云盘',
+  },
+  {
+    id: '6', name: '中国工商银行股份有限公司', shortName: '工商银行', initial: '工',
+    avatarClass: 'bg-red-50 border-red-200 text-red-700',
+    tags: [
+      { label: 'KA', color: 'text-orange-700 bg-orange-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+    ],
+    level: 'S0 公司级战略客户', levelColor: 'bg-blue-50 text-[#0071E3]',
+    industry: '金融银行', group: '-', province: '北京市',
+    top100: '世界500强', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '11,800 万', opptyAmount: '2,150 万', mau: '38,600',
+    owner: '王强', followDate: '2026-03-18', products: 'WPS Office、金山文档、WPS 会议',
+  },
+  {
+    id: '7', name: '字节跳动有限公司', shortName: '字节跳动', initial: '字',
+    avatarClass: 'bg-sky-50 border-sky-200 text-sky-700',
+    tags: [
+      { label: 'CO', color: 'text-cyan-700 bg-cyan-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '集团', color: 'text-violet-700 bg-violet-50' },
+    ],
+    level: 'S 行业战略客户', levelColor: 'bg-blue-50 text-blue-600',
+    industry: '互联网平台', group: '字节跳动集团', province: '北京市',
+    top100: '中国500强', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '7,800 万', opptyAmount: '2,450 万', mau: '28,300',
+    owner: '李娜', followDate: '2026-03-12', products: 'WPS Office、金山文档、WPS 会议',
+  },
+  {
+    id: '8', name: '中国平安保险（集团）股份有限公司', shortName: '中国平安', initial: '平',
+    avatarClass: 'bg-orange-50 border-orange-200 text-orange-700',
+    tags: [
+      { label: 'KA', color: 'text-orange-700 bg-orange-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+      { label: '集团', color: 'text-violet-700 bg-violet-50' },
+    ],
+    level: 'S0 公司级战略客户', levelColor: 'bg-blue-50 text-[#0071E3]',
+    industry: '金融保险', group: '平安集团', province: '广东省',
+    top100: '世界500强', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '9,650 万', opptyAmount: '1,580 万', mau: '52,000',
+    owner: '赵敏', followDate: '2026-03-16', products: 'WPS Office、金山文档、WPS 会议、企业云盘',
+  },
+  {
+    id: '9', name: '比亚迪股份有限公司', shortName: '比亚迪', initial: '比',
+    avatarClass: 'bg-green-50 border-green-200 text-green-700',
+    tags: [
+      { label: 'KA', color: 'text-orange-700 bg-orange-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+    ],
+    level: 'S 行业战略客户', levelColor: 'bg-blue-50 text-blue-600',
+    industry: '汽车制造', group: '比亚迪集团', province: '广东省',
+    top100: '世界500强', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '5,200 万', opptyAmount: '1,860 万', mau: '22,400',
+    owner: '周磊', followDate: '2026-03-14', products: 'WPS Office、金山文档、WPS 会议',
+  },
+  {
+    id: '10', name: '京东集团股份有限公司', shortName: '京东', initial: '京',
+    avatarClass: 'bg-red-50 border-red-200 text-red-700',
+    tags: [
+      { label: 'CO', color: 'text-cyan-700 bg-cyan-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+      { label: '集团', color: 'text-violet-700 bg-violet-50' },
+    ],
+    level: 'S 行业战略客户', levelColor: 'bg-blue-50 text-blue-600',
+    industry: '电子商务', group: '京东集团', province: '北京市',
+    top100: '中国500强', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '6,800 万', opptyAmount: '1,350 万', mau: '19,800',
+    owner: '李娜', followDate: '2026-03-11', products: 'WPS Office、金山文档、企业云盘',
+  },
+  {
+    id: '11', name: '中国移动通信集团有限公司', shortName: '中国移动', initial: '移',
+    avatarClass: 'bg-blue-50 border-blue-200 text-blue-700',
+    tags: [
+      { label: 'GA', color: 'text-emerald-700 bg-emerald-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '集团', color: 'text-violet-700 bg-violet-50' },
+    ],
+    level: 'S0 公司级战略客户', levelColor: 'bg-blue-50 text-[#0071E3]',
+    industry: '电信运营', group: '中国移动集团', province: '北京市',
+    top100: '世界500强', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '15,200 万', opptyAmount: '4,600 万', mau: '68,000',
+    owner: '张伟', followDate: '2026-03-19', products: 'WPS Office、金山文档、WPS 会议、企业云盘',
+  },
+  {
+    id: '12', name: '小米科技有限责任公司', shortName: '小米', initial: '小',
+    avatarClass: 'bg-orange-50 border-orange-200 text-orange-700',
+    tags: [
+      { label: 'EA', color: 'text-sky-700 bg-sky-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+      { label: '集团', color: 'text-violet-700 bg-violet-50' },
+    ],
+    level: 'A 行业核心客户', levelColor: 'bg-emerald-50 text-emerald-700',
+    industry: '消费电子', group: '小米集团', province: '北京市',
+    top100: '中国500强', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '3,800 万', opptyAmount: '920 万', mau: '12,500',
+    owner: '陈晨', followDate: '2026-03-06', products: 'WPS Office、金山文档',
+  },
+  {
+    id: '13', name: '宁德时代新能源科技股份有限公司', shortName: '宁德时代', initial: '宁',
+    avatarClass: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+    tags: [
+      { label: 'KA', color: 'text-orange-700 bg-orange-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+    ],
+    level: 'S 行业战略客户', levelColor: 'bg-blue-50 text-blue-600',
+    industry: '新能源', group: '-', province: '福建省',
+    top100: '中国500强', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '4,500 万', opptyAmount: '1,680 万', mau: '16,200',
+    owner: '周磊', followDate: '2026-03-09', products: 'WPS Office、金山文档、WPS 会议',
+  },
+  {
+    id: '14', name: '中国石油化工集团有限公司', shortName: '中国石化', initial: '石',
+    avatarClass: 'bg-red-50 border-red-200 text-red-700',
+    tags: [
+      { label: 'GA', color: 'text-emerald-700 bg-emerald-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '集团', color: 'text-violet-700 bg-violet-50' },
+    ],
+    level: 'S0 公司级战略客户', levelColor: 'bg-blue-50 text-[#0071E3]',
+    industry: '能源化工', group: '中石化集团', province: '北京市',
+    top100: '世界500强', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '13,400 万', opptyAmount: '3,800 万', mau: '58,000',
+    owner: '张伟', followDate: '2026-03-17', products: 'WPS Office、金山文档、WPS 会议、企业云盘',
+  },
+  {
+    id: '15', name: '浙江吉利控股集团有限公司', shortName: '吉利汽车', initial: '吉',
+    avatarClass: 'bg-blue-50 border-blue-200 text-blue-700',
+    tags: [
+      { label: 'KA', color: 'text-orange-700 bg-orange-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '集团', color: 'text-violet-700 bg-violet-50' },
+    ],
+    level: 'A 行业核心客户', levelColor: 'bg-emerald-50 text-emerald-700',
+    industry: '汽车制造', group: '吉利集团', province: '浙江省',
+    top100: '世界500强', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '3,200 万', opptyAmount: '860 万', mau: '14,500',
+    owner: '赵敏', followDate: '2026-03-05', products: 'WPS Office、金山文档',
+  },
+  {
+    id: '16', name: '网易（杭州）网络有限公司', shortName: '网易', initial: '网',
+    avatarClass: 'bg-red-50 border-red-200 text-red-700',
+    tags: [
+      { label: 'EA', color: 'text-sky-700 bg-sky-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+    ],
+    level: 'A 行业核心客户', levelColor: 'bg-emerald-50 text-emerald-700',
+    industry: '互联网平台', group: '网易集团', province: '浙江省',
+    top100: '--', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '2,800 万', opptyAmount: '580 万', mau: '9,600',
+    owner: '李娜', followDate: '2026-03-04', products: 'WPS Office、金山文档、WPS 会议',
+  },
+  {
+    id: '17', name: '中国中车股份有限公司', shortName: '中国中车', initial: '车',
+    avatarClass: 'bg-blue-50 border-blue-200 text-blue-700',
+    tags: [
+      { label: 'GA', color: 'text-emerald-700 bg-emerald-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+      { label: '集团', color: 'text-violet-700 bg-violet-50' },
+    ],
+    level: 'S 行业战略客户', levelColor: 'bg-blue-50 text-blue-600',
+    industry: '高端装备', group: '中车集团', province: '北京市',
+    top100: '世界500强', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '7,600 万', opptyAmount: '2,100 万', mau: '32,000',
+    owner: '王强', followDate: '2026-03-13', products: 'WPS Office、金山文档、WPS 会议',
+  },
+  {
+    id: '18', name: '海尔智家股份有限公司', shortName: '海尔', initial: '海',
+    avatarClass: 'bg-sky-50 border-sky-200 text-sky-700',
+    tags: [
+      { label: 'CO', color: 'text-cyan-700 bg-cyan-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+    ],
+    level: 'A 行业核心客户', levelColor: 'bg-emerald-50 text-emerald-700',
+    industry: '家电制造', group: '海尔集团', province: '山东省',
+    top100: '世界500强', dealStatus: '历史成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '未覆盖', authColor: 'text-slate-700 bg-slate-100',
+    orderAmount: '2,450 万', opptyAmount: '420 万', mau: '6,800',
+    owner: '周磊', followDate: '2026-02-28', products: 'WPS Office、金山文档',
+  },
+  {
+    id: '19', name: '三一重工股份有限公司', shortName: '三一重工', initial: '三',
+    avatarClass: 'bg-amber-50 border-amber-200 text-amber-700',
+    tags: [
+      { label: 'EA', color: 'text-sky-700 bg-sky-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+    ],
+    level: 'B 行业标准客户', levelColor: 'bg-slate-100 text-slate-700',
+    industry: '工程机械', group: '三一集团', province: '湖南省',
+    top100: '--', dealStatus: '未成交客户', dealColor: 'text-slate-700 bg-slate-100',
+    authStatus: '未覆盖', authColor: 'text-slate-700 bg-slate-100',
+    orderAmount: '860 万', opptyAmount: '1,250 万', mau: '4,200',
+    owner: '陈晨', followDate: '2026-02-25', products: 'WPS Office',
+  },
+  {
+    id: '20', name: '中国银行股份有限公司', shortName: '中国银行', initial: '中',
+    avatarClass: 'bg-red-50 border-red-200 text-red-700',
+    tags: [
+      { label: 'GA', color: 'text-emerald-700 bg-emerald-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+    ],
+    level: 'S0 公司级战略客户', levelColor: 'bg-blue-50 text-[#0071E3]',
+    industry: '金融银行', group: '-', province: '北京市',
+    top100: '世界500强', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '10,500 万', opptyAmount: '1,960 万', mau: '42,000',
+    owner: '王强', followDate: '2026-03-19', products: 'WPS Office、金山文档、WPS 会议',
+  },
+  {
+    id: '21', name: '百度在线网络技术（北京）有限公司', shortName: '百度', initial: '百',
+    avatarClass: 'bg-blue-50 border-blue-200 text-blue-700',
+    tags: [
+      { label: 'CO', color: 'text-cyan-700 bg-cyan-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+    ],
+    level: 'A 行业核心客户', levelColor: 'bg-emerald-50 text-emerald-700',
+    industry: '人工智能', group: '百度集团', province: '北京市',
+    top100: '--', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '3,600 万', opptyAmount: '780 万', mau: '11,200',
+    owner: '李娜', followDate: '2026-03-07', products: 'WPS Office、金山文档',
+  },
+  {
+    id: '22', name: '招商银行股份有限公司', shortName: '招商银行', initial: '招',
+    avatarClass: 'bg-red-50 border-red-200 text-red-700',
+    tags: [
+      { label: 'KA', color: 'text-orange-700 bg-orange-50' },
+      { label: '百强', color: 'text-amber-700 bg-amber-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+    ],
+    level: 'S 行业战略客户', levelColor: 'bg-blue-50 text-blue-600',
+    industry: '金融银行', group: '-', province: '广东省',
+    top100: '中国500强', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '7,200 万', opptyAmount: '1,450 万', mau: '28,000',
+    owner: '王强', followDate: '2026-03-14', products: 'WPS Office、金山文档、WPS 会议',
+  },
+  {
+    id: '23', name: '顺丰控股股份有限公司', shortName: '顺丰', initial: '顺',
+    avatarClass: 'bg-amber-50 border-amber-200 text-amber-700',
+    tags: [
+      { label: 'CO', color: 'text-cyan-700 bg-cyan-50' },
+      { label: '上市公司', color: 'text-indigo-700 bg-indigo-50' },
+    ],
+    level: 'A 行业核心客户', levelColor: 'bg-emerald-50 text-emerald-700',
+    industry: '快递物流', group: '顺丰集团', province: '广东省',
+    top100: '中国500强', dealStatus: '成交客户', dealColor: 'text-emerald-700 bg-emerald-50',
+    authStatus: '已覆盖', authColor: 'text-cyan-700 bg-cyan-50',
+    orderAmount: '2,650 万', opptyAmount: '560 万', mau: '18,200',
+    owner: '周磊', followDate: '2026-03-01', products: 'WPS Office、金山文档',
+  },
+];

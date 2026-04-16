@@ -38,3 +38,4 @@ data/*.db-shm
 *.njsproj
 *.sln
 *.sw?
+backend/server
