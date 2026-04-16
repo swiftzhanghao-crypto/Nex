@@ -49,6 +49,7 @@ const permissionTree: PermGroup[] = [
                 id: 's_dashboard', label: '看板功能',
                 permissions: [
                     { id: 'dashboard_view', label: '查看数据看板', desc: '访问首页数据看板（KPI 卡片、销售趋势、订单状态分布、热门商品、业务动态）' },
+                    { id: 'sab_insight_view', label: '查看SAB客户洞察', desc: '访问 SAB 客户洞察（智能查客户、客户列表、客户详情）' },
                 ]
             },
         ]

@@ -57,6 +57,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
           return;
       }
       const currentRoles = [...roles];
+      const prevRoles = [...roles];
       const srcIdx = currentRoles.findIndex(r => r.id === sourceId);
       const tgtIdx = currentRoles.findIndex(r => r.id === targetId);
       if (srcIdx === -1 || tgtIdx === -1) return;
@@ -65,7 +66,10 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       setRoles(currentRoles);
       setDragRoleId(null);
       setDragOverRoleId(null);
-      userApi.reorderRoles(currentRoles.map(r => r.id)).catch(() => {});
+      userApi.reorderRoles(currentRoles.map(r => r.id)).catch((err: any) => {
+          setRoles(prevRoles);
+          alert(err?.message || '角色排序保存失败，已恢复原顺序。');
+      });
   };
 
   const handleRoleDragEnd = () => {

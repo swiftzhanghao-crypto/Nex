@@ -97,6 +97,19 @@ const OrganizationManager: React.FC = () => {
   const handleSave = () => {
     if (!formData.name) return;
     if (formData.parentId === formData.id) return alert("上级部门不能是自己");
+
+    if (formData.parentId) {
+      let currentParentId = formData.parentId;
+      while (currentParentId) {
+        if (currentParentId === formData.id) {
+          alert('上级部门不能设置为当前部门的下级部门。');
+          return;
+        }
+        const parent = departments.find((d) => d.id === currentParentId);
+        currentParentId = parent?.parentId || '';
+      }
+    }
+
     if (editingId) setDepartments(prev => prev.map(d => d.id === editingId ? formData : d));
     else setDepartments(prev => [...prev, formData]);
     setIsModalOpen(false);

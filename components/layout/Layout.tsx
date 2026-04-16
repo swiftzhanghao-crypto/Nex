@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ExternalLink, Minus, Trash2, ClipboardCheck, Radar, Search, List, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ExternalLink, Minus, Trash2, ClipboardCheck, Radar, Search, List, ArrowLeft, Smartphone } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import manualContent from '../../docs/产品说明文档.md?raw';
 import { useAppContext } from '../../contexts/AppContext';
 import WPSLogo from '../common/WPSLogo';
+import MobilePreview from '../mobile/MobilePreview';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -18,7 +19,7 @@ interface PageTab {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { currentUser, users, setCurrentUser, roles } = useAppContext();
+  const { currentUser, users, setCurrentUser, roles, apiMode } = useAppContext();
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -34,6 +35,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   });
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isManualOpen, setIsManualOpen] = useState(false);
+  const [isMobilePreviewOpen, setIsMobilePreviewOpen] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const toggleSection = (id: string) => setCollapsedSections(prev => ({ ...prev, [id]: !prev[id] }));
 
@@ -158,7 +160,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
   const handleFeedbackSubmit = () => {
     if (!feedbackTitle.trim() || !feedbackContent.trim()) return;
-    console.log('Feedback submitted:', { type: feedbackType, rating: feedbackRating, title: feedbackTitle, content: feedbackContent, contact: feedbackContact, user: currentUser.name });
+    // NOTE: Keep feedback content in component state only until backend endpoint is ready.
     setFeedbackSubmitted(true);
     setTimeout(() => {
       setIsFeedbackOpen(false);
@@ -219,6 +221,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const currentUserRole = roles.find(r => r.id === currentUser.role);
   const permissions = currentUserRole?.permissions || [];
   const hasPermission = (perm: string) => permissions.includes('all') || permissions.includes(perm);
+  const canAccessSabInsight = hasPermission('sab_insight_view') || hasPermission('customer_view');
 
   const renderSectionGroup = (id: string, label: string, children: React.ReactNode, requiredPermissions?: string[]) => {
     if (requiredPermissions && requiredPermissions.length > 0 && !requiredPermissions.some(p => hasPermission(p))) return null;
@@ -247,7 +250,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       { id: 'PERFORMANCE_CENTER', label: '业绩中心', path: '/performance', permissions: ['performance_view'] },
       { id: 'LEADS_CENTER', label: '线索中心', path: '/leads', permissions: ['leads_view'] },
       { id: 'OPERATIONS_CENTER', label: '运营中心', path: '/wps-ops', permissions: ['wps_ops_view'] },
-      { id: 'SAB_CUSTOMER_INSIGHT', label: 'SAB 客户洞察', path: '/sab-insight', permissions: ['dashboard_view'] },
+      { id: 'SAB_CUSTOMER_INSIGHT', label: 'SAB 客户洞察', path: '/sab-insight', permissions: ['sab_insight_view', 'customer_view'] },
       { id: 'SYSTEM_CONFIG', label: '系统配置', path: '/organization', permissions: ['admin_view', 'user_manage', 'role_manage', 'org_manage', 'license_type_view'] }
   ].filter(item => item.permissions.some(p => hasPermission(p)));
 
@@ -349,6 +352,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             >
               <BookOpen className="w-4 h-4" />
             </button>
+
+            <button
+              onClick={() => setIsMobilePreviewOpen(true)}
+              className="p-2 text-gray-400 hover:text-[#0071E3] dark:text-gray-400 dark:hover:text-blue-400 transition rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
+              title="移动端预览"
+            >
+              <Smartphone className="w-4 h-4" />
+            </button>
             
             <div className="relative pl-2 border-l border-gray-200 dark:border-white/10 ml-1">
                 <button 
@@ -374,16 +385,25 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             <p className="text-sm font-bold text-gray-900 dark:text-white">{currentUser.name}</p>
                         </div>
                         <div className="max-h-64 overflow-y-auto custom-scrollbar">
-                            <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">切换账号</div>
+                            <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                              {apiMode ? '账号列表（API模式禁用快速切换）' : '切换账号'}
+                            </div>
                             {users.map(user => (
                                 <button
                                     key={user.id}
                                     onClick={() => {
+                                        if (apiMode && user.id !== currentUser.id) {
+                                            alert('API 模式下请通过登录流程切换账号，已禁用快速切换。');
+                                            setIsUserMenuOpen(false);
+                                            return;
+                                        }
                                         setCurrentUser(user);
                                         setIsUserMenuOpen(false);
                                     }}
+                                    disabled={apiMode && user.id !== currentUser.id}
                                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition text-left mb-1
                                         ${currentUser.id === user.id ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-white/5'}
+                                        ${apiMode && user.id !== currentUser.id ? 'opacity-50 cursor-not-allowed' : ''}
                                     `}
                                 >
                                     <div className="relative flex-shrink-0">
@@ -594,7 +614,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       </>
                     )}
 
-                    {activeTopNav === 'SAB_CUSTOMER_INSIGHT' && (
+                    {activeTopNav === 'SAB_CUSTOMER_INSIGHT' && canAccessSabInsight && (
                       <>
                         {renderSectionGroup('sab_main', 'SAB 客户洞察',
                           <>
@@ -900,6 +920,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </>
       )}
+      <MobilePreview isOpen={isMobilePreviewOpen} onClose={() => setIsMobilePreviewOpen(false)} />
     </div>
   );
 };

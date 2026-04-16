@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AppProvider } from './contexts/AppContext';
+import { AppProvider, useAppContext } from './contexts/AppContext';
 import Layout from './components/layout/Layout';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import ProductManager from './components/product/ProductManager';
@@ -44,6 +44,14 @@ import ProductPolicyManager from './components/product/ProductPolicyManager';
 import CustomerInsight from './components/sab/CustomerInsight';
 import SABCustomerList from './components/sab/SABCustomerList';
 import SABCustomerDetail from './components/sab/SABCustomerDetail';
+
+const RequireAnyPermission: React.FC<{ permissions: string[]; children: React.ReactElement }> = ({ permissions, children }) => {
+  const { currentUser, roles } = useAppContext();
+  const currentUserRole = roles.find((r) => r.id === currentUser.role);
+  const rolePermissions = currentUserRole?.permissions || [];
+  const canAccess = rolePermissions.includes('all') || permissions.some((p) => rolePermissions.includes(p));
+  return canAccess ? children : <Navigate to="/" replace />;
+};
 
 function AppRoutes() {
   return (
@@ -103,9 +111,21 @@ function AppRoutes() {
         <Route path="/ops/enterprise" element={<OpsEnterpriseManager />} />
         <Route path="/ops/*" element={<OperationsManager />} />
 
-        <Route path="/sab-insight" element={<CustomerInsight />} />
-        <Route path="/sab-insight/customer-list" element={<SABCustomerList />} />
-        <Route path="/sab-insight/customer/:id" element={<SABCustomerDetail />} />
+        <Route path="/sab-insight" element={
+          <RequireAnyPermission permissions={['sab_insight_view', 'customer_view']}>
+            <CustomerInsight />
+          </RequireAnyPermission>
+        } />
+        <Route path="/sab-insight/customer-list" element={
+          <RequireAnyPermission permissions={['sab_insight_view', 'customer_view']}>
+            <SABCustomerList />
+          </RequireAnyPermission>
+        } />
+        <Route path="/sab-insight/customer/:id" element={
+          <RequireAnyPermission permissions={['sab_insight_view', 'customer_view']}>
+            <SABCustomerDetail />
+          </RequireAnyPermission>
+        } />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
