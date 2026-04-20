@@ -53,7 +53,7 @@ interface MobileOrderManagerProps {
 }
 
 const MobileOrderManager: React.FC<MobileOrderManagerProps> = ({ onViewDetail }) => {
-  const { orders, customers } = useAppContext();
+  const { filteredOrders: orders, filteredCustomers: customers } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeStatus, setActiveStatus] = useState('All');
   const [showSearch, setShowSearch] = useState(false);

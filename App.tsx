@@ -14,6 +14,8 @@ import OpportunityManager from './components/crm/OpportunityManager';
 import ProductDetails from './components/product/ProductDetails';
 import OrderDetails from './components/order/OrderDetails';
 import CustomerDetails from './components/crm/CustomerDetails';
+import ReportsManager from './components/crm/ReportsManager';
+import ReportsDetail from './components/crm/ReportsDetail';
 import MerchandiseDetails from './components/product/MerchandiseDetails';
 import ChannelDetails from './components/channel/ChannelDetails';
 
@@ -85,6 +87,9 @@ function AppRoutes() {
         <Route path="/channels/:id" element={<ChannelDetails />} />
 
         <Route path="/opportunities" element={<OpportunityManager />} />
+
+        <Route path="/reports" element={<ReportsManager />} />
+        <Route path="/reports/:id" element={<ReportsDetail />} />
 
         <Route path="/contracts" element={<ContractManager />} />
         <Route path="/remittances" element={<RemittanceManager />} />

@@ -45,11 +45,11 @@ function renderSubscriptionCountdown(endDate: string) {
 }
 
 const CustomerDetails: React.FC = () => {
-  const { customers, setCustomers, users, currentUser, subscriptions } = useAppContext();
+  const { customers, setCustomers, filteredCustomers, users, currentUser, subscriptions } = useAppContext();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const customer = customers.find(c => c.id === id);
+  const customer = filteredCustomers.find(c => c.id === id);
 
   const customerSubscriptions = useMemo(() => {
     if (!id) return [];
@@ -92,7 +92,7 @@ const CustomerDetails: React.FC = () => {
   const roleLabel = (r: string) =>
       r === 'Purchasing' ? '采购' : r === 'IT' ? 'IT' : r === 'Finance' ? '财务' : r === 'Management' ? '管理' : '其他';
 
-  const [activeTab, setActiveTab] = useState<'info' | 'org' | 'contacts' | 'address' | 'invoice' | 'bank' | 'subscriptions'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'org' | 'contacts' | 'address' | 'invoice' | 'bank' | 'subscriptions' | 'insight'>('info');
   const [expandedSubIds, setExpandedSubIds] = useState<Set<string>>(() => new Set());
 
   interface ShippingAddress {
@@ -300,6 +300,7 @@ const CustomerDetails: React.FC = () => {
                   { id: 'invoice' as const, label: '发票信息' },
                   { id: 'bank' as const, label: '银行账号' },
                   { id: 'subscriptions' as const, label: `客户订阅（${customerSubscriptions.length}）` },
+                  { id: 'insight' as const, label: '客户洞察' },
               ]).map(tab => (
                   <button
                       key={tab.id}
@@ -997,6 +998,35 @@ const CustomerDetails: React.FC = () => {
               <p className="px-4 py-2 text-[11px] text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-white/10">授权起止按订单行周期推算；主表「首次开通/当前到期」为整条订阅汇总。展开表不展示下单日。表格紫边行为增购。</p>
           </div>
           )}
+      </div>
+      )}
+
+      {/* ── Tab: 客户洞察 ── */}
+      {activeTab === 'insight' && (
+      <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col" style={{ height: 'calc(100vh - 260px)', minHeight: 520 }}>
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.02] shrink-0">
+              <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#0071E3] to-[#34AADC] flex items-center justify-center">
+                      <Layers className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                      <h3 className="text-sm font-bold text-gray-900 dark:text-white leading-none">客户洞察</h3>
+                      <span className="text-[10px] text-gray-400 dark:text-gray-500">SAB · 360° 客户视图</span>
+                  </div>
+              </div>
+              <button
+                  type="button"
+                  onClick={() => navigate(`/sab-insight/customer/${customer.id}`)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0071E3] dark:text-[#0A84FF] hover:bg-[#0071E3]/10 dark:hover:bg-[#0A84FF]/10 rounded-lg transition"
+              >
+                  <ExternalLink className="w-3.5 h-3.5" /> 在洞察中心打开
+              </button>
+          </div>
+          <iframe
+              title="客户洞察"
+              src={`${import.meta.env.BASE_URL || '/'}customer-detail.html`}
+              className="flex-1 w-full border-0 bg-white dark:bg-black"
+          />
       </div>
       )}
 

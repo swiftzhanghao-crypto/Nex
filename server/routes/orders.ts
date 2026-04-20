@@ -2,15 +2,10 @@ import { Router } from 'express';
 import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
+import { filterByRowPermissions, checkRowPermissionForSingle } from '../rowPermissionFilter.ts';
 
 const router = Router();
 router.use(authMiddleware);
-
-type OrderRowRule = {
-  resource?: string;
-  dimension?: string;
-  values?: string[];
-};
 
 const STATUS_ALIASES: Record<string, string> = {
   APPROVED: 'PENDING_CONFIRM',
@@ -64,127 +59,6 @@ function getUserName(db: any, userId: string): string {
   return row?.name || '';
 }
 
-function getOrderRowRules(db: any, roleId: string): OrderRowRule[] {
-  const role = db.prepare('SELECT row_permissions FROM roles WHERE id = ?').get(roleId) as any;
-  const rules = safeJsonParse(role?.row_permissions, []);
-  if (!Array.isArray(rules)) return [];
-  return rules.filter((r: OrderRowRule) => r?.resource === 'Order' && Array.isArray(r.values) && r.values.length > 0);
-}
-
-function getDescendantDeptIds(db: any, deptId: string): string[] {
-  const rows = db.prepare('SELECT id, parent_id FROM departments').all() as Array<{ id: string; parent_id: string | null }>;
-  const childrenMap = new Map<string, string[]>();
-  rows.forEach((row) => {
-    const pid = row.parent_id || '__root__';
-    const arr = childrenMap.get(pid) || [];
-    arr.push(row.id);
-    childrenMap.set(pid, arr);
-  });
-
-  const result = new Set<string>([deptId]);
-  const queue: string[] = [deptId];
-  while (queue.length > 0) {
-    const curr = queue.shift()!;
-    const children = childrenMap.get(curr) || [];
-    for (const child of children) {
-      if (!result.has(child)) {
-        result.add(child);
-        queue.push(child);
-      }
-    }
-  }
-  return Array.from(result);
-}
-
-function evaluateOrderRowRule(
-  rule: OrderRowRule,
-  order: any,
-  currentUserId: string,
-  currentUserDeptId: string | null,
-  currentUserDeptAndChildrenIds: string[],
-  userDeptMap: Map<string, string | null>
-): boolean {
-  const vals = rule.values || [];
-  if (vals.length === 0) return true;
-
-  switch (rule.dimension) {
-    case 'salesRep':
-      return vals.some((v) => {
-        if (v === 'self') return order.salesRepId === currentUserId;
-        const salesDeptId = order.salesRepId ? userDeptMap.get(order.salesRepId) : null;
-        if (v === 'department') return !!currentUserDeptId && salesDeptId === currentUserDeptId;
-        if (v === 'departmentAndChildren') {
-          return !!currentUserDeptId && !!salesDeptId && currentUserDeptAndChildrenIds.includes(salesDeptId);
-        }
-        return false;
-      });
-    case 'businessManager':
-      return vals.some((v) => {
-        if (v === 'self') return order.businessManagerId === currentUserId;
-        const bmDeptId = order.businessManagerId ? userDeptMap.get(order.businessManagerId) : null;
-        if (v === 'department') return !!currentUserDeptId && bmDeptId === currentUserDeptId;
-        if (v === 'departmentAndChildren') {
-          return !!currentUserDeptId && !!bmDeptId && currentUserDeptAndChildrenIds.includes(bmDeptId);
-        }
-        return false;
-      });
-    case 'creator':
-      return vals.some((v) => {
-        if (v === 'self') return order.creatorId === currentUserId;
-        const creatorDeptId = order.creatorId ? userDeptMap.get(order.creatorId) : null;
-        if (v === 'department') return !!currentUserDeptId && creatorDeptId === currentUserDeptId;
-        if (v === 'departmentAndChildren') {
-          return !!currentUserDeptId && !!creatorDeptId && currentUserDeptAndChildrenIds.includes(creatorDeptId);
-        }
-        return false;
-      });
-    case 'departmentId': {
-      const salesDeptId = order.salesRepId ? userDeptMap.get(order.salesRepId) : null;
-      return !!salesDeptId && vals.includes(salesDeptId);
-    }
-    case 'orderType':
-    case 'buyerType':
-      return vals.includes(order.buyerType || 'Customer');
-    case 'orderSource':
-      return !!order.source && vals.includes(order.source);
-    case 'orderStatus':
-      return !!order.status && vals.includes(order.status);
-    case 'industryLine':
-      return !!order.industryLine && vals.includes(order.industryLine);
-    case 'province':
-      return !!order.province && vals.includes(order.province);
-    case 'customerIndustry':
-      return !!order.customerIndustry && vals.includes(order.customerIndustry);
-    case 'customerLevel':
-      return !!order.customerLevel && vals.includes(order.customerLevel);
-    case 'directChannelId':
-    case 'channelId': {
-      const directChannelId = order.buyerType === 'Channel' ? order.buyerId : undefined;
-      return !!directChannelId && vals.includes(directChannelId);
-    }
-    default:
-      return true;
-  }
-}
-
-function filterOrdersByRowPermissions(db: any, user: { userId: string; role: string }, orders: any[]): any[] {
-  const orderRules = getOrderRowRules(db, user.role);
-  if (orderRules.length === 0) return orders;
-
-  const userRows = db.prepare('SELECT id, department_id FROM users').all() as Array<{ id: string; department_id: string | null }>;
-  const userDeptMap = new Map<string, string | null>();
-  userRows.forEach((u) => userDeptMap.set(u.id, u.department_id || null));
-
-  const currentUserDeptId = userDeptMap.get(user.userId) || null;
-  const currentUserDeptAndChildrenIds = currentUserDeptId ? getDescendantDeptIds(db, currentUserDeptId) : [];
-
-  return orders.filter((order) =>
-    orderRules.every((rule) =>
-      evaluateOrderRowRule(rule, order, user.userId, currentUserDeptId, currentUserDeptAndChildrenIds, userDeptMap)
-    )
-  );
-}
-
 function toOrder(row: any) {
   const extra = safeJsonParse(row.extra, {});
   return {
@@ -226,7 +100,7 @@ router.get('/', checkPermission('order', 'list'), (req: AuthRequest, res) => {
   const rows = db.prepare(sql).all(...params);
   const allOrders = rows.map(toOrder);
   const statusFilteredOrders = statusFilter ? allOrders.filter((order) => order.status === statusFilter) : allOrders;
-  const visibleOrders = filterOrdersByRowPermissions(db, req.user!, statusFilteredOrders);
+  const visibleOrders = filterByRowPermissions(db, req.user!, 'Order', statusFilteredOrders);
   const total = visibleOrders.length;
   const paged = visibleOrders.slice(offset, offset + limit);
   res.json({ data: paged, total, page: pageNum, size: limit });
@@ -237,7 +111,7 @@ router.get('/:id', checkPermission('order', 'read'), (req: AuthRequest, res) => 
   const row = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
   if (!row) { res.status(404).json({ error: '订单不存在' }); return; }
   const order = toOrder(row);
-  const readable = filterOrdersByRowPermissions(db, req.user!, [order]).length > 0;
+  const readable = checkRowPermissionForSingle(db, req.user!, 'Order', order);
   if (!readable) {
     res.status(403).json({ error: '无权查看此订单' });
     return;
@@ -296,6 +170,11 @@ router.put('/:id', checkPermission('order', 'update'), (req: AuthRequest, res) =
   const existing = db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as any;
   if (!existing) { res.status(404).json({ error: '订单不存在' }); return; }
   const existingOrder = toOrder(existing);
+
+  if (!checkRowPermissionForSingle(db, req.user!, 'Order', existingOrder)) {
+    res.status(403).json({ error: '行权限限制，无权修改此订单' });
+    return;
+  }
 
   const isAdmin = req.user!.role === 'Admin';
   const isOwner = existing.sales_rep_id === req.user!.userId;
@@ -374,6 +253,11 @@ router.post('/:id/approve', checkPermission('order', 'approve'), (req: AuthReque
   const existing = db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as any;
   if (!existing) { res.status(404).json({ error: '订单不存在' }); return; }
 
+  if (!checkRowPermissionForSingle(db, req.user!, 'Order', toOrder(existing))) {
+    res.status(403).json({ error: '行权限限制，无权审批此订单' });
+    return;
+  }
+
   const currentStatus = normalizeOrderStatus(existing.status);
   if (currentStatus !== 'PENDING_APPROVAL') {
     res.status(400).json({ error: `当前状态 ${currentStatus} 不允许审批操作` });
@@ -435,6 +319,11 @@ router.post('/:id/submit', checkPermission('order', 'submit'), (req: AuthRequest
   const existing = db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as any;
   if (!existing) { res.status(404).json({ error: '订单不存在' }); return; }
 
+  if (!checkRowPermissionForSingle(db, req.user!, 'Order', toOrder(existing))) {
+    res.status(403).json({ error: '行权限限制，无权提交此订单' });
+    return;
+  }
+
   const currentStatus = normalizeOrderStatus(existing.status);
   if (currentStatus !== 'DRAFT') {
     res.status(400).json({ error: `当前状态 ${currentStatus} 不允许提交审批` });
@@ -457,6 +346,11 @@ router.delete('/:id', checkPermission('order', 'delete'), (req: AuthRequest, res
   const db = getDb();
   const existing = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id) as any;
   if (!existing) { res.status(404).json({ error: '订单不存在' }); return; }
+
+  if (!checkRowPermissionForSingle(db, req.user!, 'Order', toOrder(existing))) {
+    res.status(403).json({ error: '行权限限制，无权删除此订单' });
+    return;
+  }
 
   const isAdmin = req.user!.role === 'Admin';
   const isOwner = existing.sales_rep_id === req.user!.userId;
@@ -482,7 +376,7 @@ router.get('/:id/logs', checkPermission('order', 'read'), (req: AuthRequest, res
   const db = getDb();
   const orderRow = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
   if (!orderRow) { res.status(404).json({ error: '订单不存在' }); return; }
-  const readable = filterOrdersByRowPermissions(db, req.user!, [toOrder(orderRow)]).length > 0;
+  const readable = checkRowPermissionForSingle(db, req.user!, 'Order', toOrder(orderRow));
   if (!readable) {
     res.status(403).json({ error: '无权查看此订单日志' });
     return;

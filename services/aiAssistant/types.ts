@@ -19,6 +19,13 @@ export interface SkillRouteResult {
   clarificationQuestion?: string;
 }
 
+/** AI 卡片载荷（用于在对话气泡内嵌入结构化卡片） */
+export type ChatCard =
+  | { type: 'order'; orderId: string }
+  | { type: 'customer'; customerId: string }
+  | { type: 'product'; productId: string }
+  | { type: 'report'; title: string; content: string; generatedAt: number };
+
 /** 对话消息 */
 export interface ChatMessage {
   id: string;
@@ -26,6 +33,8 @@ export interface ChatMessage {
   content: string;
   skillId?: SkillId;
   timestamp: number;
+  /** 可选：附带在消息中的结构化卡片 */
+  cards?: ChatCard[];
 }
 
 /** 技能注册描述 */

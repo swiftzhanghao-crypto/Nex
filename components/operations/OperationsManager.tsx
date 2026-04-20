@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../contexts/AppContext';
 
 const OperationsManager: React.FC = () => {
-  const { orders, setOrders } = useAppContext();
+  const { orders, setOrders, filteredOrders: rowFilteredOrders } = useAppContext();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'AUTH' | 'PKG' | 'SHIP' | 'CD'>('AUTH');
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,8 +24,7 @@ const OperationsManager: React.FC = () => {
     { id: 'ACCEPTANCE', label: '验收', icon: ClipboardCheck, status: 'Locked' },
   ];
 
-  // Filter orders that are in PROCESSING_PROD status
-  const processingOrders = orders.filter(o => o.status === OrderStatus.PROCESSING_PROD);
+  const processingOrders = rowFilteredOrders.filter(o => o.status === OrderStatus.PROCESSING_PROD);
 
   // Filter based on active tab requirements
   const getTabOrders = () => {

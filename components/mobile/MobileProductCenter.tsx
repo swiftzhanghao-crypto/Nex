@@ -15,8 +15,12 @@ const categoryTree: CategoryGroup[] = [
   { group: '组件示例',   children: ['其他软件'] },
 ];
 
-const MobileProductCenter: React.FC = () => {
-  const { products } = useAppContext();
+interface MobileProductCenterProps {
+  onViewDetail?: (productId: string) => void;
+}
+
+const MobileProductCenter: React.FC<MobileProductCenterProps> = ({ onViewDetail }) => {
+  const { filteredProducts: products } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'ON_SHELF' | 'OFF_SHELF'>('ON_SHELF');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -156,7 +160,8 @@ const MobileProductCenter: React.FC = () => {
               {displayProducts.map((product, idx) => (
                 <div
                   key={product.id}
-                  className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-sm border border-black/[0.04] dark:border-white/[0.06] overflow-hidden active:scale-[0.98] transition-transform"
+                  onClick={() => onViewDetail?.(product.id)}
+                  className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-sm border border-black/[0.04] dark:border-white/[0.06] overflow-hidden active:scale-[0.98] transition-transform cursor-pointer"
                   style={{ animation: `mobileSlideUp 0.3s ease-out ${idx * 0.04}s both` }}
                 >
                   <div className="p-4 space-y-3">
@@ -227,17 +232,18 @@ const MobileProductCenter: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Tags */}
-                    {product.tags && product.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 pt-1 border-t border-gray-50 dark:border-white/5">
-                        {product.tags.map(tag => (
+                    {/* Tags + Arrow */}
+                    <div className="flex items-center justify-between pt-1 border-t border-gray-50 dark:border-white/5">
+                      <div className="flex flex-wrap gap-1">
+                        {product.tags?.map(tag => (
                           <span key={tag} className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-[11px] font-bold border ${getTagColor(tag)}`}>
                             <Tag className="w-2.5 h-2.5" />
                             {tag}
                           </span>
                         ))}
                       </div>
-                    )}
+                      <ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 shrink-0" />
+                    </div>
                   </div>
                 </div>
               ))}

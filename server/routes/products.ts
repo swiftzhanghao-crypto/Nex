@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
+import { filterByRowPermissions, checkRowPermissionForSingle } from '../rowPermissionFilter.ts';
 
 const router = Router();
 router.use(authMiddleware);
@@ -29,7 +30,7 @@ function toProduct(row: any) {
   };
 }
 
-router.get('/', checkPermission('product', 'list'), (req, res) => {
+router.get('/', checkPermission('product', 'list'), (req: AuthRequest, res) => {
   const { category, status, search } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM products WHERE 1=1';
@@ -40,7 +41,8 @@ router.get('/', checkPermission('product', 'list'), (req, res) => {
   if (search) { sql += ' AND name LIKE ?'; params.push(`%${search}%`); }
 
   sql += ' ORDER BY name';
-  res.json(db.prepare(sql).all(...params).map(toProduct));
+  const allProducts = db.prepare(sql).all(...params).map(toProduct);
+  res.json(filterByRowPermissions(db, req.user!, 'Product', allProducts));
 });
 
 router.get('/meta/channels', (_req, res) => {
@@ -65,10 +67,16 @@ router.get('/meta/opportunities', (_req, res) => {
   })));
 });
 
-router.get('/:id', checkPermission('product', 'read'), (req, res) => {
-  const row = getDb().prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
+router.get('/:id', checkPermission('product', 'read'), (req: AuthRequest, res) => {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
   if (!row) { res.status(404).json({ error: '产品不存在' }); return; }
-  res.json(toProduct(row));
+  const product = toProduct(row);
+  if (!checkRowPermissionForSingle(db, req.user!, 'Product', product)) {
+    res.status(403).json({ error: '无权查看此产品' });
+    return;
+  }
+  res.json(product);
 });
 
 router.post('/', checkPermission('product', 'create'), (req: AuthRequest, res) => {

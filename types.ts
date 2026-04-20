@@ -889,3 +889,18 @@ export interface Subscription {
     salesRepName?: string;
     region?: string;
 }
+
+/** AI 助手提交的周报/日报 */
+export interface WorkReport {
+    id: string;
+    userId: string;
+    type: '周报' | '日报';
+    title: string;
+    date: string;
+    weekRange?: string;
+    summary: string;
+    htmlContent: string;
+    sections: { heading: string; bullets: string[] }[];
+    source: 'ai' | 'manual';
+    createdAt: number;
+}

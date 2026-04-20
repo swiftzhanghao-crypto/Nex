@@ -5,8 +5,13 @@ import type {
     AuthTypeData, Customer, Opportunity, Order,
     User, Department, RoleDefinition, Channel, Enterprise,
     Contract, Remittance, Invoice, Performance, Authorization, DeliveryInfo,
-    OrderDraft, Subscription,
+    OrderDraft, Subscription, WorkReport,
 } from '../types';
+import {
+    filterOrdersByRowPermissions,
+    filterCustomersByRowPermissions,
+    filterProductsByRowPermissions,
+} from '../utils/rowPermissionFilter';
 
 import {
     initialProducts, initialMerchandises, initialAtomicCapabilities,
@@ -109,6 +114,13 @@ interface AppContextType {
     deliveryInfos: DeliveryInfo[];
     subscriptions: Subscription[];
 
+    workReports: WorkReport[];
+    addWorkReport: (report: WorkReport) => void;
+
+    filteredOrders: Order[];
+    filteredCustomers: Customer[];
+    filteredProducts: Product[];
+
     refreshOrders: () => Promise<void>;
     refreshCustomers: () => Promise<void>;
 
@@ -165,6 +177,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         USE_API ? [] : generateAuthorizations());
     const [deliveryInfos, setDeliveryInfos] = useState<DeliveryInfo[]>(() =>
         USE_API ? [] : generateDeliveryInfos());
+
+    // --- WorkReports domain ---
+    const [workReports, setWorkReports] = useState<WorkReport[]>([]);
+    const addWorkReport = useCallback((report: WorkReport) => {
+        setWorkReports(prev => [report, ...prev]);
+    }, []);
 
     /** 聚合 orderRemark 为订阅链标记的演示单（订单号格式与普通订单一致）；无此类订单时列表为空 */
     const subscriptions = useMemo(
@@ -280,6 +298,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+    const currentUserRole = useMemo(() =>
+        roles.find(r => r.id === currentUser.role),
+        [roles, currentUser.role]
+    );
+
+    const filteredOrders = useMemo(() =>
+        filterOrdersByRowPermissions(orders, currentUserRole, currentUser, users, departments),
+        [orders, currentUserRole, currentUser, users, departments]
+    );
+
+    const filteredCustomers = useMemo(() =>
+        filterCustomersByRowPermissions(customers, currentUserRole, currentUser, users, departments),
+        [customers, currentUserRole, currentUser, users, departments]
+    );
+
+    const filteredProducts = useMemo(() =>
+        filterProductsByRowPermissions(products, currentUserRole, currentUser, users, departments),
+        [products, currentUserRole, currentUser, users, departments]
+    );
+
     const value: AppContextType = {
         apiMode: USE_API,
 
@@ -309,6 +347,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         authorizations,
         deliveryInfos,
         subscriptions,
+
+        workReports,
+        addWorkReport,
+
+        filteredOrders,
+        filteredCustomers,
+        filteredProducts,
 
         refreshOrders,
         refreshCustomers,

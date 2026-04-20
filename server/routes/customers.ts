@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
+import { filterByRowPermissions, checkRowPermissionForSingle } from '../rowPermissionFilter.ts';
 
 const router = Router();
 router.use(authMiddleware);
@@ -37,7 +38,7 @@ function toCustomer(row: any) {
   };
 }
 
-router.get('/', checkPermission('customer', 'list'), (req, res) => {
+router.get('/', checkPermission('customer', 'list'), (req: AuthRequest, res) => {
   const { type, level, status, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM customers WHERE 1=1';
@@ -48,20 +49,27 @@ router.get('/', checkPermission('customer', 'list'), (req, res) => {
   if (status) { sql += ' AND status = ?'; params.push(status); }
   if (search) { sql += ' AND company_name LIKE ?'; params.push(`%${search}%`); }
 
-  const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
-  const { total } = db.prepare(countSql).get(...params) as { total: number };
+  sql += ' ORDER BY company_name';
+  const allCustomers = db.prepare(sql).all(...params).map(toCustomer);
+  const visibleCustomers = filterByRowPermissions(db, req.user!, 'Customer', allCustomers);
 
   const { limit, offset, pageNum } = safePagination(page, size);
-  sql += ' ORDER BY company_name LIMIT ? OFFSET ?';
-  params.push(limit, offset);
+  const total = visibleCustomers.length;
+  const paged = visibleCustomers.slice(offset, offset + limit);
 
-  res.json({ data: db.prepare(sql).all(...params).map(toCustomer), total, page: pageNum, size: limit });
+  res.json({ data: paged, total, page: pageNum, size: limit });
 });
 
-router.get('/:id', checkPermission('customer', 'read'), (req, res) => {
-  const row = getDb().prepare('SELECT * FROM customers WHERE id = ?').get(req.params.id);
+router.get('/:id', checkPermission('customer', 'read'), (req: AuthRequest, res) => {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.params.id);
   if (!row) { res.status(404).json({ error: '客户不存在' }); return; }
-  res.json(toCustomer(row));
+  const customer = toCustomer(row);
+  if (!checkRowPermissionForSingle(db, req.user!, 'Customer', customer)) {
+    res.status(403).json({ error: '无权查看此客户' });
+    return;
+  }
+  res.json(customer);
 });
 
 router.post('/', checkPermission('customer', 'create'), (req: AuthRequest, res) => {

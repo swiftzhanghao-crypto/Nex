@@ -91,13 +91,13 @@ const AIAssistantDialog: React.FC<AIAssistantDialogProps> = ({ open, onClose }) 
   }, [open]);
 
   const getAppData = useCallback((): AppDataSnapshot => ({
-    orders: appCtx.orders as unknown[],
-    customers: appCtx.customers as unknown[],
+    orders: appCtx.filteredOrders as unknown[],
+    customers: appCtx.filteredCustomers as unknown[],
     opportunities: appCtx.opportunities as unknown[],
     contracts: appCtx.contracts as unknown[],
-    products: appCtx.products as unknown[],
+    products: appCtx.filteredProducts as unknown[],
     performances: appCtx.performances as unknown[],
-  }), [appCtx.orders, appCtx.customers, appCtx.opportunities, appCtx.contracts, appCtx.products, appCtx.performances]);
+  }), [appCtx.filteredOrders, appCtx.filteredCustomers, appCtx.opportunities, appCtx.contracts, appCtx.filteredProducts, appCtx.performances]);
 
   const handleSend = useCallback(async () => {
     const text = input.trim();

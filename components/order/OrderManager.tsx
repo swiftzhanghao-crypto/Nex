@@ -10,7 +10,7 @@ import OrderCreateWizard from './OrderCreateWizard';
 import StatusFilterCard from './StatusFilterCard';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import ColumnConfigModal from './ColumnConfigModal';
-import UserDetailsDrawer from './UserDetailsDrawer';
+import UserDetailPanel from '../common/UserDetailPanel';
 import { useAppContext } from '../../contexts/AppContext';
 
 type FilterMode = '单选' | '多选' | '时间段' | '时间点' | '金额范围';
@@ -75,7 +75,7 @@ const paymentMethodMap: Record<string, string> = {
 };
 
 const OrderManager: React.FC = () => {
-  const { orders, setOrders, products, customers, currentUser, users, departments, opportunities, channels, roles, standaloneEnterprises, orderDrafts, setOrderDrafts, apiMode, refreshOrders } = useAppContext();
+  const { orders, setOrders, products, customers, filteredOrders: ctxFilteredOrders, currentUser, users, departments, opportunities, channels, roles, standaloneEnterprises, orderDrafts, setOrderDrafts, apiMode, refreshOrders } = useAppContext();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -447,103 +447,7 @@ const OrderManager: React.FC = () => {
       }
   }, []);
 
-  const getDescendantDeptIds = useCallback((deptId: string): string[] => {
-      const result: string[] = [deptId];
-      const children = departments.filter(d => d.parentId === deptId);
-      for (const child of children) {
-          result.push(...getDescendantDeptIds(child.id));
-      }
-      return result;
-  }, [departments]);
-
-  const rowPermissionOrders = useMemo(() => {
-      if (!currentUserRole) return orders;
-      if (permissions.includes('all')) return orders;
-      if ((currentUserRole.baseRowPermission || 'all') === 'all') {
-          const hasOrderRules = (currentUserRole.rowPermissions || []).some(r => r.resource === 'Order' && r.values.length > 0);
-          if (!hasOrderRules) return orders;
-      }
-      const orderRules = (currentUserRole.rowPermissions || []).filter(r => r.resource === 'Order' && r.values.length > 0);
-      if (orderRules.length === 0) return orders;
-
-      const userDeptId = currentUser.departmentId;
-      const userDeptAndChildrenIds = userDeptId ? getDescendantDeptIds(userDeptId) : [];
-
-      return orders.filter(order => {
-          return orderRules.every(rule => {
-              const vals = rule.values;
-
-              switch (rule.dimension) {
-                  case 'salesRep': {
-                      return vals.some(v => {
-                          if (v === 'self') return order.salesRepId === currentUser.id;
-                          if (v === 'department') {
-                              if (!userDeptId) return false;
-                              const salesUser = users.find(u => u.id === order.salesRepId);
-                              return salesUser?.departmentId === userDeptId;
-                          }
-                          if (v === 'departmentAndChildren') {
-                              if (!userDeptId) return false;
-                              const salesUser = users.find(u => u.id === order.salesRepId);
-                              return salesUser?.departmentId ? userDeptAndChildrenIds.includes(salesUser.departmentId) : false;
-                          }
-                          return false;
-                      });
-                  }
-                  case 'businessManager': {
-                      return vals.some(v => {
-                          if (v === 'self') return order.businessManagerId === currentUser.id;
-                          if (v === 'department') {
-                              if (!userDeptId) return false;
-                              const bmUser = users.find(u => u.id === order.businessManagerId);
-                              return bmUser?.departmentId === userDeptId;
-                          }
-                          if (v === 'departmentAndChildren') {
-                              if (!userDeptId) return false;
-                              const bmUser = users.find(u => u.id === order.businessManagerId);
-                              return bmUser?.departmentId ? userDeptAndChildrenIds.includes(bmUser.departmentId) : false;
-                          }
-                          return false;
-                      });
-                  }
-                  case 'creator': {
-                      return vals.some(v => {
-                          if (v === 'self') return order.creatorId === currentUser.id;
-                          if (v === 'department') {
-                              if (!userDeptId) return false;
-                              const creatorUser = users.find(u => u.id === order.creatorId);
-                              return creatorUser?.departmentId === userDeptId;
-                          }
-                          if (v === 'departmentAndChildren') {
-                              if (!userDeptId) return false;
-                              const creatorUser = users.find(u => u.id === order.creatorId);
-                              return creatorUser?.departmentId ? userDeptAndChildrenIds.includes(creatorUser.departmentId) : false;
-                          }
-                          return false;
-                      });
-                  }
-                  case 'departmentId': {
-                      const salesUser = users.find(u => u.id === order.salesRepId);
-                      return salesUser?.departmentId ? vals.includes(salesUser.departmentId) : false;
-                  }
-                  case 'orderType':
-                      return vals.includes(order.buyerType || 'Customer');
-                  case 'industryLine':
-                      return order.industryLine ? vals.includes(order.industryLine) : false;
-                  case 'province':
-                      return order.province ? vals.includes(order.province) : false;
-                  case 'directChannelId': {
-                      const directChannelId = order.buyerId && order.buyerType === 'Channel' ? order.buyerId : undefined;
-                      return directChannelId ? vals.includes(directChannelId) : false;
-                  }
-                  default:
-                      return true;
-              }
-          });
-      });
-  }, [orders, currentUserRole, currentUser, users, departments, getDescendantDeptIds]);
-
-  const filteredOrders = useMemo(() => rowPermissionOrders.filter(order => {
+  const filteredOrders = useMemo(() => ctxFilteredOrders.filter(order => {
     let matchesStatus = filterStatus === 'All' || order.status === filterStatus;
     
     // Handle sub-status filtering for PROCESSING_PROD
@@ -663,7 +567,7 @@ const OrderManager: React.FC = () => {
     });
 
     return matchesStatus && matchesSearch && matchesSource && matchesDate && matchesAmount && matchesAdvanced;
-  }), [rowPermissionOrders, filterStatus, searchTerm, searchField, filterSource, filterDateStart, filterDateEnd, filterAmountMin, filterAmountMax, appliedFilters]);
+  }), [ctxFilteredOrders, filterStatus, searchTerm, searchField, filterSource, filterDateStart, filterDateEnd, filterAmountMin, filterAmountMax, appliedFilters]);
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage) || 1;
   const safePage = Math.min(currentPage, totalPages);
@@ -1808,7 +1712,7 @@ const OrderManager: React.FC = () => {
       />
 
       {isDrawerOpen && detailsUser && (
-        <UserDetailsDrawer user={detailsUser} isClosing={isDrawerClosing} getDepartmentPath={getDepartmentPath} onClose={closeDrawer} />
+        <UserDetailPanel user={detailsUser} isClosing={isDrawerClosing} onClose={closeDrawer} roles={roles} departments={departments} users={users} readonly />
       )}
 
       {isColumnConfigOpen && (

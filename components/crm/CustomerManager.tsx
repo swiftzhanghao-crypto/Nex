@@ -23,7 +23,7 @@ interface CFilterCondition {
 }
 
 const CustomerManager: React.FC = () => {
-  const { customers, setCustomers, users } = useAppContext();
+  const { customers, setCustomers, filteredCustomers: rowFilteredCustomers, users } = useAppContext();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [searchField, setSearchField] = useState<'crmId' | 'companyName' | 'enterpriseId'>('crmId');
@@ -150,7 +150,7 @@ const CustomerManager: React.FC = () => {
   };
 
 
-  const filteredCustomers = customers.filter(c => {
+  const filteredCustomers = rowFilteredCustomers.filter(c => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || (
         searchField === 'crmId'        ? c.id.toLowerCase().includes(searchLower) :
@@ -286,8 +286,7 @@ const CustomerManager: React.FC = () => {
           <table className="w-full text-left border-separate border-spacing-0">
             <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E] sticky top-0 z-10">
               <tr>
-                <th className="pl-6 pr-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">客户编号</th>
-                <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">客户名称</th>
+                <th className="pl-6 pr-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">客户</th>
                 <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">关联企业ID</th>
                 <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">客户类型</th>
                 <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">行业条线</th>
@@ -306,18 +305,18 @@ const CustomerManager: React.FC = () => {
                       key={customer.id}
                       className="group hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors border-b border-gray-100/50 dark:border-white/5 last:border-0"
                   >
-                    <td className="pl-6 pr-4 py-3 whitespace-nowrap">
+                    <td className="pl-6 pr-4 py-3 max-w-[300px]">
                       <button
                           onClick={() => navigate(`/customers/${customer.id}`)}
-                          className="text-sm font-mono font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline cursor-pointer"
+                          className="text-left group/name"
                       >
+                        <div className="font-medium text-gray-900 dark:text-white leading-snug group-hover/name:text-[#0071E3] dark:group-hover/name:text-[#0A84FF] transition">
+                          {customer.companyName}
+                        </div>
+                        <div className="text-xs font-mono text-gray-400 dark:text-gray-500 mt-0.5">
                           {customer.id}
+                        </div>
                       </button>
-                    </td>
-                    <td className="px-4 py-3 max-w-[240px]">
-                      <div className="font-medium text-gray-900 dark:text-white leading-snug">
-                        {customer.companyName}
-                      </div>
                     </td>
                     <td className="px-4 py-3 text-xs font-mono text-gray-500 dark:text-gray-400">
                       {enterprises.length === 0 ? (
@@ -372,7 +371,7 @@ const CustomerManager: React.FC = () => {
               })}
               {currentCustomers.length === 0 && (
                   <tr>
-                      <td colSpan={8} className="p-12 text-center text-gray-400">暂无客户数据</td>
+                      <td colSpan={7} className="p-12 text-center text-gray-400">暂无客户数据</td>
                   </tr>
               )}
             </tbody>

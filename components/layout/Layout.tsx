@@ -1,13 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ExternalLink, Minus, Trash2, ClipboardCheck, Radar, Search, List, ArrowLeft, Smartphone, RefreshCcw } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ExternalLink, Minus, Trash2, ClipboardCheck, Radar, Search, List, ArrowLeft, Smartphone, RefreshCcw, Sparkles, Bot } from 'lucide-react';
 import manualContent from '../../docs/产品说明文档.md?raw';
+import designSpecContent from '../../docs/设计规范.md?raw';
+import operationManualContent from '../../docs/WPS365业务平台操作手册.md?raw';
+import aiManualContent from '../../docs/AI业务助手操作手册.md?raw';
+import openApiContent from '../../docs/开放API-订单下单.md?raw';
+import aiTechDocContent from '../../docs/AI业务助手技术文档.md?raw';
+import DocCenterDrawer from './DocCenterDrawer';
 import { useAppContext } from '../../contexts/AppContext';
 import WPSLogo from '../common/WPSLogo';
 import MobilePreview from '../mobile/MobilePreview';
-import AIAssistantButton from '../ai/AIAssistantButton';
+import AIAssistantDrawer from '../ai/AIAssistantDrawer';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -20,7 +25,7 @@ interface PageTab {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { currentUser, users, setCurrentUser, roles, apiMode } = useAppContext();
+  const { currentUser, users, setCurrentUser, roles, apiMode, filteredCustomers: customers, filteredProducts: products } = useAppContext();
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -37,8 +42,23 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isManualOpen, setIsManualOpen] = useState(false);
   const [isMobilePreviewOpen, setIsMobilePreviewOpen] = useState(false);
+  const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
+  const [aiInitialQuery, setAiInitialQuery] = useState('');
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const toggleSection = (id: string) => setCollapsedSections(prev => ({ ...prev, [id]: !prev[id] }));
+
+  // ── ⌘K shortcut ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setAiInitialQuery('');
+        setIsAIDrawerOpen(prev => !prev);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
 
   // ── Tab Bar ────────────────────────────────────────────────
   const [tabs, setTabs] = useState<PageTab[]>([]);
@@ -81,31 +101,59 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       '/system/sales-org': '销售组织配置',
       '/sab-insight': '智能查客户',
       '/sab-insight/customer-list': '客户列表',
+      '/reports': '周报日报',
     };
     if (staticMap[pathname]) return staticMap[pathname];
-    const m = pathname.match(/^\/orders\/(.+)$/);
-    if (m) return `订单 ${m[1]}`;
-    const c = pathname.match(/^\/customers\/(.+)$/);
-    if (c) return `客户详情`;
-    const p = pathname.match(/^\/products\/(.+)$/);
-    if (p) return `产品详情`;
-    const ch = pathname.match(/^\/channels\/(.+)$/);
-    if (ch) return `渠道详情`;
-    const sabC = pathname.match(/^\/sab-insight\/customer\/(.+)$/);
-    if (sabC) return '客户详情';
-    return '页面';
+
+    const orderId = pathname.match(/^\/orders\/(.+)$/);
+    if (orderId) return `订单 ${orderId[1]}`;
+
+    const customerId = pathname.match(/^\/customers\/(.+)$/);
+    if (customerId) {
+      const cust = customers.find(c => c.id === customerId[1]);
+      return cust ? `客户 ${cust.companyName}` : `客户 ${customerId[1]}`;
+    }
+
+    const productId = pathname.match(/^\/products\/(.+)$/);
+    if (productId) {
+      const prod = products.find(p => p.id === productId[1]);
+      return prod ? `产品 ${prod.name}` : `产品 ${productId[1]}`;
+    }
+
+    const channelId = pathname.match(/^\/channels\/(.+)$/);
+    if (channelId) return `渠道 ${channelId[1]}`;
+
+    const sabCustomerId = pathname.match(/^\/sab-insight\/customer\/(.+)$/);
+    if (sabCustomerId) {
+      const cust = customers.find(c => c.id === sabCustomerId[1]);
+      return cust ? `客户洞察 ${cust.companyName}` : `客户洞察 ${sabCustomerId[1]}`;
+    }
+
+    const reportUserId = pathname.match(/^\/reports\/(.+)$/);
+    if (reportUserId) {
+      const u = users.find(usr => usr.id === reportUserId[1]);
+      return u ? `${u.name} 的报告` : `报告详情`;
+    }
+
+    return pathname.split('/').filter(Boolean).pop() || '页面';
   };
 
   useEffect(() => {
     const path = location.pathname;
     const title = getTabTitle(path);
     setTabs(prev => {
-      if (prev.find(t => t.id === path)) return prev;
+      const existing = prev.find(t => t.id === path);
+      if (existing) {
+        if (existing.title !== title) {
+          return prev.map(t => t.id === path ? { ...t, title } : t);
+        }
+        return prev;
+      }
       return [...prev, { id: path, title, path }];
     });
     setActiveTabId(path);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
+  }, [location.pathname, customers, products, users]);
 
   const closeTab = (e: React.MouseEvent, tabId: string) => {
     e.stopPropagation();
@@ -332,7 +380,25 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
 
           <div className="flex items-center gap-3">
-             <button 
+            {/* AI Search Bar */}
+            <div
+              onClick={() => { setAiInitialQuery(''); setIsAIDrawerOpen(true); }}
+              className="hidden md:flex items-center gap-2.5 px-3.5 py-1.5 bg-gray-100/80 dark:bg-white/[0.06] border border-gray-200/60 dark:border-white/[0.08] rounded-xl cursor-pointer hover:bg-[#0071E3]/5 dark:hover:bg-[#0A84FF]/10 hover:border-[#0071E3]/30 dark:hover:border-[#0A84FF]/30 transition-all group w-[220px]"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#0071E3] dark:group-hover:text-[#0A84FF] transition shrink-0" />
+              <span className="text-xs text-gray-400 group-hover:text-[#0071E3] dark:text-gray-500 dark:group-hover:text-[#0A84FF] transition truncate">AI 搜索...</span>
+              <kbd className="ml-auto hidden lg:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-white dark:bg-white/10 border border-gray-200/80 dark:border-white/10 text-[10px] text-gray-400 font-mono shrink-0">⌘K</kbd>
+            </div>
+
+            <button
+              onClick={() => { setAiInitialQuery(''); setIsAIDrawerOpen(true); }}
+              className="p-2 text-gray-400 hover:text-[#0071E3] dark:text-gray-400 dark:hover:text-[#0A84FF] transition rounded-full hover:bg-[#0071E3]/10 dark:hover:bg-[#0A84FF]/10"
+              title="AI 业务助手"
+            >
+              <Bot className="w-4.5 h-4.5" />
+            </button>
+
+             <button
                 onClick={toggleFullScreen}
                 className="hidden sm:block p-2 text-gray-400 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
                 title={isFullScreen ? "退出全屏" : "全屏模式"}
@@ -350,7 +416,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <button
               onClick={() => setIsManualOpen(true)}
               className="p-2 text-gray-400 hover:text-[#0071E3] dark:text-gray-400 dark:hover:text-blue-400 transition rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
-              title="产品使用说明手册"
+              title="文档中心"
             >
               <BookOpen className="w-4 h-4" />
             </button>
@@ -509,6 +575,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           <>
                             <NavItem to="/customers" icon={Users} label="客户信息" permission="customer_view" />
                             <NavItem to="/opportunities" icon={Target} label="商机信息" permission="opportunity_manage" />
+                            <NavItem to="/reports" icon={FileText} label="周报日报" />
                           </>,
                           ['customer_view', 'opportunity_manage']
                         )}
@@ -713,70 +780,39 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </div>
 
       {/* Manual Panel Overlay */}
-      {isManualOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50"
-          onClick={() => setIsManualOpen(false)}
-        />
-      )}
+      {/* ── Document Center Drawer ── */}
+      {isManualOpen && (() => {
+        const DOC_LIST = [
+          { id: 'manual', title: '产品说明文档', icon: '📘', content: manualContent },
+          { id: 'design', title: '设计规范', icon: '🎨', content: designSpecContent },
+          { id: 'ops', title: '操作手册', icon: '📋', content: operationManualContent },
+          { id: 'prd', title: '产品 PRD', icon: '📄', link: 'https://365.kdocs.cn/l/cg9iaTHwv9VX' },
+          { id: 'ai-manual', title: 'AI 助手手册', icon: '🤖', content: aiManualContent },
+          { id: 'ai-tech', title: 'AI 技术文档', icon: '⚙️', content: aiTechDocContent },
+          { id: 'open-api', title: '开放 API', icon: '🔗', content: openApiContent },
+        ];
+        return <DocCenterDrawer docs={DOC_LIST} onClose={() => setIsManualOpen(false)} />;
+      })()}
 
-      {/* Manual Side Drawer */}
-      <div className={`fixed top-0 right-0 h-full w-full max-w-2xl z-50 flex flex-col bg-white dark:bg-[#1C1C1E] shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${isManualOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        {/* Drawer Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/10 shrink-0">
-          <div className="flex items-center gap-3">
-            <BookOpen className="w-5 h-5 text-[#0071E3]" />
-            <h2 className="text-base font-bold text-gray-900 dark:text-white">产品使用说明手册</h2>
-          </div>
+      {/* AI 业务助手抽屉 */}
+      <AIAssistantDrawer open={isAIDrawerOpen} onClose={() => setIsAIDrawerOpen(false)} initialQuery={aiInitialQuery} />
+
+      {/* AI 助手悬浮球 */}
+      {!isAIDrawerOpen && (
+        <div className="fixed bottom-[168px] right-0 z-[60]">
           <button
-            onClick={() => setIsManualOpen(false)}
-            className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition"
+            onClick={() => { setAiInitialQuery(''); setIsAIDrawerOpen(true); }}
+            className="flex items-center gap-2 bg-[#0071E3] text-white pl-4 pr-5 py-2.5 rounded-l-full shadow-md translate-x-[calc(100%-40px)] hover:translate-x-0 transition-transform duration-300 ease-in-out active:scale-95 hover:shadow-lg hover:bg-[#0062CC]"
           >
-            <X className="w-4 h-4" />
+            <Bot className="w-5 h-5 shrink-0" />
+            <span className="text-sm font-medium whitespace-nowrap">AI 助手</span>
           </button>
         </div>
-        {/* Drawer Content */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-5">
-          <ReactMarkdown
-            components={{
-              h1: ({children}) => <h1 className="text-xl font-bold text-gray-900 dark:text-white mt-2 mb-4 pb-2 border-b border-gray-100 dark:border-white/10">{children}</h1>,
-              h2: ({children}) => <h2 className="text-base font-bold text-gray-900 dark:text-white mt-8 mb-3 flex items-center gap-2 before:content-[''] before:w-1 before:h-4 before:bg-[#0071E3] before:rounded-full before:shrink-0">{children}</h2>,
-              h3: ({children}) => <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100 mt-5 mb-2">{children}</h3>,
-              h4: ({children}) => <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mt-4 mb-1.5">{children}</h4>,
-              p: ({children}) => <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-3">{children}</p>,
-              ul: ({children}) => <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>,
-              ol: ({children}) => <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>,
-              li: ({children}) => <li className="text-sm text-gray-600 dark:text-gray-300">{children}</li>,
-              strong: ({children}) => <strong className="font-semibold text-gray-800 dark:text-gray-100">{children}</strong>,
-              em: ({children}) => <em className="italic text-gray-600 dark:text-gray-300">{children}</em>,
-              code: ({children, className}) => {
-                const isBlock = className?.includes('language-');
-                return isBlock
-                  ? <code className="block text-xs font-mono text-gray-700 dark:text-gray-200">{children}</code>
-                  : <code className="text-xs font-mono text-[#0071E3] dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">{children}</code>;
-              },
-              pre: ({children}) => <pre className="bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl p-4 text-xs overflow-x-auto mb-4">{children}</pre>,
-              table: ({children}) => <div className="overflow-x-auto mb-4"><table className="w-full text-sm border-collapse">{children}</table></div>,
-              thead: ({children}) => <thead className="bg-gray-50 dark:bg-white/5">{children}</thead>,
-              th: ({children}) => <th className="text-left text-xs font-semibold text-gray-700 dark:text-gray-200 px-3 py-2 border-b border-gray-200 dark:border-white/10">{children}</th>,
-              td: ({children}) => <td className="text-xs text-gray-600 dark:text-gray-300 px-3 py-2 border-b border-gray-100 dark:border-white/5">{children}</td>,
-              tr: ({children}) => <tr className="hover:bg-gray-50/50 dark:hover:bg-white/3 transition-colors">{children}</tr>,
-              blockquote: ({children}) => <blockquote className="border-l-2 border-[#0071E3] pl-4 my-3 text-sm text-gray-500 dark:text-gray-400 italic">{children}</blockquote>,
-              hr: () => <hr className="my-6 border-gray-100 dark:border-white/10" />,
-              a: ({children, href}) => <a href={href} className="text-[#0071E3] dark:text-blue-400 hover:underline">{children}</a>,
-            }}
-          >
-            {manualContent}
-          </ReactMarkdown>
-        </div>
-      </div>
-
-      {/* AI 业务助手入口 */}
-      <AIAssistantButton />
+      )}
 
       {/* Feedback FAB */}
       {!isFeedbackOpen && (
-        <div className="fixed bottom-[104px] right-0 z-[60]">
+        <div className="fixed bottom-[112px] right-0 z-[60]">
           <button
             onClick={() => { resetFeedback(); setIsFeedbackOpen(true); }}
             className="flex items-center gap-2 bg-white dark:bg-[#232326] text-[#0071E3] dark:text-blue-400 pl-4 pr-5 py-2.5 rounded-l-full shadow-md border border-gray-200 dark:border-white/10 translate-x-[calc(100%-40px)] hover:translate-x-0 transition-transform duration-300 ease-in-out active:scale-95"

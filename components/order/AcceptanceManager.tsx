@@ -35,7 +35,7 @@ const statusLabelMap: Record<string, { label: string; color: string; bg: string;
 };
 
 const AcceptanceManager: React.FC = () => {
-  const { orders } = useAppContext();
+  const { filteredOrders: orders } = useAppContext();
   const [searchText, setSearchText] = useState('');
   const [searchField, setSearchField] = useState<'acceptanceNo' | 'orderId' | 'customerName'>('acceptanceNo');
   const [isSearchFieldOpen, setIsSearchFieldOpen] = useState(false);

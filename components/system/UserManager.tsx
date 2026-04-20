@@ -2,8 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { User, UserType, RoleDefinition, PermissionDimension, RowPermissionRule, ColumnPermissionRule, PermissionResource, BaseRowPermission, Department, RowLogicConfig } from '../../types';
-import { Search, Plus, Shield, User as UserIcon, Briefcase, Truck, Edit, Building2, X, Mail, Phone, CheckCircle, Calendar, Hash, Lock, CheckSquare, Settings, Save, Trash2, Database, Check, ChevronDown, ChevronRight, Columns, Copy, Globe, GripVertical } from 'lucide-react';
+import { Search, Plus, Shield, User as UserIcon, Briefcase, Truck, Edit, Building2, X, Mail, Phone, CheckCircle, Calendar, Hash, Lock, CheckSquare, Settings, Save, Trash2, Database, Check, ChevronDown, ChevronRight, Columns, Copy, Globe, GripVertical, IdCard, MapPin, Clock } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
+import UserDetailPanel from '../common/UserDetailPanel';
 import { useAppContext } from '../../contexts/AppContext';
 import { userApi } from '../../services/api';
 import { columnConfig, permissionTree, permissionModules, resourceConfig, PermSubgroup, PermGroup, PermCategory, resourceFunctionalPermMap, getRequiredPermIdsForResource, getSubgroupPermIds, getSubgroupPermItems } from './permissionConfig';
@@ -81,6 +82,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   const [detailsUser, setDetailsUser] = useState<User | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isDrawerClosing, setIsDrawerClosing] = useState(false);
+  const [isEmployeeCardOpen, setIsEmployeeCardOpen] = useState(false);
   
   // Row Permission Editor State
   const [selectedResource, setSelectedResource] = useState<PermissionResource>('Order');
@@ -779,7 +781,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                           className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white"
                       />
                   </div>
-                  <button onClick={() => handleOpenModal()} className="bg-black dark:bg-white text-white dark:text-black px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:opacity-80 transition"><Plus className="w-4 h-4"/> 新增用户</button>
+                  <button onClick={() => handleOpenModal()} className="bg-[#0071E3] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-[#0062CC] transition shadow-sm"><Plus className="w-4 h-4"/> 新增用户</button>
               </div>
               <div className="flex-1 overflow-auto">
                   <table className="w-full text-left">
@@ -819,7 +821,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                   <td className="p-4 text-gray-600 dark:text-gray-300">{getDepartmentName(user.departmentId)}</td>
                                   <td className="p-4"><span className={`px-2 py-0.5 text-[10px] rounded border ${user.userType === 'Internal' ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400' : 'bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-900/30 dark:border-orange-800 dark:text-orange-400'}`}>{user.userType}</span></td>
                                   <td className="p-4"><span className={`flex items-center gap-1.5 text-xs font-medium ${user.status === 'Active' ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`}><div className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-green-500' : 'bg-gray-400'}`}></div> {user.status}</span></td>
-                                  <td className="p-4 text-right pr-6"><button onClick={() => handleOpenModal(user)} className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition"><Edit className="w-4 h-4"/></button></td>
+                                  <td className="p-4 text-right pr-6"><button onClick={(e) => handleAvatarClick(e, user)} className="p-2 text-gray-400 hover:text-[#0071E3] dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition"><Edit className="w-4 h-4"/></button></td>
                               </tr>
                           ))}
                       </tbody>
@@ -1209,7 +1211,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                           <div className="flex-1 min-w-0">
                                                               <div className={`text-sm font-semibold truncate ${!hasFuncPerm ? 'text-gray-400 dark:text-gray-500' : isActive ? 'text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'}`}>{res.label}</div>
                                                               <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                                                                  {!hasFuncPerm ? '未开启功能权限' : rulesCount > 0 ? `${rulesCount} 条规则` : `${res.dimensions.length} 个维度`}
+                                                                  {!hasFuncPerm ? '未开启功能权限' : rulesCount > 0 ? `${rulesCount} 条维度规则` : `${res.dimensions.length} 个可选维度`}
                                                               </div>
                                                           </div>
                                                           {hasFuncPerm && rulesCount > 0 && (
@@ -1237,9 +1239,9 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                   <>
                                                       <div className="flex items-start justify-between gap-3">
                                                           <div>
-                                                              <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200">{resourceConfig.find(r => r.id === selectedResource)?.label} — 行权限配置</h4>
+                                                              <h4 className="text-base font-bold text-gray-800 dark:text-gray-200">{resourceConfig.find(r => r.id === selectedResource)?.label} — 行权限配置</h4>
                                                               {resourceConfig.find(r => r.id === selectedResource)?.description && (
-                                                                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{resourceConfig.find(r => r.id === selectedResource)?.description}</p>
+                                                                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{resourceConfig.find(r => r.id === selectedResource)?.description}</p>
                                                               )}
                                                           </div>
                                                           <button
@@ -1251,8 +1253,8 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                                   }
                                                               }}
                                                               disabled={hasRulesForResource && !isAllData}
-                                                              title={hasRulesForResource && !isAllData ? '已配置维度过滤，需先清除' : isAllData ? '点击切换为自定义维度' : '点击切换为全部数据'}
-                                                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                                              title={hasRulesForResource && !isAllData ? '已配置维度规则，需先清除' : isAllData ? '点击切换为自定义维度' : '点击切换为全部数据'}
+                                                              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-bold transition-all ${
                                                                   isAllData
                                                                       ? 'bg-blue-50 text-blue-700 border border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-600 shadow-sm'
                                                                       : hasRulesForResource
@@ -1260,22 +1262,22 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                                           : 'bg-gray-50 text-gray-500 border border-gray-200 dark:bg-white/5 dark:text-gray-400 dark:border-white/10 hover:border-blue-300 hover:text-blue-600 dark:hover:border-blue-500 dark:hover:text-blue-400 cursor-pointer'
                                                               }`}
                                                           >
-                                                              <Globe className="w-3.5 h-3.5"/>
+                                                              <Globe className="w-4 h-4"/>
                                                               <span>全部数据</span>
-                                                              {isAllData && <Check className="w-3 h-3"/>}
+                                                              {isAllData && <Check className="w-3.5 h-3.5"/>}
                                                           </button>
                                                       </div>
 
                                                       <div className={isAllData ? 'opacity-40 pointer-events-none select-none' : ''}>
-                                                          <div className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">维度过滤{isAllData && <span className="ml-2 text-gray-300 dark:text-gray-600 normal-case">（请先取消"全部数据"以启用）</span>}</div>
+                                                          <div className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">维度规则{isAllData && <span className="ml-2 text-gray-300 dark:text-gray-600 normal-case">（请先取消"全部数据"以启用）</span>}</div>
                                                       </div>
 
                                                       {/* Formula Preview Bar */}
                                                       {!isAllData && ((roleForm.rowPermissions || []).filter(r => r.resource === selectedResource).length >= 2) && (
                                                           <div className="mt-2 mb-1">
-                                                              <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-900/15 dark:via-indigo-900/15 dark:to-purple-900/15 border border-blue-200/60 dark:border-blue-700/30">
-                                                                  <span className="text-[10px] font-bold text-blue-500 dark:text-blue-400 uppercase tracking-wider shrink-0">公式</span>
-                                                                  <div className="w-px h-4 bg-blue-200 dark:bg-blue-700/50 shrink-0"/>
+                                                                              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-900/15 dark:via-indigo-900/15 dark:to-purple-900/15 border border-blue-200/60 dark:border-blue-700/30">
+                                                                                  <span className="text-xs font-bold text-blue-500 dark:text-blue-400 uppercase tracking-wider shrink-0">公式</span>
+                                                                                  <div className="w-px h-4 bg-blue-200 dark:bg-blue-700/50 shrink-0"/>
                                                                   <div className="text-xs font-mono font-semibold break-all leading-relaxed flex flex-wrap items-center gap-x-1 gap-y-0.5">
                                                                       {buildFormulaDisplay(selectedResource).split(/(\(|\)|AND|OR)/).filter(Boolean).map((token, ti) => {
                                                                           const trimmed = token.trim();
@@ -1438,7 +1440,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                                   {rule.values.map(v => (
                                                                       <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700/50 rounded text-xs font-medium text-blue-700 dark:text-blue-300">
                                                                           {getReadableValue(dimId as PermissionDimension, v)}
-                                                                          <button onClick={(e) => { e.stopPropagation(); toggleRuleValue(rule.id, v); }} className="text-blue-400 hover:text-red-500 transition-colors"><X className="w-2.5 h-2.5"/></button>
+                                                                          <button onClick={(e) => { e.stopPropagation(); toggleRuleValue(rule.id, v); }} className="text-blue-400 hover:text-red-500 transition-colors"><X className="w-3 h-3"/></button>
                                                                       </span>
                                                                   ))}
                                                               </div>
@@ -1462,19 +1464,26 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                               return (
                                                                   <React.Fragment key={rule.id}>
                                                                       {ruleIdx > 0 && (
-                                                                          <div className="flex items-center justify-center py-1.5 -my-px">
+                                                                          <div className="flex items-center justify-center py-1">
                                                                               <div className="flex-1 border-t border-dashed border-gray-200 dark:border-white/10"/>
-                                                                              <button
-                                                                                  onClick={() => toggleDimOperator(selectedResource, rule.id)}
-                                                                                  className={`px-4 py-1 rounded-full text-xs font-extrabold tracking-wider transition-all mx-3 select-none shadow-sm ${
-                                                                                      getDimOperator(selectedResource, rule.id) === 'OR'
-                                                                                          ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-300 dark:border-amber-700 hover:bg-amber-200'
-                                                                                          : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-700 hover:bg-blue-200'
-                                                                                  }`}
-                                                                                  title="点击切换 AND / OR"
-                                                                              >
-                                                                                  {getDimOperator(selectedResource, rule.id)}
-                                                                              </button>
+                                                                              <div className="mx-2.5 flex bg-gray-100 dark:bg-[#2C2C2E] rounded-full p-0.5 border border-gray-200 dark:border-white/10">
+                                                                                  <button
+                                                                                      onClick={() => { if (getDimOperator(selectedResource, rule.id) !== 'AND') toggleDimOperator(selectedResource, rule.id); }}
+                                                                                      className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold tracking-wider transition-all select-none ${
+                                                                                          getDimOperator(selectedResource, rule.id) === 'AND'
+                                                                                              ? 'bg-blue-500 dark:bg-blue-600 text-white shadow-sm'
+                                                                                              : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                                                                                      }`}
+                                                                                  >AND</button>
+                                                                                  <button
+                                                                                      onClick={() => { if (getDimOperator(selectedResource, rule.id) !== 'OR') toggleDimOperator(selectedResource, rule.id); }}
+                                                                                      className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold tracking-wider transition-all select-none ${
+                                                                                          getDimOperator(selectedResource, rule.id) === 'OR'
+                                                                                              ? 'bg-amber-500 dark:bg-amber-600 text-white shadow-sm'
+                                                                                              : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                                                                                      }`}
+                                                                                  >OR</button>
+                                                                              </div>
                                                                               <div className="flex-1 border-t border-dashed border-gray-200 dark:border-white/10"/>
                                                                           </div>
                                                                       )}
@@ -1486,20 +1495,20 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                                           {groupSelectMode && (
                                                                               <div
                                                                                   onClick={() => setGroupSelectRules(prev => prev.includes(rule.id) ? prev.filter(r => r !== rule.id) : [...prev, rule.id])}
-                                                                                  className={`flex items-center justify-center w-8 min-w-[32px] cursor-pointer border-r border-gray-200 dark:border-white/10 transition-colors ${
+                                                                                  className={`flex items-center justify-center w-9 min-w-[36px] cursor-pointer border-r border-gray-200 dark:border-white/10 transition-colors ${
                                                                                       groupSelectRules.includes(rule.id) ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'hover:bg-gray-50 dark:hover:bg-white/5'
                                                                                   }`}
                                                                               >
-                                                                                  <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
+                                                                                  <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
                                                                                       groupSelectRules.includes(rule.id) ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300 dark:border-gray-600'
                                                                                   }`}>
-                                                                                      {groupSelectRules.includes(rule.id) && <Check className="w-2.5 h-2.5 text-white"/>}
+                                                                                      {groupSelectRules.includes(rule.id) && <Check className="w-3 h-3 text-white"/>}
                                                                                   </div>
                                                                               </div>
                                                                           )}
-                                                                          <div className={`flex items-center justify-center w-10 min-w-[40px] border-r border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/[0.02] text-[11px] font-bold select-none shrink-0 ${!groupSelectMode ? 'rounded-l-xl' : ''} ${grpColor ? grpColor.text : 'text-gray-400 dark:text-gray-500'}`}>
-                                                                              {grpColor && isFirstInGroup && <span className="text-[9px] font-extrabold">{grpColor.label}</span>}
-                                                                              {grpColor && !isFirstInGroup && <span className="text-[9px]">{grpColor.label}</span>}
+                                                                          <div className={`flex items-center justify-center w-10 min-w-[40px] border-r border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/[0.02] text-xs font-bold select-none shrink-0 ${!groupSelectMode ? 'rounded-l-xl' : ''} ${grpColor ? grpColor.text : 'text-gray-400 dark:text-gray-500'}`}>
+                                                                              {grpColor && isFirstInGroup && <span className="text-[10px] font-extrabold">{grpColor.label}</span>}
+                                                                              {grpColor && !isFirstInGroup && <span className="text-[10px]">{grpColor.label}</span>}
                                                                               {!grpColor && (ruleIdx + 1)}
                                                                           </div>
 
@@ -1509,7 +1518,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                                                       if (openDimPicker === rule.id) { setOpenDimPicker(null); setDropdownPos(null); }
                                                                                       else { setOpenDimPicker(rule.id); setOpenDimDropdown(null); setDropdownPos(computeDropdownPos(e.currentTarget, 'dim')); }
                                                                                   }}
-                                                                                  className="flex items-center gap-1.5 w-[140px] min-w-[140px] px-3 py-2.5 border-r border-gray-200 dark:border-white/10 text-sm font-bold text-blue-700 dark:text-blue-300 bg-blue-50/70 dark:bg-blue-900/15 hover:bg-blue-100/80 dark:hover:bg-blue-900/25 transition-colors cursor-pointer select-none"
+                                                                                  className="flex items-center gap-1.5 min-w-[80px] h-full px-3 py-2 border-r border-gray-200 dark:border-white/10 text-sm font-bold text-blue-700 dark:text-blue-300 bg-blue-50/70 dark:bg-blue-900/15 hover:bg-blue-100/80 dark:hover:bg-blue-900/25 transition-colors cursor-pointer select-none whitespace-nowrap"
                                                                               >
                                                                                   <span className="truncate">{dimCfg?.label || rule.dimension}</span>
                                                                                   <ChevronDown className={`w-3 h-3 text-blue-400 shrink-0 transition-transform ${openDimPicker === rule.id ? 'rotate-180' : ''}`}/>
@@ -1535,7 +1544,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                                                               }`}
                                                                                           >
                                                                                               <span>{d.label}</span>
-                                                                                              {rule.dimension === d.id && <Check className="w-3 h-3 text-blue-600 shrink-0"/>}
+                                                                                              {rule.dimension === d.id && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0"/>}
                                                                                           </button>
                                                                                       ))}
                                                                                   </div>,
@@ -1544,7 +1553,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                                           </div>
 
                                                                           <div className="flex items-center px-3 border-r border-gray-200 dark:border-white/10 shrink-0">
-                                                                              <span className="text-sm font-bold text-blue-600 dark:text-blue-400">等于</span>
+                                                                              <span className="text-sm font-semibold text-gray-400 dark:text-gray-500">等于</span>
                                                                           </div>
 
                                                                           <div className="flex-1 px-3 py-2 min-h-[40px] flex items-center">
@@ -1558,7 +1567,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                                                       className="p-1 rounded-md text-gray-300 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
                                                                                       title="解除此分组"
                                                                                   >
-                                                                                      <span className="text-[10px] font-extrabold leading-none">( )</span>
+                                                                                      <span className="text-xs font-extrabold leading-none">( )</span>
                                                                                   </button>
                                                                               )}
                                                                               <button
@@ -1577,29 +1586,29 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                                   ) : (
                                                       <div className="text-center py-8 text-gray-400 dark:text-gray-500">
                                                           <Database className="w-8 h-8 mx-auto mb-2 text-gray-300 dark:text-gray-600"/>
-                                                          <p className="text-xs italic">尚未添加过滤条件，点击下方按钮添加。</p>
-                                                          <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-1">未添加条件时，默认可见所有{resourceConfig.find(r => r.id === selectedResource)?.label}。</p>
+                                                          <p className="text-sm italic">尚未添加过滤条件，点击下方按钮添加。</p>
+                                                          <p className="text-xs text-gray-300 dark:text-gray-600 mt-1">未添加条件时，默认可见所有{resourceConfig.find(r => r.id === selectedResource)?.label}。</p>
                                                       </div>
                                                   )}
 
                                                   <div className="flex items-center gap-2 pt-3">
-                                                      <button
-                                                          onClick={() => addCondition()}
-                                                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-dashed border-blue-300 dark:border-blue-600 text-sm font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-400 dark:hover:border-blue-500 transition-all flex-1 justify-center"
-                                                      >
-                                                          <Plus className="w-4 h-4"/>
-                                                          添加条件
-                                                      </button>
-                                                      {resourceRules.length >= 2 && !groupSelectMode && (
-                                                          <button
-                                                              onClick={() => { setGroupSelectMode(true); setGroupSelectRules([]); }}
-                                                              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border-2 border-dashed border-indigo-300 dark:border-indigo-600 text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-400 dark:hover:border-indigo-500 transition-all shrink-0"
-                                                          >
-                                                              <span className="text-base leading-none font-mono">(</span>
-                                                              添加分组
-                                                              <span className="text-base leading-none font-mono">)</span>
-                                                          </button>
-                                                      )}
+                                                                      <button
+                                                                          onClick={() => addCondition()}
+                                                                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-dashed border-blue-300 dark:border-blue-600 text-sm font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-400 dark:hover:border-blue-500 transition-all flex-1 justify-center"
+                                                                      >
+                                                                          <Plus className="w-4 h-4"/>
+                                                                          添加条件
+                                                                      </button>
+                                                                      {resourceRules.length >= 2 && !groupSelectMode && (
+                                                                          <button
+                                                                              onClick={() => { setGroupSelectMode(true); setGroupSelectRules([]); }}
+                                                                              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border-2 border-dashed border-indigo-300 dark:border-indigo-600 text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-400 dark:hover:border-indigo-500 transition-all shrink-0"
+                                                                          >
+                                                                              <span className="text-base leading-none font-mono">(</span>
+                                                                              添加分组
+                                                                              <span className="text-base leading-none font-mono">)</span>
+                                                                          </button>
+                                                                      )}
                                                   </div>
                                                   {groupSelectMode && (
                                                       <div className="mt-2 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-900/15 border border-indigo-200 dark:border-indigo-700/40">
@@ -1975,7 +1984,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                           <span className="text-xs font-bold text-gray-500 dark:text-gray-400">基础范围：</span>
                                           {(roleForm.rowPermissions && roleForm.rowPermissions.length > 0) ? (
                                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-700/30">
-                                                  自定义维度过滤
+                                                  自定义维度规则
                                               </span>
                                           ) : (
                                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-700/30">
@@ -1983,7 +1992,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                               </span>
                                           )}
                                           <span className="text-xs text-gray-400">
-                                              {(roleForm.rowPermissions && roleForm.rowPermissions.length > 0) ? '按维度过滤可见数据' : '可见所有数据'}
+                                              {(roleForm.rowPermissions && roleForm.rowPermissions.length > 0) ? '按维度规则过滤可见数据' : '可见所有数据'}
                                           </span>
                                       </div>
                                       {(roleForm.rowPermissions && roleForm.rowPermissions.length > 0) ? (
@@ -2128,7 +2137,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[500] p-4 animate-fade-in">
               <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-lg flex flex-col animate-modal-enter border-white/10">
                   <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5">
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">{editingId ? '编辑用户' : '新增用户'}</h3>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">新增用户</h3>
                       <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5"/></button>
                   </div>
                   <div className="p-6 space-y-4">
@@ -2178,7 +2187,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                   </div>
                   <div className="p-6 bg-gray-50 dark:bg-white/5 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
                       <button onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition text-sm font-medium">取消</button>
-                      <button onClick={handleSaveUser} className="unified-button-primary bg-[#0071E3] dark:bg-[#FF2D55] hover: shadow-apple">保存</button>
+                      <button onClick={handleSaveUser} className="px-5 py-2.5 bg-[#0071E3] text-white rounded-full text-sm font-medium hover:bg-[#0062CC] transition shadow-sm">保存</button>
                   </div>
               </div>
           </div>
@@ -2188,198 +2197,215 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
 
       {/* User Details Drawer */}
       {isDrawerOpen && detailsUser && (
-
-        <ModalPortal>
-        <div className="fixed inset-0 z-[500] flex justify-end">
-            <div className={`absolute inset-0 bg-black/20 backdrop-blur-sm ${isDrawerClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={closeDrawer}></div>
-            <div className={`relative w-full max-w-md h-full bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col border-l border-white/10 ${isDrawerClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
-                 <div className="flex-1 overflow-y-auto">
-                    {/* Header */}
-                    <div className="p-6 pb-8 bg-gradient-to-b from-gray-50 to-white dark:from-white/5 dark:to-[#1C1C1E] border-b border-gray-100 dark:border-white/10">
-                        <div className="flex justify-between items-start mb-6">
-                            <button onClick={closeDrawer} className="p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition text-gray-500 dark:text-gray-400">
-                                <X className="w-5 h-5" />
-                            </button>
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${detailsUser.status === 'Active' ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-white/10 dark:text-gray-400 dark:border-white/10'}`}>
-                                {detailsUser.status}
-                            </span>
-                        </div>
-                        <div className="flex flex-col items-center text-center">
-                            <div className="relative w-24 h-24 rounded-full p-1 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/10 shadow-lg mb-4">
-                                <img src={detailsUser.avatar} className="w-full h-full rounded-full object-cover" alt={detailsUser.name} />
-                                {detailsUser.monthBadge && (
-                                    <span className="absolute bottom-0 right-0 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-pink-500 rounded-full shadow ring-2 ring-white dark:ring-[#2C2C2E]">{detailsUser.monthBadge}</span>
-                                )}
-                            </div>
-                            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">{detailsUser.name}</h2>
-                            <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                                <Mail className="w-3.5 h-3.5" /> {detailsUser.email}
-                            </div>
-                            {detailsUser.phone && (
-                                <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-1">
-                                    <Phone className="w-3.5 h-3.5" /> {detailsUser.phone}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Body */}
-                    <div className="p-6 space-y-8">
-                        {/* Basic Info */}
-                        <div>
-                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                <UserIcon className="w-4 h-4" /> 基础信息
-                            </h3>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5">
-                                    <div className="text-[10px] text-gray-400 uppercase mb-1">账号 ID</div>
-                                    <div className="font-mono text-sm font-bold text-gray-700 dark:text-gray-200">{detailsUser.accountId}</div>
-                                </div>
-                                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5">
-                                    <div className="text-[10px] text-gray-400 uppercase mb-1">人员类型</div>
-                                    <div className="text-sm font-bold text-gray-700 dark:text-gray-200">{detailsUser.userType === 'Internal' ? '内部员工' : '外部协作'}</div>
-                                </div>
-                                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5 col-span-2">
-                                    <div className="text-[10px] text-gray-400 uppercase mb-1">手机号</div>
-                                    <div className="text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center gap-1.5">
-                                        <Phone className="w-3.5 h-3.5 text-green-500" />
-                                        {detailsUser.phone || <span className="text-gray-400 font-normal italic">未填写</span>}
-                                    </div>
-                                </div>
-                                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5 col-span-2">
-                                    <div className="text-[10px] text-gray-400 uppercase mb-1">所属部门</div>
-                                    <div className="text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2">
-                                        <Building2 className="w-4 h-4 text-indigo-500" />
-                                        {departments.find(d => d.id === detailsUser.departmentId)?.name || '未分配部门'}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Permissions */}
-                        <div>
-                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                <Shield className="w-4 h-4" /> 角色权限
-                            </h3>
-                            <div className="bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden">
-                                <div className="p-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5">
-                                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">当前角色</div>
-                                    <div className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                        <Briefcase className="w-4 h-4 text-blue-500" />
-                                        {roles.find(r => r.id === detailsUser.role)?.name || detailsUser.role}
-                                    </div>
-                                    <div className="text-xs text-gray-400 mt-1">
-                                        {roles.find(r => r.id === detailsUser.role)?.description}
-                                    </div>
-                                </div>
-                                <div className="p-4 bg-white dark:bg-transparent">
-                                    <div className="text-[10px] text-gray-400 uppercase font-bold mb-3">拥有的功能权限</div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {roles.find(r => r.id === detailsUser.role)?.permissions.map(permId => {
-                                            const permLabel = permissionModules.flatMap(m => m.permissions).find(p => p.id === permId)?.label || permId;
-                                            return (
-                                                <span key={permId} className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-medium border border-blue-100 dark:border-blue-900/30 flex items-center gap-1">
-                                                    <CheckCircle className="w-3 h-3" /> {permLabel}
-                                                </span>
-                                            );
-                                        })}
-                                        {(!roles.find(r => r.id === detailsUser.role)?.permissions.length) && (
-                                            <span className="text-gray-400 text-xs italic">无特殊功能权限</span>
-                                        )}
-                                    </div>
-                                </div>
-                                
-                                <div className="p-4 bg-gray-50 dark:bg-black/20 border-t border-gray-100 dark:border-white/10">
-                                    <div className="text-[10px] text-gray-400 uppercase font-bold mb-3 flex items-center gap-1"><Database className="w-3 h-3"/> 数据行权限</div>
-                                    {(() => {
-                                        const userRole = roles.find(r => r.id === detailsUser.role);
-                                        const hasRules = (userRole?.rowPermissions?.length ?? 0) > 0;
-                                        return (
-                                            <div className="mb-2 flex items-center gap-1.5">
-                                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${hasRules ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'}`}>
-                                                    {hasRules ? '自定义' : '全部'}
-                                                </span>
-                                            </div>
-                                        );
-                                    })()}
-                                    <div className="space-y-2">
-                                        {(() => {
-                                            const userRole = roles.find(r => r.id === detailsUser.role);
-                                            const allRules = userRole?.rowPermissions || [];
-                                            if (allRules.length === 0) return <span className="text-xs text-gray-400 italic">默认可见所有数据行</span>;
-                                            return resourceConfig.map(res => {
-                                                const resRules = allRules.filter(r => r.resource === res.id);
-                                                if (resRules.length === 0) return null;
-                                                return (
-                                                    <div key={res.id} className="p-2 bg-white dark:bg-[#2C2C2E] rounded border border-gray-200 dark:border-white/10 text-xs">
-                                                        <div className="font-bold text-gray-700 dark:text-gray-300 mb-1.5">{res.label}</div>
-                                                        <div className="space-y-1">
-                                                            {resRules.map((rule, ri) => {
-                                                                const dimLabel = res.dimensions.find(d => d.id === rule.dimension)?.label || rule.dimension;
-                                                                return (
-                                                                    <div key={rule.id} className="flex items-center gap-1.5 flex-wrap">
-                                                                        {ri > 0 && (
-                                                                            <span className={`text-[9px] font-extrabold ${getDimOperator(res.id, rule.id) === 'OR' ? 'text-amber-500' : 'text-blue-500'}`}>
-                                                                                {getDimOperator(res.id, rule.id)}
-                                                                            </span>
-                                                                        )}
-                                                                        <span className="font-medium text-gray-500 dark:text-gray-400">{dimLabel}</span>
-                                                                        <span className="font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">等于</span>
-                                                                        {rule.values.map(v => (
-                                                                            <span key={v} className="px-1.5 py-0.5 bg-gray-100 dark:bg-white/10 rounded text-gray-600 dark:text-gray-400">{getReadableValue(rule.dimension, v)}</span>
-                                                                        ))}
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            });
-                                        })()}
-                                    </div>
-                                </div>
-
-                                <div className="p-4 bg-white dark:bg-transparent border-t border-gray-100 dark:border-white/10">
-                                    <div className="text-[10px] text-gray-400 uppercase font-bold mb-3 flex items-center gap-1"><Columns className="w-3 h-3"/> 数据列权限</div>
-                                    <div className="space-y-2">
-                                        {roles.find(r => r.id === detailsUser.role)?.columnPermissions?.map((rule, idx) => {
-                                            const resConfig = columnConfig.find(res => res.id === rule.resource);
-                                            const resLabel = resConfig?.label || rule.resource;
-                                            return (
-                                                <div key={idx} className="p-2 bg-gray-50 dark:bg-white/5 rounded border border-gray-200 dark:border-white/10 text-xs">
-                                                    <div className="font-bold text-gray-700 dark:text-gray-300 mb-1">{resLabel}</div>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {rule.allowedColumns.map(colId => {
-                                                            const colLabel = resConfig?.columns.find(c => c.id === colId)?.label || colId;
-                                                            return (
-                                                                <span key={colId} className="px-1.5 py-0.5 bg-white dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded text-gray-600 dark:text-gray-400">{colLabel}</span>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                        {(!roles.find(r => r.id === detailsUser.role)?.columnPermissions || roles.find(r => r.id === detailsUser.role)?.columnPermissions?.length === 0) && (
-                                            <span className="text-xs text-gray-400 italic">默认可见所有基础列</span>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                 </div>
-                 
-                 {/* Footer Actions */}
-                 <div className="p-4 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex gap-3">
-                    <button onClick={() => { closeDrawer(); handleOpenModal(detailsUser); }} className="flex-1 py-2.5 bg-black dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm hover:opacity-80 transition flex items-center justify-center gap-2">
-                        <Edit className="w-4 h-4" /> 编辑用户
-                    </button>
-                 </div>
-            </div>
-        </div>
-        </ModalPortal>
-
+        <UserDetailPanel
+          user={detailsUser}
+          isClosing={isDrawerClosing}
+          onClose={closeDrawer}
+          roles={roles}
+          departments={departments}
+          users={users}
+          onEmployeeCard={() => setIsEmployeeCardOpen(true)}
+          onSave={(updated) => {
+            setUsers(prev => prev.map(u => u.id === detailsUser.id ? { ...u, ...updated } as User : u));
+            setDetailsUser(prev => prev ? { ...prev, ...updated } as User : prev);
+          }}
+        />
       )}
+
+      {/* Employee Card Modal */}
+      {isEmployeeCardOpen && detailsUser && (() => {
+        const dept = departments.find(d => d.id === detailsUser.departmentId);
+        const roleDef = roles.find(r => r.id === detailsUser.role);
+        const getDeptPath = (deptId?: string): string => {
+          if (!deptId) return '—';
+          const parts: string[] = [];
+          let cur = deptId;
+          while (cur) {
+            const d = departments.find(dd => dd.id === cur);
+            if (!d) break;
+            parts.unshift(d.name);
+            cur = d.parentId || '';
+          }
+          return parts.join('/') || '—';
+        };
+
+        const seed = detailsUser.accountId ? parseInt(detailsUser.accountId, 10) : 55005;
+        const entryYear = 2020 + (seed % 6);
+        const entryMonth = ((seed % 12) + 1).toString().padStart(2, '0');
+        const entryDay = ((seed % 28) + 1).toString().padStart(2, '0');
+        const entryDate = `${entryYear}-${entryMonth}-${entryDay}`;
+        const confirmDate = `${entryYear + 1}-${entryMonth}-${entryDay}`;
+        const seniority = new Date().getFullYear() - entryYear;
+
+        const positionMap: Record<string, string> = {
+          Admin: '系统管理员', Sales: '销售经理', Business: '商务经理', Technical: '技术工程师',
+          FinanceManager: '财务经理', ProductManager: '产品经理', SalesRep: '销售代表', ChannelManager: '渠道经理',
+          'sales-rep': '销售代表', 'finance-mgr': '财务经理', 'product-mgr': '产品经理', 'channel-mgr': '渠道经理',
+        };
+        const position = positionMap[detailsUser.role] || roleDef?.name || '员工';
+
+        const levelMap: Record<string, string> = {
+          Admin: 'P8', Sales: 'P7', Business: 'P6', Technical: 'P7',
+          FinanceManager: 'P7', ProductManager: 'P7', SalesRep: 'P5', ChannelManager: 'P6',
+        };
+        const level = levelMap[detailsUser.role] || `P${5 + (seed % 4)}`;
+
+        const sequenceMap: Record<string, string> = {
+          Admin: '管理 - 综合', Sales: '销售 - 直销', Business: '商务 - 运营', Technical: '产研 - 研发',
+          FinanceManager: '职能 - 财务', ProductManager: '产研 - 产品', SalesRep: '销售 - 直销', ChannelManager: '销售 - 渠道',
+        };
+        const sequence = sequenceMap[detailsUser.role] || '产研 - 产品';
+
+        const cities = ['北京市', '珠海市', '武汉市', '长沙市', '成都市', '上海市', '深圳市'];
+        const city = cities[seed % cities.length];
+
+        const companies = ['珠海金山办公软件股份有限公司', '北京金山办公软件有限公司', '武汉金山办公软件有限公司'];
+        const company = companies[seed % companies.length];
+
+        const hrbps = ['李红梅', '王丽华', '张晓敏', '刘芳', '陈雪'];
+        const hrbp = hrbps[seed % hrbps.length];
+
+        const supervisors = users.filter(u => u.id !== detailsUser.id && u.departmentId === detailsUser.departmentId);
+        const supervisor = supervisors.length > 0 ? supervisors[seed % supervisors.length]?.name : '—';
+
+        const jobRecords = [
+          { date: `${new Date().getFullYear()}-03-01`, reason: '调动 - 公司内部调动', category: '正式员工-社招', seq: sequence, pos: `${position} ${level}`, deptName: getDeptPath(detailsUser.departmentId) },
+          { date: `${entryYear + 1}-03-01`, reason: `调动 - 批量调岗 - ${entryYear + 1}年组织架构调整`, category: '正式员工-社招', seq: sequence, pos: `${position} ${level}`, deptName: dept?.name ? `业务委员会/营销管理中心/${dept.name}` : '—' },
+          { date: confirmDate, reason: '转正', category: '正式员工-社招', seq: sequence, pos: `${position} ${level}`, deptName: dept?.name ? `${dept.name}/数据管理组` : '—' },
+        ];
+
+        return (
+          <ModalPortal>
+          <div className="fixed inset-0 z-[600] flex items-center justify-center p-4" onClick={() => setIsEmployeeCardOpen(false)}>
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in" />
+            <div
+              className="relative bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col border border-gray-200 dark:border-white/10"
+              onClick={e => e.stopPropagation()}
+              style={{ animation: 'empCardIn 0.35s cubic-bezier(0.16,1,0.3,1)' }}
+            >
+              {/* Card Header — blue banner */}
+              <div className="bg-gradient-to-r from-[#2563EB] to-[#3B82F6] px-6 pt-6 pb-16 relative">
+                <button onClick={() => setIsEmployeeCardOpen(false)} className="absolute top-4 right-4 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Profile section overlapping banner */}
+              <div className="px-6 -mt-12 flex items-end gap-5 relative z-10">
+                <div className="w-[88px] h-[88px] rounded-2xl border-4 border-white dark:border-[#1C1C1E] shadow-lg overflow-hidden bg-gray-100 shrink-0">
+                  <img src={detailsUser.avatar} alt={detailsUser.name} className="w-full h-full object-cover" />
+                </div>
+                <div className="pb-1 min-w-0">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">{detailsUser.name}</h2>
+                  <div className="flex items-center gap-2 flex-wrap mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <span>{position} {level}</span>
+                    <span className="text-gray-300">|</span>
+                    <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{city}</span>
+                    <span className="text-gray-300">|</span>
+                    <span>{detailsUser.userType === 'Internal' ? '正式员工' : '外部协作'}</span>
+                    <span className="text-gray-300">|</span>
+                    <span className="text-[#2563EB]">{detailsUser.email}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Scrollable body */}
+              <div className="flex-1 overflow-y-auto px-6 pb-6 pt-6 space-y-6">
+
+                {/* 基本信息 */}
+                <section>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-white/10">基本信息</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                    {[
+                      { label: '员工号', value: detailsUser.accountId },
+                      { label: '人员类别', value: detailsUser.userType === 'Internal' ? '正式员工-社招' : '外部协作' },
+                      { label: '部门全路径', value: getDeptPath(detailsUser.departmentId), colSpan: true },
+                      { label: '族群序列', value: sequence },
+                      { label: '岗位', value: `${position} ${level}` },
+                      { label: '实际工作地', value: city },
+                      { label: '公司', value: company, colSpan: true },
+                      { label: '直接上级', value: supervisor, highlight: true },
+                      { label: 'HRBP', value: hrbp, highlight: true },
+                    ].map((f, i) => (
+                      <div
+                        key={i}
+                        className={`flex items-start gap-3 py-1.5 ${f.colSpan ? 'md:col-span-2' : ''}`}
+                      >
+                        <div className="w-28 shrink-0 text-xs text-gray-400 dark:text-gray-500 pt-0.5">{f.label}</div>
+                        <div className={`flex-1 min-w-0 text-sm font-medium break-words ${f.highlight ? 'text-[#2563EB] dark:text-blue-400' : 'text-gray-800 dark:text-gray-200'}`}>
+                          {f.value || '—'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                {/* 入职信息 */}
+                <section>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-white/10">入职信息</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                    {[
+                      { label: '入职日期', value: entryDate },
+                      { label: '首次加入日期', value: entryDate },
+                      { label: '是否二次入职', value: seed % 5 === 0 ? '是' : '否' },
+                      { label: '司龄（年）', value: String(seniority) },
+                      { label: '是否转正', value: '是' },
+                      { label: '转正日期', value: confirmDate },
+                    ].map((f, i) => (
+                      <div key={i} className="flex items-start gap-3 py-1.5">
+                        <div className="w-28 shrink-0 text-xs text-gray-400 dark:text-gray-500 pt-0.5">{f.label}</div>
+                        <div className="flex-1 min-w-0 text-sm font-medium text-gray-800 dark:text-gray-200 break-words">
+                          {f.value || '—'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                {/* 任职记录 */}
+                <section>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-white/10">任职记录</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead>
+                        <tr className="border-b border-gray-200 dark:border-white/10 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          <th className="py-2.5 pr-4 font-semibold whitespace-nowrap">开始日期</th>
+                          <th className="py-2.5 pr-4 font-semibold whitespace-nowrap">变动原因</th>
+                          <th className="py-2.5 pr-4 font-semibold whitespace-nowrap">员工类别</th>
+                          <th className="py-2.5 pr-4 font-semibold whitespace-nowrap">族群序列</th>
+                          <th className="py-2.5 pr-4 font-semibold whitespace-nowrap">岗位</th>
+                          <th className="py-2.5 font-semibold whitespace-nowrap">部门</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                        {jobRecords.map((rec, i) => (
+                          <tr key={i} className="text-gray-700 dark:text-gray-300">
+                            <td className="py-2.5 pr-4 font-mono text-gray-500 whitespace-nowrap">{rec.date}</td>
+                            <td className="py-2.5 pr-4 whitespace-nowrap">{rec.reason}</td>
+                            <td className="py-2.5 pr-4 whitespace-nowrap">{rec.category}</td>
+                            <td className="py-2.5 pr-4 whitespace-nowrap">{rec.seq}</td>
+                            <td className="py-2.5 pr-4 whitespace-nowrap">{rec.pos}</td>
+                            <td className="py-2.5 max-w-[260px] truncate" title={rec.deptName}>{rec.deptName}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+
+          <style>{`
+            @keyframes empCardIn {
+              from { opacity: 0; transform: scale(0.92) translateY(20px); }
+              to { opacity: 1; transform: scale(1) translateY(0); }
+            }
+          `}</style>
+          </ModalPortal>
+        );
+      })()}
+
       {/* Add User to Role Modal */}
       {isAddUserModalOpen && (
 
