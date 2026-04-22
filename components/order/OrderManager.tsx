@@ -11,7 +11,8 @@ import StatusFilterCard from './StatusFilterCard';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import ColumnConfigModal from './ColumnConfigModal';
 import UserDetailPanel from '../common/UserDetailPanel';
-import { useAppContext } from '../../contexts/AppContext';
+import { useAppContext, useEnsureData } from '../../contexts/AppContext';
+import Pagination from '../common/Pagination';
 
 type FilterMode = '单选' | '多选' | '时间段' | '时间点' | '金额范围';
 
@@ -76,6 +77,7 @@ const paymentMethodMap: Record<string, string> = {
 
 const OrderManager: React.FC = () => {
   const { orders, setOrders, products, customers, filteredOrders: ctxFilteredOrders, currentUser, users, departments, opportunities, channels, roles, standaloneEnterprises, orderDrafts, setOrderDrafts, apiMode, refreshOrders } = useAppContext();
+  useEnsureData(['orders', 'customers', 'opportunities']);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -452,9 +454,9 @@ const OrderManager: React.FC = () => {
     
     // Handle sub-status filtering for PROCESSING_PROD
     if (filterStatus === 'STOCK_AUTH') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && !order.isAuthConfirmed;
-    if (filterStatus === 'STOCK_PKG') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && order.isAuthConfirmed && !order.isPackageConfirmed;
-    if (filterStatus === 'STOCK_SHIP') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && order.isPackageConfirmed && !order.isShippingConfirmed;
-    if (filterStatus === 'STOCK_CD') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && order.isShippingConfirmed && !order.isCDBurned;
+    if (filterStatus === 'STOCK_PKG') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && !!order.isAuthConfirmed && !order.isPackageConfirmed;
+    if (filterStatus === 'STOCK_SHIP') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && !!order.isPackageConfirmed && !order.isShippingConfirmed;
+    if (filterStatus === 'STOCK_CD') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && !!order.isShippingConfirmed && !order.isCDBurned;
 
     const searchLower = searchTerm.toLowerCase();
     const safeItems = order.items || [];
@@ -749,7 +751,7 @@ const OrderManager: React.FC = () => {
   const currentSearchOption = searchFieldOptions.find(o => o.value === searchField)!;
 
   const colWidthMap: Record<string, number> = {
-      id: 200, customer: 175, buyer: 165, products: 285,
+      id: 260, customer: 175, buyer: 165, products: 285,
       sales: 120, businessManager: 120, department: 190,
       source: 100, buyerType: 100, date: 150, status: 90,
       paymentStatus: 95, stockStatus: 90, total: 125,
@@ -1026,7 +1028,7 @@ const OrderManager: React.FC = () => {
                     switch (colId) {
                       case 'id':
                         return (
-                          <td key={colId} className={`px-3 py-2.5 whitespace-nowrap sticky left-[52px] z-20 ${stickyBg} shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors align-middle`}>
+                          <td key={colId} className={`px-3 py-2 sticky left-[52px] z-20 ${stickyBg} shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors align-middle`}>
                               <div className="relative">
                                   <span
                                       className={`text-sm font-semibold cursor-pointer hover:underline ${order.status === OrderStatus.DRAFT ? 'text-amber-500 dark:text-amber-400' : 'text-[#0071E3] dark:text-[#FF2D55]'}`}
@@ -1037,13 +1039,30 @@ const OrderManager: React.FC = () => {
                                   </span>
                                   <button
                                       onClick={(e) => handleCopyOrderId(e, order.id)}
-                                      className="absolute left-0 top-full mt-px opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-white/10 text-gray-300 hover:text-gray-500 dark:hover:text-gray-300 transition-all"
+                                      className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-white/10 text-gray-300 hover:text-gray-500 dark:hover:text-gray-300 transition-all"
                                       title="复制订单编号"
                                   >
                                       {copiedOrderId === order.id
                                           ? <Check className="w-3 h-3 text-green-500" />
                                           : <Copy className="w-3 h-3" />}
                                   </button>
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                  <span className="group/tip relative">
+                                    {order.buyerType === 'Channel'    && <span className="unified-tag-indigo">{buyerTypeMap['Channel']}</span>}
+                                    {order.buyerType === 'SelfDeal'   && <span className="unified-tag-orange">{buyerTypeMap['SelfDeal']}</span>}
+                                    {order.buyerType === 'RedeemCode' && <span className="unified-tag-purple">{buyerTypeMap['RedeemCode']}</span>}
+                                    {(order.buyerType === 'Customer' || !order.buyerType) && <span className="unified-tag-blue">{buyerTypeMap[order.buyerType || 'Customer']}</span>}
+                                    <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-7 px-1.5 py-0.5 rounded bg-gray-800 dark:bg-gray-700 text-[10px] text-white whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity z-30">订单类型</span>
+                                  </span>
+                                  <span className="group/tip relative">
+                                    {getStatusBadge(order.status)}
+                                    <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-7 px-1.5 py-0.5 rounded bg-gray-800 dark:bg-gray-700 text-[10px] text-white whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity z-30">订单状态</span>
+                                  </span>
+                                  <span className="group/tip relative text-xs font-semibold text-red-600 dark:text-red-400 whitespace-nowrap ml-auto" style={{fontVariantNumeric:'tabular-nums'}}>
+                                    ¥{(order.total ?? 0).toLocaleString()}
+                                    <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-7 px-1.5 py-0.5 rounded bg-gray-800 dark:bg-gray-700 text-[10px] text-white font-normal whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity z-30">订单应付金额</span>
+                                  </span>
                               </div>
                           </td>
                         );
@@ -1322,26 +1341,16 @@ const OrderManager: React.FC = () => {
                     {tableCopied ? '已复制' : '复制表格'}
                 </button>
             </div>
-            <div className="flex items-center gap-3">
-                {/* 每页条数下拉 */}
-                <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">每页</span>
-                    <select
-                        value={itemsPerPage}
-                        onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                        className="unified-card h-7 pl-2 pr-6 text-xs font-medium text-gray-700 dark:text-gray-200 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 outline-none appearance-none cursor-pointer hover:-[#0071E3]/50 transition"
-                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
-                    >
-                        {[20, 50, 100].map(n => <option key={n} value={n}>{n} 条</option>)}
-                    </select>
-                </div>
-                {/* 页码信息 + 翻页 */}
-                <span className="text-xs text-gray-400 dark:text-gray-500">第 {currentPage} / {totalPages} 页</span>
-                <div className="flex items-center gap-1.5">
-                    <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1} className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium transition disabled:cursor-not-allowed">上一页</button>
-                    <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages} className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium transition disabled:cursor-not-allowed">下一页</button>
-                </div>
-            </div>
+            <Pagination
+                page={safePage}
+                size={itemsPerPage}
+                total={filteredOrders.length}
+                onPageChange={setCurrentPage}
+                onSizeChange={(s) => { setItemsPerPage(s); setCurrentPage(1); }}
+                sizeOptions={[20, 50, 100]}
+                showJumper
+                className="!py-0"
+            />
         </div>
       </div>
     </div>

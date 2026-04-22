@@ -12,6 +12,7 @@ import productRoutes from './routes/products.ts';
 import financeRoutes from './routes/finance.ts';
 import channelRoutes from './routes/channels.ts';
 import opportunityRoutes from './routes/opportunities.ts';
+import spacesRoutes from './routes/spaces.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '4567');
@@ -53,6 +54,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/channels', channelRoutes);
 app.use('/api/opportunities', opportunityRoutes);
+app.use('/api/spaces', spacesRoutes);
 
 app.use(((err: any, _req: any, res: any, _next: any) => {
   console.error(`[error] ${err.message}`);

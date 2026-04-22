@@ -5,7 +5,7 @@ import { ArrowLeft, Building2, Phone, Mail, CreditCard, Building, Users, Plus, X
 import type { Subscription, SubscriptionLineProductSnapshot, SubscriptionStatus, PurchaseNature } from '../../types';
 import { CustomerContact, ContactRole } from '../../types';
 import ModalPortal from '../common/ModalPortal';
-import { useAppContext } from '../../contexts/AppContext';
+import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 import { SubscriptionOrderChain } from '../common/SubscriptionOrderChain';
 import {
   subscriptionRollupEndDate,
@@ -46,6 +46,7 @@ function renderSubscriptionCountdown(endDate: string) {
 
 const CustomerDetails: React.FC = () => {
   const { customers, setCustomers, filteredCustomers, users, currentUser, subscriptions } = useAppContext();
+  useEnsureData(['customers', 'orders']);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -133,6 +134,7 @@ const CustomerDetails: React.FC = () => {
   const [linkEnterpriseId, setLinkEnterpriseId] = useState('');
   const [linkEnterpriseName, setLinkEnterpriseName] = useState('');
   const handleLinkEnterprise = () => {
+      if (!customer) return;
       if (!linkEnterpriseId.trim()) return;
       const today = new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(/\//g, '-');
       const newEnt = { id: linkEnterpriseId.trim(), name: linkEnterpriseName.trim() || linkEnterpriseId.trim(), createdAt: today, source: '渠道人员创建' as const };
@@ -147,6 +149,7 @@ const CustomerDetails: React.FC = () => {
   const emptyEnt = { name: '', industry: '', province: '', contact: '', phone: '' };
   const [createEntForm, setCreateEntForm] = useState(emptyEnt);
   const handleCreateEnterprise = () => {
+      if (!customer) return;
       if (!createEntForm.name.trim()) return;
       const newId = (600000000 + Math.floor(Math.random() * 999999)).toString();
       const today = new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(/\//g, '-');
@@ -162,6 +165,7 @@ const CustomerDetails: React.FC = () => {
   const emptyInvoice = { invoiceType: '增值税专用发票' as '增值税普通发票' | '增值税专用发票', title: customer?.companyName || '', taxId: '', registerAddress: '', registerPhone: '', accountNumber: '', bankName: '' };
   const [invoiceForm, setInvoiceForm] = useState(emptyInvoice);
   const handleSaveInvoice = () => {
+      if (!customer) return;
       setInvoiceFormTouched(true);
       const { taxId, registerAddress, registerPhone, accountNumber, bankName } = invoiceForm;
       if (!taxId || !registerAddress || !registerPhone || !accountNumber || !bankName) return;
@@ -231,6 +235,7 @@ const CustomerDetails: React.FC = () => {
       setIsContactModalOpen(true);
   };
   const handleSaveContact = () => {
+      if (!customer) return;
       if (!contactForm.name || !contactForm.phone || !contactForm.email || contactForm.roles.length === 0) return;
       let contacts = [...customer.contacts];
       if (isEditingContact) {

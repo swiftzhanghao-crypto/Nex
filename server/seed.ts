@@ -5,6 +5,7 @@ import {
   initialDepartments, initialRoles, initialUsers, initialChannels,
   initialStandaloneEnterprises,
 } from '../data/staticData.ts';
+import { initialSpaces, initialSpaceRoles } from '../data/spaceSeedData.ts';
 import {
   generateCustomers, generateOpportunities, generateOrders,
   generateContracts, generateRemittances, generateInvoices,
@@ -202,5 +203,39 @@ export function seedDatabase() {
       d.serviceStartDate ?? null, d.serviceEndDate ?? null);
   }
 
-  console.log(`[seed] Done. Users: ${initialUsers.length}, Customers: ${customers.length}, Orders: ${orders.length}, Products: ${initialProducts.length}, Performances: ${performances.length}, Authorizations: ${authorizations.length}, DeliveryInfos: ${deliveryInfos.length}`);
+  // --- Spaces ---
+  const insertSpace = db.prepare(`
+    INSERT INTO spaces (id, name, description, icon, perm_tree, resource_config, column_config, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const s of initialSpaces) {
+    insertSpace.run(s.id, s.name, s.description, s.icon,
+      JSON.stringify(s.permTree), JSON.stringify(s.resourceConfig), JSON.stringify(s.columnConfig),
+      s.sortOrder ?? 0);
+  }
+
+  const insertSpaceRole = db.prepare(`
+    INSERT INTO space_roles (id, space_id, name, description, permissions, row_permissions, row_logic, column_permissions, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const r of initialSpaceRoles) {
+    insertSpaceRole.run(r.id, r.spaceId, r.name, r.description,
+      JSON.stringify(r.permissions), JSON.stringify(r.rowPermissions ?? []),
+      JSON.stringify(r.rowLogic ?? {}),
+      JSON.stringify(r.columnPermissions ?? []), r.sortOrder ?? 0);
+  }
+
+  // 默认把第一个 Admin 加为 SAB 空间管理员
+  const adminUser = initialUsers.find(u => u.role === 'Admin');
+  if (adminUser && initialSpaces.length > 0) {
+    const adminRole = initialSpaceRoles.find(r => r.spaceId === initialSpaces[0].id && r.id === 'sr_sab_admin');
+    if (adminRole) {
+      db.prepare(`
+        INSERT INTO space_members (id, space_id, user_id, role_id, is_admin)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(`sm_${Date.now()}`, initialSpaces[0].id, adminUser.id, adminRole.id, 1);
+    }
+  }
+
+  console.log(`[seed] Done. Users: ${initialUsers.length}, Customers: ${customers.length}, Orders: ${orders.length}, Products: ${initialProducts.length}, Performances: ${performances.length}, Authorizations: ${authorizations.length}, DeliveryInfos: ${deliveryInfos.length}, Spaces: ${initialSpaces.length}`);
 }

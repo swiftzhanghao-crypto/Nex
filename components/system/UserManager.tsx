@@ -1,21 +1,42 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { User, UserType, RoleDefinition, PermissionDimension, RowPermissionRule, ColumnPermissionRule, PermissionResource, BaseRowPermission, Department, RowLogicConfig } from '../../types';
-import { Search, Plus, Shield, User as UserIcon, Briefcase, Truck, Edit, Building2, X, Mail, Phone, CheckCircle, Calendar, Hash, Lock, CheckSquare, Settings, Save, Trash2, Database, Check, ChevronDown, ChevronRight, Columns, Copy, Globe, GripVertical, IdCard, MapPin, Clock } from 'lucide-react';
+import { Search, Plus, Shield, User as UserIcon, Briefcase, Truck, Edit, Building2, X, Mail, Phone, CheckCircle, Calendar, Hash, Lock, CheckSquare, Settings, Save, Trash2, Database, Check, ChevronDown, ChevronRight, Columns, Copy, Globe, GripVertical, IdCard, MapPin, Clock, Box, Eye } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import UserDetailPanel from '../common/UserDetailPanel';
 import { useAppContext } from '../../contexts/AppContext';
-import { userApi } from '../../services/api';
 import { columnConfig, permissionTree, permissionModules, resourceConfig, PermSubgroup, PermGroup, PermCategory, resourceFunctionalPermMap, getRequiredPermIdsForResource, getSubgroupPermIds, getSubgroupPermItems } from './permissionConfig';
+import { useRoleDrag } from './userManager/useRoleDrag';
+import { usePermissionTreeExpansion } from './userManager/usePermissionTreeExpansion';
+import { useRowPermissionRules } from './userManager/useRowPermissionRules';
+import { useFunctionalPermissions } from './userManager/useFunctionalPermissions';
+import { useUserDrawer } from './userManager/useUserDrawer';
+import { useRowPermissionHelpers } from './userManager/useRowPermissionHelpers';
+import SpaceRoleManager from './SpaceRoleManager';
+import { spaceApi } from '../../services/api';
 
 interface UserManagerProps {
   defaultTab?: 'USERS' | 'ROLES';
 }
 
+const MAIN_SPACE_ID = '__main__';
+
 const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
-  const { users, setUsers, departments, roles, setRoles, channels } = useAppContext();
+  const { users, setUsers, departments, roles, setRoles, channels, apiMode, spaces, refreshSpaces } = useAppContext();
   const [activeTab, setActiveTab] = useState<'USERS' | 'ROLES'>(defaultTab);
+  const [activeSpaceId, setActiveSpaceId] = useState<string>(MAIN_SPACE_ID);
+  const [showCreateSpace, setShowCreateSpace] = useState(false);
+  const [newSpaceName, setNewSpaceName] = useState('');
+  const [newSpaceDesc, setNewSpaceDesc] = useState('');
+  const [creatingSpace, setCreatingSpace] = useState(false);
+
+  // User permission search state
+  const [userPermSearch, setUserPermSearch] = useState('');
+  const [showUserPermDropdown, setShowUserPermDropdown] = useState(false);
+  const [selectedPermUser, setSelectedPermUser] = useState<User | null>(null);
+  const [userPermTab, setUserPermTab] = useState<'FUNCTIONAL' | 'ROW' | 'COLUMN'>('FUNCTIONAL');
+  const userPermSearchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setActiveTab(defaultTab);
@@ -33,56 +54,27 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [roleSearchTerm, setRoleSearchTerm] = useState('');
 
-  // Role Drag Reorder State
-  const [dragRoleId, setDragRoleId] = useState<string | null>(null);
-  const [dragOverRoleId, setDragOverRoleId] = useState<string | null>(null);
+  const {
+    dragRoleId,
+    dragOverRoleId,
+    handleRoleDragStart,
+    handleRoleDragOver,
+    handleRoleDrop,
+    handleRoleDragEnd,
+  } = useRoleDrag(roles, setRoles, apiMode);
 
-  const handleRoleDragStart = (e: React.DragEvent, roleId: string) => {
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', roleId);
-      setDragRoleId(roleId);
-  };
-
-  const handleRoleDragOver = (e: React.DragEvent, roleId: string) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      if (roleId !== dragOverRoleId) setDragOverRoleId(roleId);
-  };
-
-  const handleRoleDrop = (e: React.DragEvent, targetId: string) => {
-      e.preventDefault();
-      const sourceId = e.dataTransfer.getData('text/plain');
-      if (!sourceId || sourceId === targetId) {
-          setDragRoleId(null);
-          setDragOverRoleId(null);
-          return;
-      }
-      const currentRoles = [...roles];
-      const prevRoles = [...roles];
-      const srcIdx = currentRoles.findIndex(r => r.id === sourceId);
-      const tgtIdx = currentRoles.findIndex(r => r.id === targetId);
-      if (srcIdx === -1 || tgtIdx === -1) return;
-      const [moved] = currentRoles.splice(srcIdx, 1);
-      currentRoles.splice(tgtIdx, 0, moved);
-      setRoles(currentRoles);
-      setDragRoleId(null);
-      setDragOverRoleId(null);
-      userApi.reorderRoles(currentRoles.map(r => r.id)).catch((err: any) => {
-          setRoles(prevRoles);
-          alert(err?.message || '角色排序保存失败，已恢复原顺序。');
-      });
-  };
-
-  const handleRoleDragEnd = () => {
-      setDragRoleId(null);
-      setDragOverRoleId(null);
-  };
-
-  // User Details Drawer State
-  const [detailsUser, setDetailsUser] = useState<User | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isDrawerClosing, setIsDrawerClosing] = useState(false);
-  const [isEmployeeCardOpen, setIsEmployeeCardOpen] = useState(false);
+  const {
+    detailsUser,
+    setDetailsUser,
+    isDrawerOpen,
+    setIsDrawerOpen,
+    isDrawerClosing,
+    setIsDrawerClosing,
+    isEmployeeCardOpen,
+    setIsEmployeeCardOpen,
+    handleAvatarClick,
+    closeDrawer,
+  } = useUserDrawer();
   
   // Row Permission Editor State
   const [selectedResource, setSelectedResource] = useState<PermissionResource>('Order');
@@ -150,78 +142,31 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       }
   };
 
-  const addCondition = (dim?: PermissionDimension) => {
-      const resCfg = resourceConfig.find(r => r.id === selectedResource);
-      const defaultDim = dim || resCfg?.dimensions[0]?.id || 'salesRep';
-      const newRule: RowPermissionRule = {
-          id: `rule-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          resource: selectedResource,
-          dimension: defaultDim as PermissionDimension,
-          operator: 'equals',
-          values: []
-      };
-      setRoleForm(prev => ({
-          ...prev,
-          rowPermissions: [...(prev.rowPermissions || []), newRule]
-      }));
-  };
-
-  const changeRuleDimension = (ruleId: string, newDim: PermissionDimension) => {
-      setRoleForm(prev => ({
-          ...prev,
-          rowPermissions: prev.rowPermissions?.map(r =>
-              r.id === ruleId ? { ...r, dimension: newDim, values: [] } : r
-          )
-      }));
-  };
-
-  const removeSingleRule = (ruleId: string) => {
-      setRoleForm(prev => ({
-          ...prev,
-          rowPermissions: prev.rowPermissions?.filter(r => r.id !== ruleId)
-      }));
-  };
+  // Row permission rule mutators - moved to useRowPermissionRules below
+  // (declared after roleForm state because hook requires setRoleForm)
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  const [expandedGroups,     setExpandedGroups]     = useState<string[]>(permissionTree.map(g => g.id));
-  const [expandedSubgroups,  setExpandedSubgroups]  = useState<string[]>(permissionTree.flatMap(g => g.subgroups.map(sg => sg.id)));
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(
-      permissionTree.flatMap(g => g.subgroups.flatMap(sg => (sg.categories || []).map(c => c.id)))
-  );
-  const [expandedModules, setExpandedModules] = useState<string[]>(permissionModules.map(m => m.id));
+  const {
+    expandedGroups,
+    setExpandedGroups,
+    expandedSubgroups,
+    setExpandedSubgroups,
+    expandedCategories,
+    setExpandedCategories,
+    expandedModules,
+    setExpandedModules,
+    toggleGroupExpand,
+    toggleSubgroupExpand,
+    toggleCategoryExpand,
+    allPermsInSubgroup,
+    allPermsInGroup,
+    allPermsInCategory,
+    getCheckState,
+  } = usePermissionTreeExpansion();
 
-  const toggleGroupExpand    = (id: string) => setExpandedGroups(prev    => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  const toggleSubgroupExpand = (id: string) => setExpandedSubgroups(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  const toggleCategoryExpand = (id: string) => setExpandedCategories(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-
-  const allPermsInSubgroup = (sg: PermSubgroup) => getSubgroupPermIds(sg);
-  const allPermsInGroup    = (g:  PermGroup)    => g.subgroups.flatMap(sg => getSubgroupPermIds(sg));
-  const allPermsInCategory = (cat: PermCategory) => cat.permissions.map(p => p.id);
-
-  const getCheckState = (permIds: string[], current: string[]): 'all' | 'some' | 'none' => {
-      const checked = permIds.filter(id => current.includes(id)).length;
-      if (checked === 0) return 'none';
-      if (checked === permIds.length) return 'all';
-      return 'some';
-  };
-
-  const toggleSubgroupPerms = (sg: PermSubgroup) => {
-      const ids = allPermsInSubgroup(sg);
-      const current = roleForm.permissions || [];
-      const state = getCheckState(ids, current);
-      if (state === 'all') setRoleForm({ ...roleForm, permissions: current.filter(p => !ids.includes(p)) });
-      else                 setRoleForm({ ...roleForm, permissions: Array.from(new Set([...current, ...ids])) });
-  };
-
-  const toggleCategoryPerms = (cat: PermCategory) => {
-      const ids = allPermsInCategory(cat);
-      const current = roleForm.permissions || [];
-      const state = getCheckState(ids, current);
-      if (state === 'all') setRoleForm({ ...roleForm, permissions: current.filter(p => !ids.includes(p)) });
-      else                 setRoleForm({ ...roleForm, permissions: Array.from(new Set([...current, ...ids])) });
-  };
+  // toggleSubgroupPerms / toggleCategoryPerms moved into useFunctionalPermissions below
 
   // Forms
   const [userForm, setUserForm] = useState<Partial<User>>({
@@ -241,6 +186,21 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       rowPermissions: [],
       rowLogic: {}
   });
+
+  const {
+    addCondition,
+    changeRuleDimension,
+    removeSingleRule,
+    handleDeleteRowRule,
+    updateRuleValues,
+    setRuleSingleValue: setRuleSingleValueRaw,
+    clearRuleValue,
+    toggleRuleValue,
+    updateRuleOperator,
+    toggleDimOperator,
+    createRuleGroup: createRuleGroupRaw,
+    removeDimGroup,
+  } = useRowPermissionRules(selectedResource, setRoleForm);
 
   // Auto-select first role when switching to ROLES tab
   useEffect(() => {
@@ -294,9 +254,9 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
           setUsers(prev => prev.map(u => u.id === editingId ? { ...u, ...userForm } as User : u));
       } else { 
           const newUser: User = { 
+              ...(userForm as User), 
               id: `u-${Date.now()}`,
               accountId: generateAccountId(), 
-              ...userForm as User, 
               avatar: userForm.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${userForm.name}` 
           }; 
           setUsers(prev => [...prev, newUser]); 
@@ -304,20 +264,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       setIsModalOpen(false);
   };
 
-  const handleAvatarClick = (e: React.MouseEvent, user: User) => {
-      e.stopPropagation();
-      setDetailsUser(user);
-      setIsDrawerOpen(true);
-  };
-
-  const closeDrawer = () => {
-      setIsDrawerClosing(true);
-      setTimeout(() => {
-          setIsDrawerOpen(false);
-          setDetailsUser(null);
-          setIsDrawerClosing(false);
-      }, 280);
-  };
+  // handleAvatarClick / closeDrawer moved into useUserDrawer above
 
   // --- Role Handlers ---
   const handleSelectRole = (role: RoleDefinition) => {
@@ -339,9 +286,9 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       } else {
           const newId = `role-${Date.now()}`;
           const newRole: RoleDefinition = {
+              ...(roleForm as RoleDefinition),
               id: newId,
               isSystem: false,
-              ...roleForm as RoleDefinition
           };
           setRoles(prev => [...prev, newRole]);
           setSelectedRoleId(newId);
@@ -380,38 +327,19 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       setIsEditingRole(true);
   };
 
-  const getDependentPermIds = (parentPermId: string): string[] => {
-      return permissionTree.flatMap(g =>
-          g.subgroups
-              .filter(sg => sg.dependsOn === parentPermId)
-              .flatMap(sg => getSubgroupPermIds(sg))
-      );
-  };
-
-  const togglePermission = (permId: string) => {
-      const current = roleForm.permissions || [];
-      if (current.includes(permId)) {
-          const cascadeRemove = getDependentPermIds(permId);
-          setRoleForm({ ...roleForm, permissions: current.filter(p => p !== permId && !cascadeRemove.includes(p)) });
-      } else {
-          setRoleForm({ ...roleForm, permissions: [...current, permId] });
-      }
-  };
-
-  const toggleModule = (moduleId: string) => {
-      const module = permissionModules.find(m => m.id === moduleId);
-      if (!module) return;
-      const modulePerms = module.permissions.map(p => p.id);
-      const current = roleForm.permissions || [];
-      const allChecked = modulePerms.every(p => current.includes(p));
-      
-      if (allChecked) {
-          setRoleForm({ ...roleForm, permissions: current.filter(p => !modulePerms.includes(p)) });
-      } else {
-          const newPerms = new Set([...current, ...modulePerms]);
-          setRoleForm({ ...roleForm, permissions: Array.from(newPerms) });
-      }
-  };
+  const {
+    getDependentPermIds,
+    togglePermission,
+    toggleModule,
+    toggleSubgroupPerms,
+    toggleCategoryPerms,
+  } = useFunctionalPermissions(
+    roleForm,
+    setRoleForm,
+    getCheckState,
+    allPermsInSubgroup,
+    allPermsInCategory,
+  );
 
   const toggleModuleExpand = (moduleId: string) => {
       if (expandedModules.includes(moduleId)) {
@@ -431,145 +359,35 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       }
   };
 
-  // --- Row Permissions Handlers ---
-  const handleDeleteRowRule = (ruleId: string) => {
-      setRoleForm(prev => ({
-          ...prev,
-          rowPermissions: prev.rowPermissions?.filter(r => r.id !== ruleId)
-      }));
-  };
-
-  const updateRuleValues = (ruleId: string, val: string) => {
-      setRoleForm(prev => {
-          const rules = prev.rowPermissions || [];
-          return {
-              ...prev,
-              rowPermissions: rules.map(r => {
-                  if (r.id === ruleId) {
-                      const newValues = r.values.includes(val) 
-                          ? r.values.filter(v => v !== val)
-                          : [...r.values, val];
-                      return { ...r, values: newValues };
-                  }
-                  return r;
-              })
-          };
-      });
-  };
-
+  // --- Row Permissions UI wrappers (mutations live in useRowPermissionRules) ---
   const setRuleSingleValue = (ruleId: string, val: string) => {
-      setRoleForm(prev => ({
-          ...prev,
-          rowPermissions: (prev.rowPermissions || []).map(r =>
-              r.id === ruleId ? { ...r, values: [val] } : r
-          )
-      }));
+      setRuleSingleValueRaw(ruleId, val);
       setOpenDimDropdown(null);
       setDropdownPos(null);
   };
 
-  const clearRuleValue = (ruleId: string) => {
-      setRoleForm(prev => ({
-          ...prev,
-          rowPermissions: (prev.rowPermissions || []).map(r =>
-              r.id === ruleId ? { ...r, values: [] } : r
-          )
-      }));
-  };
-
-  const toggleRuleValue = (ruleId: string, val: string) => {
-      setRoleForm(prev => ({
-          ...prev,
-          rowPermissions: (prev.rowPermissions || []).map(r => {
-              if (r.id !== ruleId) return r;
-              const has = r.values.includes(val);
-              return { ...r, values: has ? r.values.filter(v => v !== val) : [...r.values, val] };
-          })
-      }));
-  };
-
-  const buildDeptTree = (parentId?: string): Array<{ dept: Department; children: any[] }> => {
-      return departments
-          .filter(d => (d.parentId || undefined) === parentId)
-          .map(d => ({ dept: d, children: buildDeptTree(d.id) }));
-  };
-
-  const updateRuleOperator = (ruleId: string, operator: 'equals' | 'contains') => {
-      setRoleForm(prev => ({
-          ...prev,
-          rowPermissions: (prev.rowPermissions || []).map(r =>
-              r.id === ruleId ? { ...r, operator } : r
-          )
-      }));
+  const createRuleGroup = (resource: string, ruleIds: string[]) => {
+      if (ruleIds.length < 2) return;
+      createRuleGroupRaw(resource, ruleIds);
+      setGroupSelectMode(false);
+      setGroupSelectRules([]);
   };
 
   const getDimOperator = (resource: string, dimId: string): 'AND' | 'OR' => {
       return roleForm.rowLogic?.[resource]?.dimOperators?.[dimId] || 'AND';
   };
 
-  const toggleDimOperator = (resource: string, dimId: string) => {
-      setRoleForm(prev => {
-          const logic = prev.rowLogic?.[resource] || { dimOperators: {}, dimGroups: [] };
-          const current = logic.dimOperators[dimId] || 'AND';
-          return {
-              ...prev,
-              rowLogic: {
-                  ...prev.rowLogic,
-                  [resource]: { ...logic, dimOperators: { ...logic.dimOperators, [dimId]: current === 'AND' ? 'OR' : 'AND' } }
-              }
-          };
-      });
-  };
-
-  const createRuleGroup = (resource: string, ruleIds: string[]) => {
-      if (ruleIds.length < 2) return;
-      setRoleForm(prev => {
-          const logic = prev.rowLogic?.[resource] || { dimOperators: {}, dimGroups: [] };
-          const cleanedGroups = logic.dimGroups.map(g => ({
-              ...g, dims: g.dims.filter(d => !ruleIds.includes(d))
-          })).filter(g => g.dims.length >= 2);
-          return {
-              ...prev,
-              rowLogic: {
-                  ...prev.rowLogic,
-                  [resource]: { ...logic, dimGroups: [...cleanedGroups, { id: `grp-${Date.now()}`, dims: ruleIds }] }
-              }
-          };
-      });
-      setGroupSelectMode(false);
-      setGroupSelectRules([]);
-  };
-
-  const removeDimGroup = (resource: string, groupId: string) => {
-      setRoleForm(prev => {
-          const logic = prev.rowLogic?.[resource] || { dimOperators: {}, dimGroups: [] };
-          return {
-              ...prev,
-              rowLogic: {
-                  ...prev.rowLogic,
-                  [resource]: { ...logic, dimGroups: logic.dimGroups.filter(g => g.id !== groupId) }
-              }
-          };
-      });
-  };
-
-  const hasResourceFunctionalPerm = (resourceId: string): boolean => {
-      const perms = roleForm.permissions || [];
-      if (perms.includes('all')) return true;
-      const requiredIds = getRequiredPermIdsForResource(resourceId);
-      if (requiredIds.length === 0) return true;
-      return requiredIds.some(id => perms.includes(id));
-  };
-
-  const getResourcePermHint = (resourceId: string): string => {
-      return resourceFunctionalPermMap[resourceId]?.hint || '';
-  };
-
-  const getEnabledDimsForResource = (resource: string) => {
-      return resourceConfig.find(r => r.id === resource)?.dimensions.filter(d =>
-          roleForm.rowPermissions?.some(r => r.resource === resource && r.dimension === d.id)
-      ) || [];
-  };
+  const {
+    getDepartmentPath,
+    getDimensionOptions: getDimensionOptionsBase,
+    getReadableValue: getReadableValueBase,
+    hasResourceFunctionalPerm,
+    getResourcePermHint,
+    getEnabledDimsForResource,
+    getRuleGroup,
+    getRuleGroupIndex,
+    buildDeptTree,
+  } = useRowPermissionHelpers(roleForm, departments, channels, users);
 
   const GROUP_COLORS = [
       { bg: 'bg-indigo-50 dark:bg-indigo-900/15', border: 'border-indigo-300 dark:border-indigo-600', text: 'text-indigo-600 dark:text-indigo-400', label: 'A' },
@@ -577,16 +395,6 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       { bg: 'bg-rose-50 dark:bg-rose-900/15', border: 'border-rose-300 dark:border-rose-600', text: 'text-rose-600 dark:text-rose-400', label: 'C' },
       { bg: 'bg-orange-50 dark:bg-orange-900/15', border: 'border-orange-300 dark:border-orange-600', text: 'text-orange-600 dark:text-orange-400', label: 'D' },
   ];
-
-  const getRuleGroup = (resource: string, ruleId: string) => {
-      const groups = roleForm.rowLogic?.[resource]?.dimGroups || [];
-      return groups.find(g => g.dims.includes(ruleId)) || null;
-  };
-
-  const getRuleGroupIndex = (resource: string, ruleId: string): number => {
-      const groups = roleForm.rowLogic?.[resource]?.dimGroups || [];
-      return groups.findIndex(g => g.dims.includes(ruleId));
-  };
 
   const buildFormulaDisplay = (resource: string): string => {
       const rules = (roleForm.rowPermissions || []).filter(r => r.resource === resource);
@@ -598,16 +406,13 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       const groups = roleForm.rowLogic?.[resource]?.dimGroups || [];
       const ruleToGroup = new Map<string, string>();
       groups.forEach(g => g.dims.forEach(rid => ruleToGroup.set(rid, g.id)));
-
       const groupSegments = new Map<string, string[]>();
       const topLevelParts: { type: 'rule' | 'group'; content: string; ruleId: string }[] = [];
       const processedGroups = new Set<string>();
-
       rules.forEach((rule) => {
           const dimCfg = resourceConfig.find(rc => rc.id === resource)?.dimensions.find(d => d.id === rule.dimension);
           const label = dimCfg?.label || rule.dimension;
           const groupId = ruleToGroup.get(rule.id) || null;
-
           if (groupId) {
               if (!groupSegments.has(groupId)) groupSegments.set(groupId, []);
               groupSegments.get(groupId)!.push(rule.id);
@@ -619,39 +424,24 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
               topLevelParts.push({ type: 'rule', content: label, ruleId: rule.id });
           }
       });
-
       return topLevelParts.map((part, idx) => {
           let prefix = '';
           if (idx > 0) {
-              const firstRuleIdOfPart = part.type === 'group'
-                  ? groupSegments.get(part.content)![0]
-                  : part.ruleId;
-              const op = getDimOperator(resource, firstRuleIdOfPart);
-              prefix = ` ${op} `;
+              const firstRuleIdOfPart = part.type === 'group' ? groupSegments.get(part.content)![0] : part.ruleId;
+              prefix = ` ${getDimOperator(resource, firstRuleIdOfPart)} `;
           }
           if (part.type === 'rule') return prefix + part.content;
           const grpRuleIds = groupSegments.get(part.content) || [];
-          const innerParts = grpRuleIds.map((rid, i) => {
+          const innerParts = grpRuleIds.map((rid: string, i: number) => {
               const r = rules.find(rr => rr.id === rid);
               if (!r) return '?';
               const dCfg = resourceConfig.find(rc => rc.id === resource)?.dimensions.find(d => d.id === r.dimension);
               const lbl = dCfg?.label || r.dimension;
               if (i === 0) return lbl;
-              const innerOp = getDimOperator(resource, rid);
-              return `${innerOp} ${lbl}`;
+              return `${getDimOperator(resource, rid)} ${lbl}`;
           });
           return `${prefix}( ${innerParts.join(' ')} )`;
       }).join('');
-  };
-
-  const getDepartmentPath = (deptId: string): string => {
-      const dept = departments.find(d => d.id === deptId);
-      if (!dept) return deptId;
-      if (dept.parentId) {
-          const parentPath = getDepartmentPath(dept.parentId);
-          return `${parentPath} / ${dept.name}`;
-      }
-      return dept.name;
   };
 
   const getDimensionOptions = (dim: PermissionDimension) => {
@@ -757,15 +547,141 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const handlePageChange = (page: number) => setCurrentPage(page);
 
+  // User permission search
+  const userPermSearchResults = useMemo(() => {
+    if (!userPermSearch.trim()) return [];
+    const q = userPermSearch.toLowerCase();
+    return users.filter(u =>
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      u.accountId.includes(q)
+    ).slice(0, 8);
+  }, [userPermSearch, users]);
+
+  const selectedPermUserRole = useMemo(() => {
+    if (!selectedPermUser) return null;
+    return roles.find(r => r.id === selectedPermUser.role) || null;
+  }, [selectedPermUser, roles]);
+
+  useEffect(() => {
+    if (!showUserPermDropdown) return;
+    const handler = (e: MouseEvent) => {
+      if (userPermSearchRef.current && !userPermSearchRef.current.contains(e.target as Node)) {
+        setShowUserPermDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showUserPermDropdown]);
+
+  const handleSelectPermUser = (user: User) => {
+    setSelectedPermUser(user);
+    setUserPermSearch('');
+    setShowUserPermDropdown(false);
+    setUserPermTab('FUNCTIONAL');
+  };
+
+  const handleClearPermUser = () => {
+    setSelectedPermUser(null);
+    setUserPermSearch('');
+  };
+
   return (
     <div className="p-4 lg:p-6 max-w-[2400px] mx-auto space-y-4 animate-page-enter relative h-[calc(100vh-64px)] flex flex-col">
       {/* Header */}
-      <div className="flex justify-between items-center shrink-0">
-        <div>
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight">
-                {activeTab === 'USERS' ? '用户管理' : '角色管理'}
-            </h1>
-        </div>
+      <div className="flex items-center shrink-0 gap-4">
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight">
+            {activeTab === 'USERS' ? '用户管理' : '角色管理'}
+        </h1>
+        {activeTab === 'ROLES' && (
+          <div className="flex items-center gap-1 ml-2">
+            {[
+              { id: MAIN_SPACE_ID, label: '业务平台', icon: Globe },
+              ...spaces.map(s => ({ id: s.id, label: s.name, icon: Box })),
+            ].map(item => (
+              <button
+                key={item.id}
+                onClick={() => { setActiveSpaceId(item.id); handleClearPermUser(); }}
+                className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 transition border ${
+                  activeSpaceId === item.id
+                    ? 'bg-[#0071E3] text-white border-[#0071E3] shadow-sm'
+                    : 'bg-white dark:bg-white/5 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 hover:text-gray-800 dark:hover:text-gray-200'
+                }`}
+              >
+                <item.icon className="w-3 h-3" />
+                {item.label}
+              </button>
+            ))}
+            <button
+              onClick={() => setShowCreateSpace(true)}
+              className="w-6 h-6 rounded-full flex items-center justify-center text-gray-400 hover:text-[#0071E3] hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-dashed border-gray-300 dark:border-white/20 hover:border-[#0071E3] transition"
+              title="添加空间"
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+
+        {/* User Permission Search - right side */}
+        {activeTab === 'ROLES' && activeSpaceId === MAIN_SPACE_ID && (
+          <div className="ml-auto relative" ref={userPermSearchRef}>
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                value={selectedPermUser ? '' : userPermSearch}
+                onChange={e => { setUserPermSearch(e.target.value); setShowUserPermDropdown(true); }}
+                onFocus={() => { if (userPermSearch) setShowUserPermDropdown(true); }}
+                placeholder={selectedPermUser ? `${selectedPermUser.name} 的权限` : '搜索用户查看权限...'}
+                className={`w-56 pl-8 pr-8 py-1.5 bg-white dark:bg-black border rounded-lg text-xs outline-none transition-all focus:ring-2 focus:ring-blue-500/20 dark:text-white placeholder:text-gray-400 ${
+                  selectedPermUser
+                    ? 'border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/10'
+                    : 'border-gray-200 dark:border-white/10'
+                }`}
+                readOnly={!!selectedPermUser}
+                onClick={() => { if (selectedPermUser) handleClearPermUser(); }}
+              />
+              {selectedPermUser ? (
+                <button
+                  onClick={handleClearPermUser}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <Eye className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 dark:text-gray-600" />
+              )}
+            </div>
+            {showUserPermDropdown && userPermSearch.trim() && (
+              <div className="absolute right-0 top-full mt-1 w-72 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
+                {userPermSearchResults.length > 0 ? (
+                  <div className="max-h-64 overflow-auto py-1">
+                    {userPermSearchResults.map(u => (
+                      <button
+                        key={u.id}
+                        onClick={() => handleSelectPermUser(u)}
+                        className="w-full px-3 py-2.5 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-white/5 transition text-left"
+                      >
+                        <img src={u.avatar} alt="" className="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{u.name}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{u.email}</div>
+                        </div>
+                        <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 rounded-full flex-shrink-0">
+                          {getRoleName(u.role)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-4 py-6 text-center text-sm text-gray-400">
+                    <UserIcon className="w-6 h-6 mx-auto mb-1 opacity-40" />
+                    未找到匹配用户
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* --- USERS TAB --- */}
@@ -844,6 +760,9 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
 
       {/* --- ROLES TAB --- */}
       {activeTab === 'ROLES' && (
+        <>
+          {/* Global role management (业务平台) */}
+          {activeSpaceId === MAIN_SPACE_ID && (
           <div className="flex gap-6 flex-1 min-h-0 animate-fade-in">
               {/* Role List */}
               <div className="unified-card w-1/4 min-w-[250px] dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 flex flex-col">
@@ -910,9 +829,229 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                   </div>
               </div>
 
-              {/* Role Config */}
+              {/* Role Config / User Permission Overview */}
               <div className="unified-card flex-1 dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 flex flex-col">
-                  {selectedRoleId ? (
+                  {selectedPermUser ? (
+                      /* ===== User Permission Overview ===== */
+                      <>
+                          <div className="p-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gradient-to-r from-blue-50/50 to-indigo-50/30 dark:from-blue-900/10 dark:to-indigo-900/5">
+                              <div className="flex items-center gap-3">
+                                  <div className="relative">
+                                      <img src={selectedPermUser.avatar} alt="" className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 ring-2 ring-white dark:ring-gray-800 shadow-sm" />
+                                      {selectedPermUser.monthBadge && (
+                                          <span className="absolute -bottom-0.5 -right-1 px-1 py-px text-[8px] font-bold leading-none text-white bg-pink-500 rounded-full shadow ring-1 ring-white dark:ring-[#1C1C1E]">{selectedPermUser.monthBadge}</span>
+                                      )}
+                                  </div>
+                                  <div>
+                                      <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                          {selectedPermUser.name}
+                                          <span className="text-xs font-normal text-gray-500 dark:text-gray-400">{selectedPermUser.email}</span>
+                                      </h2>
+                                      <div className="flex items-center gap-3 mt-0.5">
+                                          <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                              <Shield className="w-3 h-3" />
+                                              角色：<strong className="text-gray-700 dark:text-gray-200">{selectedPermUserRole?.name || '未分配'}</strong>
+                                          </span>
+                                          <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                              <Building2 className="w-3 h-3" />
+                                              {(() => { const dept = departments.find(d => d.id === selectedPermUser.departmentId); return dept?.name || '未分配'; })()}
+                                          </span>
+                                      </div>
+                                  </div>
+                              </div>
+                              <button onClick={handleClearPermUser} className="px-3 py-1.5 border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 rounded-lg text-xs hover:bg-white dark:hover:bg-white/5 transition flex items-center gap-1">
+                                  <X className="w-3.5 h-3.5" /> 关闭
+                              </button>
+                          </div>
+
+                          {selectedPermUserRole ? (
+                          <>
+                          {/* Permission Tabs */}
+                          <div className="flex border-b border-gray-100 dark:border-white/10 px-6 bg-white dark:bg-[#1C1C1E]">
+                              {([
+                                  { id: 'FUNCTIONAL' as const, icon: <CheckSquare className="w-4 h-4"/>, label: '功能权限', badge: String((selectedPermUserRole.permissions || []).length) },
+                                  { id: 'ROW' as const, icon: <Database className="w-4 h-4"/>, label: '数据行权限', badge: String((selectedPermUserRole.rowPermissions || []).length) },
+                                  { id: 'COLUMN' as const, icon: <Columns className="w-4 h-4"/>, label: '数据列权限', badge: String((selectedPermUserRole.columnPermissions || []).length) },
+                              ]).map(tab => (
+                                  <button
+                                      key={tab.id}
+                                      onClick={() => setUserPermTab(tab.id)}
+                                      className={`px-4 py-3 text-sm font-bold transition-colors relative whitespace-nowrap ${userPermTab === tab.id ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                                  >
+                                      <div className="flex items-center gap-2">{tab.icon} {tab.label} <span className="text-xs font-normal text-gray-400">({tab.badge})</span></div>
+                                      {userPermTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-t-full" />}
+                                  </button>
+                              ))}
+                          </div>
+
+                          <div className="flex-1 overflow-auto p-6 space-y-6">
+                              {/* Functional Permissions - Read-only */}
+                              {userPermTab === 'FUNCTIONAL' && (
+                              <div className="animate-fade-in">
+                                  {(selectedPermUserRole.permissions || []).length === 0 ? (
+                                      <div className="text-center py-10 text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-lg">
+                                          <CheckSquare className="w-8 h-8 mx-auto mb-2 opacity-30"/>
+                                          暂未配置任何功能权限
+                                      </div>
+                                  ) : (
+                                      <div className="border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden bg-white dark:bg-[#1C1C1E]">
+                                      {permissionTree.map((group, gIdx) => {
+                                          const groupPerms = allPermsInGroup(group);
+                                          const activePerms = groupPerms.filter(p => (selectedPermUserRole.permissions || []).includes(p));
+                                          if (activePerms.length === 0) return null;
+                                          return (
+                                              <div key={group.id} className={gIdx > 0 ? 'border-t border-gray-100 dark:border-white/10' : ''}>
+                                                  <div className="px-4 py-3 bg-gray-50 dark:bg-white/5 flex items-center justify-between">
+                                                      <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{group.label}</span>
+                                                      <span className="text-xs text-gray-400">{activePerms.length}/{groupPerms.length}</span>
+                                                  </div>
+                                                  <div className="px-4 py-3">
+                                                      {group.subgroups.map(sg => {
+                                                          const sgPerms = sg.categories
+                                                              ? sg.categories.flatMap(c => c.permissions.map(p => p.id))
+                                                              : sg.permissions?.map(p => p.id) || [];
+                                                          const activeSg = sgPerms.filter(p => (selectedPermUserRole.permissions || []).includes(p));
+                                                          if (activeSg.length === 0) return null;
+                                                          return (
+                                                              <div key={sg.id} className="mb-3 last:mb-0">
+                                                                  <div className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5">{sg.label}</div>
+                                                                  <div className="flex flex-wrap gap-1.5">
+                                                                      {(sg.categories
+                                                                          ? sg.categories.flatMap(c => c.permissions)
+                                                                          : sg.permissions || []
+                                                                      ).filter(p => (selectedPermUserRole.permissions || []).includes(p.id)).map(p => (
+                                                                          <span key={p.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 border border-blue-100 dark:border-blue-800/30">
+                                                                              <Check className="w-3 h-3"/> {p.label}
+                                                                          </span>
+                                                                      ))}
+                                                                  </div>
+                                                              </div>
+                                                          );
+                                                      })}
+                                                  </div>
+                                              </div>
+                                          );
+                                      })}
+                                      </div>
+                                  )}
+                              </div>
+                              )}
+
+                              {/* Row Permissions - Read-only */}
+                              {userPermTab === 'ROW' && (
+                              <div className="animate-fade-in">
+                                  {(() => {
+                                      const baseRow = selectedPermUserRole.baseRowPermission;
+                                      const rowRules = selectedPermUserRole.rowPermissions || [];
+                                      if (!baseRow || baseRow === 'all') {
+                                          return (
+                                              <div className="mb-4">
+                                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-700/30">
+                                                      <CheckCircle className="w-3.5 h-3.5"/> 全部数据
+                                                  </span>
+                                              </div>
+                                          );
+                                      }
+                                      if (baseRow === 'custom' && rowRules.length === 0) {
+                                          return (
+                                              <div className="text-center py-10 text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-lg">
+                                                  <Database className="w-8 h-8 mx-auto mb-2 opacity-30"/>
+                                                  自定义行权限（暂无规则）
+                                              </div>
+                                          );
+                                      }
+                                      return null;
+                                  })()}
+                                  {(selectedPermUserRole.rowPermissions || []).length > 0 && (
+                                      <div className="space-y-3">
+                                          {resourceConfig.map(rc => {
+                                              const rcRules = (selectedPermUserRole.rowPermissions || []).filter(r => r.resource === rc.id);
+                                              if (rcRules.length === 0) return null;
+                                              return (
+                                                  <div key={rc.id} className="border border-gray-200 dark:border-white/10 rounded-xl p-4 bg-white dark:bg-[#1C1C1E]">
+                                                      <div className="flex items-center gap-2 mb-3">
+                                                          <Database className="w-4 h-4 text-amber-500"/>
+                                                          <span className="font-bold text-sm text-gray-800 dark:text-white">{rc.label}</span>
+                                                          <span className="text-xs text-gray-400">{rcRules.length} 条规则</span>
+                                                      </div>
+                                                      <div className="space-y-2">
+                                                          {rcRules.map(rule => {
+                                                              const dimCfg = rc.dimensions.find(d => d.id === rule.dimension);
+                                                              return (
+                                                                  <div key={rule.id} className="flex items-start gap-2 p-2.5 bg-amber-50/50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-800/20">
+                                                                      <Lock className="w-3.5 h-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
+                                                                      <div className="text-xs">
+                                                                          <span className="font-medium text-gray-700 dark:text-gray-200">{dimCfg?.label || rule.dimension}</span>
+                                                                          <span className="mx-1.5 text-gray-400">{rule.operator === 'equals' ? '等于' : rule.operator === 'contains' ? '包含' : rule.operator}</span>
+                                                                          <span className="font-medium text-amber-700 dark:text-amber-300">
+                                                                              {rule.values.length > 0
+                                                                                  ? rule.values.map(v => getReadableValue(rule.dimension, v)).join('、')
+                                                                                  : '未指定'}
+                                                                          </span>
+                                                                      </div>
+                                                                  </div>
+                                                              );
+                                                          })}
+                                                      </div>
+                                                  </div>
+                                              );
+                                          })}
+                                      </div>
+                                  )}
+                              </div>
+                              )}
+
+                              {/* Column Permissions - Read-only */}
+                              {userPermTab === 'COLUMN' && (
+                              <div className="animate-fade-in">
+                                  {(selectedPermUserRole.columnPermissions || []).length === 0 ? (
+                                      <div className="text-center py-10 text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-lg">
+                                          <Columns className="w-8 h-8 mx-auto mb-2 opacity-30"/>
+                                          暂未配置列权限（默认可见全部列）
+                                      </div>
+                                  ) : (
+                                      <div className="space-y-3">
+                                          {columnConfig.map(rc => {
+                                              const colRule = (selectedPermUserRole.columnPermissions || []).find(r => r.resource === rc.id);
+                                              if (!colRule) return null;
+                                              return (
+                                                  <div key={rc.id} className="border border-gray-200 dark:border-white/10 rounded-xl p-4 bg-white dark:bg-[#1C1C1E]">
+                                                      <div className="flex items-center gap-2 mb-3">
+                                                          <Columns className="w-4 h-4 text-purple-500"/>
+                                                          <span className="font-bold text-sm text-gray-800 dark:text-white">{rc.label}</span>
+                                                          <span className="text-xs text-gray-400">{colRule.allowedColumns.length}/{rc.columns.length} 可见列</span>
+                                                      </div>
+                                                      <div className="flex flex-wrap gap-1.5">
+                                                          {rc.columns.map(col => {
+                                                              const isAllowed = colRule.allowedColumns.includes(col.id);
+                                                              return (
+                                                                  <span key={col.id} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border ${
+                                                                      isAllowed
+                                                                          ? 'bg-purple-50 text-purple-700 border-purple-100 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800/30'
+                                                                          : 'bg-gray-50 text-gray-400 border-gray-100 dark:bg-white/5 dark:text-gray-500 dark:border-white/10 line-through opacity-60'
+                                                                  }`}>
+                                                                      {isAllowed ? <Check className="w-3 h-3"/> : <X className="w-3 h-3"/>} {col.label}
+                                                                  </span>
+                                                              );
+                                                          })}
+                                                      </div>
+                                                  </div>
+                                              );
+                                          })}
+                                      </div>
+                                  )}
+                              </div>
+                              )}
+                          </div>
+                          </>
+                          ) : (
+                              <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+                                  <Shield className="w-10 h-10 mb-2 opacity-20"/>
+                                  <p className="text-sm">该用户尚未分配角色</p>
+                              </div>
+                          )}
+                      </>
+                  ) : selectedRoleId ? (
                       isEditingRole ? (
                           <>
                               <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center">
@@ -2128,6 +2267,13 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                   )}
               </div>
           </div>
+          )}
+
+          {/* Space-specific role management */}
+          {activeSpaceId !== MAIN_SPACE_ID && (
+            <SpaceRoleManager spaceId={activeSpaceId} />
+          )}
+        </>
       )}
 
       {/* User Modal */}
@@ -2460,6 +2606,72 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
           </div>
           </ModalPortal>
 
+      )}
+
+      {/* 创建空间弹窗 */}
+      {showCreateSpace && (
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[500] p-4 animate-fade-in">
+            <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-md flex flex-col animate-modal-enter border-white/10">
+              <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><Box className="w-5 h-5" /> 添加空间</h3>
+                <button onClick={() => { setShowCreateSpace(false); setNewSpaceName(''); setNewSpaceDesc(''); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">空间名称</label>
+                  <input
+                    value={newSpaceName}
+                    onChange={e => setNewSpaceName(e.target.value)}
+                    placeholder="例如：SAB 客户洞察"
+                    className="w-full p-3 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white placeholder-gray-300"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">描述</label>
+                  <textarea
+                    value={newSpaceDesc}
+                    onChange={e => setNewSpaceDesc(e.target.value)}
+                    placeholder="空间用途说明（选填）"
+                    rows={2}
+                    className="w-full p-3 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white placeholder-gray-300 resize-none"
+                  />
+                </div>
+              </div>
+              <div className="p-6 pt-0 flex justify-end gap-3">
+                <button
+                  onClick={() => { setShowCreateSpace(false); setNewSpaceName(''); setNewSpaceDesc(''); }}
+                  className="px-5 py-2.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition"
+                >取消</button>
+                <button
+                  onClick={async () => {
+                    if (!newSpaceName.trim()) { alert('请输入空间名称'); return; }
+                    setCreatingSpace(true);
+                    try {
+                      const created = await spaceApi.create({
+                        name: newSpaceName.trim(),
+                        description: newSpaceDesc.trim(),
+                        permTree: [], resourceConfig: [], columnConfig: [],
+                      });
+                      await refreshSpaces();
+                      setShowCreateSpace(false);
+                      setNewSpaceName('');
+                      setNewSpaceDesc('');
+                      setActiveSpaceId((created as any).id);
+                    } catch (e: any) {
+                      alert(e?.message || '创建失败');
+                    } finally {
+                      setCreatingSpace(false);
+                    }
+                  }}
+                  disabled={creatingSpace || !newSpaceName.trim()}
+                  className="px-5 py-2.5 bg-[#0071E3] text-white rounded-full text-sm font-medium hover:bg-[#0062CC] transition shadow-sm disabled:opacity-40"
+                >{creatingSpace ? '创建中...' : '创建空间'}</button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
       )}
 
     </div>

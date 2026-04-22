@@ -13,6 +13,7 @@ import { useAppContext } from '../../contexts/AppContext';
 import WPSLogo from '../common/WPSLogo';
 import MobilePreview from '../mobile/MobilePreview';
 import AIAssistantDrawer from '../ai/AIAssistantDrawer';
+import GlobalSearchModal from './GlobalSearchModal';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -44,6 +45,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isMobilePreviewOpen, setIsMobilePreviewOpen] = useState(false);
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
   const [aiInitialQuery, setAiInitialQuery] = useState('');
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const toggleSection = (id: string) => setCollapsedSections(prev => ({ ...prev, [id]: !prev[id] }));
 
@@ -52,8 +54,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        setAiInitialQuery('');
-        setIsAIDrawerOpen(prev => !prev);
+        setIsGlobalSearchOpen(prev => !prev);
       }
     };
     document.addEventListener('keydown', handler);
@@ -86,7 +87,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       '/product-manage/attr-config': '属性配置',
       '/performance': '业绩管理',
       '/channels': '渠道管理',
-      '/leads': '线索中心',
+      '/leads': '线索中台',
       '/wps-ops': '运营中心',
       '/ops/dashboard': '指标看板',
       '/ops/enterprise': '企业管理',
@@ -298,7 +299,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       { id: 'PRODUCT_CENTER', label: '产品中心', path: '/product-center', permissions: ['product_display_view', 'product_display_preview', 'product_view', 'merchandise_view', 'product_msrp_view', 'product_channel_price_view', 'product_component_pool_view', 'product_package_view', 'product_license_template_view', 'product_attr_config_view'] },
       { id: 'CHANNEL_CENTER', label: '渠道中心', path: '/channels', permissions: ['channel_view'] },
       { id: 'PERFORMANCE_CENTER', label: '业绩中心', path: '/performance', permissions: ['performance_view'] },
-      { id: 'LEADS_CENTER', label: '线索中心', path: '/leads', permissions: ['leads_view'] },
+      { id: 'LEADS_CENTER', label: '线索中台', path: '/leads', permissions: ['leads_view'] },
       { id: 'OPERATIONS_CENTER', label: '运营中心', path: '/wps-ops', permissions: ['wps_ops_view'] },
       { id: 'SAB_CUSTOMER_INSIGHT', label: 'SAB 客户洞察', path: '/sab-insight', permissions: ['sab_insight_view', 'customer_view'] },
       { id: 'SYSTEM_CONFIG', label: '系统配置', path: '/organization', permissions: ['admin_view', 'user_manage', 'role_manage', 'org_manage', 'license_type_view'] }
@@ -382,7 +383,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex items-center gap-3">
             {/* AI Search Bar */}
             <div
-              onClick={() => { setAiInitialQuery(''); setIsAIDrawerOpen(true); }}
+              onClick={() => setIsGlobalSearchOpen(true)}
               className="hidden md:flex items-center gap-2.5 px-3.5 py-1.5 bg-gray-100/80 dark:bg-white/[0.06] border border-gray-200/60 dark:border-white/[0.08] rounded-xl cursor-pointer hover:bg-[#0071E3]/5 dark:hover:bg-[#0A84FF]/10 hover:border-[#0071E3]/30 dark:hover:border-[#0A84FF]/30 transition-all group w-[220px]"
             >
               <Sparkles className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#0071E3] dark:group-hover:text-[#0A84FF] transition shrink-0" />
@@ -793,6 +794,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         ];
         return <DocCenterDrawer docs={DOC_LIST} onClose={() => setIsManualOpen(false)} />;
       })()}
+
+      {/* 全局搜索弹窗 */}
+      <GlobalSearchModal
+        open={isGlobalSearchOpen}
+        onClose={() => setIsGlobalSearchOpen(false)}
+        onOpenAIDrawer={(q) => {
+          setIsGlobalSearchOpen(false);
+          setAiInitialQuery(q || '');
+          setIsAIDrawerOpen(true);
+        }}
+      />
 
       {/* AI 业务助手抽屉 */}
       <AIAssistantDrawer open={isAIDrawerOpen} onClose={() => setIsAIDrawerOpen(false)} initialQuery={aiInitialQuery} />

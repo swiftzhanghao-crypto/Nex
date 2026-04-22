@@ -144,13 +144,49 @@ function evaluateCustomerRowRule(
   }
 }
 
+const warnedProductDimensions = new Set<string>();
+
 function evaluateProductRowRule(
   rule: RowRule,
-  _product: any,
+  product: any,
 ): boolean {
   const vals = rule.values || [];
   if (vals.length === 0) return true;
-  return true;
+
+  switch (rule.dimension) {
+    case 'productId':
+      return !!product.id && vals.includes(product.id);
+    case 'category':
+      return !!product.category && vals.includes(product.category);
+    case 'subCategory':
+      return !!product.subCategory && vals.includes(product.subCategory);
+    case 'status':
+      return !!product.status && vals.includes(product.status);
+    case 'tag':
+    case 'tags': {
+      const tags: string[] = Array.isArray(product.tags) ? product.tags : [];
+      return tags.some(t => vals.includes(t));
+    }
+    case 'departmentId':
+    case 'industryLine':
+    case 'directChannelId':
+    case 'province': {
+      const key = `Product:${rule.dimension}`;
+      if (!warnedProductDimensions.has(key)) {
+        warnedProductDimensions.add(key);
+        console.warn(`[rowPermission] Product 资源不支持维度 "${rule.dimension}"（产品表无对应字段），规则被忽略`);
+      }
+      return true;
+    }
+    default: {
+      const key = `Product:${rule.dimension || 'unknown'}`;
+      if (!warnedProductDimensions.has(key)) {
+        warnedProductDimensions.add(key);
+        console.warn(`[rowPermission] Product 资源未识别维度 "${rule.dimension}"，规则被忽略`);
+      }
+      return true;
+    }
+  }
 }
 
 export function filterByRowPermissions(
@@ -188,4 +224,211 @@ export function checkRowPermissionForSingle(
   item: any,
 ): boolean {
   return filterByRowPermissions(db, user, resource, [item]).length > 0;
+}
+
+// ============================================================================
+// SQL 下推：把行权限规则编译为 WHERE 片段，避免内存过滤
+// ============================================================================
+
+type Ctx = {
+  userId: string;
+  currentUserDeptId: string | null;
+  deptAndChildrenIds: string[];
+};
+
+type Clause = { sql: string; params: any[] } | null;
+
+const warnedDims = new Set<string>();
+function warnDim(resource: string, dim: string | undefined, reason: string) {
+  const key = `${resource}:${dim}:${reason}`;
+  if (warnedDims.has(key)) return;
+  warnedDims.add(key);
+  console.warn(`[rowPermission/SQL] ${resource} 维度 "${dim}" ${reason}，规则被忽略`);
+}
+
+/**
+ * 构造 person 维度（self / department / departmentAndChildren）的 SQL 片段。
+ *  - columnExpr: 目标用户列表达式（可以是表字段或 json_extract）
+ */
+function buildPersonClause(vals: string[], columnExpr: string, ctx: Ctx): Clause {
+  const orParts: string[] = [];
+  const params: any[] = [];
+  for (const v of vals) {
+    if (v === 'self') {
+      orParts.push(`${columnExpr} = ?`);
+      params.push(ctx.userId);
+    } else if (v === 'department' && ctx.currentUserDeptId) {
+      orParts.push(`${columnExpr} IN (SELECT id FROM users WHERE department_id = ?)`);
+      params.push(ctx.currentUserDeptId);
+    } else if (v === 'departmentAndChildren' && ctx.deptAndChildrenIds.length > 0) {
+      const placeholders = ctx.deptAndChildrenIds.map(() => '?').join(',');
+      orParts.push(`${columnExpr} IN (SELECT id FROM users WHERE department_id IN (${placeholders}))`);
+      params.push(...ctx.deptAndChildrenIds);
+    }
+  }
+  if (orParts.length === 0) return { sql: '1=0', params: [] };
+  return { sql: `(${orParts.join(' OR ')})`, params };
+}
+
+/** 简单 IN(...) 片段 */
+function buildInClause(columnExpr: string, vals: string[]): Clause {
+  if (vals.length === 0) return null;
+  const placeholders = vals.map(() => '?').join(',');
+  return { sql: `${columnExpr} IN (${placeholders})`, params: vals };
+}
+
+function buildOrderRuleClause(rule: RowRule, ctx: Ctx): Clause {
+  const vals = rule.values || [];
+  if (vals.length === 0) return null;
+
+  switch (rule.dimension) {
+    case 'salesRep':
+      return buildPersonClause(vals, 'sales_rep_id', ctx);
+    case 'businessManager':
+      return buildPersonClause(vals, 'biz_manager_id', ctx);
+    case 'creator':
+      // creatorId 写在 extra JSON 中
+      return buildPersonClause(vals, "json_extract(extra, '$.creatorId')", ctx);
+    case 'departmentId': {
+      // 通过销售负责人的部门关联
+      const placeholders = vals.map(() => '?').join(',');
+      return {
+        sql: `sales_rep_id IN (SELECT id FROM users WHERE department_id IN (${placeholders}))`,
+        params: vals,
+      };
+    }
+    case 'orderType':
+    case 'buyerType':
+      return buildInClause('buyer_type', vals);
+    case 'orderSource':
+      return buildInClause('source', vals);
+    case 'orderStatus':
+      return buildInClause('status', vals);
+    case 'customerIndustry':
+      return buildInClause('customer_industry', vals);
+    case 'customerLevel':
+      return buildInClause('customer_level', vals);
+    case 'directChannelId':
+    case 'channelId': {
+      // 仅当 buyer_type='Channel' 时 buyer_id 即渠道 id
+      const placeholders = vals.map(() => '?').join(',');
+      return {
+        sql: `(buyer_type = 'Channel' AND buyer_id IN (${placeholders}))`,
+        params: vals,
+      };
+    }
+    case 'industryLine':
+      return buildInClause("json_extract(extra, '$.industryLine')", vals);
+    case 'province':
+      return buildInClause("json_extract(extra, '$.province')", vals);
+    default:
+      warnDim('Order', rule.dimension, '未识别');
+      return null;
+  }
+}
+
+function buildCustomerRuleClause(rule: RowRule, ctx: Ctx): Clause {
+  const vals = rule.values || [];
+  if (vals.length === 0) return null;
+
+  switch (rule.dimension) {
+    case 'salesRep':
+      return buildPersonClause(vals, 'owner_id', ctx);
+    case 'departmentId': {
+      const placeholders = vals.map(() => '?').join(',');
+      return {
+        sql: `owner_id IN (SELECT id FROM users WHERE department_id IN (${placeholders}))`,
+        params: vals,
+      };
+    }
+    case 'industryLine':
+    case 'industry':
+      // Customer 表用 industry 字段；industryLine 也兼容映射到 industry
+      return buildInClause('industry', vals);
+    case 'province':
+    case 'region':
+      return buildInClause('region', vals);
+    case 'directChannelId':
+    case 'channelId':
+      warnDim('Customer', rule.dimension, '客户表无渠道字段');
+      return null;
+    default:
+      warnDim('Customer', rule.dimension, '未识别');
+      return null;
+  }
+}
+
+function buildProductRuleClause(rule: RowRule): Clause {
+  const vals = rule.values || [];
+  if (vals.length === 0) return null;
+
+  switch (rule.dimension) {
+    case 'productId':
+      return buildInClause('id', vals);
+    case 'category':
+      return buildInClause('category', vals);
+    case 'subCategory':
+      return buildInClause('sub_category', vals);
+    case 'status':
+      return buildInClause('status', vals);
+    case 'tag':
+    case 'tags': {
+      // tags 存的是 JSON 数组，使用 EXISTS + json_each 检查交集
+      const placeholders = vals.map(() => '?').join(',');
+      return {
+        sql: `EXISTS (SELECT 1 FROM json_each(products.tags) WHERE json_each.value IN (${placeholders}))`,
+        params: vals,
+      };
+    }
+    case 'departmentId':
+    case 'industryLine':
+    case 'directChannelId':
+    case 'province':
+      warnDim('Product', rule.dimension, '产品表无对应字段');
+      return null;
+    default:
+      warnDim('Product', rule.dimension, '未识别');
+      return null;
+  }
+}
+
+/**
+ * 构造行权限的 SQL WHERE 片段。
+ * 返回值：
+ *   - { sql: '', params: [] }           没有规则或全部规则被忽略
+ *   - { sql: ' AND (a) AND (b)', ... }  可拼接到主查询尾部
+ *
+ * 注意：调用方需要在主查询里使用资源所在的表名（如 orders、customers、products）。
+ *       products 的 EXISTS 子句使用了带表名的 `products.tags`，因此调用方主表别名需保持为 products。
+ */
+export function buildRowPermissionWhere(
+  db: any,
+  user: { userId: string; role: string },
+  resource: PermissionResource,
+): { sql: string; params: any[] } {
+  const rules = getRowRules(db, user.role, resource);
+  if (rules.length === 0) return { sql: '', params: [] };
+
+  const userDeptMap = buildUserDeptMap(db);
+  const currentUserDeptId = userDeptMap.get(user.userId) || null;
+  const deptAndChildrenIds = currentUserDeptId ? getDescendantDeptIds(db, currentUserDeptId) : [];
+
+  const ctx: Ctx = { userId: user.userId, currentUserDeptId, deptAndChildrenIds };
+
+  const clauses: string[] = [];
+  const params: any[] = [];
+  for (const rule of rules) {
+    let c: Clause = null;
+    if (resource === 'Order') c = buildOrderRuleClause(rule, ctx);
+    else if (resource === 'Customer') c = buildCustomerRuleClause(rule, ctx);
+    else if (resource === 'Product') c = buildProductRuleClause(rule);
+    if (c) {
+      clauses.push(c.sql);
+      params.push(...c.params);
+    }
+    // null = 维度无法 SQL 表达 → 忽略（已 warn）
+  }
+
+  if (clauses.length === 0) return { sql: '', params: [] };
+  return { sql: ' AND ' + clauses.map(c => `(${c})`).join(' AND '), params };
 }

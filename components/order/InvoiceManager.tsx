@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Search, X, ChevronDown, Receipt, Calendar, SlidersHorizontal } from 'lucide-react';
-import { useAppContext } from '../../contexts/AppContext';
+import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 
 const statusConfig: Record<string, { label: string; dot: string; text: string; bg: string; darkBg: string; darkText: string }> = {
   PENDING:    { label: '待开票', dot: 'bg-amber-400',  text: 'text-amber-600',  bg: 'bg-amber-50',  darkBg: 'dark:bg-amber-900/20',  darkText: 'dark:text-amber-400' },
@@ -21,6 +21,7 @@ const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 const InvoiceManager: React.FC = () => {
   const { invoices } = useAppContext();
+  useEnsureData(['invoices']);
   const [searchText, setSearchText] = useState('');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');

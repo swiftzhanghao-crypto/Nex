@@ -29,9 +29,8 @@ function nextId(): string {
   return `msg_${Date.now()}_${++_msgCounter}`;
 }
 
-function makeWelcomeMessage(): ChatMessage {
-  const hasAI = isAIConfigured();
-  const modeNote = hasAI ? '' : '\n\n⚠️ 当前未配置 Gemini API Key，运行在**本地分析模式**。';
+function makeWelcomeMessage(hasAI: boolean | null = null): ChatMessage {
+  const modeNote = hasAI === false ? '\n\n⚠️ 后端未配置 GEMINI_API_KEY，当前运行在**本地分析模式**。' : '';
   return {
     id: 'welcome',
     role: 'assistant',
@@ -228,6 +227,14 @@ const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({ open, onClose, in
   const appCtx = useAppContext();
   const location = useLocation();
 
+  const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
+  useEffect(() => { isAIConfigured().then(setAiAvailable); }, []);
+  // AI 助手抽屉打开时按需加载全量订单/客户
+  useEffect(() => {
+    if (!open) return;
+    appCtx.loadAllOrders?.();
+    appCtx.loadAllCustomers?.();
+  }, [open, appCtx]);
   const [sessions, setSessions] = useState<ChatSession[]>(() => [createSession()]);
   const [activeSessionId, setActiveSessionId] = useState<string>(() => sessions[0]?.id || '');
   const [input, setInput] = useState('');
@@ -804,7 +811,7 @@ const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({ open, onClose, in
               </div>
             </div>
             <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-2 text-center">
-              {isAIConfigured() ? 'AI 助手回答仅供参考，请核对关键信息' : '本地模式 · 配置 API Key 后启用 AI 深度分析'}
+              {aiAvailable === false ? '本地模式 · 后端未配置 GEMINI_API_KEY' : 'AI 助手回答仅供参考，请核对关键信息'}
             </p>
           </div>
         </div>

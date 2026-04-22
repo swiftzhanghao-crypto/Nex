@@ -4,7 +4,7 @@ import {
   User, Building, Clock, CheckCircle, AlertCircle, Shield, ChevronRight, Receipt
 } from 'lucide-react';
 import { Order, OrderStatus, OrderItem } from '../../types';
-import { useAppContext } from '../../contexts/AppContext';
+import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 
 const statusMap: Record<string, string> = {
   [OrderStatus.DRAFT]: '草稿',
@@ -50,6 +50,7 @@ interface MobileOrderDetailProps {
 
 const MobileOrderDetail: React.FC<MobileOrderDetailProps> = ({ orderId, onBack }) => {
   const { filteredOrders: orders, users, departments } = useAppContext();
+  useEnsureData(['orders']);
   const [copiedId, setCopiedId] = useState(false);
   const [activeSection, setActiveSection] = useState<'overview' | 'items' | 'logistics' | 'approval'>('overview');
 

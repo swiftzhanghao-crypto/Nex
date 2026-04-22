@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Search, ChevronRight, Package, X, Filter, ChevronDown } from 'lucide-react';
 import { Order, OrderStatus, OrderSource } from '../../types';
-import { useAppContext } from '../../contexts/AppContext';
+import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 
 const statusMap: Record<string, string> = {
   [OrderStatus.DRAFT]: '草稿',
@@ -54,6 +54,7 @@ interface MobileOrderManagerProps {
 
 const MobileOrderManager: React.FC<MobileOrderManagerProps> = ({ onViewDetail }) => {
   const { filteredOrders: orders, filteredCustomers: customers } = useAppContext();
+  useEnsureData(['orders', 'customers']);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeStatus, setActiveStatus] = useState('All');
   const [showSearch, setShowSearch] = useState(false);

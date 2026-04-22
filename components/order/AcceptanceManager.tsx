@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Search, ChevronDown, X, Filter, ChevronLeft, ChevronRight, ClipboardCheck } from 'lucide-react';
-import { useAppContext } from '../../contexts/AppContext';
+import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 import { Order, OrderStatus } from '../../types';
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
@@ -36,6 +36,7 @@ const statusLabelMap: Record<string, { label: string; color: string; bg: string;
 
 const AcceptanceManager: React.FC = () => {
   const { filteredOrders: orders } = useAppContext();
+  useEnsureData(['orders']);
   const [searchText, setSearchText] = useState('');
   const [searchField, setSearchField] = useState<'acceptanceNo' | 'orderId' | 'customerName'>('acceptanceNo');
   const [isSearchFieldOpen, setIsSearchFieldOpen] = useState(false);

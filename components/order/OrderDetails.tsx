@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import UserDetailPanel from '../common/UserDetailPanel';
-import { useAppContext } from '../../contexts/AppContext';
+import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 import OrderLogDrawer from './OrderLogDrawer';
 import OrderSnapshotDrawer from './OrderSnapshotDrawer';
 import OrderContractPreview from './OrderContractPreview';
@@ -31,6 +31,7 @@ const statusMap: Record<string, string> = {
 
 const OrderDetails: React.FC = () => {
   const { orders, setOrders, products, customers, filteredOrders, currentUser, users, departments, opportunities, contracts, roles, apiMode, refreshOrders } = useAppContext();
+  useEnsureData(['orders', 'customers', 'contracts']);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();

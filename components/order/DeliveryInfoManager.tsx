@@ -1,12 +1,13 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Search, ChevronDown, X, Filter, ChevronLeft, ChevronRight, PackageCheck } from 'lucide-react';
-import { useAppContext } from '../../contexts/AppContext';
+import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 const DeliveryInfoManager: React.FC = () => {
   const { deliveryInfos } = useAppContext();
+  useEnsureData(['deliveryInfos']);
   const [searchText, setSearchText] = useState('');
   const [searchField, setSearchField] = useState<'id' | 'orderId' | 'customerName'>('id');
   const [isSearchFieldOpen, setIsSearchFieldOpen] = useState(false);

@@ -21,9 +21,36 @@ function getUserName(db: any, userId: string): string {
   return row?.name || '';
 }
 
-router.get('/', checkPermission('user', 'list'), (_req, res) => {
-  const rows = getDb().prepare('SELECT * FROM users ORDER BY name').all();
-  res.json(rows.map(toUser));
+function safePagination(page: string, size: string) {
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const limit = Math.min(Math.max(1, parseInt(size) || 50), 200);
+  return { limit, offset: (pageNum - 1) * limit, pageNum };
+}
+
+router.get('/', checkPermission('user', 'list'), (req, res) => {
+  const { search, role, status, departmentId, page = '1', size = '50' } = req.query as Record<string, string>;
+  const db = getDb();
+  const conds: string[] = ['1=1'];
+  const params: any[] = [];
+
+  if (role) { conds.push('role = ?'); params.push(role); }
+  if (status) { conds.push('status = ?'); params.push(status); }
+  if (departmentId) { conds.push('department_id = ?'); params.push(departmentId); }
+  if (search && search.trim()) {
+    conds.push('(name LIKE ? OR email LIKE ? OR phone LIKE ? OR account_id LIKE ?)');
+    const k = `%${search.trim()}%`;
+    params.push(k, k, k, k);
+  }
+
+  const whereSql = ' WHERE ' + conds.join(' AND ');
+  const totalRow = db.prepare(`SELECT COUNT(*) AS c FROM users${whereSql}`).get(...params) as { c: number };
+  const total = totalRow?.c ?? 0;
+
+  const { limit, offset, pageNum } = safePagination(page, size);
+  const rows = db.prepare(`SELECT * FROM users${whereSql} ORDER BY name LIMIT ? OFFSET ?`)
+    .all(...params, limit, offset);
+
+  res.json({ data: rows.map(toUser), total, page: pageNum, size: limit });
 });
 
 router.get('/meta/departments', (_req, res) => {
@@ -32,13 +59,35 @@ router.get('/meta/departments', (_req, res) => {
 });
 
 router.get('/meta/roles', (_req, res) => {
-  const rows = getDb().prepare('SELECT * FROM roles').all() as any[];
+  const rows = getDb().prepare('SELECT * FROM roles ORDER BY sort_order ASC, rowid ASC').all() as any[];
   res.json(rows.map(r => ({
     id: r.id, name: r.name, description: r.description,
     permissions: safeJsonParse(r.permissions, []), isSystem: !!r.is_system,
     rowPermissions: safeJsonParse(r.row_permissions, []),
     columnPermissions: safeJsonParse(r.column_permissions, []),
   })));
+});
+
+router.put('/meta/roles-order', checkPermission('role', 'update'), (req: AuthRequest, res) => {
+  const db = getDb();
+  const { orderedIds } = req.body as { orderedIds?: unknown };
+  if (!Array.isArray(orderedIds) || orderedIds.some((id) => typeof id !== 'string')) {
+    res.status(400).json({ error: 'orderedIds 必须为字符串数组' });
+    return;
+  }
+  const update = db.prepare('UPDATE roles SET sort_order = ? WHERE id = ?');
+  const tx = db.transaction((ids: string[]) => {
+    ids.forEach((id, idx) => update.run(idx, id));
+  });
+  try {
+    tx(orderedIds as string[]);
+    const userName = getUserName(db, req.user!.userId);
+    db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(req.user!.userId, userName, 'REORDER', 'Role', '-', `重排角色顺序: ${(orderedIds as string[]).join(',')}`);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: '保存角色顺序失败' });
+  }
 });
 
 router.get('/:id', checkPermission('user', 'read'), (req, res) => {

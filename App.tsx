@@ -4,6 +4,7 @@ import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AppProvider, useAppContext } from './contexts/AppContext';
 import Layout from './components/layout/Layout';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import LoginModal from './components/auth/LoginModal';
 import ProductManager from './components/product/ProductManager';
 import OrderManager from './components/order/OrderManager';
 import CustomerManager from './components/crm/CustomerManager';
@@ -144,7 +145,10 @@ function App() {
   return (
     <AppProvider>
       <Router>
-        <AppRoutes />
+        <ErrorBoundary fallbackTitle="页面加载异常">
+          <AppRoutes />
+        </ErrorBoundary>
+        <LoginModal />
       </Router>
     </AppProvider>
   );

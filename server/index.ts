@@ -10,6 +10,8 @@ import productRoutes from './routes/products.ts';
 import financeRoutes from './routes/finance.ts';
 import channelRoutes from './routes/channels.ts';
 import opportunityRoutes from './routes/opportunities.ts';
+import aiRoutes from './routes/ai.ts';
+import spacesRoutes from './routes/spaces.ts';
 
 const PORT = parseInt(process.env.PORT || '3001');
 const app = express();
@@ -48,14 +50,22 @@ app.use('/api/products', productRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/channels', channelRoutes);
 app.use('/api/opportunities', opportunityRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/spaces', spacesRoutes);
 
 app.use(((err: any, _req: any, res: any, _next: any) => {
-  console.error(`[error] ${err.message}`);
-  if (err.code?.startsWith('SQLITE_')) {
-    const msg = err.code === 'SQLITE_CONSTRAINT_FOREIGNKEY' ? '关联数据不存在，请检查外键引用'
-      : err.code === 'SQLITE_CONSTRAINT_UNIQUE' ? '数据重复，违反唯一约束'
-      : `数据库错误: ${err.message}`;
-    res.status(400).json({ error: msg });
+  // 详细错误仅写入服务端日志，不外泄给客户端
+  console.error(`[error] ${err?.code || ''} ${err?.message}`);
+  if (err.code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
+    res.status(400).json({ error: '关联数据不存在，请检查外键引用' });
+    return;
+  }
+  if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    res.status(400).json({ error: '数据重复，违反唯一约束' });
+    return;
+  }
+  if (err.code?.startsWith?.('SQLITE_')) {
+    res.status(400).json({ error: '数据库操作失败' });
     return;
   }
   res.status(500).json({ error: '服务器内部错误' });
@@ -82,5 +92,10 @@ app.listen(PORT, () => {
   console.log(`     GET    /api/finance/authorizations`);
   console.log(`     GET    /api/finance/delivery-infos`);
   console.log(`     GET    /api/finance/audit-logs`);
-  console.log(`\n  Default login: any user email + password "123456"\n`);
+  console.log(`     POST   /api/ai/generate, /api/ai/category-suggest, /api/ai/generate-json`);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`\n  [dev] Default login: any user email + password "123456"\n`);
+  } else {
+    console.log('');
+  }
 });

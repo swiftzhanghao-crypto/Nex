@@ -5,7 +5,7 @@ import {
   Search, X, ChevronDown, ChevronRight, Filter, RefreshCcw, Download,
   Layers, CheckCircle, Clock, AlertTriangle, XCircle, Timer,
 } from 'lucide-react';
-import { useAppContext } from '../../contexts/AppContext';
+import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 import type { Subscription, SubscriptionLineProductSnapshot, SubscriptionStatus, PurchaseNature } from '../../types';
 import StatusFilterCard from './StatusFilterCard';
 import { SubscriptionOrderChain } from '../common/SubscriptionOrderChain';
@@ -116,6 +116,7 @@ function distinctProductCount(sub: Subscription): number {
 
 const RenewalManager: React.FC = () => {
   const { subscriptions } = useAppContext();
+  useEnsureData(['orders']);
   const navigate = useNavigate();
 
   const [searchField, setSearchField] = useState<'id' | 'customerName' | 'productName'>('id');

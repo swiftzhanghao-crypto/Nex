@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Search, X, ChevronDown, KeyRound, Filter } from 'lucide-react';
-import { useAppContext } from '../../contexts/AppContext';
+import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 
 const regions = ['全部', '北京', '上海', '广州', '深圳', '杭州', '成都', '武汉', '南京', '珠海'];
 
@@ -19,6 +19,7 @@ const colWidthMap: Record<string, number> = {
 
 const AuthorizationManager: React.FC = () => {
   const { authorizations } = useAppContext();
+  useEnsureData(['authorizations']);
   const [searchField, setSearchField] = useState<'authCode' | 'orderId' | 'customerName' | 'productName'>('authCode');
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchFieldOpen, setIsSearchFieldOpen] = useState(false);

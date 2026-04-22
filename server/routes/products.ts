@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
-import { filterByRowPermissions, checkRowPermissionForSingle } from '../rowPermissionFilter.ts';
+import { buildRowPermissionWhere, checkRowPermissionForSingle } from '../rowPermissionFilter.ts';
 
 const router = Router();
 router.use(authMiddleware);
@@ -30,19 +30,38 @@ function toProduct(row: any) {
   };
 }
 
+function safePagination(page: string, size: string) {
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const limit = Math.min(Math.max(1, parseInt(size) || 50), 200);
+  return { limit, offset: (pageNum - 1) * limit, pageNum };
+}
+
 router.get('/', checkPermission('product', 'list'), (req: AuthRequest, res) => {
-  const { category, status, search } = req.query as Record<string, string>;
+  const { category, status, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
-  let sql = 'SELECT * FROM products WHERE 1=1';
+  const conds: string[] = ['1=1'];
   const params: any[] = [];
 
-  if (category) { sql += ' AND category = ?'; params.push(category); }
-  if (status) { sql += ' AND status = ?'; params.push(status); }
-  if (search) { sql += ' AND name LIKE ?'; params.push(`%${search}%`); }
+  if (category) { conds.push('category = ?'); params.push(category); }
+  if (status) { conds.push('status = ?'); params.push(status); }
+  if (search && search.trim()) {
+    conds.push('(name LIKE ? OR id LIKE ?)');
+    const k = `%${search.trim()}%`;
+    params.push(k, k);
+  }
 
-  sql += ' ORDER BY name';
-  const allProducts = db.prepare(sql).all(...params).map(toProduct);
-  res.json(filterByRowPermissions(db, req.user!, 'Product', allProducts));
+  const rowPerm = buildRowPermissionWhere(db, req.user!, 'Product');
+  const whereSql = ' WHERE ' + conds.join(' AND ') + rowPerm.sql;
+  const whereParams = [...params, ...rowPerm.params];
+
+  const totalRow = db.prepare(`SELECT COUNT(*) AS c FROM products${whereSql}`).get(...whereParams) as { c: number };
+  const total = totalRow?.c ?? 0;
+
+  const { limit, offset, pageNum } = safePagination(page, size);
+  const rows = db.prepare(`SELECT * FROM products${whereSql} ORDER BY name LIMIT ? OFFSET ?`)
+    .all(...whereParams, limit, offset);
+
+  res.json({ data: rows.map(toProduct), total, page: pageNum, size: limit });
 });
 
 router.get('/meta/channels', (_req, res) => {

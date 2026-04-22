@@ -112,8 +112,8 @@ const ProductManager: React.FC = () => {
     };
 
     const newProduct: Product = {
+      ...(formData as Product),
       id: newId,
-      ...formData as Product,
       skus: [initialSku],
     };
 

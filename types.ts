@@ -348,6 +348,106 @@ export interface RoleDefinition {
     columnPermissions?: ColumnPermissionRule[];
 }
 
+// ========= Space（空间）相关类型 =========
+// 每个 Space 对应一个独立应用（如 SAB 客户洞察），具有独立的权限树、角色、成员
+export interface SpacePermItem {
+    id: string;
+    label: string;
+    desc?: string;
+}
+
+export interface SpacePermCategory {
+    id: string;
+    label: string;
+    permissions: SpacePermItem[];
+}
+
+export interface SpacePermSubgroup {
+    id: string;
+    label: string;
+    permissions?: SpacePermItem[];
+    categories?: SpacePermCategory[];
+}
+
+export interface SpacePermGroup {
+    id: string;
+    label: string;
+    subgroups: SpacePermSubgroup[];
+}
+
+export interface SpaceResourceDimension {
+    id: string;
+    label: string;
+}
+
+export interface SpaceResourceConfig {
+    id: string;
+    label: string;
+    description?: string;
+    dimensions: SpaceResourceDimension[];
+}
+
+export interface SpaceColumnItem {
+    id: string;
+    label: string;
+}
+
+export interface SpaceColumnConfig {
+    id: string;
+    label: string;
+    columns: SpaceColumnItem[];
+}
+
+export interface Space {
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    permTree: SpacePermGroup[];
+    resourceConfig: SpaceResourceConfig[];
+    columnConfig: SpaceColumnConfig[];
+    sortOrder?: number;
+}
+
+export interface SpaceRowPermissionRule {
+    id: string;
+    resource: string;
+    dimension: string;
+    operator: PermissionOperator;
+    values: string[];
+}
+
+export interface SpaceColumnPermissionRule {
+    id: string;
+    resource: string;
+    allowedColumns: string[];
+}
+
+export interface SpaceRole {
+    id: string;
+    spaceId: string;
+    name: string;
+    description: string;
+    permissions: string[];
+    rowPermissions?: SpaceRowPermissionRule[];
+    rowLogic?: Record<string, RowLogicConfig>;
+    columnPermissions?: SpaceColumnPermissionRule[];
+    sortOrder?: number;
+}
+
+export interface SpaceMember {
+    id: string;
+    spaceId: string;
+    userId: string;
+    userName?: string;
+    userEmail?: string;
+    userAvatar?: string;
+    departmentId?: string;
+    roleId: string;
+    roleName?: string;
+    isAdmin: boolean;
+}
+
 export interface User {
     id: string;
     accountId: string; // 8-digit numeric ID

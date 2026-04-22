@@ -3,10 +3,11 @@ import React, { useState } from 'react';
 import { Order, OrderStatus } from '../../types';
 import { Package, CheckCircle, FileText, Truck, Disc, Search, ChevronRight, Clock, AlertCircle, CreditCard, CheckSquare, ClipboardCheck, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAppContext } from '../../contexts/AppContext';
+import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 
 const OperationsManager: React.FC = () => {
   const { orders, setOrders, filteredOrders: rowFilteredOrders } = useAppContext();
+  useEnsureData(['orders']);
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'AUTH' | 'PKG' | 'SHIP' | 'CD'>('AUTH');
   const [searchTerm, setSearchTerm] = useState('');
