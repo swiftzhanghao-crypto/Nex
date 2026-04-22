@@ -78,7 +78,7 @@ const UserDetailsDrawer: React.FC<UserDetailsDrawerProps> = ({ user, isClosing, 
               </h5>
               <div className="p-4 bg-gray-50 dark:bg-black/20 rounded-2xl border border-gray-100 dark:border-white/5">
                 <p className="text-xs text-gray-500 leading-relaxed">
-                  该用户拥有 <span className="text-blue-600 font-bold">{user.role}</span> 角色对应的功能权限。
+                  该用户拥有 <span className="text-blue-600 font-bold">{user.roles?.join(', ')}</span> 角色对应的功能权限。
                   数据权限受限于所属部门 <span className="text-gray-900 dark:text-white font-medium">{getDepartmentPath(user.departmentId)}</span> 及其下属机构。
                 </p>
               </div>

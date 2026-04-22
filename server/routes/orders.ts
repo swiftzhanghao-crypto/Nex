@@ -82,6 +82,7 @@ function toOrder(row: any) {
     opportunityId: row.opportunity_id, opportunityName: row.opportunity_name,
     originalOrderId: row.original_order_id,
     refundReason: row.refund_reason, refundAmount: row.refund_amount,
+    orderRemark: row.order_remark ?? undefined,
     ...extra,
   };
 }
@@ -140,7 +141,7 @@ router.post('/', checkPermission('order', 'create'), validateBody(orderCreateSch
   const id = o.id || `ORD-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
   // ---- 服务端绑定身份字段，避免客户端冒充他人创建订单 ----
-  const isAdminOrManager = req.user!.role === 'Admin' || req.user!.role === 'Business' || req.user!.role === 'Commerce';
+  const isAdminOrManager = req.user!.roles.some(r => ['Admin', 'Business', 'Commerce'].includes(r));
   const currentUserName = getUserName(db, req.user!.userId);
 
   // 销售代表：普通 Sales 必须为自己；管理员/商务可以为他人指定
@@ -173,8 +174,8 @@ router.post('/', checkPermission('order', 'create'), validateBody(orderCreateSch
   const nextStatus = normalizeOrderStatus(o.status || 'PENDING_APPROVAL');
 
   const insertOrder = db.prepare(`
-    INSERT INTO orders (id, customer_id, customer_name, customer_type, customer_level, customer_industry, customer_region, date, status, total, items, source, buyer_type, buyer_name, buyer_id, shipping_address, delivery_method, is_paid, payment_method, payment_terms, approval, approval_records, sales_rep_id, sales_rep_name, biz_manager_id, biz_manager_name, invoice_info, acceptance_info, acceptance_config, opportunity_id, opportunity_name, original_order_id, extra)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO orders (id, customer_id, customer_name, customer_type, customer_level, customer_industry, customer_region, date, status, total, items, source, buyer_type, buyer_name, buyer_id, shipping_address, delivery_method, is_paid, payment_method, payment_terms, approval, approval_records, sales_rep_id, sales_rep_name, biz_manager_id, biz_manager_name, invoice_info, acceptance_info, acceptance_config, opportunity_id, opportunity_name, original_order_id, order_remark, extra)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const insertAudit = db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`);
 
@@ -193,7 +194,8 @@ router.post('/', checkPermission('order', 'create'), validateBody(orderCreateSch
       o.invoiceInfo ? JSON.stringify(o.invoiceInfo) : null,
       o.acceptanceInfo ? JSON.stringify(o.acceptanceInfo) : null,
       o.acceptanceConfig ? JSON.stringify(o.acceptanceConfig) : null,
-      o.opportunityId ?? null, o.opportunityName ?? null, o.originalOrderId ?? null, extra
+      o.opportunityId ?? null, o.opportunityName ?? null, o.originalOrderId ?? null,
+      o.orderRemark ?? null, extra
     );
     insertAudit.run(req.user!.userId, currentUserName, 'CREATE', 'Order', id, `创建订单 ${id}`);
   });
@@ -217,10 +219,9 @@ router.put('/:id', checkPermission('order', 'update'), validateBody(orderUpdateS
     return;
   }
 
-  const isAdmin = req.user!.role === 'Admin';
+  const isAdmin = req.user!.roles.includes('Admin');
   const isOwner = existing.sales_rep_id === req.user!.userId;
-  // 与 rbac.ts 中 'order:update' 矩阵保持一致：Admin / Sales / Business
-  const isManager = ['Business', 'Commerce'].includes(req.user!.role);
+  const isManager = req.user!.roles.some(r => ['Business', 'Commerce'].includes(r));
   if (!isAdmin && !isOwner && !isManager) {
     res.status(403).json({ error: '无权修改此订单' });
     return;
@@ -328,7 +329,6 @@ router.post('/:id/approve', checkPermission('order', 'approve'), (req: AuthReque
   const approval = safeJsonParse(existing.approval, {});
   const records = safeJsonParse(existing.approval_records, []);
 
-  const roleKey = req.user!.role;
   const approvalFieldMap: Record<string, string> = {
     'Sales': 'salesApproved',
     'Business': 'businessApproved',
@@ -336,7 +336,7 @@ router.post('/:id/approve', checkPermission('order', 'approve'), (req: AuthReque
     'Finance': 'financeApproved',
     'Admin': 'financeApproved',
   };
-  const field = approvalFieldMap[roleKey];
+  const field = req.user!.roles.map(r => approvalFieldMap[r]).find(Boolean);
   if (!field) {
     res.status(403).json({ error: '当前角色无审批字段映射' });
     return;
@@ -348,7 +348,7 @@ router.post('/:id/approve', checkPermission('order', 'approve'), (req: AuthReque
 
   records.push({
     userId: req.user!.userId,
-    role: roleKey,
+    role: req.user!.roles.join(','),
     action,
     remark: remark || '',
     timestamp: new Date().toISOString(),
@@ -413,7 +413,7 @@ router.delete('/:id', checkPermission('order', 'delete'), (req: AuthRequest, res
     return;
   }
 
-  const isAdmin = req.user!.role === 'Admin';
+  const isAdmin = req.user!.roles.includes('Admin');
   const isOwner = existing.sales_rep_id === req.user!.userId;
   if (!isAdmin && !isOwner) {
     res.status(403).json({ error: '只有管理员或订单归属销售可以删除订单' });

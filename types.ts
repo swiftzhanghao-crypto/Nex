@@ -348,7 +348,7 @@ export interface RoleDefinition {
     columnPermissions?: ColumnPermissionRule[];
 }
 
-// ========= Space（空间）相关类型 =========
+// ========= Space（应用）相关类型 =========
 // 每个 Space 对应一个独立应用（如 SAB 客户洞察），具有独立的权限树、角色、成员
 export interface SpacePermItem {
     id: string;
@@ -378,6 +378,7 @@ export interface SpacePermGroup {
 export interface SpaceResourceDimension {
     id: string;
     label: string;
+    options?: { value: string; label: string }[];
 }
 
 export interface SpaceResourceConfig {
@@ -454,12 +455,22 @@ export interface User {
     name: string;
     email: string;
     phone?: string;
-    role: UserRole;
+    /** 平台角色（支持多角色，对应 roles 表中的 id） */
+    roles: string[];
     userType: UserType;
     status: 'Active' | 'Inactive';
     avatar?: string;
     departmentId?: string;
     monthBadge?: string;
+}
+
+/** 便捷判断：用户是否拥有某平台角色 */
+export function userHasRole(user: { roles: string[] } | null | undefined, roleId: string): boolean {
+    return !!user?.roles?.includes(roleId);
+}
+/** 便捷判断：用户是否拥有任一角色 */
+export function userHasAnyRole(user: { roles: string[] } | null | undefined, roleIds: string[]): boolean {
+    return !!user?.roles?.some(r => roleIds.includes(r));
 }
 
 export interface Department {

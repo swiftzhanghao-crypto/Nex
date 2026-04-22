@@ -3,7 +3,6 @@ import { GoogleGenAI, Type } from '@google/genai';
 import { authMiddleware } from '../auth.ts';
 
 const router = Router();
-router.use(authMiddleware);
 
 let _ai: GoogleGenAI | null = null;
 let _missing = false;
@@ -21,9 +20,13 @@ function getAI(): GoogleGenAI | null {
   return _ai;
 }
 
+// /status 不走鉴权——前端登录前的探测调用即可返回，避免产生误导性的 401 控制台错误
 router.get('/status', (_req, res) => {
   res.json({ configured: !!process.env.GEMINI_API_KEY });
 });
+
+// 其他 AI 接口需要登录态
+router.use(authMiddleware);
 
 router.post('/generate', async (req, res) => {
   const ai = getAI();

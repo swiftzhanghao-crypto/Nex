@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom';
-import { User, UserType, RoleDefinition, PermissionDimension, RowPermissionRule, ColumnPermissionRule, PermissionResource, BaseRowPermission, Department, RowLogicConfig } from '../../types';
+import { User, UserType, RoleDefinition, PermissionDimension, RowPermissionRule, ColumnPermissionRule, PermissionResource, BaseRowPermission, Department, RowLogicConfig, Space } from '../../types';
 import { Search, Plus, Shield, User as UserIcon, Briefcase, Truck, Edit, Building2, X, Mail, Phone, CheckCircle, Calendar, Hash, Lock, CheckSquare, Settings, Save, Trash2, Database, Check, ChevronDown, ChevronRight, Columns, Copy, Globe, GripVertical, IdCard, MapPin, Clock, Box, Eye } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import UserDetailPanel from '../common/UserDetailPanel';
@@ -23,7 +23,7 @@ interface UserManagerProps {
 const MAIN_SPACE_ID = '__main__';
 
 const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
-  const { users, setUsers, departments, roles, setRoles, channels, apiMode, spaces, refreshSpaces } = useAppContext();
+  const { users, setUsers, departments, roles, setRoles, channels, apiMode, spaces, setSpaces, refreshSpaces } = useAppContext();
   const [activeTab, setActiveTab] = useState<'USERS' | 'ROLES'>(defaultTab);
   const [activeSpaceId, setActiveSpaceId] = useState<string>(MAIN_SPACE_ID);
   const [showCreateSpace, setShowCreateSpace] = useState(false);
@@ -172,7 +172,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   const [userForm, setUserForm] = useState<Partial<User>>({
       name: '',
       email: '',
-      role: 'Sales',
+      roles: ['Sales'],
       departmentId: '',
       status: 'Active',
       avatar: '',
@@ -238,7 +238,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
           setUserForm({ 
               name: '', 
               email: '', 
-              role: roles[0]?.id || '', 
+              roles: roles[0]?.id ? [roles[0].id] : [], 
               departmentId: '', 
               status: 'Active', 
               userType: 'Internal',
@@ -299,7 +299,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   const handleDeleteRole = (id: string) => {
       const role = roles.find(r => r.id === id);
       if (role?.isSystem) return alert("系统内置角色不可删除。");
-      if (users.some(u => u.role === id)) return alert("该角色下仍有用户，无法删除。");
+      if (users.some(u => u.roles?.includes(id))) return alert("该角色下仍有用户，无法删除。");
       if (confirm("确定要删除此角色吗？")) {
           setRoles(prev => prev.filter(r => r.id !== id));
           if (selectedRoleId === id) {
@@ -350,13 +350,17 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   };
 
   const handleRemoveUserFromRole = (userId: string) => {
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: '' } as User : u));
+      if (!selectedRoleId) return;
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, roles: (u.roles || []).filter(r => r !== selectedRoleId) } : u));
   };
 
   const handleAddUserToRole = (userId: string) => {
-      if (selectedRoleId) {
-          setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: selectedRoleId } as User : u));
-      }
+      if (!selectedRoleId) return;
+      setUsers(prev => prev.map(u => {
+          if (u.id !== userId) return u;
+          if (u.roles?.includes(selectedRoleId)) return u;
+          return { ...u, roles: [...(u.roles || []), selectedRoleId] };
+      }));
   };
 
   // --- Row Permissions UI wrappers (mutations live in useRowPermissionRules) ---
@@ -560,7 +564,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
 
   const selectedPermUserRole = useMemo(() => {
     if (!selectedPermUser) return null;
-    return roles.find(r => r.id === selectedPermUser.role) || null;
+    return roles.find(r => selectedPermUser.roles?.includes(r.id)) || null;
   }, [selectedPermUser, roles]);
 
   useEffect(() => {
@@ -596,8 +600,8 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
         {activeTab === 'ROLES' && (
           <div className="flex items-center gap-1 ml-2">
             {[
-              { id: MAIN_SPACE_ID, label: '业务平台', icon: Globe },
-              ...spaces.map(s => ({ id: s.id, label: s.name, icon: Box })),
+              { id: MAIN_SPACE_ID, label: '平台角色', icon: Globe },
+              ...spaces.map(s => ({ id: s.id, label: s.name, icon: Box, isApp: true })),
             ].map(item => (
               <button
                 key={item.id}
@@ -615,7 +619,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
             <button
               onClick={() => setShowCreateSpace(true)}
               className="w-6 h-6 rounded-full flex items-center justify-center text-gray-400 hover:text-[#0071E3] hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-dashed border-gray-300 dark:border-white/20 hover:border-[#0071E3] transition"
-              title="添加空间"
+              title="添加应用"
             >
               <Plus className="w-3 h-3" />
             </button>
@@ -667,7 +671,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                           <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{u.email}</div>
                         </div>
                         <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 rounded-full flex-shrink-0">
-                          {getRoleName(u.role)}
+                          {u.roles?.map(r => getRoleName(r)).join(', ') || '-'}
                         </span>
                       </button>
                     ))}
@@ -1974,7 +1978,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                               {/* Tab 切换 */}
                               <div className="flex border-b border-gray-100 dark:border-white/10 px-6 overflow-x-auto">
                                   {([
-                                      { id: 'MEMBERS' as const, icon: <UserIcon className="w-4 h-4"/>, label: '角色成员', badge: String(users.filter(u => u.role === selectedRoleId).length) },
+                                      { id: 'MEMBERS' as const, icon: <UserIcon className="w-4 h-4"/>, label: '角色成员', badge: String(users.filter(u => selectedRoleId && u.roles?.includes(selectedRoleId)).length) },
                                       { id: 'FUNCTIONAL' as const, icon: <CheckSquare className="w-4 h-4"/>, label: '功能权限', badge: String((roleForm.permissions || []).length) },
                                       { id: 'ROW' as const, icon: <Database className="w-4 h-4"/>, label: '数据行权限', badge: String((roleForm.rowPermissions || []).length) },
                                       { id: 'COLUMN' as const, icon: <Columns className="w-4 h-4"/>, label: '数据列权限', badge: String((roleForm.columnPermissions || []).length) },
@@ -1999,8 +2003,8 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                           <button onClick={() => setIsAddUserModalOpen(true)} className="px-3 py-1.5 bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-lg text-sm hover:bg-blue-100 dark:hover:bg-blue-900/40 transition flex items-center gap-1"><Plus className="w-4 h-4"/> 添加成员</button>
                                       </div>
                                       <div className="space-y-2">
-                                          {users.filter(u => u.role === selectedRoleId).length > 0 ? (
-                                              users.filter(u => u.role === selectedRoleId).map(user => (
+                                          {users.filter(u => selectedRoleId && u.roles?.includes(selectedRoleId)).length > 0 ? (
+                                              users.filter(u => selectedRoleId && u.roles?.includes(selectedRoleId)).map(user => (
                                                   <div key={user.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-white/5 rounded-lg border border-gray-100 dark:border-white/10">
                                                       <div className="flex items-center gap-3">
                                                           <div className="relative flex-shrink-0">
@@ -2302,7 +2306,15 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                       <div className="grid grid-cols-2 gap-4">
                           <div>
                               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">角色</label>
-                              <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value})} className="w-full p-3 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white">
+                              <select
+                                  multiple
+                                  value={userForm.roles || []}
+                                  onChange={e => {
+                                      const selected = Array.from(e.target.selectedOptions, o => o.value);
+                                      setUserForm({ ...userForm, roles: selected });
+                                  }}
+                                  className="w-full min-h-[7.5rem] p-3 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white"
+                              >
                                   {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                               </select>
                           </div>
@@ -2361,7 +2373,8 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       {/* Employee Card Modal */}
       {isEmployeeCardOpen && detailsUser && (() => {
         const dept = departments.find(d => d.id === detailsUser.departmentId);
-        const roleDef = roles.find(r => r.id === detailsUser.role);
+        const primaryRoleId = detailsUser.roles?.[0];
+        const roleDef = primaryRoleId ? roles.find(r => r.id === primaryRoleId) : undefined;
         const getDeptPath = (deptId?: string): string => {
           if (!deptId) return '—';
           const parts: string[] = [];
@@ -2388,19 +2401,19 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
           FinanceManager: '财务经理', ProductManager: '产品经理', SalesRep: '销售代表', ChannelManager: '渠道经理',
           'sales-rep': '销售代表', 'finance-mgr': '财务经理', 'product-mgr': '产品经理', 'channel-mgr': '渠道经理',
         };
-        const position = positionMap[detailsUser.role] || roleDef?.name || '员工';
+        const position = (primaryRoleId && positionMap[primaryRoleId]) || roleDef?.name || '员工';
 
         const levelMap: Record<string, string> = {
           Admin: 'P8', Sales: 'P7', Business: 'P6', Technical: 'P7',
           FinanceManager: 'P7', ProductManager: 'P7', SalesRep: 'P5', ChannelManager: 'P6',
         };
-        const level = levelMap[detailsUser.role] || `P${5 + (seed % 4)}`;
+        const level = (primaryRoleId && levelMap[primaryRoleId]) || `P${5 + (seed % 4)}`;
 
         const sequenceMap: Record<string, string> = {
           Admin: '管理 - 综合', Sales: '销售 - 直销', Business: '商务 - 运营', Technical: '产研 - 研发',
           FinanceManager: '职能 - 财务', ProductManager: '产研 - 产品', SalesRep: '销售 - 直销', ChannelManager: '销售 - 渠道',
         };
-        const sequence = sequenceMap[detailsUser.role] || '产研 - 产品';
+        const sequence = (primaryRoleId && sequenceMap[primaryRoleId]) || '产研 - 产品';
 
         const cities = ['北京市', '珠海市', '武汉市', '长沙市', '成都市', '上海市', '深圳市'];
         const city = cities[seed % cities.length];
@@ -2574,7 +2587,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                       </div>
                   </div>
                   <div className="flex-1 overflow-auto p-2">
-                      {users.filter(u => u.role !== selectedRoleId && (u.name.toLowerCase().includes(userSearchTerm.toLowerCase()) || u.email.toLowerCase().includes(userSearchTerm.toLowerCase()))).map(user => (
+                      {users.filter(u => selectedRoleId && !u.roles?.includes(selectedRoleId) && (u.name.toLowerCase().includes(userSearchTerm.toLowerCase()) || u.email.toLowerCase().includes(userSearchTerm.toLowerCase()))).map(user => (
                           <div key={user.id} className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg transition-colors">
                               <div className="flex items-center gap-3">
                                   <div className="relative flex-shrink-0">
@@ -2596,7 +2609,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                               </button>
                           </div>
                       ))}
-                      {users.filter(u => u.role !== selectedRoleId && (u.name.toLowerCase().includes(userSearchTerm.toLowerCase()) || u.email.toLowerCase().includes(userSearchTerm.toLowerCase()))).length === 0 && (
+                      {users.filter(u => selectedRoleId && !u.roles?.includes(selectedRoleId) && (u.name.toLowerCase().includes(userSearchTerm.toLowerCase()) || u.email.toLowerCase().includes(userSearchTerm.toLowerCase()))).length === 0 && (
                           <div className="p-8 text-center text-gray-500 dark:text-gray-400 text-sm">
                               没有找到可添加的用户
                           </div>
@@ -2608,18 +2621,18 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
 
       )}
 
-      {/* 创建空间弹窗 */}
+      {/* 创建应用弹窗 */}
       {showCreateSpace && (
         <ModalPortal>
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[500] p-4 animate-fade-in">
             <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-md flex flex-col animate-modal-enter border-white/10">
               <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><Box className="w-5 h-5" /> 添加空间</h3>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><Box className="w-5 h-5" /> 添加应用</h3>
                 <button onClick={() => { setShowCreateSpace(false); setNewSpaceName(''); setNewSpaceDesc(''); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5" /></button>
               </div>
               <div className="p-6 space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">空间名称</label>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">应用名称</label>
                   <input
                     value={newSpaceName}
                     onChange={e => setNewSpaceName(e.target.value)}
@@ -2633,7 +2646,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                   <textarea
                     value={newSpaceDesc}
                     onChange={e => setNewSpaceDesc(e.target.value)}
-                    placeholder="空间用途说明（选填）"
+                    placeholder="应用用途说明（选填）"
                     rows={2}
                     className="w-full p-3 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white placeholder-gray-300 resize-none"
                   />
@@ -2646,19 +2659,46 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                 >取消</button>
                 <button
                   onClick={async () => {
-                    if (!newSpaceName.trim()) { alert('请输入空间名称'); return; }
+                    if (!newSpaceName.trim()) { alert('请输入应用名称'); return; }
+                    // 检查重名
+                    if (spaces.some(s => s.name === newSpaceName.trim())) {
+                      alert('已存在同名应用');
+                      return;
+                    }
                     setCreatingSpace(true);
                     try {
-                      const created = await spaceApi.create({
-                        name: newSpaceName.trim(),
-                        description: newSpaceDesc.trim(),
-                        permTree: [], resourceConfig: [], columnConfig: [],
-                      });
-                      await refreshSpaces();
+                      let createdId: string;
+                      if (apiMode) {
+                        const created = await spaceApi.create({
+                          name: newSpaceName.trim(),
+                          description: newSpaceDesc.trim(),
+                          permTree: [], resourceConfig: [], columnConfig: [],
+                        });
+                        await refreshSpaces();
+                        createdId = (created as any).id;
+                      } else {
+                        // Mock 模式：本地构造 Space 写入 context，并持久化到 localStorage
+                        const newSpace: Space = {
+                          id: `space_mock_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+                          name: newSpaceName.trim(),
+                          description: newSpaceDesc.trim(),
+                          icon: 'Box',
+                          permTree: [],
+                          resourceConfig: [],
+                          columnConfig: [],
+                          sortOrder: spaces.length,
+                        };
+                        setSpaces(prev => {
+                          const next = [...prev, newSpace];
+                          try { localStorage.setItem('spaceMock:list', JSON.stringify(next)); } catch {}
+                          return next;
+                        });
+                        createdId = newSpace.id;
+                      }
                       setShowCreateSpace(false);
                       setNewSpaceName('');
                       setNewSpaceDesc('');
-                      setActiveSpaceId((created as any).id);
+                      setActiveSpaceId(createdId);
                     } catch (e: any) {
                       alert(e?.message || '创建失败');
                     } finally {
@@ -2667,7 +2707,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                   }}
                   disabled={creatingSpace || !newSpaceName.trim()}
                   className="px-5 py-2.5 bg-[#0071E3] text-white rounded-full text-sm font-medium hover:bg-[#0062CC] transition shadow-sm disabled:opacity-40"
-                >{creatingSpace ? '创建中...' : '创建空间'}</button>
+                >{creatingSpace ? '创建中...' : '创建应用'}</button>
               </div>
             </div>
           </div>

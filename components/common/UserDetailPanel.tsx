@@ -32,7 +32,7 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
     name: user.name,
     email: user.email,
     phone: user.phone || '',
-    role: user.role,
+    roles: user.roles || [],
     departmentId: user.departmentId || '',
     userType: user.userType as UserType,
     status: user.status as 'Active' | 'Inactive',
@@ -43,7 +43,7 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
       name: user.name,
       email: user.email,
       phone: user.phone || '',
-      role: user.role,
+      roles: user.roles || [],
       departmentId: user.departmentId || '',
       userType: user.userType as UserType,
       status: user.status as 'Active' | 'Inactive',
@@ -51,7 +51,7 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
     setIsEditing(false);
   }, [user.id]);
 
-  const roleDef = roles.find(r => r.id === (isEditing ? form.role : user.role));
+  const roleDef = roles.find(r => (isEditing ? form.roles : user.roles)?.includes(r.id));
 
   const getDeptPath = (deptId?: string): string => {
     if (!deptId) return '未分配部门';
@@ -93,7 +93,7 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
       name: user.name,
       email: user.email,
       phone: user.phone || '',
-      role: user.role,
+      roles: user.roles || [],
       departmentId: user.departmentId || '',
       userType: user.userType as UserType,
       status: user.status as 'Active' | 'Inactive',
@@ -199,7 +199,15 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
                     </div>
                     <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5">
                       <div className="text-[10px] text-gray-400 uppercase mb-1.5">角色</div>
-                      <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))} className={selectCls}>
+                      <select
+                        multiple
+                        value={form.roles}
+                        onChange={e => {
+                          const selected = Array.from(e.target.selectedOptions, o => o.value);
+                          setForm(p => ({ ...p, roles: selected }));
+                        }}
+                        className={`${selectCls} min-h-[6rem]`}
+                      >
                         {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                       </select>
                     </div>
@@ -255,7 +263,7 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">当前角色</div>
                     <div className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
                       <Briefcase className="w-4 h-4 text-[#0071E3]" />
-                      {roleDef?.name || user.role}
+                      {roleDef?.name || (user.roles || []).map(rid => roles.find(r => r.id === rid)?.name || rid).join(', ') || '—'}
                     </div>
                     {roleDef?.description && <div className="text-xs text-gray-400 mt-1">{roleDef.description}</div>}
                   </div>

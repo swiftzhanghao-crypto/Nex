@@ -21,7 +21,7 @@ const TOKEN_EXPIRY = (process.env.JWT_EXPIRES_IN as any) || '24h';
 
 export interface JwtPayload {
   userId: string;
-  role: string;
+  roles: string[];
 }
 
 export function signToken(payload: JwtPayload): string {
@@ -80,7 +80,7 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
 
 export function requireRole(...roles: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user || !req.user.roles.some(r => roles.includes(r))) {
       res.status(403).json({ error: '权限不足' });
       return;
     }
@@ -92,7 +92,7 @@ export function requireSelfOrRole(...roles: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) { res.status(401).json({ error: '未认证' }); return; }
     const targetId = req.params.id;
-    if (req.user.userId === targetId || roles.includes(req.user.role)) {
+    if (req.user.userId === targetId || req.user.roles.some(r => roles.includes(r))) {
       next();
       return;
     }

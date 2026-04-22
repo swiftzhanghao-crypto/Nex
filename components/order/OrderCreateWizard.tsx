@@ -317,7 +317,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
   // Product cascade reset effects are now in useProductCascade
 
-  const salesUsers = users.filter(u => u.role === 'Sales' || u.role === 'Admin');
+  const salesUsers = users.filter(u => u.roles?.includes('Sales') || u.roles?.includes('Admin'));
   const resetCreateForm = () => {
       setCurrentDraftId(undefined);
       setDraftSavedTip(false);
@@ -335,7 +335,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setSelectedChannelId('');
       setDirectChannel('');
       setTerminalChannel('');
-      setSalesRepId(currentUser.role === 'Sales' ? currentUser.id : '');
+      setSalesRepId(currentUser.roles?.includes('Sales') ? currentUser.id : '');
       setBusinessManagerId('');
       setCreatorId(currentUser.id);
       setNewOrderItems([]);
@@ -1498,7 +1498,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">商务负责人</label>
                                     <select className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={businessManagerId} onChange={e => setBusinessManagerId(e.target.value)}>
                                         <option value="">-- 分配商务人员 --</option>
-                                        {users.filter(u => u.role === 'Business' || u.role === 'Admin').map(u => <option key={u.id} value={u.id}>{u.name.replace(/\s*\(.*?\)/g, '')}</option>)}
+                                        {users.filter(u => u.roles?.includes('Business') || u.roles?.includes('Admin')).map(u => <option key={u.id} value={u.id}>{u.name.replace(/\s*\(.*?\)/g, '')}</option>)}
                                     </select>
                                 </div>
                                 <div className="space-y-2">

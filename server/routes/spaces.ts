@@ -15,9 +15,9 @@ function getUserName(db: any, userId: string): string {
   return row?.name || '';
 }
 
-/** 全局 Admin 或该空间的 is_admin=1 成员可以管理空间配置 */
-function requireSpaceAdmin(spaceId: string, userId: string, userRole: string): boolean {
-  if (userRole === 'Admin') return true;
+/** 全局 Admin 或该应用的 is_admin=1 成员可以管理应用配置 */
+function requireSpaceAdmin(spaceId: string, userId: string, userRoles: string[]): boolean {
+  if (userRoles.includes('Admin')) return true;
   const db = getDb();
   const row = db.prepare('SELECT is_admin FROM space_members WHERE space_id = ? AND user_id = ?')
     .get(spaceId, userId) as any;
@@ -60,18 +60,18 @@ router.get('/', (_req, res) => {
 
 router.get('/:id', (req, res) => {
   const row = getDb().prepare('SELECT * FROM spaces WHERE id = ?').get(req.params.id) as any;
-  if (!row) { res.status(404).json({ error: '空间不存在' }); return; }
+  if (!row) { res.status(404).json({ error: '应用不存在' }); return; }
   res.json(toSpace(row));
 });
 
 router.post('/', (req: AuthRequest, res) => {
-  if (req.user!.role !== 'Admin') {
-    res.status(403).json({ error: '只有全局管理员可以创建空间' });
+  if (!req.user!.roles.includes('Admin')) {
+    res.status(403).json({ error: '只有全局管理员可以创建应用' });
     return;
   }
   const db = getDb();
   const { name, description, icon, permTree, resourceConfig, columnConfig } = req.body;
-  if (!name) { res.status(400).json({ error: '空间名称必填' }); return; }
+  if (!name) { res.status(400).json({ error: '应用名称必填' }); return; }
   const id = `space_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   db.prepare(`
     INSERT INTO spaces (id, name, description, icon, perm_tree, resource_config, column_config, sort_order)
@@ -83,20 +83,20 @@ router.post('/', (req: AuthRequest, res) => {
     0);
   const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, userName, 'CREATE', 'Space', id, `创建空间 ${name}`);
+    .run(req.user!.userId, userName, 'CREATE', 'Space', id, `创建应用 ${name}`);
   const row = db.prepare('SELECT * FROM spaces WHERE id = ?').get(id) as any;
   res.status(201).json(toSpace(row));
 });
 
 router.put('/:id', (req: AuthRequest, res) => {
   const spaceId = String(req.params.id);
-  if (!requireSpaceAdmin(spaceId, req.user!.userId, req.user!.role)) {
-    res.status(403).json({ error: '无权管理该空间' });
+  if (!requireSpaceAdmin(spaceId, req.user!.userId, req.user!.roles)) {
+    res.status(403).json({ error: '无权管理该应用' });
     return;
   }
   const db = getDb();
   const current = db.prepare('SELECT * FROM spaces WHERE id = ?').get(spaceId) as any;
-  if (!current) { res.status(404).json({ error: '空间不存在' }); return; }
+  if (!current) { res.status(404).json({ error: '应用不存在' }); return; }
   const { name, description, icon, permTree, resourceConfig, columnConfig } = req.body;
   db.prepare(`
     UPDATE spaces
@@ -113,23 +113,23 @@ router.put('/:id', (req: AuthRequest, res) => {
   );
   const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, userName, 'UPDATE', 'Space', spaceId, `更新空间 ${name ?? current.name}`);
+    .run(req.user!.userId, userName, 'UPDATE', 'Space', spaceId, `更新应用 ${name ?? current.name}`);
   const row = db.prepare('SELECT * FROM spaces WHERE id = ?').get(spaceId) as any;
   res.json(toSpace(row));
 });
 
 router.delete('/:id', (req: AuthRequest, res) => {
-  if (req.user!.role !== 'Admin') {
-    res.status(403).json({ error: '只有全局管理员可以删除空间' });
+  if (!req.user!.roles.includes('Admin')) {
+    res.status(403).json({ error: '只有全局管理员可以删除应用' });
     return;
   }
   const db = getDb();
   const row = db.prepare('SELECT name FROM spaces WHERE id = ?').get(req.params.id) as any;
-  if (!row) { res.status(404).json({ error: '空间不存在' }); return; }
+  if (!row) { res.status(404).json({ error: '应用不存在' }); return; }
   db.prepare('DELETE FROM spaces WHERE id = ?').run(req.params.id);
   const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, userName, 'DELETE', 'Space', req.params.id, `删除空间 ${row.name}`);
+    .run(req.user!.userId, userName, 'DELETE', 'Space', req.params.id, `删除应用 ${row.name}`);
   res.json({ ok: true });
 });
 
@@ -143,8 +143,8 @@ router.get('/:id/roles', (req, res) => {
 
 router.post('/:id/roles', (req: AuthRequest, res) => {
   const spaceId = String(req.params.id);
-  if (!requireSpaceAdmin(spaceId, req.user!.userId, req.user!.role)) {
-    res.status(403).json({ error: '无权在该空间创建角色' });
+  if (!requireSpaceAdmin(spaceId, req.user!.userId, req.user!.roles)) {
+    res.status(403).json({ error: '无权在该应用创建角色' });
     return;
   }
   const db = getDb();
@@ -163,15 +163,15 @@ router.post('/:id/roles', (req: AuthRequest, res) => {
   );
   const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, userName, 'CREATE', 'SpaceRole', id, `空间 ${spaceId} 创建角色 ${name}`);
+    .run(req.user!.userId, userName, 'CREATE', 'SpaceRole', id, `应用 ${spaceId} 创建角色 ${name}`);
   const row = db.prepare('SELECT * FROM space_roles WHERE id = ?').get(id) as any;
   res.status(201).json(toSpaceRole(row));
 });
 
 router.put('/:id/roles/:roleId', (req: AuthRequest, res) => {
   const spaceId = String(req.params.id);
-  if (!requireSpaceAdmin(spaceId, req.user!.userId, req.user!.role)) {
-    res.status(403).json({ error: '无权修改该空间的角色' });
+  if (!requireSpaceAdmin(spaceId, req.user!.userId, req.user!.roles)) {
+    res.status(403).json({ error: '无权修改该应用的角色' });
     return;
   }
   const db = getDb();
@@ -194,15 +194,15 @@ router.put('/:id/roles/:roleId', (req: AuthRequest, res) => {
   );
   const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, userName, 'UPDATE', 'SpaceRole', req.params.roleId, `更新空间角色 ${name ?? current.name}`);
+    .run(req.user!.userId, userName, 'UPDATE', 'SpaceRole', req.params.roleId, `更新应用角色 ${name ?? current.name}`);
   const row = db.prepare('SELECT * FROM space_roles WHERE id = ?').get(req.params.roleId) as any;
   res.json(toSpaceRole(row));
 });
 
 router.delete('/:id/roles/:roleId', (req: AuthRequest, res) => {
   const spaceId = String(req.params.id);
-  if (!requireSpaceAdmin(spaceId, req.user!.userId, req.user!.role)) {
-    res.status(403).json({ error: '无权删除该空间的角色' });
+  if (!requireSpaceAdmin(spaceId, req.user!.userId, req.user!.roles)) {
+    res.status(403).json({ error: '无权删除该应用的角色' });
     return;
   }
   const db = getDb();
@@ -216,7 +216,7 @@ router.delete('/:id/roles/:roleId', (req: AuthRequest, res) => {
     .run(req.params.roleId, spaceId);
   const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, userName, 'DELETE', 'SpaceRole', req.params.roleId, `删除空间角色`);
+    .run(req.user!.userId, userName, 'DELETE', 'SpaceRole', req.params.roleId, `删除应用角色`);
   res.json({ ok: true });
 });
 
@@ -249,8 +249,8 @@ router.get('/:id/members', (req, res) => {
 
 router.post('/:id/members', (req: AuthRequest, res) => {
   const spaceId = String(req.params.id);
-  if (!requireSpaceAdmin(spaceId, req.user!.userId, req.user!.role)) {
-    res.status(403).json({ error: '无权管理该空间成员' });
+  if (!requireSpaceAdmin(spaceId, req.user!.userId, req.user!.roles)) {
+    res.status(403).json({ error: '无权管理该应用成员' });
     return;
   }
   const db = getDb();
@@ -258,7 +258,7 @@ router.post('/:id/members', (req: AuthRequest, res) => {
   if (!userId || !roleId) { res.status(400).json({ error: 'userId 与 roleId 必填' }); return; }
   const existing = db.prepare('SELECT id FROM space_members WHERE space_id = ? AND user_id = ?')
     .get(spaceId, userId) as any;
-  if (existing) { res.status(400).json({ error: '该用户已是空间成员' }); return; }
+  if (existing) { res.status(400).json({ error: '该用户已是应用成员' }); return; }
   const id = `sm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   db.prepare(`
     INSERT INTO space_members (id, space_id, user_id, role_id, is_admin)
@@ -266,14 +266,14 @@ router.post('/:id/members', (req: AuthRequest, res) => {
   `).run(id, spaceId, userId, roleId, isAdmin ? 1 : 0);
   const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, userName, 'CREATE', 'SpaceMember', id, `空间 ${spaceId} 添加成员 ${userId}`);
+    .run(req.user!.userId, userName, 'CREATE', 'SpaceMember', id, `应用 ${spaceId} 添加成员 ${userId}`);
   res.status(201).json({ id, spaceId, userId, roleId, isAdmin: !!isAdmin });
 });
 
 router.put('/:id/members/:memberId', (req: AuthRequest, res) => {
   const spaceId = String(req.params.id);
-  if (!requireSpaceAdmin(spaceId, req.user!.userId, req.user!.role)) {
-    res.status(403).json({ error: '无权管理该空间成员' });
+  if (!requireSpaceAdmin(spaceId, req.user!.userId, req.user!.roles)) {
+    res.status(403).json({ error: '无权管理该应用成员' });
     return;
   }
   const db = getDb();
@@ -286,14 +286,14 @@ router.put('/:id/members/:memberId', (req: AuthRequest, res) => {
       req.params.memberId, spaceId);
   const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, userName, 'UPDATE', 'SpaceMember', req.params.memberId, `更新空间成员`);
+    .run(req.user!.userId, userName, 'UPDATE', 'SpaceMember', req.params.memberId, `更新应用成员`);
   res.json({ ok: true });
 });
 
 router.delete('/:id/members/:memberId', (req: AuthRequest, res) => {
   const spaceId = String(req.params.id);
-  if (!requireSpaceAdmin(spaceId, req.user!.userId, req.user!.role)) {
-    res.status(403).json({ error: '无权管理该空间成员' });
+  if (!requireSpaceAdmin(spaceId, req.user!.userId, req.user!.roles)) {
+    res.status(403).json({ error: '无权管理该应用成员' });
     return;
   }
   const db = getDb();
@@ -301,7 +301,7 @@ router.delete('/:id/members/:memberId', (req: AuthRequest, res) => {
     .run(req.params.memberId, spaceId);
   const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, userName, 'DELETE', 'SpaceMember', req.params.memberId, `移除空间成员`);
+    .run(req.user!.userId, userName, 'DELETE', 'SpaceMember', req.params.memberId, `移除应用成员`);
   res.json({ ok: true });
 });
 

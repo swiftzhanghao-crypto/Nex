@@ -10,6 +10,32 @@ interface Props {
   spaceId: string;
 }
 
+// 仅在 mock 模式下使用：localStorage 持久化应用角色 / 成员，避免刷新丢失
+const MOCK_PREFIX = 'spaceMock';
+const mockStore = {
+  loadRoles(spaceId: string): SpaceRole[] | null {
+    try {
+      const v = localStorage.getItem(`${MOCK_PREFIX}:roles:${spaceId}`);
+      return v ? (JSON.parse(v) as SpaceRole[]) : null;
+    } catch { return null; }
+  },
+  saveRoles(spaceId: string, roles: SpaceRole[]) {
+    try { localStorage.setItem(`${MOCK_PREFIX}:roles:${spaceId}`, JSON.stringify(roles)); } catch {}
+  },
+  loadMembers(spaceId: string): SpaceMember[] | null {
+    try {
+      const v = localStorage.getItem(`${MOCK_PREFIX}:members:${spaceId}`);
+      return v ? (JSON.parse(v) as SpaceMember[]) : null;
+    } catch { return null; }
+  },
+  saveMembers(spaceId: string, members: SpaceMember[]) {
+    try { localStorage.setItem(`${MOCK_PREFIX}:members:${spaceId}`, JSON.stringify(members)); } catch {}
+  },
+};
+
+const genId = (prefix: string) =>
+  `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
 const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
   const { spaces, setSpaces, users, apiMode, currentUser } = useAppContext();
   const [spaceRoles, setSpaceRoles] = useState<SpaceRole[]>([]);
@@ -31,15 +57,23 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
 
   const canManage = useMemo(() => {
     if (!space) return false;
-    if (currentUser.role === 'Admin') return true;
+    if (currentUser.roles?.includes('Admin')) return true;
     return spaceMembers.some(m => m.userId === currentUser.id && m.isAdmin);
   }, [space, currentUser, spaceMembers]);
 
   const fetchData = useCallback(async () => {
     if (!apiMode) {
-      const { initialSpaceRoles } = await import('../../data/spaceSeedData');
-      setSpaceRoles(initialSpaceRoles.filter(r => r.spaceId === spaceId));
-      setSpaceMembers([]);
+      // Mock 模式：优先从 localStorage 读取；首次访问则用 seed 数据初始化
+      const cachedRoles = mockStore.loadRoles(spaceId);
+      if (cachedRoles) {
+        setSpaceRoles(cachedRoles);
+      } else {
+        const { initialSpaceRoles } = await import('../../data/spaceSeedData');
+        const seeded = initialSpaceRoles.filter(r => r.spaceId === spaceId);
+        setSpaceRoles(seeded);
+        mockStore.saveRoles(spaceId, seeded);
+      }
+      setSpaceMembers(mockStore.loadMembers(spaceId) || []);
       return;
     }
     setLoadingDetail(true);
@@ -51,7 +85,7 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
       setSpaceRoles(roles as SpaceRole[]);
       setSpaceMembers(members as SpaceMember[]);
     } catch (e: any) {
-      console.error('加载空间数据失败', e);
+      console.error('加载应用数据失败', e);
     } finally {
       setLoadingDetail(false);
     }
@@ -83,7 +117,20 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
 
   const handleDeleteRole = async (roleId: string) => {
     if (!window.confirm('确定删除此角色？')) return;
-    if (!apiMode) return;
+    if (!apiMode) {
+      // Mock：本地删除并联动清理该角色下的成员
+      const nextRoles = spaceRoles.filter(r => r.id !== roleId);
+      const nextMembers = spaceMembers.filter(m => m.roleId !== roleId);
+      setSpaceRoles(nextRoles);
+      setSpaceMembers(nextMembers);
+      mockStore.saveRoles(spaceId, nextRoles);
+      mockStore.saveMembers(spaceId, nextMembers);
+      if (selectedRoleId === roleId) {
+        setSelectedRoleId(null);
+        setIsEditingRole(false);
+      }
+      return;
+    }
     try {
       await spaceApi.deleteRole(spaceId, roleId);
       if (selectedRoleId === roleId) {
@@ -97,7 +144,29 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
   };
 
   const handleCopyRole = async (role: SpaceRole) => {
-    if (!apiMode) { alert('Mock 模式下不支持复制空间角色'); return; }
+    if (!apiMode) {
+      // Mock：本地复制
+      const newId = genId('srole_mock');
+      const copied: SpaceRole = {
+        ...role,
+        id: newId,
+        name: `${role.name} (副本)`,
+        permissions: [...(role.permissions || [])],
+        rowPermissions: (role.rowPermissions || []).map(r => ({
+          ...r,
+          id: `rule-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        })),
+        rowLogic: role.rowLogic ? JSON.parse(JSON.stringify(role.rowLogic)) : {},
+        columnPermissions: (role.columnPermissions || []).map(r => ({ ...r })),
+        sortOrder: spaceRoles.length,
+      };
+      const next = [...spaceRoles, copied];
+      setSpaceRoles(next);
+      mockStore.saveRoles(spaceId, next);
+      setSelectedRoleId(newId);
+      setIsEditingRole(true);
+      return;
+    }
     try {
       const created = await spaceApi.createRole(spaceId, {
         name: `${role.name} (副本)`,
@@ -107,20 +176,79 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
         rowLogic: role.rowLogic ? JSON.parse(JSON.stringify(role.rowLogic)) : {},
         columnPermissions: (role.columnPermissions || []).map(r => ({ ...r })),
       });
-      await fetchData();
       setSelectedRoleId((created as SpaceRole).id);
       setIsEditingRole(true);
+      await fetchData();
     } catch (e: any) {
       alert(e?.message || '复制失败');
     }
   };
 
+  // Mock 模式下的成员增/减回调
+  const handleMockAddMember = useCallback((userId: string, roleId: string) => {
+    const user = users.find(u => u.id === userId);
+    const role = spaceRoles.find(r => r.id === roleId);
+    const newMember: SpaceMember = {
+      id: genId('smem_mock'),
+      spaceId,
+      userId,
+      userName: user?.name || userId,
+      userEmail: user?.email || '',
+      userAvatar: user?.avatar,
+      departmentId: user?.departmentId,
+      roleId,
+      roleName: role?.name || '',
+      isAdmin: false,
+    };
+    setSpaceMembers(prev => {
+      const next = [...prev, newMember];
+      mockStore.saveMembers(spaceId, next);
+      return next;
+    });
+  }, [users, spaceRoles, spaceId]);
+
+  const handleMockRemoveMember = useCallback((memberId: string) => {
+    setSpaceMembers(prev => {
+      const next = prev.filter(m => m.id !== memberId);
+      mockStore.saveMembers(spaceId, next);
+      return next;
+    });
+  }, [spaceId]);
+
   const handleRoleSaved = async (savedRole?: SpaceRole) => {
-    await fetchData();
+    if (!apiMode) {
+      // Mock：upsert 本地 state 并持久化
+      if (savedRole) {
+        setSpaceRoles(prev => {
+          const exists = prev.some(r => r.id === savedRole.id);
+          const next = exists
+            ? prev.map(r => (r.id === savedRole.id ? savedRole : r))
+            : [...prev, { ...savedRole, sortOrder: savedRole.sortOrder ?? prev.length }];
+          mockStore.saveRoles(spaceId, next);
+          return next;
+        });
+        setSelectedRoleId(savedRole.id);
+      }
+      setIsEditingRole(false);
+      return;
+    }
     if (savedRole) {
       setSelectedRoleId(savedRole.id);
     }
     setIsEditingRole(false);
+    setLoadingDetail(true);
+    try {
+      const [roles, members] = await Promise.all([
+        spaceApi.listRoles(spaceId),
+        spaceApi.listMembers(spaceId),
+      ]);
+      setSpaceRoles(roles as SpaceRole[]);
+      setSpaceMembers(members as SpaceMember[]);
+    } catch (e: any) {
+      console.error('加载应用数据失败', e);
+    } finally {
+      setLoadingDetail(false);
+    }
   };
 
   // Drag handlers
@@ -141,14 +269,28 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
     const reordered = [...spaceRoles];
     const [moved] = reordered.splice(fromIdx, 1);
     reordered.splice(toIdx, 0, moved);
-    setSpaceRoles(reordered);
+    // 重排时同步刷新 sortOrder，保持序号一致
+    const withOrder = reordered.map((r, idx) => ({ ...r, sortOrder: idx }));
+    setSpaceRoles(withOrder);
     setDragRoleId(null);
     setDragOverRoleId(null);
+    if (!apiMode) {
+      mockStore.saveRoles(spaceId, withOrder);
+    } else {
+      // API 模式：批量持久化排序（如后端有专门接口可替换为更轻量调用）
+      try {
+        await Promise.all(
+          withOrder.map(r => spaceApi.updateRole(spaceId, r.id, { sortOrder: r.sortOrder })),
+        );
+      } catch (e: any) {
+        console.error('排序持久化失败', e);
+      }
+    }
   };
   const handleDragEnd = () => { setDragRoleId(null); setDragOverRoleId(null); };
 
   if (!space) {
-    return <div className="flex-1 flex items-center justify-center text-sm text-gray-400">空间不存在</div>;
+    return <div className="flex-1 flex items-center justify-center text-sm text-gray-400">应用不存在</div>;
   }
 
   return (
@@ -160,13 +302,13 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
           {/* Role List */}
           <div className="unified-card w-1/4 min-w-[250px] dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 flex flex-col">
             <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 bg-gray-50 dark:bg-white/5">
-              <h3 className="font-bold text-gray-800 dark:text-white flex-1">空间角色</h3>
+              <h3 className="font-bold text-gray-800 dark:text-white flex-1">应用角色</h3>
               {canManage && (
                 <>
                   <button onClick={handleCreateRole} className="p-1.5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full text-gray-500 dark:text-gray-400" title="新建角色">
                     <Plus className="w-4 h-4" />
                   </button>
-                  <button onClick={() => setShowSettings(true)} className="p-1.5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full text-gray-500 dark:text-gray-400" title="空间设置">
+                  <button onClick={() => setShowSettings(true)} className="p-1.5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full text-gray-500 dark:text-gray-400" title="应用设置">
                     <Settings className="w-4 h-4" />
                   </button>
                 </>
@@ -250,6 +392,8 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
                 members={spaceMembers}
                 allUsers={users}
                 onMembersChange={fetchData}
+                onMockAddMember={handleMockAddMember}
+                onMockRemoveMember={handleMockRemoveMember}
                 initialEditing={isEditingRole}
                 onCancelNew={() => {
                   if (selectedRoleId === 'new') {
@@ -261,20 +405,20 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
                 <Shield className="w-12 h-12 mb-2 opacity-20" />
-                <p>请选择或创建一个空间角色</p>
+                <p>请选择或创建一个应用角色</p>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* 空间设置弹窗 */}
+      {/* 应用设置弹窗 */}
       {showSettings && (
         <ModalPortal>
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[500] p-4 animate-fade-in">
             <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-2xl flex flex-col animate-modal-enter border-white/10 max-h-[80vh]">
               <div className="p-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5 shrink-0">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><Settings className="w-5 h-5" /> 空间设置</h3>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><Settings className="w-5 h-5" /> 应用设置</h3>
                 <button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5" /></button>
               </div>
               <div className="p-5 flex-1 overflow-y-auto">
@@ -353,12 +497,12 @@ const SettingsPanel: React.FC<{
     <div className="space-y-4 max-w-3xl">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">空间名称</label>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">应用名称</label>
           <input disabled={disabled} value={name} onChange={e => setName(e.target.value)}
             className="w-full px-3 py-1.5 text-sm bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-md disabled:opacity-60" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">空间 ID</label>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">应用 ID</label>
           <input value={space.id} disabled className="w-full px-3 py-1.5 text-sm bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-md text-gray-500" />
         </div>
         <div className="md:col-span-2">

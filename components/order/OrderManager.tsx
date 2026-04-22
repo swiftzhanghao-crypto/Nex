@@ -82,7 +82,7 @@ const OrderManager: React.FC = () => {
   const location = useLocation();
 
   // Permission Check
-  const currentUserRole = roles.find(r => r.id === currentUser.role);
+  const currentUserRole = roles.find(r => currentUser.roles?.includes(r.id));
   const permissions = currentUserRole?.permissions || [];
   const hasPermission = (perm: string) => permissions.includes('all') || permissions.includes(perm);
 
@@ -621,7 +621,7 @@ const OrderManager: React.FC = () => {
               if (selectedOrderIds.has(o.id) && o.status === OrderStatus.PENDING_CONFIRM) {
                   return { ...o, status: OrderStatus.PROCESSING_PROD, confirmedDate: now,
                       approvalRecords: [{ id: `op-batch-${Date.now()}-${o.id}`, operatorId: currentUser.id,
-                          operatorName: currentUser.name, operatorRole: currentUser.role,
+                          operatorName: currentUser.name, operatorRole: currentUser.roles?.join(',') || '',
                           actionType: 'Batch Confirm', result: 'Confirmed', timestamp: now, comment: '批量确认操作'
                       }, ...(o.approvalRecords || [])] };
               }
@@ -658,7 +658,7 @@ const OrderManager: React.FC = () => {
                       trackingNumber: isPhysical ? (o.trackingNumber || `BATCH-${Date.now()}`) : undefined,
                       isPackageConfirmed: true, isCDBurned: true,
                       approvalRecords: [{ id: `op-batch-ship-${Date.now()}-${o.id}`, operatorId: currentUser.id,
-                          operatorName: currentUser.name, operatorRole: currentUser.role,
+                          operatorName: currentUser.name, operatorRole: currentUser.roles?.join(',') || '',
                           actionType: 'Batch Ship', result: 'Shipped', timestamp: now, comment: '批量发货操作'
                       }, ...(o.approvalRecords || [])] };
               }

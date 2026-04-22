@@ -163,6 +163,7 @@ export function initSchema() {
       original_order_id   TEXT,
       refund_reason       TEXT,
       refund_amount       REAL,
+      order_remark        TEXT,
       extra               TEXT NOT NULL DEFAULT '{}',
       created_at          TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
@@ -334,5 +335,8 @@ export function initSchema() {
   `);
 
   try { db.exec("ALTER TABLE roles ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0"); }
+  catch { /* column already exists */ }
+
+  try { db.exec("ALTER TABLE orders ADD COLUMN order_remark TEXT"); }
   catch { /* column already exists */ }
 }

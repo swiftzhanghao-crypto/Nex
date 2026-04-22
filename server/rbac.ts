@@ -107,7 +107,7 @@ export function checkPermission(resource: string, action: string): (req: AuthReq
       res.status(403).json({ error: '权限未定义' });
       return;
     }
-    if (allowedRoles.includes(req.user.role)) {
+    if (req.user.roles.some(r => allowedRoles.includes(r))) {
       next();
       return;
     }
@@ -115,10 +115,12 @@ export function checkPermission(resource: string, action: string): (req: AuthReq
   };
 }
 
-export function hasPermission(role: string, resource: string, action: string): boolean {
+export function hasPermission(roles: string | string[], resource: string, action: string): boolean {
   const key = `${resource}:${action}`;
   const allowedRoles = PERMISSION_MATRIX[key];
-  return !!allowedRoles && allowedRoles.includes(role);
+  if (!allowedRoles) return false;
+  const arr = Array.isArray(roles) ? roles : [roles];
+  return arr.some(r => allowedRoles.includes(r));
 }
 
 export { PERMISSION_MATRIX };

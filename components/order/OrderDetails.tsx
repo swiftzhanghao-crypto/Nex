@@ -36,7 +36,7 @@ const OrderDetails: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  const currentUserRole = roles.find(r => r.id === currentUser.role);
+  const currentUserRole = roles.find(r => currentUser.roles?.includes(r.id));
   const permissions = currentUserRole?.permissions || [];
   const hasPermission = (perm: string) => permissions.includes('all') || permissions.includes(perm);
 
@@ -150,7 +150,7 @@ const OrderDetails: React.FC = () => {
       id: `op-${Date.now()}`,
       operatorId: currentUser.id,
       operatorName: currentUser.name,
-      operatorRole: currentUser.role,
+      operatorRole: currentUser.roles?.join(',') || '',
       actionType,
       result,
       timestamp: new Date().toISOString(),

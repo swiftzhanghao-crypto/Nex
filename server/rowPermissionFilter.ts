@@ -12,11 +12,16 @@ function safeJsonParse(str: string | null | undefined, fallback: any = {}) {
   catch { return fallback; }
 }
 
-export function getRowRules(db: any, roleId: string, resource: PermissionResource): RowRule[] {
-  const role = db.prepare('SELECT row_permissions FROM roles WHERE id = ?').get(roleId) as any;
-  const rules = safeJsonParse(role?.row_permissions, []);
-  if (!Array.isArray(rules)) return [];
-  return rules.filter((r: RowRule) => r?.resource === resource && Array.isArray(r.values) && r.values.length > 0);
+export function getRowRules(db: any, roleId: string | string[], resource: PermissionResource): RowRule[] {
+  const ids = Array.isArray(roleId) ? roleId : [roleId];
+  const allRules: RowRule[] = [];
+  for (const id of ids) {
+    const role = db.prepare('SELECT row_permissions FROM roles WHERE id = ?').get(id) as any;
+    const rules = safeJsonParse(role?.row_permissions, []);
+    if (!Array.isArray(rules)) continue;
+    allRules.push(...rules.filter((r: RowRule) => r?.resource === resource && Array.isArray(r.values) && r.values.length > 0));
+  }
+  return allRules;
 }
 
 export function getDescendantDeptIds(db: any, deptId: string): string[] {
@@ -191,11 +196,11 @@ function evaluateProductRowRule(
 
 export function filterByRowPermissions(
   db: any,
-  user: { userId: string; role: string },
+  user: { userId: string; roles: string[] },
   resource: PermissionResource,
   data: any[],
 ): any[] {
-  const rules = getRowRules(db, user.role, resource);
+  const rules = getRowRules(db, user.roles, resource);
   if (rules.length === 0) return data;
 
   const userDeptMap = buildUserDeptMap(db);
@@ -219,7 +224,7 @@ export function filterByRowPermissions(
 
 export function checkRowPermissionForSingle(
   db: any,
-  user: { userId: string; role: string },
+  user: { userId: string; roles: string[] },
   resource: PermissionResource,
   item: any,
 ): boolean {
@@ -403,10 +408,10 @@ function buildProductRuleClause(rule: RowRule): Clause {
  */
 export function buildRowPermissionWhere(
   db: any,
-  user: { userId: string; role: string },
+  user: { userId: string; roles: string[] },
   resource: PermissionResource,
 ): { sql: string; params: any[] } {
-  const rules = getRowRules(db, user.role, resource);
+  const rules = getRowRules(db, user.roles, resource);
   if (rules.length === 0) return { sql: '', params: [] };
 
   const userDeptMap = buildUserDeptMap(db);

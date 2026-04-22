@@ -6,10 +6,20 @@ import { checkPermission } from '../rbac.ts';
 const router = Router();
 router.use(authMiddleware);
 
+/** 兼容旧格式：DB 列原为 'Admin'，新格式为 '["Admin","Sales"]' */
+export function parseRoles(raw: string | null): string[] {
+  if (!raw) return [];
+  const s = raw.trim();
+  if (s.startsWith('[')) {
+    try { return JSON.parse(s) as string[]; } catch { return [s]; }
+  }
+  return [s];
+}
+
 function toUser(row: any) {
   return {
     id: row.id, accountId: row.account_id, name: row.name,
-    email: row.email, phone: row.phone, role: row.role,
+    email: row.email, phone: row.phone, roles: parseRoles(row.role),
     userType: row.user_type, status: row.status,
     avatar: row.avatar, departmentId: row.department_id,
     monthBadge: row.month_badge,
@@ -33,7 +43,7 @@ router.get('/', checkPermission('user', 'list'), (req, res) => {
   const conds: string[] = ['1=1'];
   const params: any[] = [];
 
-  if (role) { conds.push('role = ?'); params.push(role); }
+  if (role) { conds.push("(role = ? OR role LIKE '%\"' || ? || '\"%')"); params.push(role, role); }
   if (status) { conds.push('status = ?'); params.push(status); }
   if (departmentId) { conds.push('department_id = ?'); params.push(departmentId); }
   if (search && search.trim()) {
@@ -98,13 +108,17 @@ router.get('/:id', checkPermission('user', 'read'), (req, res) => {
 
 router.put('/:id', requireSelfOrRole('Admin'), (req: AuthRequest, res) => {
   const db = getDb();
-  const { name, email, phone, role, userType, status, departmentId } = req.body;
+  const { name, email, phone, roles, role, userType, status, departmentId } = req.body;
+  // 兼容前端新旧版本：优先 roles（数组），其次 role（旧单值）
+  const rolesVal = roles ? JSON.stringify(Array.isArray(roles) ? roles : [roles])
+    : role ? JSON.stringify(Array.isArray(role) ? role : [role])
+    : undefined;
 
   const isSelf = req.user!.userId === req.params.id;
-  const isAdmin = req.user!.role === 'Admin';
+  const isAdmin = req.user!.roles.includes('Admin');
 
   if (isSelf && !isAdmin) {
-    if (role || userType || status || departmentId) {
+    if (rolesVal || userType || status || departmentId) {
       res.status(403).json({ error: '非管理员不能修改角色、类型、状态或部门' });
       return;
     }
@@ -114,7 +128,7 @@ router.put('/:id', requireSelfOrRole('Admin'), (req: AuthRequest, res) => {
     db.prepare(`
       UPDATE users SET name=?, email=?, phone=?, role=?, user_type=?, status=?, department_id=?, updated_at=datetime('now')
       WHERE id=?
-    `).run(name, email, phone ?? null, role, userType ?? 'Internal', status ?? 'Active', departmentId ?? null, req.params.id);
+    `).run(name, email, phone ?? null, rolesVal ?? '["Sales"]', userType ?? 'Internal', status ?? 'Active', departmentId ?? null, req.params.id);
   }
   const row = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
   res.json(toUser(row));
@@ -193,7 +207,7 @@ router.delete('/meta/roles/:id', checkPermission('role', 'delete'), (req: AuthRe
   if (!role) { res.status(404).json({ error: '角色不存在' }); return; }
   if (role.is_system) { res.status(400).json({ error: '系统内置角色不可删除' }); return; }
 
-  const userCount = db.prepare('SELECT COUNT(*) as n FROM users WHERE role = ?').get(req.params.id) as { n: number };
+  const userCount = db.prepare("SELECT COUNT(*) as n FROM users WHERE role = ? OR role LIKE '%\"' || ? || '\"%'").get(req.params.id, req.params.id) as { n: number };
   if (userCount.n > 0) { res.status(400).json({ error: '该角色下仍有用户，无法删除' }); return; }
 
   db.prepare('DELETE FROM roles WHERE id = ?').run(req.params.id);

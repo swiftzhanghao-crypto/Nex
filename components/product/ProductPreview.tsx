@@ -21,7 +21,7 @@ const ProductPreview: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const currentUserRole = roles.find(r => r.id === currentUser.role);
+  const currentUserRole = roles.find(r => currentUser.roles?.includes(r.id));
   const permissions = currentUserRole?.permissions || [];
   const hasPermission = (perm: string) => permissions.includes('all') || permissions.includes(perm);
 

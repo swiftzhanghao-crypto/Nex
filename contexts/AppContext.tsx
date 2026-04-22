@@ -122,7 +122,7 @@ interface AppContextType {
     filteredCustomers: Customer[];
     filteredProducts: Product[];
 
-    /** Spaces（应用空间）列表 */
+    /** Spaces（应用）列表 */
     spaces: Space[];
     setSpaces: React.Dispatch<React.SetStateAction<Space[]>>;
     refreshSpaces: () => Promise<void>;
@@ -222,7 +222,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [standaloneEnterprises] = useState(initialStandaloneEnterprises);
 
     // --- Space domain ---
-    const [spaces, setSpaces] = useState<Space[]>(USE_API ? [] : initialSpaces);
+    // Mock 模式下优先从 localStorage 恢复（含用户新建/修改过的应用），无则用 seed
+    const [spaces, setSpacesRaw] = useState<Space[]>(() => {
+        if (USE_API) return [];
+        try {
+            const cached = localStorage.getItem('spaceMock:list');
+            if (cached) return JSON.parse(cached) as Space[];
+        } catch { /* noop */ }
+        return initialSpaces;
+    });
+    // 包装 setter：Mock 模式下任何变更都同步写回 localStorage
+    const setSpaces: React.Dispatch<React.SetStateAction<Space[]>> = useCallback((value) => {
+        setSpacesRaw(prev => {
+            const next = typeof value === 'function' ? (value as (p: Space[]) => Space[])(prev) : value;
+            if (!USE_API) {
+                try { localStorage.setItem('spaceMock:list', JSON.stringify(next)); } catch { /* noop */ }
+            }
+            return next;
+        });
+    }, []);
 
     // --- Read-only generated domains ---
     const [contracts, setContracts] = useState<Contract[]>(() => USE_API ? [] : mockContracts);
@@ -287,12 +305,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (loadedOnceRef.current[key]) return;
         const inflight = inFlightRef.current[key];
         if (inflight) return inflight;
-        const p = run().finally(() => {
-            inFlightRef.current[key] = null;
-        });
+        const p = (async () => {
+            let ok = false;
+            try {
+                await run();
+                ok = true;
+            } catch (e) {
+                // 仅在失败时打印，不标记为已加载——组件下次 mount 时会重试
+                console.error(`[API] dedupedLoad "${key}" failed:`, e);
+            } finally {
+                inFlightRef.current[key] = null;
+                if (ok) loadedOnceRef.current[key] = true;
+            }
+        })();
         inFlightRef.current[key] = p;
-        await p;
-        loadedOnceRef.current[key] = true;
+        return p;
     }, []);
 
     /** 拉取某个分页接口的全量数据：分批 size=200 直到 total 满 */
@@ -311,67 +338,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return acc;
     }
 
+    // NOTE: 这里的 run 函数不再吞错误，失败会被 dedupedLoad 捕获
+    // 并**不**标记为已加载，保证用户下次切换到相应页面时会自动重试。
     const loadAllOrders = useCallback(() => dedupedLoad('orders', async () => {
-        try {
-            const all = await fetchAllPaged((p) => orderApi.list(p));
-            setOrders(all);
-        } catch (e) { console.error('[API] loadAllOrders failed:', e); }
+        const all = await fetchAllPaged((p) => orderApi.list(p));
+        setOrders(all);
     }), [dedupedLoad]);
 
     const loadAllCustomers = useCallback(() => dedupedLoad('customers', async () => {
-        try {
-            const all = await fetchAllPaged((p) => customerApi.list(p));
-            setCustomers(all);
-        } catch (e) { console.error('[API] loadAllCustomers failed:', e); }
+        const all = await fetchAllPaged((p) => customerApi.list(p));
+        setCustomers(all);
     }), [dedupedLoad]);
 
     const loadAllOpportunities = useCallback(() => dedupedLoad('opportunities', async () => {
-        try {
-            const all = await fetchAllPaged((p) => opportunityApi.list(p));
-            setOpportunities(all);
-        } catch (e) { console.error('[API] loadAllOpportunities failed:', e); }
+        const all = await fetchAllPaged((p) => opportunityApi.list(p));
+        setOpportunities(all);
     }), [dedupedLoad]);
 
     const loadAllContracts = useCallback(() => dedupedLoad('contracts', async () => {
-        try {
-            const all = await fetchAllPaged((p) => financeApi.contracts(p));
-            setContracts(all);
-        } catch (e) { console.error('[API] loadAllContracts failed:', e); }
+        const all = await fetchAllPaged((p) => financeApi.contracts(p));
+        setContracts(all);
     }), [dedupedLoad]);
 
     const loadAllRemittances = useCallback(() => dedupedLoad('remittances', async () => {
-        try {
-            const all = await fetchAllPaged((p) => financeApi.remittances(p));
-            setRemittances(all);
-        } catch (e) { console.error('[API] loadAllRemittances failed:', e); }
+        const all = await fetchAllPaged((p) => financeApi.remittances(p));
+        setRemittances(all);
     }), [dedupedLoad]);
 
     const loadAllInvoices = useCallback(() => dedupedLoad('invoices', async () => {
-        try {
-            const all = await fetchAllPaged((p) => financeApi.invoices(p));
-            setInvoices(all);
-        } catch (e) { console.error('[API] loadAllInvoices failed:', e); }
+        const all = await fetchAllPaged((p) => financeApi.invoices(p));
+        setInvoices(all);
     }), [dedupedLoad]);
 
     const loadAllPerformances = useCallback(() => dedupedLoad('performances', async () => {
-        try {
-            const all = await fetchAllPaged((p) => financeApi.performances(p));
-            setPerformances(all);
-        } catch (e) { console.error('[API] loadAllPerformances failed:', e); }
+        const all = await fetchAllPaged((p) => financeApi.performances(p));
+        setPerformances(all);
     }), [dedupedLoad]);
 
     const loadAllAuthorizations = useCallback(() => dedupedLoad('authorizations', async () => {
-        try {
-            const all = await fetchAllPaged((p) => financeApi.authorizations(p));
-            setAuthorizations(all);
-        } catch (e) { console.error('[API] loadAllAuthorizations failed:', e); }
+        const all = await fetchAllPaged((p) => financeApi.authorizations(p));
+        setAuthorizations(all);
     }), [dedupedLoad]);
 
     const loadAllDeliveryInfos = useCallback(() => dedupedLoad('deliveryInfos', async () => {
-        try {
-            const all = await fetchAllPaged((p) => financeApi.deliveryInfos(p));
-            setDeliveryInfos(all);
-        } catch (e) { console.error('[API] loadAllDeliveryInfos failed:', e); }
+        const all = await fetchAllPaged((p) => financeApi.deliveryInfos(p));
+        setDeliveryInfos(all);
     }), [dedupedLoad]);
 
     /** 兼容旧接口：refreshXxx 强制重拉一次全量 */
@@ -387,7 +398,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const refreshSpaces = useCallback(async () => {
         if (!USE_API) {
-            setSpaces(initialSpaces);
+            // Mock 模式：优先恢复 localStorage 中的最新列表，避免覆盖用户本地新建/修改的应用
+            try {
+                const cached = localStorage.getItem('spaceMock:list');
+                setSpaces(cached ? (JSON.parse(cached) as Space[]) : initialSpaces);
+            } catch {
+                setSpaces(initialSpaces);
+            }
             return;
         }
         try {
@@ -396,7 +413,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } catch (e) {
             console.error('[API] refreshSpaces failed:', e);
         }
-    }, []);
+    }, [setSpaces]);
 
     const clearApiData = useCallback(() => {
         setCustomers([]);
@@ -485,10 +502,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setError(null);
     }, [clearApiData]);
 
-    const currentUserRole = useMemo(() =>
-        roles.find(r => r.id === currentUser.role),
-        [roles, currentUser.role]
+    // 多角色：取用户所有平台角色定义，行权限取并集
+    const currentUserRoles = useMemo(() =>
+        roles.filter(r => currentUser.roles?.includes(r.id)),
+        [roles, currentUser.roles]
     );
+    // 兼容：很多地方还只接受单个 RoleDefinition，取第一个（优先级最高的）
+    const currentUserRole = currentUserRoles[0] ?? undefined;
 
     const filteredOrders = useMemo(() =>
         filterOrdersByRowPermissions(orders, currentUserRole, currentUser, users, departments),

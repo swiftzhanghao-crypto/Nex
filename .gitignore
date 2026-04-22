@@ -39,3 +39,4 @@ data/*.db-shm
 *.sln
 *.sw?
 backend/server
+server/app.db

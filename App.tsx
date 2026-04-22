@@ -51,7 +51,7 @@ import SABCustomerDetail from './components/sab/SABCustomerDetail';
 
 const RequireAnyPermission: React.FC<{ permissions: string[]; children: React.ReactElement }> = ({ permissions, children }) => {
   const { currentUser, roles } = useAppContext();
-  const currentUserRole = roles.find((r) => r.id === currentUser.role);
+  const currentUserRole = roles.find((r) => currentUser.roles?.includes(r.id));
   const rolePermissions = currentUserRole?.permissions || [];
   const canAccess = rolePermissions.includes('all') || permissions.some((p) => rolePermissions.includes(p));
   return canAccess ? children : <Navigate to="/" replace />;
