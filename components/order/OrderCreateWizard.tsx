@@ -1096,8 +1096,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         orderRemark: orderRemark || undefined,
         purchasingContactId: selectedPurchasingContactId || undefined,
         itContactId: selectedItContactId || undefined,
-        linkedContractIds: linkedContractIds.length > 0 ? linkedContractIds : undefined,
-        linkedContractNames: linkedContractIds.length > 0 ? linkedContractIds.map(id => contracts.find(c => c.id === id)?.name || id) : undefined,
+        linkedContractIds: buyerType !== 'SelfDeal' && linkedContractIds.length > 0 ? linkedContractIds : undefined,
+        linkedContractNames: buyerType !== 'SelfDeal' && linkedContractIds.length > 0 ? linkedContractIds.map(id => contracts.find(c => c.id === id)?.name || id) : undefined,
         settlementMethod: settlementMethod || undefined,
         settlementType: settlementMethod === 'credit' ? settlementType : undefined,
         expectedPaymentDate: settlementMethod === 'credit' && settlementType === 'once' && expectedPaymentDate ? expectedPaymentDate : undefined,
@@ -1293,7 +1293,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 ].map(type => (
                                     <button
                                         key={type.id}
-                                        onClick={() => setBuyerType(type.id as BuyerType)}
+                                        onClick={() => {
+                                            setBuyerType(type.id as BuyerType);
+                                            if (type.id === 'SelfDeal') setLinkedContractIds([]);
+                                        }}
                                         className={`px-4 py-3 rounded-xl border-2 flex items-center gap-3 transition-all duration-200 ${
                                             buyerType === type.id
                                             ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/30 dark:bg-white/5 ring-2 ring-blue-500/10'
@@ -1773,8 +1776,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                         </div>
                         )}
 
-                        {/* 关联合同 - 官网订单不需要选择合同 */}
-                        {orderSource !== 'OnlineStore' && <div>
+                        {/* 关联合同 - 官网订单和自成交订单不需要选择合同 */}
+                        {orderSource !== 'OnlineStore' && buyerType !== 'SelfDeal' && <div>
                             <div className="flex items-center justify-between mb-3">
                                 <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                     <ScrollText className="w-4 h-4 text-blue-500"/> 关联合同
