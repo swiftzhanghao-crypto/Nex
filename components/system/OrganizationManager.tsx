@@ -291,7 +291,7 @@ const OrganizationManager: React.FC = () => {
                                             <div>
                                                 <div className="font-medium text-gray-800 dark:text-white text-sm">{user.name}</div>
                                                 <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                                    <Briefcase className="w-3 h-3" /> {user.role}
+                                                    <Briefcase className="w-3 h-3" /> {user.roles?.join(', ')}
                                                     <span className="text-gray-300 dark:text-gray-600">|</span>
                                                     <Mail className="w-3 h-3" /> {user.email}
                                                 </div>

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { X, ShoppingCart, Package, Wifi, Battery, Signal } from 'lucide-react';
 import MobileOrderManager from './MobileOrderManager';
+import MobileOrderDetail from './MobileOrderDetail';
 import MobileProductCenter from './MobileProductCenter';
+import MobileProductDetail from './MobileProductDetail';
 
 interface MobilePreviewProps {
   isOpen: boolean;
@@ -12,6 +14,8 @@ type MobileTab = 'orders' | 'products';
 
 const MobilePreview: React.FC<MobilePreviewProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<MobileTab>('orders');
+  const [viewingProductId, setViewingProductId] = useState<string | null>(null);
+  const [viewingOrderId, setViewingOrderId] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -76,8 +80,16 @@ const MobilePreview: React.FC<MobilePreviewProps> = ({ isOpen, onClose }) => {
 
             {/* Content Area */}
             <div className="absolute top-[54px] left-0 right-0 bottom-[83px] overflow-hidden">
-              {activeTab === 'orders' && <MobileOrderManager />}
-              {activeTab === 'products' && <MobileProductCenter />}
+              {activeTab === 'orders' && (
+                viewingOrderId
+                  ? <MobileOrderDetail orderId={viewingOrderId} onBack={() => setViewingOrderId(null)} />
+                  : <MobileOrderManager onViewDetail={id => setViewingOrderId(id)} />
+              )}
+              {activeTab === 'products' && (
+                viewingProductId
+                  ? <MobileProductDetail productId={viewingProductId} onBack={() => setViewingProductId(null)} />
+                  : <MobileProductCenter onViewDetail={id => setViewingProductId(id)} />
+              )}
             </div>
 
             {/* Bottom Tab Bar — iOS style */}
@@ -87,13 +99,13 @@ const MobilePreview: React.FC<MobilePreviewProps> = ({ isOpen, onClose }) => {
                   icon={<ShoppingCart className="w-[22px] h-[22px]" />}
                   label="订单"
                   isActive={activeTab === 'orders'}
-                  onClick={() => setActiveTab('orders')}
+                  onClick={() => { setActiveTab('orders'); setViewingProductId(null); setViewingOrderId(null); }}
                 />
                 <TabBarItem
                   icon={<Package className="w-[22px] h-[22px]" />}
                   label="产品"
                   isActive={activeTab === 'products'}
-                  onClick={() => setActiveTab('products')}
+                  onClick={() => { setActiveTab('products'); setViewingProductId(null); setViewingOrderId(null); }}
                 />
               </div>
               {/* Home Indicator */}

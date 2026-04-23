@@ -371,15 +371,15 @@ const permissionTree: PermGroup[] = [
     },
 
     // ═══════════════════════════════════════════════
-    //  一级：线索中心
+    //  一级：线索中台
     // ═══════════════════════════════════════════════
     {
-        id: 'g_leads', label: '线索中心',
+        id: 'g_leads', label: '线索中台',
         subgroups: [
             {
                 id: 's_leads', label: '线索管理',
                 permissions: [
-                    { id: 'leads_view', label: '查看线索列表', desc: '访问线索中心页面，查看线索列表及统计' },
+                    { id: 'leads_view', label: '查看线索列表', desc: '访问线索中台页面，查看线索列表及统计' },
                 ]
             },
         ]

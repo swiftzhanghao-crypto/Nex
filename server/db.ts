@@ -52,7 +52,10 @@ export function initSchema() {
       permissions        TEXT NOT NULL DEFAULT '[]',
       is_system          INTEGER NOT NULL DEFAULT 0,
       row_permissions    TEXT NOT NULL DEFAULT '[]',
-      column_permissions TEXT NOT NULL DEFAULT '[]'
+      row_logic          TEXT NOT NULL DEFAULT '{}',
+      column_permissions TEXT NOT NULL DEFAULT '[]',
+      app_permissions    TEXT NOT NULL DEFAULT '{}',
+      sort_order         INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS customers (
@@ -162,6 +165,7 @@ export function initSchema() {
       original_order_id   TEXT,
       refund_reason       TEXT,
       refund_amount       REAL,
+      order_remark        TEXT,
       extra               TEXT NOT NULL DEFAULT '{}',
       created_at          TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
@@ -288,5 +292,58 @@ export function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_authorizations_customer ON authorizations(customer_id);
     CREATE INDEX IF NOT EXISTS idx_delivery_customer      ON delivery_infos(customer_id);
     CREATE INDEX IF NOT EXISTS idx_invoices_order         ON invoices(order_id);
+
+    CREATE TABLE IF NOT EXISTS spaces (
+      id              TEXT PRIMARY KEY,
+      name            TEXT NOT NULL,
+      description     TEXT NOT NULL DEFAULT '',
+      icon            TEXT NOT NULL DEFAULT 'Box',
+      perm_tree       TEXT NOT NULL DEFAULT '[]',
+      resource_config TEXT NOT NULL DEFAULT '[]',
+      column_config   TEXT NOT NULL DEFAULT '[]',
+      sort_order      INTEGER NOT NULL DEFAULT 0,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS space_roles (
+      id                 TEXT PRIMARY KEY,
+      space_id           TEXT NOT NULL,
+      name               TEXT NOT NULL,
+      description        TEXT NOT NULL DEFAULT '',
+      permissions        TEXT NOT NULL DEFAULT '[]',
+      row_permissions    TEXT NOT NULL DEFAULT '[]',
+      row_logic          TEXT NOT NULL DEFAULT '{}',
+      column_permissions TEXT NOT NULL DEFAULT '[]',
+      sort_order         INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (space_id) REFERENCES spaces(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS space_members (
+      id        TEXT PRIMARY KEY,
+      space_id  TEXT NOT NULL,
+      user_id   TEXT NOT NULL,
+      role_id   TEXT NOT NULL,
+      is_admin  INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (space_id) REFERENCES spaces(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(space_id, user_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_space_roles_space   ON space_roles(space_id);
+    CREATE INDEX IF NOT EXISTS idx_space_members_space ON space_members(space_id);
+    CREATE INDEX IF NOT EXISTS idx_space_members_user  ON space_members(user_id);
   `);
+
+  try { db.exec("ALTER TABLE roles ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0"); }
+  catch { /* column already exists */ }
+
+  try { db.exec("ALTER TABLE orders ADD COLUMN order_remark TEXT"); }
+  catch { /* column already exists */ }
+
+  try { db.exec("ALTER TABLE roles ADD COLUMN row_logic TEXT NOT NULL DEFAULT '{}'"); }
+  catch { /* column already exists */ }
+  try { db.exec("ALTER TABLE roles ADD COLUMN app_permissions TEXT NOT NULL DEFAULT '{}'"); }
+  catch { /* column already exists */ }
 }

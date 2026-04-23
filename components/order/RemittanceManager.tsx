@@ -1,12 +1,13 @@
 
 import React, { useState, useMemo } from 'react';
 import { Search, X, ChevronDown, Banknote, Calendar, Filter, SlidersHorizontal } from 'lucide-react';
-import { useAppContext } from '../../contexts/AppContext';
+import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 const RemittanceManager: React.FC = () => {
   const { remittances } = useAppContext();
+  useEnsureData(['remittances']);
   const [searchText, setSearchText] = useState('');
   const [dateStart, setDateStart] = useState('2025-12-14');
   const [dateEnd, setDateEnd] = useState(() => new Date().toISOString().slice(0, 10));

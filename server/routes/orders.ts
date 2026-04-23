@@ -2,15 +2,11 @@ import { Router } from 'express';
 import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
+import { buildRowPermissionWhere, checkRowPermissionForSingle } from '../rowPermissionFilter.ts';
+import { validateBody, orderCreateSchema, orderUpdateSchema } from '../validate.ts';
 
 const router = Router();
 router.use(authMiddleware);
-
-type OrderRowRule = {
-  resource?: string;
-  dimension?: string;
-  values?: string[];
-};
 
 const STATUS_ALIASES: Record<string, string> = {
   APPROVED: 'PENDING_CONFIRM',
@@ -64,127 +60,6 @@ function getUserName(db: any, userId: string): string {
   return row?.name || '';
 }
 
-function getOrderRowRules(db: any, roleId: string): OrderRowRule[] {
-  const role = db.prepare('SELECT row_permissions FROM roles WHERE id = ?').get(roleId) as any;
-  const rules = safeJsonParse(role?.row_permissions, []);
-  if (!Array.isArray(rules)) return [];
-  return rules.filter((r: OrderRowRule) => r?.resource === 'Order' && Array.isArray(r.values) && r.values.length > 0);
-}
-
-function getDescendantDeptIds(db: any, deptId: string): string[] {
-  const rows = db.prepare('SELECT id, parent_id FROM departments').all() as Array<{ id: string; parent_id: string | null }>;
-  const childrenMap = new Map<string, string[]>();
-  rows.forEach((row) => {
-    const pid = row.parent_id || '__root__';
-    const arr = childrenMap.get(pid) || [];
-    arr.push(row.id);
-    childrenMap.set(pid, arr);
-  });
-
-  const result = new Set<string>([deptId]);
-  const queue: string[] = [deptId];
-  while (queue.length > 0) {
-    const curr = queue.shift()!;
-    const children = childrenMap.get(curr) || [];
-    for (const child of children) {
-      if (!result.has(child)) {
-        result.add(child);
-        queue.push(child);
-      }
-    }
-  }
-  return Array.from(result);
-}
-
-function evaluateOrderRowRule(
-  rule: OrderRowRule,
-  order: any,
-  currentUserId: string,
-  currentUserDeptId: string | null,
-  currentUserDeptAndChildrenIds: string[],
-  userDeptMap: Map<string, string | null>
-): boolean {
-  const vals = rule.values || [];
-  if (vals.length === 0) return true;
-
-  switch (rule.dimension) {
-    case 'salesRep':
-      return vals.some((v) => {
-        if (v === 'self') return order.salesRepId === currentUserId;
-        const salesDeptId = order.salesRepId ? userDeptMap.get(order.salesRepId) : null;
-        if (v === 'department') return !!currentUserDeptId && salesDeptId === currentUserDeptId;
-        if (v === 'departmentAndChildren') {
-          return !!currentUserDeptId && !!salesDeptId && currentUserDeptAndChildrenIds.includes(salesDeptId);
-        }
-        return false;
-      });
-    case 'businessManager':
-      return vals.some((v) => {
-        if (v === 'self') return order.businessManagerId === currentUserId;
-        const bmDeptId = order.businessManagerId ? userDeptMap.get(order.businessManagerId) : null;
-        if (v === 'department') return !!currentUserDeptId && bmDeptId === currentUserDeptId;
-        if (v === 'departmentAndChildren') {
-          return !!currentUserDeptId && !!bmDeptId && currentUserDeptAndChildrenIds.includes(bmDeptId);
-        }
-        return false;
-      });
-    case 'creator':
-      return vals.some((v) => {
-        if (v === 'self') return order.creatorId === currentUserId;
-        const creatorDeptId = order.creatorId ? userDeptMap.get(order.creatorId) : null;
-        if (v === 'department') return !!currentUserDeptId && creatorDeptId === currentUserDeptId;
-        if (v === 'departmentAndChildren') {
-          return !!currentUserDeptId && !!creatorDeptId && currentUserDeptAndChildrenIds.includes(creatorDeptId);
-        }
-        return false;
-      });
-    case 'departmentId': {
-      const salesDeptId = order.salesRepId ? userDeptMap.get(order.salesRepId) : null;
-      return !!salesDeptId && vals.includes(salesDeptId);
-    }
-    case 'orderType':
-    case 'buyerType':
-      return vals.includes(order.buyerType || 'Customer');
-    case 'orderSource':
-      return !!order.source && vals.includes(order.source);
-    case 'orderStatus':
-      return !!order.status && vals.includes(order.status);
-    case 'industryLine':
-      return !!order.industryLine && vals.includes(order.industryLine);
-    case 'province':
-      return !!order.province && vals.includes(order.province);
-    case 'customerIndustry':
-      return !!order.customerIndustry && vals.includes(order.customerIndustry);
-    case 'customerLevel':
-      return !!order.customerLevel && vals.includes(order.customerLevel);
-    case 'directChannelId':
-    case 'channelId': {
-      const directChannelId = order.buyerType === 'Channel' ? order.buyerId : undefined;
-      return !!directChannelId && vals.includes(directChannelId);
-    }
-    default:
-      return true;
-  }
-}
-
-function filterOrdersByRowPermissions(db: any, user: { userId: string; role: string }, orders: any[]): any[] {
-  const orderRules = getOrderRowRules(db, user.role);
-  if (orderRules.length === 0) return orders;
-
-  const userRows = db.prepare('SELECT id, department_id FROM users').all() as Array<{ id: string; department_id: string | null }>;
-  const userDeptMap = new Map<string, string | null>();
-  userRows.forEach((u) => userDeptMap.set(u.id, u.department_id || null));
-
-  const currentUserDeptId = userDeptMap.get(user.userId) || null;
-  const currentUserDeptAndChildrenIds = currentUserDeptId ? getDescendantDeptIds(db, currentUserDeptId) : [];
-
-  return orders.filter((order) =>
-    orderRules.every((rule) =>
-      evaluateOrderRowRule(rule, order, user.userId, currentUserDeptId, currentUserDeptAndChildrenIds, userDeptMap)
-    )
-  );
-}
-
 function toOrder(row: any) {
   const extra = safeJsonParse(row.extra, {});
   return {
@@ -207,29 +82,44 @@ function toOrder(row: any) {
     opportunityId: row.opportunity_id, opportunityName: row.opportunity_name,
     originalOrderId: row.original_order_id,
     refundReason: row.refund_reason, refundAmount: row.refund_amount,
+    orderRemark: row.order_remark ?? undefined,
     ...extra,
   };
 }
 
+/**
+ * 列表查询：行权限下推到 SQL（buildRowPermissionWhere），SQL 真分页 + COUNT(*)
+ * 支持过滤参数：status / customerId / source / keyword（按 customer_name / id 模糊匹配）
+ */
 router.get('/', checkPermission('order', 'list'), (req: AuthRequest, res) => {
   const db = getDb();
-  const { status, customerId, source, page = '1', size = '50' } = req.query as Record<string, string>;
+  const { status, customerId, source, keyword, page = '1', size = '50' } = req.query as Record<string, string>;
   const statusFilter = status ? normalizeOrderStatus(status) : null;
-  let sql = 'SELECT * FROM orders WHERE 1=1';
+
+  const conds: string[] = ['1=1'];
   const params: any[] = [];
 
-  if (customerId) { sql += ' AND customer_id = ?'; params.push(customerId); }
-  if (source) { sql += ' AND source = ?'; params.push(source); }
+  if (customerId) { conds.push('customer_id = ?'); params.push(customerId); }
+  if (source) { conds.push('source = ?'); params.push(source); }
+  if (statusFilter) { conds.push('status = ?'); params.push(statusFilter); }
+  if (keyword && keyword.trim()) {
+    conds.push('(customer_name LIKE ? OR id LIKE ?)');
+    const k = `%${keyword.trim()}%`;
+    params.push(k, k);
+  }
+
+  const rowPerm = buildRowPermissionWhere(db, req.user!, 'Order');
+  const whereSql = ' WHERE ' + conds.join(' AND ') + rowPerm.sql;
+  const whereParams = [...params, ...rowPerm.params];
+
+  const totalRow = db.prepare(`SELECT COUNT(*) AS c FROM orders${whereSql}`).get(...whereParams) as { c: number };
+  const total = totalRow?.c ?? 0;
 
   const { limit, offset, pageNum } = safePagination(page, size);
-  sql += ' ORDER BY date DESC';
-  const rows = db.prepare(sql).all(...params);
-  const allOrders = rows.map(toOrder);
-  const statusFilteredOrders = statusFilter ? allOrders.filter((order) => order.status === statusFilter) : allOrders;
-  const visibleOrders = filterOrdersByRowPermissions(db, req.user!, statusFilteredOrders);
-  const total = visibleOrders.length;
-  const paged = visibleOrders.slice(offset, offset + limit);
-  res.json({ data: paged, total, page: pageNum, size: limit });
+  const rows = db.prepare(`SELECT * FROM orders${whereSql} ORDER BY date DESC, rowid DESC LIMIT ? OFFSET ?`)
+    .all(...whereParams, limit, offset);
+
+  res.json({ data: rows.map(toOrder), total, page: pageNum, size: limit });
 });
 
 router.get('/:id', checkPermission('order', 'read'), (req: AuthRequest, res) => {
@@ -237,7 +127,7 @@ router.get('/:id', checkPermission('order', 'read'), (req: AuthRequest, res) => 
   const row = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
   if (!row) { res.status(404).json({ error: '订单不存在' }); return; }
   const order = toOrder(row);
-  const readable = filterOrdersByRowPermissions(db, req.user!, [order]).length > 0;
+  const readable = checkRowPermissionForSingle(db, req.user!, 'Order', order);
   if (!readable) {
     res.status(403).json({ error: '无权查看此订单' });
     return;
@@ -245,50 +135,78 @@ router.get('/:id', checkPermission('order', 'read'), (req: AuthRequest, res) => 
   res.json(order);
 });
 
-router.post('/', checkPermission('order', 'create'), (req: AuthRequest, res) => {
+router.post('/', checkPermission('order', 'create'), validateBody(orderCreateSchema), (req: AuthRequest, res) => {
   const db = getDb();
   const o = req.body;
   const id = o.id || `ORD-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+  // ---- 服务端绑定身份字段，避免客户端冒充他人创建订单 ----
+  const userRoles = Array.isArray(req.user!.roles) ? req.user!.roles : [];
+  const isAdminOrManager = userRoles.some(r => ['Admin', 'Business', 'Commerce'].includes(r));
+  const currentUserName = getUserName(db, req.user!.userId);
+
+  // 销售代表：普通 Sales 必须为自己；管理员/商务可以为他人指定
+  let salesRepId: string | null = o.salesRepId ?? null;
+  let salesRepName: string | null = o.salesRepName ?? null;
+  if (!isAdminOrManager) {
+    if (salesRepId && salesRepId !== req.user!.userId) {
+      res.status(403).json({ error: '无权将订单的销售归属指定为他人' });
+      return;
+    }
+    salesRepId = req.user!.userId;
+    salesRepName = currentUserName;
+  } else if (!salesRepId) {
+    salesRepId = req.user!.userId;
+    salesRepName = currentUserName;
+  }
+
+  // 制单人：始终强制为当前登录人
+  const creatorId = req.user!.userId;
+  const creatorName = currentUserName;
 
   const extra = JSON.stringify({
     receivingParty: o.receivingParty, receivingCompany: o.receivingCompany,
     receivingMethod: o.receivingMethod, directChannel: o.directChannel,
     terminalChannel: o.terminalChannel, orderType: o.orderType,
-    creatorId: o.creatorId, creatorName: o.creatorName, creatorPhone: o.creatorPhone,
+    creatorId, creatorName, creatorPhone: o.creatorPhone,
     industryLine: o.industryLine, province: o.province, city: o.city, district: o.district,
   });
 
   const nextStatus = normalizeOrderStatus(o.status || 'PENDING_APPROVAL');
 
-  db.prepare(`
-    INSERT INTO orders (id, customer_id, customer_name, customer_type, customer_level, customer_industry, customer_region, date, status, total, items, source, buyer_type, buyer_name, buyer_id, shipping_address, delivery_method, is_paid, payment_method, payment_terms, approval, approval_records, sales_rep_id, sales_rep_name, biz_manager_id, biz_manager_name, invoice_info, acceptance_info, acceptance_config, opportunity_id, opportunity_name, original_order_id, extra)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id, o.customerId, o.customerName, o.customerType ?? null,
-    o.customerLevel ?? null, o.customerIndustry ?? null, o.customerRegion ?? null,
-    o.date || new Date().toISOString(), nextStatus, o.total || 0,
-    JSON.stringify(o.items || []), o.source || 'Sales', o.buyerType || 'Customer',
-    o.buyerName ?? null, o.buyerId ?? null, o.shippingAddress ?? null,
-    o.deliveryMethod ?? null, 0, o.paymentMethod ?? null, o.paymentTerms ?? null,
-    JSON.stringify(o.approval || { salesApproved: false, businessApproved: false, financeApproved: false }),
-    JSON.stringify(o.approvalRecords || []),
-    o.salesRepId ?? null, o.salesRepName ?? null,
-    o.businessManagerId ?? null, o.businessManagerName ?? null,
-    o.invoiceInfo ? JSON.stringify(o.invoiceInfo) : null,
-    o.acceptanceInfo ? JSON.stringify(o.acceptanceInfo) : null,
-    o.acceptanceConfig ? JSON.stringify(o.acceptanceConfig) : null,
-    o.opportunityId ?? null, o.opportunityName ?? null, o.originalOrderId ?? null, extra
-  );
+  const insertOrder = db.prepare(`
+    INSERT INTO orders (id, customer_id, customer_name, customer_type, customer_level, customer_industry, customer_region, date, status, total, items, source, buyer_type, buyer_name, buyer_id, shipping_address, delivery_method, is_paid, payment_method, payment_terms, approval, approval_records, sales_rep_id, sales_rep_name, biz_manager_id, biz_manager_name, invoice_info, acceptance_info, acceptance_config, opportunity_id, opportunity_name, original_order_id, order_remark, extra)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const insertAudit = db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`);
 
-  const userName = getUserName(db, req.user!.userId);
-  db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, userName, 'CREATE', 'Order', id, `创建订单 ${id}`);
+  const tx = db.transaction(() => {
+    insertOrder.run(
+      id, o.customerId, o.customerName, o.customerType ?? null,
+      o.customerLevel ?? null, o.customerIndustry ?? null, o.customerRegion ?? null,
+      o.date || new Date().toISOString(), nextStatus, o.total || 0,
+      JSON.stringify(o.items || []), o.source || 'Sales', o.buyerType || 'Customer',
+      o.buyerName ?? null, o.buyerId ?? null, o.shippingAddress ?? null,
+      o.deliveryMethod ?? null, 0, o.paymentMethod ?? null, o.paymentTerms ?? null,
+      JSON.stringify(o.approval || { salesApproved: false, businessApproved: false, financeApproved: false }),
+      JSON.stringify(o.approvalRecords || []),
+      salesRepId, salesRepName,
+      o.businessManagerId ?? null, o.businessManagerName ?? null,
+      o.invoiceInfo ? JSON.stringify(o.invoiceInfo) : null,
+      o.acceptanceInfo ? JSON.stringify(o.acceptanceInfo) : null,
+      o.acceptanceConfig ? JSON.stringify(o.acceptanceConfig) : null,
+      o.opportunityId ?? null, o.opportunityName ?? null, o.originalOrderId ?? null,
+      o.orderRemark ?? null, extra
+    );
+    insertAudit.run(req.user!.userId, currentUserName, 'CREATE', 'Order', id, `创建订单 ${id}`);
+  });
+  tx();
 
   const row = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
   res.status(201).json(toOrder(row));
 });
 
-router.put('/:id', checkPermission('order', 'update'), (req: AuthRequest, res) => {
+router.put('/:id', checkPermission('order', 'update'), validateBody(orderUpdateSchema), (req: AuthRequest, res) => {
   const db = getDb();
   const o = req.body;
   const id = req.params.id;
@@ -297,13 +215,30 @@ router.put('/:id', checkPermission('order', 'update'), (req: AuthRequest, res) =
   if (!existing) { res.status(404).json({ error: '订单不存在' }); return; }
   const existingOrder = toOrder(existing);
 
-  const isAdmin = req.user!.role === 'Admin';
+  if (!checkRowPermissionForSingle(db, req.user!, 'Order', existingOrder)) {
+    res.status(403).json({ error: '行权限限制，无权修改此订单' });
+    return;
+  }
+
+  const updRoles = Array.isArray(req.user!.roles) ? req.user!.roles : [];
+  const isAdmin = updRoles.includes('Admin');
   const isOwner = existing.sales_rep_id === req.user!.userId;
-  const isManager = ['Business', 'Finance', 'Commerce'].includes(req.user!.role);
+  const isManager = updRoles.some(r => ['Business', 'Commerce'].includes(r));
   if (!isAdmin && !isOwner && !isManager) {
     res.status(403).json({ error: '无权修改此订单' });
     return;
   }
+
+  // 防止非管理员把订单"转给别人"绕过行权限
+  const isAdminOrManager = isAdmin || isManager;
+  if (!isAdminOrManager && o.salesRepId && o.salesRepId !== existing.sales_rep_id) {
+    res.status(403).json({ error: '无权变更订单的销售归属' });
+    return;
+  }
+  // creatorId 始终保持原值，禁止前端覆盖
+  const existingExtra = safeJsonParse(existing.extra, {});
+  const lockedCreatorId = existingExtra.creatorId || existing.created_by_user || null;
+  const lockedCreatorName = existingExtra.creatorName || null;
 
   const existingStatus = normalizeOrderStatus(existingOrder.status);
   const targetStatus = normalizeOrderStatus(o.status ?? existingStatus);
@@ -326,7 +261,7 @@ router.put('/:id', checkPermission('order', 'update'), (req: AuthRequest, res) =
     receivingParty: merged.receivingParty, receivingCompany: merged.receivingCompany,
     receivingMethod: merged.receivingMethod, directChannel: merged.directChannel,
     terminalChannel: merged.terminalChannel, orderType: merged.orderType,
-    creatorId: merged.creatorId, creatorName: merged.creatorName, creatorPhone: merged.creatorPhone,
+    creatorId: lockedCreatorId, creatorName: lockedCreatorName, creatorPhone: merged.creatorPhone,
     industryLine: merged.industryLine, province: merged.province, city: merged.city, district: merged.district,
     isAuthConfirmed: merged.isAuthConfirmed, authConfirmedDate: merged.authConfirmedDate,
     isPackageConfirmed: merged.isPackageConfirmed, packageConfirmedDate: merged.packageConfirmedDate,
@@ -335,7 +270,7 @@ router.put('/:id', checkPermission('order', 'update'), (req: AuthRequest, res) =
     shippedDate: merged.shippedDate, carrier: merged.carrier, trackingNumber: merged.trackingNumber,
   });
 
-  db.prepare(`
+  const updateOrder = db.prepare(`
     UPDATE orders SET customer_id=?, customer_name=?, status=?, total=?, items=?,
     source=?, buyer_type=?, shipping_address=?, delivery_method=?,
     is_paid=?, payment_date=?, payment_method=?, payment_terms=?, payment_record=?,
@@ -343,23 +278,31 @@ router.put('/:id', checkPermission('order', 'update'), (req: AuthRequest, res) =
     biz_manager_id=?, biz_manager_name=?, invoice_info=?, acceptance_info=?,
     acceptance_config=?, refund_reason=?, refund_amount=?, extra=?, updated_at=datetime('now')
     WHERE id=?
-  `).run(
-    merged.customerId, merged.customerName, merged.status, merged.total, JSON.stringify(merged.items || []),
-    merged.source, merged.buyerType, merged.shippingAddress ?? null, merged.deliveryMethod ?? null,
-    merged.isPaid ? 1 : 0, merged.paymentDate ?? null, merged.paymentMethod ?? null, merged.paymentTerms ?? null,
-    merged.paymentRecord ? JSON.stringify(merged.paymentRecord) : null,
-    JSON.stringify(existingOrder.approval || {}), JSON.stringify(existingOrder.approvalRecords || []),
-    merged.salesRepId ?? null, merged.salesRepName ?? null,
-    merged.businessManagerId ?? null, merged.businessManagerName ?? null,
-    merged.invoiceInfo ? JSON.stringify(merged.invoiceInfo) : null,
-    merged.acceptanceInfo ? JSON.stringify(merged.acceptanceInfo) : null,
-    merged.acceptanceConfig ? JSON.stringify(merged.acceptanceConfig) : null,
-    merged.refundReason ?? null, merged.refundAmount ?? null, extra, id
-  );
-
+  `);
+  const insertAudit = db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`);
   const userName = getUserName(db, req.user!.userId);
-  db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, userName, 'UPDATE', 'Order', id, `更新订单 ${id}，状态: ${merged.status}`);
+
+  // salesRepId 校验后已经处理；非管理员场景下保留原值
+  const finalSalesRepId = isAdminOrManager ? (merged.salesRepId ?? null) : existing.sales_rep_id;
+  const finalSalesRepName = isAdminOrManager ? (merged.salesRepName ?? null) : existing.sales_rep_name;
+
+  const tx = db.transaction(() => {
+    updateOrder.run(
+      merged.customerId, merged.customerName, merged.status, merged.total, JSON.stringify(merged.items || []),
+      merged.source, merged.buyerType, merged.shippingAddress ?? null, merged.deliveryMethod ?? null,
+      merged.isPaid ? 1 : 0, merged.paymentDate ?? null, merged.paymentMethod ?? null, merged.paymentTerms ?? null,
+      merged.paymentRecord ? JSON.stringify(merged.paymentRecord) : null,
+      JSON.stringify(existingOrder.approval || {}), JSON.stringify(existingOrder.approvalRecords || []),
+      finalSalesRepId, finalSalesRepName,
+      merged.businessManagerId ?? null, merged.businessManagerName ?? null,
+      merged.invoiceInfo ? JSON.stringify(merged.invoiceInfo) : null,
+      merged.acceptanceInfo ? JSON.stringify(merged.acceptanceInfo) : null,
+      merged.acceptanceConfig ? JSON.stringify(merged.acceptanceConfig) : null,
+      merged.refundReason ?? null, merged.refundAmount ?? null, extra, id
+    );
+    insertAudit.run(req.user!.userId, userName, 'UPDATE', 'Order', id, `更新订单 ${id}，状态: ${merged.status}`);
+  });
+  tx();
 
   const row = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
   res.json(toOrder(row));
@@ -374,6 +317,11 @@ router.post('/:id/approve', checkPermission('order', 'approve'), (req: AuthReque
   const existing = db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as any;
   if (!existing) { res.status(404).json({ error: '订单不存在' }); return; }
 
+  if (!checkRowPermissionForSingle(db, req.user!, 'Order', toOrder(existing))) {
+    res.status(403).json({ error: '行权限限制，无权审批此订单' });
+    return;
+  }
+
   const currentStatus = normalizeOrderStatus(existing.status);
   if (currentStatus !== 'PENDING_APPROVAL') {
     res.status(400).json({ error: `当前状态 ${currentStatus} 不允许审批操作` });
@@ -383,7 +331,6 @@ router.post('/:id/approve', checkPermission('order', 'approve'), (req: AuthReque
   const approval = safeJsonParse(existing.approval, {});
   const records = safeJsonParse(existing.approval_records, []);
 
-  const roleKey = req.user!.role;
   const approvalFieldMap: Record<string, string> = {
     'Sales': 'salesApproved',
     'Business': 'businessApproved',
@@ -391,7 +338,7 @@ router.post('/:id/approve', checkPermission('order', 'approve'), (req: AuthReque
     'Finance': 'financeApproved',
     'Admin': 'financeApproved',
   };
-  const field = approvalFieldMap[roleKey];
+  const field = req.user!.roles.map(r => approvalFieldMap[r]).find(Boolean);
   if (!field) {
     res.status(403).json({ error: '当前角色无审批字段映射' });
     return;
@@ -403,7 +350,7 @@ router.post('/:id/approve', checkPermission('order', 'approve'), (req: AuthReque
 
   records.push({
     userId: req.user!.userId,
-    role: roleKey,
+    role: req.user!.roles.join(','),
     action,
     remark: remark || '',
     timestamp: new Date().toISOString(),
@@ -435,6 +382,11 @@ router.post('/:id/submit', checkPermission('order', 'submit'), (req: AuthRequest
   const existing = db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as any;
   if (!existing) { res.status(404).json({ error: '订单不存在' }); return; }
 
+  if (!checkRowPermissionForSingle(db, req.user!, 'Order', toOrder(existing))) {
+    res.status(403).json({ error: '行权限限制，无权提交此订单' });
+    return;
+  }
+
   const currentStatus = normalizeOrderStatus(existing.status);
   if (currentStatus !== 'DRAFT') {
     res.status(400).json({ error: `当前状态 ${currentStatus} 不允许提交审批` });
@@ -458,7 +410,12 @@ router.delete('/:id', checkPermission('order', 'delete'), (req: AuthRequest, res
   const existing = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id) as any;
   if (!existing) { res.status(404).json({ error: '订单不存在' }); return; }
 
-  const isAdmin = req.user!.role === 'Admin';
+  if (!checkRowPermissionForSingle(db, req.user!, 'Order', toOrder(existing))) {
+    res.status(403).json({ error: '行权限限制，无权删除此订单' });
+    return;
+  }
+
+  const isAdmin = req.user!.roles.includes('Admin');
   const isOwner = existing.sales_rep_id === req.user!.userId;
   if (!isAdmin && !isOwner) {
     res.status(403).json({ error: '只有管理员或订单归属销售可以删除订单' });
@@ -482,7 +439,7 @@ router.get('/:id/logs', checkPermission('order', 'read'), (req: AuthRequest, res
   const db = getDb();
   const orderRow = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
   if (!orderRow) { res.status(404).json({ error: '订单不存在' }); return; }
-  const readable = filterOrdersByRowPermissions(db, req.user!, [toOrder(orderRow)]).length > 0;
+  const readable = checkRowPermissionForSingle(db, req.user!, 'Order', toOrder(orderRow));
   if (!readable) {
     res.status(403).json({ error: '无权查看此订单日志' });
     return;

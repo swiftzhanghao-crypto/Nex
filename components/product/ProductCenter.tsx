@@ -18,9 +18,9 @@ const categoryTree: CategoryGroup[] = [
 ];
 
 const ProductCenter: React.FC = () => {
-  const { products, currentUser, roles } = useAppContext();
+  const { filteredProducts: products, currentUser, roles } = useAppContext();
   const navigate = useNavigate();
-  const currentUserRole = roles.find(r => r.id === currentUser.role);
+  const currentUserRole = roles.find(r => currentUser.roles?.includes(r.id));
   const permissions = currentUserRole?.permissions || [];
   const hasPermission = (perm: string) => permissions.includes('all') || permissions.includes(perm);
   const [mainView, setMainView]       = useState<'catalog' | 'packages'>('catalog');

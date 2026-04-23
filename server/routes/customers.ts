@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
+import { buildRowPermissionWhere, checkRowPermissionForSingle } from '../rowPermissionFilter.ts';
+import { validateBody, customerCreateSchema, customerUpdateSchema } from '../validate.ts';
 
 const router = Router();
 router.use(authMiddleware);
@@ -37,34 +39,50 @@ function toCustomer(row: any) {
   };
 }
 
-router.get('/', checkPermission('customer', 'list'), (req, res) => {
-  const { type, level, status, search, page = '1', size = '50' } = req.query as Record<string, string>;
+router.get('/', checkPermission('customer', 'list'), (req: AuthRequest, res) => {
+  const { type, level, status, search, industry, region, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
-  let sql = 'SELECT * FROM customers WHERE 1=1';
+  const conds: string[] = ['1=1'];
   const params: any[] = [];
 
-  if (type) { sql += ' AND customer_type = ?'; params.push(type); }
-  if (level) { sql += ' AND level = ?'; params.push(level); }
-  if (status) { sql += ' AND status = ?'; params.push(status); }
-  if (search) { sql += ' AND company_name LIKE ?'; params.push(`%${search}%`); }
+  if (type) { conds.push('customer_type = ?'); params.push(type); }
+  if (level) { conds.push('level = ?'); params.push(level); }
+  if (status) { conds.push('status = ?'); params.push(status); }
+  if (industry) { conds.push('industry = ?'); params.push(industry); }
+  if (region) { conds.push('region = ?'); params.push(region); }
+  if (search && search.trim()) {
+    conds.push('(company_name LIKE ? OR id LIKE ?)');
+    const k = `%${search.trim()}%`;
+    params.push(k, k);
+  }
 
-  const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
-  const { total } = db.prepare(countSql).get(...params) as { total: number };
+  const rowPerm = buildRowPermissionWhere(db, req.user!, 'Customer');
+  const whereSql = ' WHERE ' + conds.join(' AND ') + rowPerm.sql;
+  const whereParams = [...params, ...rowPerm.params];
+
+  const totalRow = db.prepare(`SELECT COUNT(*) AS c FROM customers${whereSql}`).get(...whereParams) as { c: number };
+  const total = totalRow?.c ?? 0;
 
   const { limit, offset, pageNum } = safePagination(page, size);
-  sql += ' ORDER BY company_name LIMIT ? OFFSET ?';
-  params.push(limit, offset);
+  const rows = db.prepare(`SELECT * FROM customers${whereSql} ORDER BY company_name LIMIT ? OFFSET ?`)
+    .all(...whereParams, limit, offset);
 
-  res.json({ data: db.prepare(sql).all(...params).map(toCustomer), total, page: pageNum, size: limit });
+  res.json({ data: rows.map(toCustomer), total, page: pageNum, size: limit });
 });
 
-router.get('/:id', checkPermission('customer', 'read'), (req, res) => {
-  const row = getDb().prepare('SELECT * FROM customers WHERE id = ?').get(req.params.id);
+router.get('/:id', checkPermission('customer', 'read'), (req: AuthRequest, res) => {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.params.id);
   if (!row) { res.status(404).json({ error: '客户不存在' }); return; }
-  res.json(toCustomer(row));
+  const customer = toCustomer(row);
+  if (!checkRowPermissionForSingle(db, req.user!, 'Customer', customer)) {
+    res.status(403).json({ error: '无权查看此客户' });
+    return;
+  }
+  res.json(customer);
 });
 
-router.post('/', checkPermission('customer', 'create'), (req: AuthRequest, res) => {
+router.post('/', checkPermission('customer', 'create'), validateBody(customerCreateSchema), (req: AuthRequest, res) => {
   const db = getDb();
   const c = req.body;
   const id = c.id || `C${Date.now().toString().slice(-8)}`;
@@ -86,7 +104,7 @@ router.post('/', checkPermission('customer', 'create'), (req: AuthRequest, res) 
   res.status(201).json(toCustomer(row));
 });
 
-router.put('/:id', checkPermission('customer', 'update'), (req: AuthRequest, res) => {
+router.put('/:id', checkPermission('customer', 'update'), validateBody(customerUpdateSchema), (req: AuthRequest, res) => {
   const db = getDb();
   const c = req.body;
 

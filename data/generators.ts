@@ -72,7 +72,7 @@ export function generateCustomers(users: User[]): Customer[] {
     const name = `${['科技', '发展', '贸易', '网络', '信息', '实业'][i % 6]}有限公司`;
     const prefix = ['华兴', '信达', '中科', '远洋', '天行', '博大', '瑞通', '金桥', '海纳', '智汇'][i % 10];
     const companyName = `${prefix}${name}`;
-    const owner = users.filter(u => u.role === 'Sales')[i % users.filter(u => u.role === 'Sales').length];
+    const owner = users.filter(u => u.roles?.includes('Sales'))[i % users.filter(u => u.roles?.includes('Sales')).length];
 
     const entCount = Math.floor(Math.random() * 3) + 1;
     const enterprises = Array.from({ length: entCount }).map((_, idx) => ({
@@ -1357,7 +1357,22 @@ export function generateSubscriptionChainOrders(params: SubscriptionChainOrderPa
     }
     steps[0] = 'New';
 
-    let cursor = new Date(2023, 2 + (ci % 10), 8 + (ci % 20));
+    // 前 14 条链（ci 0-13）起始日期较近，使最后一笔订单的授权期仍在当前附近
+    // → 产生 Active / ExpiringSoon / GracePeriod 等多种状态，让续费管理页面有丰富数据
+    const now = new Date();
+    let cursor: Date;
+    if (ci < 5) {
+      // 最近 1-2 年新购 → 末笔授权仍在活跃期
+      cursor = new Date(now.getFullYear() - 1, (ci * 2) % 12, 5 + ci);
+    } else if (ci < 10) {
+      // 近 6-12 月新购 → 末笔可能即将到期
+      cursor = new Date(now.getFullYear(), (ci - 5) % 12, 10 + ci);
+    } else if (ci < 14) {
+      // 一年半前 → 部分已到期、部分宽限期
+      cursor = new Date(now.getFullYear() - 2, 6 + (ci % 6), 1 + ci);
+    } else {
+      cursor = new Date(2023, 2 + (ci % 10), 8 + (ci % 20));
+    }
     const baseQty = 80 + (ci % 12) * 40;
 
     for (let si = 0; si < steps.length; si++) {

@@ -21,10 +21,10 @@ const SALES_ORG_OPTIONS = [
 const TAX_REFUND_OPTIONS = ['非退税', '退税', '即征即退', '先征后退'];
 
 const ProductDetails: React.FC = () => {
-  const { products, setProducts, authTypes, atomicCapabilities, apiMode } = useAppContext();
+  const { products, setProducts, filteredProducts, authTypes, atomicCapabilities, apiMode } = useAppContext();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const product = products.find(p => p.id === id);
+  const product = filteredProducts.find(p => p.id === id);
 
   const persistProduct = useCallback((updatedProduct: Product) => {
       setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));

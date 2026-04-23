@@ -1,13 +1,20 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ExternalLink, Minus, Trash2, ClipboardCheck, Radar, Search, List, ArrowLeft, Smartphone, RefreshCcw } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ExternalLink, Minus, Trash2, ClipboardCheck, Radar, Search, List, ArrowLeft, Smartphone, RefreshCcw, Sparkles, Bot, Pin } from 'lucide-react';
 import manualContent from '../../docs/产品说明文档.md?raw';
+import designSpecContent from '../../docs/设计规范.md?raw';
+import operationManualContent from '../../docs/WPS365业务平台操作手册.md?raw';
+import aiManualContent from '../../docs/AI业务助手操作手册.md?raw';
+import openApiContent from '../../docs/开放API-订单下单.md?raw';
+import aiTechDocContent from '../../docs/AI业务助手技术文档.md?raw';
+import DocCenterDrawer from './DocCenterDrawer';
 import { useAppContext } from '../../contexts/AppContext';
 import WPSLogo from '../common/WPSLogo';
 import MobilePreview from '../mobile/MobilePreview';
-import AIAssistantButton from '../ai/AIAssistantButton';
+import AIAssistantDrawer from '../ai/AIAssistantDrawer';
+import GlobalSearchModal from './GlobalSearchModal';
+import { mergeAllPlatformPermissionIds } from '../../utils/mergeRolePermissions';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -17,10 +24,11 @@ interface PageTab {
   id: string;
   title: string;
   path: string;
+  pinned?: boolean;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { currentUser, users, setCurrentUser, roles, apiMode } = useAppContext();
+  const { currentUser, users, setCurrentUser, roles, apiMode, filteredCustomers: customers, filteredProducts: products } = useAppContext();
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -37,8 +45,28 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isManualOpen, setIsManualOpen] = useState(false);
   const [isMobilePreviewOpen, setIsMobilePreviewOpen] = useState(false);
+  const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
+  const [aiInitialQuery, setAiInitialQuery] = useState('');
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const toggleSection = (id: string) => setCollapsedSections(prev => ({ ...prev, [id]: !prev[id] }));
+
+  const [isTabMaximized, setIsTabMaximized] = useState(false);
+
+  // ── ⌘K shortcut ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsGlobalSearchOpen(prev => !prev);
+      }
+      if (e.key === 'Escape' && isTabMaximized) {
+        setIsTabMaximized(false);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [isTabMaximized]);
 
   // ── Tab Bar ────────────────────────────────────────────────
   const [tabs, setTabs] = useState<PageTab[]>([]);
@@ -66,7 +94,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       '/product-manage/attr-config': '属性配置',
       '/performance': '业绩管理',
       '/channels': '渠道管理',
-      '/leads': '线索中心',
+      '/leads': '线索中台',
       '/wps-ops': '运营中心',
       '/ops/dashboard': '指标看板',
       '/ops/enterprise': '企业管理',
@@ -81,34 +109,64 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       '/system/sales-org': '销售组织配置',
       '/sab-insight': '智能查客户',
       '/sab-insight/customer-list': '客户列表',
+      '/reports': '周报日报',
     };
     if (staticMap[pathname]) return staticMap[pathname];
-    const m = pathname.match(/^\/orders\/(.+)$/);
-    if (m) return `订单 ${m[1]}`;
-    const c = pathname.match(/^\/customers\/(.+)$/);
-    if (c) return `客户详情`;
-    const p = pathname.match(/^\/products\/(.+)$/);
-    if (p) return `产品详情`;
-    const ch = pathname.match(/^\/channels\/(.+)$/);
-    if (ch) return `渠道详情`;
-    const sabC = pathname.match(/^\/sab-insight\/customer\/(.+)$/);
-    if (sabC) return '客户详情';
-    return '页面';
+
+    const orderId = pathname.match(/^\/orders\/(.+)$/);
+    if (orderId) return `订单 ${orderId[1]}`;
+
+    const customerId = pathname.match(/^\/customers\/(.+)$/);
+    if (customerId) {
+      const cust = customers.find(c => c.id === customerId[1]);
+      return cust ? `客户 ${cust.companyName}` : `客户 ${customerId[1]}`;
+    }
+
+    const productId = pathname.match(/^\/products\/(.+)$/);
+    if (productId) {
+      const prod = products.find(p => p.id === productId[1]);
+      return prod ? `产品 ${prod.name}` : `产品 ${productId[1]}`;
+    }
+
+    const channelId = pathname.match(/^\/channels\/(.+)$/);
+    if (channelId) return `渠道 ${channelId[1]}`;
+
+    const sabCustomerId = pathname.match(/^\/sab-insight\/customer\/(.+)$/);
+    if (sabCustomerId) {
+      const cust = customers.find(c => c.id === sabCustomerId[1]);
+      return cust ? `客户洞察 ${cust.companyName}` : `客户洞察 ${sabCustomerId[1]}`;
+    }
+
+    const reportUserId = pathname.match(/^\/reports\/(.+)$/);
+    if (reportUserId) {
+      const u = users.find(usr => usr.id === reportUserId[1]);
+      return u ? `${u.name} 的报告` : `报告详情`;
+    }
+
+    return pathname.split('/').filter(Boolean).pop() || '页面';
   };
 
   useEffect(() => {
     const path = location.pathname;
     const title = getTabTitle(path);
     setTabs(prev => {
-      if (prev.find(t => t.id === path)) return prev;
+      const existing = prev.find(t => t.id === path);
+      if (existing) {
+        if (existing.title !== title) {
+          return prev.map(t => t.id === path ? { ...t, title } : t);
+        }
+        return prev;
+      }
       return [...prev, { id: path, title, path }];
     });
     setActiveTabId(path);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
+  }, [location.pathname, customers, products, users]);
 
   const closeTab = (e: React.MouseEvent, tabId: string) => {
     e.stopPropagation();
+    const tab = tabs.find(t => t.id === tabId);
+    if (tab?.pinned) return;
     const idx = tabs.findIndex(t => t.id === tabId);
     const newTabs = tabs.filter(t => t.id !== tabId);
     setTabs(newTabs);
@@ -122,16 +180,34 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   };
   const closeOtherTabs = (tabId: string) => {
-    const keep = tabs.filter(t => t.id === tabId);
+    const keep = tabs.filter(t => t.id === tabId || t.pinned);
     setTabs(keep);
     if (activeTabId !== tabId && keep.length > 0) {
-      navigate(keep[0].path);
+      navigate(keep.find(t => t.id === tabId)?.path || keep[0].path);
     }
   };
 
   const closeAllTabs = () => {
-    setTabs([]);
-    navigate('/');
+    const pinned = tabs.filter(t => t.pinned);
+    setTabs(pinned);
+    if (pinned.length > 0) {
+      navigate(pinned[0].path);
+    } else {
+      navigate('/');
+    }
+  };
+
+  const togglePinTab = (tabId: string) => {
+    setTabs(prev => {
+      const updated = prev.map(t => t.id === tabId ? { ...t, pinned: !t.pinned } : t);
+      const pinned = updated.filter(t => t.pinned);
+      const unpinned = updated.filter(t => !t.pinned);
+      return [...pinned, ...unpinned];
+    });
+  };
+
+  const toggleMaximizeTab = () => {
+    setIsTabMaximized(prev => !prev);
   };
 
   const [ctxMenu, setCtxMenu] = useState<{x: number; y: number; tabId: string} | null>(null);
@@ -220,8 +296,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
-  const currentUserRole = roles.find(r => r.id === currentUser.role);
-  const permissions = currentUserRole?.permissions || [];
+  const currentUserRoleDefs = useMemo(
+    () => roles.filter(r => currentUser.roles?.includes(r.id)),
+    [roles, currentUser],
+  );
+  const permissions = useMemo(
+    () => mergeAllPlatformPermissionIds(currentUserRoleDefs),
+    [currentUserRoleDefs],
+  );
   const hasPermission = (perm: string) => permissions.includes('all') || permissions.includes(perm);
   const canAccessSabInsight = hasPermission('sab_insight_view') || hasPermission('customer_view');
 
@@ -250,7 +332,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       { id: 'PRODUCT_CENTER', label: '产品中心', path: '/product-center', permissions: ['product_display_view', 'product_display_preview', 'product_view', 'merchandise_view', 'product_msrp_view', 'product_channel_price_view', 'product_component_pool_view', 'product_package_view', 'product_license_template_view', 'product_attr_config_view'] },
       { id: 'CHANNEL_CENTER', label: '渠道中心', path: '/channels', permissions: ['channel_view'] },
       { id: 'PERFORMANCE_CENTER', label: '业绩中心', path: '/performance', permissions: ['performance_view'] },
-      { id: 'LEADS_CENTER', label: '线索中心', path: '/leads', permissions: ['leads_view'] },
+      { id: 'LEADS_CENTER', label: '线索中台', path: '/leads', permissions: ['leads_view'] },
       { id: 'OPERATIONS_CENTER', label: '运营中心', path: '/wps-ops', permissions: ['wps_ops_view'] },
       { id: 'SAB_CUSTOMER_INSIGHT', label: 'SAB 客户洞察', path: '/sab-insight', permissions: ['sab_insight_view', 'customer_view'] },
       { id: 'SYSTEM_CONFIG', label: '系统配置', path: '/organization', permissions: ['admin_view', 'user_manage', 'role_manage', 'org_manage', 'license_type_view'] }
@@ -300,7 +382,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="h-screen flex flex-col font-sans overflow-hidden bg-[#F5F5F7] dark:bg-black transition-colors duration-300 selection:bg-blue-500/30">
       
       {/* Top Header */}
-      <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 z-30 sticky top-0 bg-white border-b border-gray-200/50 dark:bg-[#1C1C1E] dark:border-white/10 transition-all">
+      <header className={`h-16 flex-shrink-0 flex items-center justify-between px-6 z-30 sticky top-0 bg-white border-b border-gray-200/50 dark:bg-[#1C1C1E] dark:border-white/10 transition-all ${isTabMaximized ? 'hidden' : ''}`}>
           <div className="flex items-center gap-6">
               {/* Logo Area */}
               <div className="flex items-center gap-3">
@@ -332,7 +414,25 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
 
           <div className="flex items-center gap-3">
-             <button 
+            {/* AI Search Bar */}
+            <div
+              onClick={() => setIsGlobalSearchOpen(true)}
+              className="hidden md:flex items-center gap-2.5 px-3.5 py-1.5 bg-gray-100/80 dark:bg-white/[0.06] border border-gray-200/60 dark:border-white/[0.08] rounded-xl cursor-pointer hover:bg-[#0071E3]/5 dark:hover:bg-[#0A84FF]/10 hover:border-[#0071E3]/30 dark:hover:border-[#0A84FF]/30 transition-all group w-[220px]"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#0071E3] dark:group-hover:text-[#0A84FF] transition shrink-0" />
+              <span className="text-xs text-gray-400 group-hover:text-[#0071E3] dark:text-gray-500 dark:group-hover:text-[#0A84FF] transition truncate">AI 搜索...</span>
+              <kbd className="ml-auto hidden lg:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-white dark:bg-white/10 border border-gray-200/80 dark:border-white/10 text-[10px] text-gray-400 font-mono shrink-0">⌘K</kbd>
+            </div>
+
+            <button
+              onClick={() => { setAiInitialQuery(''); setIsAIDrawerOpen(true); }}
+              className="p-2 text-gray-400 hover:text-[#0071E3] dark:text-gray-400 dark:hover:text-[#0A84FF] transition rounded-full hover:bg-[#0071E3]/10 dark:hover:bg-[#0A84FF]/10"
+              title="AI 业务助手"
+            >
+              <Bot className="w-4.5 h-4.5" />
+            </button>
+
+             <button
                 onClick={toggleFullScreen}
                 className="hidden sm:block p-2 text-gray-400 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
                 title={isFullScreen ? "退出全屏" : "全屏模式"}
@@ -350,7 +450,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <button
               onClick={() => setIsManualOpen(true)}
               className="p-2 text-gray-400 hover:text-[#0071E3] dark:text-gray-400 dark:hover:text-blue-400 transition rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
-              title="产品使用说明手册"
+              title="文档中心"
             >
               <BookOpen className="w-4 h-4" />
             </button>
@@ -438,7 +538,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           )}
 
           {/* Sidebar */}
-          {!hideSidebar && (
+          {!hideSidebar && !isTabMaximized && (
             <aside className={`absolute inset-y-0 left-4 top-4 bottom-4 z-40 transform transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] lg:relative lg:translate-x-0 lg:top-0 lg:bottom-0 lg:left-0 lg:pt-2 lg:pb-2 lg:pl-2 lg:pr-3
               ${isSidebarOpen ? 'translate-x-0 w-[240px]' : '-translate-x-[110%] lg:translate-x-0'}
               ${isCollapsed ? 'lg:w-[88px]' : 'lg:w-[240px]'}
@@ -509,6 +609,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           <>
                             <NavItem to="/customers" icon={Users} label="客户信息" permission="customer_view" />
                             <NavItem to="/opportunities" icon={Target} label="商机信息" permission="opportunity_manage" />
+                            <NavItem to="/reports" icon={FileText} label="周报日报" />
                           </>,
                           ['customer_view', 'opportunity_manage']
                         )}
@@ -628,7 +729,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       </>
                     )}
 
-                    {activeTopNav === 'SYSTEM_CONFIG' && currentUser.role === 'Admin' && (
+                    {activeTopNav === 'SYSTEM_CONFIG' && currentUser.roles?.includes('Admin') && (
                       <>
                         {renderSectionGroup('system_main', '系统配置',
                           <>
@@ -657,7 +758,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Tab Bar */}
             {tabs.length > 0 && (
-              <div className="shrink-0 flex items-end bg-[#F0F0F2] dark:bg-[#111] border-b border-gray-200 dark:border-white/10 px-2 overflow-x-auto no-scrollbar relative" style={{ height: 36 }}>
+              <div className="shrink-0 flex items-end bg-[#F0F0F2] dark:bg-[#111] border-b border-gray-200 dark:border-white/10 px-2 overflow-x-auto no-scrollbar relative" style={{ height: isTabMaximized ? 40 : 36 }}>
                 {tabs.map(tab => {
                   const isActive = activeTabId === tab.id;
                   return (
@@ -673,15 +774,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       style={{ height: 34, maxWidth: 160 }}
                       title={tab.title}
                     >
+                      {tab.pinned && <Pin className="w-3 h-3 shrink-0 text-blue-500 dark:text-blue-400 -rotate-45" />}
                       <span className="text-xs font-medium truncate max-w-[110px] whitespace-nowrap">{tab.title}</span>
-                      <button
-                        onClick={(e) => closeTab(e, tab.id)}
-                        className={`shrink-0 w-4 h-4 rounded-full flex items-center justify-center transition-all hover:bg-gray-200 dark:hover:bg-white/20 ${
-                          isActive ? 'opacity-60 hover:opacity-100' : 'opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100'
-                        }`}
-                      >
-                        <X className="w-2.5 h-2.5" />
-                      </button>
+                      {!tab.pinned && (
+                        <button
+                          onClick={(e) => closeTab(e, tab.id)}
+                          className={`shrink-0 w-4 h-4 rounded-full flex items-center justify-center transition-all hover:bg-gray-200 dark:hover:bg-white/20 ${
+                            isActive ? 'opacity-60 hover:opacity-100' : 'opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100'
+                          }`}
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      )}
                       {isActive && (
                         <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#0071E3] dark:bg-[#0A84FF] rounded-t-full" />
                       )}
@@ -689,15 +793,32 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   );
                 })}
 
+                {/* Maximize restore button */}
+                {isTabMaximized && (
+                  <button
+                    onClick={toggleMaximizeTab}
+                    className="shrink-0 ml-auto flex items-center gap-1.5 px-2.5 self-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/70 dark:hover:bg-white/10 rounded-md transition-all"
+                    style={{ height: 28 }}
+                    title="还原"
+                  >
+                    <Minimize className="w-3.5 h-3.5" />
+                    <span className="text-[11px] font-medium">还原</span>
+                  </button>
+                )}
+
                 {/* Tab context menu */}
                 {ctxMenu && (() => {
                   const ctxTab = tabs.find(t => t.id === ctxMenu.tabId);
+                  const isPinned = ctxTab?.pinned;
                   const newWindowUrl = ctxTab ? `${window.location.origin}${window.location.pathname}#${ctxTab.path}` : '';
                   return (
                   <div className="tab-ctx-menu fixed bg-white dark:bg-[#2C2C2E] rounded-lg shadow-2xl border border-gray-200 dark:border-white/10 py-1 z-[999] min-w-[160px]" style={{ left: ctxMenu.x, top: ctxMenu.y }}>
+                    <button onClick={() => { togglePinTab(ctxMenu.tabId); setCtxMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2"><Pin className={`w-3 h-3 opacity-50 ${isPinned ? '-rotate-45' : ''}`}/>{isPinned ? '取消固定' : '固定标签页'}</button>
+                    <button onClick={() => { toggleMaximizeTab(); setCtxMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2">{isTabMaximized ? <Minimize className="w-3 h-3 opacity-50"/> : <Maximize className="w-3 h-3 opacity-50"/>}{isTabMaximized ? '还原' : '最大化'}</button>
+                    <div className="h-px bg-gray-100 dark:bg-white/10 my-1"></div>
                     <button onClick={() => { if (newWindowUrl) window.open(newWindowUrl, '_blank', 'noopener'); setCtxMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2"><ExternalLink className="w-3 h-3 opacity-50"/>在新窗口打开</button>
                     <div className="h-px bg-gray-100 dark:bg-white/10 my-1"></div>
-                    <button onClick={(e) => { e.stopPropagation(); closeTab(e as any, ctxMenu.tabId); setCtxMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2"><X className="w-3 h-3 opacity-50"/>关闭标签页</button>
+                    {!isPinned && <button onClick={(e) => { e.stopPropagation(); closeTab(e as any, ctxMenu.tabId); setCtxMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2"><X className="w-3 h-3 opacity-50"/>关闭标签页</button>}
                     <button onClick={() => { closeOtherTabs(ctxMenu.tabId); setCtxMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2"><Minus className="w-3 h-3 opacity-50"/>关闭其他标签页</button>
                     <div className="h-px bg-gray-100 dark:bg-white/10 my-1"></div>
                     <button onClick={() => { closeAllTabs(); setCtxMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center gap-2"><Trash2 className="w-3 h-3 opacity-50"/>关闭所有标签页</button>
@@ -713,70 +834,50 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </div>
 
       {/* Manual Panel Overlay */}
-      {isManualOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50"
-          onClick={() => setIsManualOpen(false)}
-        />
-      )}
+      {/* ── Document Center Drawer ── */}
+      {isManualOpen && (() => {
+        const DOC_LIST = [
+          { id: 'manual', title: '产品说明文档', icon: '📘', content: manualContent },
+          { id: 'design', title: '设计规范', icon: '🎨', content: designSpecContent },
+          { id: 'ops', title: '操作手册', icon: '📋', content: operationManualContent },
+          { id: 'prd', title: '产品 PRD', icon: '📄', link: 'https://365.kdocs.cn/l/cg9iaTHwv9VX' },
+          { id: 'ai-manual', title: 'AI 助手手册', icon: '🤖', content: aiManualContent },
+          { id: 'ai-tech', title: 'AI 技术文档', icon: '⚙️', content: aiTechDocContent },
+          { id: 'open-api', title: '开放 API', icon: '🔗', content: openApiContent },
+        ];
+        return <DocCenterDrawer docs={DOC_LIST} onClose={() => setIsManualOpen(false)} />;
+      })()}
 
-      {/* Manual Side Drawer */}
-      <div className={`fixed top-0 right-0 h-full w-full max-w-2xl z-50 flex flex-col bg-white dark:bg-[#1C1C1E] shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${isManualOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        {/* Drawer Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/10 shrink-0">
-          <div className="flex items-center gap-3">
-            <BookOpen className="w-5 h-5 text-[#0071E3]" />
-            <h2 className="text-base font-bold text-gray-900 dark:text-white">产品使用说明手册</h2>
-          </div>
+      {/* 全局搜索弹窗 */}
+      <GlobalSearchModal
+        open={isGlobalSearchOpen}
+        onClose={() => setIsGlobalSearchOpen(false)}
+        onOpenAIDrawer={(q) => {
+          setIsGlobalSearchOpen(false);
+          setAiInitialQuery(q || '');
+          setIsAIDrawerOpen(true);
+        }}
+      />
+
+      {/* AI 业务助手抽屉 */}
+      <AIAssistantDrawer open={isAIDrawerOpen} onClose={() => setIsAIDrawerOpen(false)} initialQuery={aiInitialQuery} />
+
+      {/* AI 助手悬浮球 */}
+      {!isAIDrawerOpen && (
+        <div className="fixed bottom-[168px] right-0 z-[60]">
           <button
-            onClick={() => setIsManualOpen(false)}
-            className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition"
+            onClick={() => { setAiInitialQuery(''); setIsAIDrawerOpen(true); }}
+            className="flex items-center gap-2 bg-[#0071E3] text-white pl-4 pr-5 py-2.5 rounded-l-full shadow-md translate-x-[calc(100%-40px)] hover:translate-x-0 transition-transform duration-300 ease-in-out active:scale-95 hover:shadow-lg hover:bg-[#0062CC]"
           >
-            <X className="w-4 h-4" />
+            <Bot className="w-5 h-5 shrink-0" />
+            <span className="text-sm font-medium whitespace-nowrap">AI 助手</span>
           </button>
         </div>
-        {/* Drawer Content */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-5">
-          <ReactMarkdown
-            components={{
-              h1: ({children}) => <h1 className="text-xl font-bold text-gray-900 dark:text-white mt-2 mb-4 pb-2 border-b border-gray-100 dark:border-white/10">{children}</h1>,
-              h2: ({children}) => <h2 className="text-base font-bold text-gray-900 dark:text-white mt-8 mb-3 flex items-center gap-2 before:content-[''] before:w-1 before:h-4 before:bg-[#0071E3] before:rounded-full before:shrink-0">{children}</h2>,
-              h3: ({children}) => <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100 mt-5 mb-2">{children}</h3>,
-              h4: ({children}) => <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mt-4 mb-1.5">{children}</h4>,
-              p: ({children}) => <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-3">{children}</p>,
-              ul: ({children}) => <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>,
-              ol: ({children}) => <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>,
-              li: ({children}) => <li className="text-sm text-gray-600 dark:text-gray-300">{children}</li>,
-              strong: ({children}) => <strong className="font-semibold text-gray-800 dark:text-gray-100">{children}</strong>,
-              em: ({children}) => <em className="italic text-gray-600 dark:text-gray-300">{children}</em>,
-              code: ({children, className}) => {
-                const isBlock = className?.includes('language-');
-                return isBlock
-                  ? <code className="block text-xs font-mono text-gray-700 dark:text-gray-200">{children}</code>
-                  : <code className="text-xs font-mono text-[#0071E3] dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">{children}</code>;
-              },
-              pre: ({children}) => <pre className="bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl p-4 text-xs overflow-x-auto mb-4">{children}</pre>,
-              table: ({children}) => <div className="overflow-x-auto mb-4"><table className="w-full text-sm border-collapse">{children}</table></div>,
-              thead: ({children}) => <thead className="bg-gray-50 dark:bg-white/5">{children}</thead>,
-              th: ({children}) => <th className="text-left text-xs font-semibold text-gray-700 dark:text-gray-200 px-3 py-2 border-b border-gray-200 dark:border-white/10">{children}</th>,
-              td: ({children}) => <td className="text-xs text-gray-600 dark:text-gray-300 px-3 py-2 border-b border-gray-100 dark:border-white/5">{children}</td>,
-              tr: ({children}) => <tr className="hover:bg-gray-50/50 dark:hover:bg-white/3 transition-colors">{children}</tr>,
-              blockquote: ({children}) => <blockquote className="border-l-2 border-[#0071E3] pl-4 my-3 text-sm text-gray-500 dark:text-gray-400 italic">{children}</blockquote>,
-              hr: () => <hr className="my-6 border-gray-100 dark:border-white/10" />,
-              a: ({children, href}) => <a href={href} className="text-[#0071E3] dark:text-blue-400 hover:underline">{children}</a>,
-            }}
-          >
-            {manualContent}
-          </ReactMarkdown>
-        </div>
-      </div>
-
-      {/* AI 业务助手入口 */}
-      <AIAssistantButton />
+      )}
 
       {/* Feedback FAB */}
       {!isFeedbackOpen && (
-        <div className="fixed bottom-[104px] right-0 z-[60]">
+        <div className="fixed bottom-[112px] right-0 z-[60]">
           <button
             onClick={() => { resetFeedback(); setIsFeedbackOpen(true); }}
             className="flex items-center gap-2 bg-white dark:bg-[#232326] text-[#0071E3] dark:text-blue-400 pl-4 pr-5 py-2.5 rounded-l-full shadow-md border border-gray-200 dark:border-white/10 translate-x-[calc(100%-40px)] hover:translate-x-0 transition-transform duration-300 ease-in-out active:scale-95"

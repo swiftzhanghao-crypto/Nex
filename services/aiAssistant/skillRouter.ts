@@ -1,34 +1,59 @@
 /**
  * 技能路由器
- * 优先使用 Gemini AI 进行意图分类；API Key 缺失时降级为本地关键词匹配
+ * 优先通过后端代理调用 Gemini AI；后端未配置 API Key 时降级为本地关键词匹配
+ * 注：API Key 不再放到前端，统一由后端 /api/ai/* 接口调用
  */
-import { GoogleGenAI, Type } from '@google/genai';
 import type { SkillId, SkillRouteResult } from './types';
 
-/* ────────────── Gemini 初始化 ────────────── */
+const API_BASE: string = (import.meta as any).env?.VITE_API_URL || '/api';
 
-let _ai: GoogleGenAI | null = null;
-let _apiKeyMissing = false;
+let _aiAvailable: boolean | null = null;
 
-function getAI(): GoogleGenAI | null {
-  if (_apiKeyMissing) return null;
-  if (!_ai) {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) {
-      _apiKeyMissing = true;
-      console.warn('[AI助手] VITE_GEMINI_API_KEY 未配置，将使用本地路由 + 本地分析');
-      return null;
-    }
-    _ai = new GoogleGenAI({ apiKey });
-  }
-  return _ai;
+function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = localStorage.getItem('auth_token');
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
 }
 
-/** 外部可检查 API Key 是否已配置 */
-export function isAIConfigured(): boolean {
-  if (_ai) return true;
-  const key = import.meta.env.VITE_GEMINI_API_KEY;
-  return !!key;
+async function aiCall<T>(path: string, body: any): Promise<T | null> {
+  if (_aiAvailable === false) return null;
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (res.status === 503) {
+      _aiAvailable = false;
+      console.warn('[AI助手] 后端未配置 GEMINI_API_KEY，降级为本地分析');
+      return null;
+    }
+    if (!res.ok) {
+      console.error('[AI助手] 后端调用失败', res.status);
+      return null;
+    }
+    _aiAvailable = true;
+    return (await res.json()) as T;
+  } catch (e) {
+    console.error('[AI助手] 后端调用异常:', e);
+    return null;
+  }
+}
+
+/** 检查后端 AI 是否已配置（异步缓存结果） */
+export async function isAIConfigured(): Promise<boolean> {
+  if (_aiAvailable !== null) return _aiAvailable;
+  try {
+    const res = await fetch(`${API_BASE}/ai/status`, { headers: getAuthHeaders() });
+    if (!res.ok) { _aiAvailable = false; return false; }
+    const data = await res.json();
+    _aiAvailable = !!data.configured;
+    return _aiAvailable;
+  } catch {
+    _aiAvailable = false;
+    return false;
+  }
 }
 
 /* ────────────── 本地关键词路由（降级方案） ────────────── */
@@ -136,80 +161,52 @@ const ROUTER_PROMPT = `你是一个业务意图分类器，用于 WPS 365 业务
  * 优先 Gemini，无 API Key 时自动降级到本地关键词匹配
  */
 export async function routeSkill(userMessage: string): Promise<SkillRouteResult> {
-  const ai = getAI();
+  const result = await aiCall<{ json: any | null }>('/ai/generate-json', {
+    prompt: `${ROUTER_PROMPT}\n\n用户问题：「${userMessage}」`,
+    schema: {
+      type: 'OBJECT',
+      properties: {
+        skillId: {
+          type: 'STRING',
+          enum: ['order_risk', 'renew_analysis', 'customer_query', 'business_summary', 'fallback'],
+        },
+        confidence: { type: 'NUMBER' },
+        reasoning: { type: 'STRING' },
+      },
+      required: ['skillId', 'confidence', 'reasoning'],
+    },
+  });
 
-  // 无 API Key → 本地路由
-  if (!ai) {
+  if (!result || !result.json) {
     return localRoute(userMessage);
   }
 
-  // 有 API Key → Gemini 路由
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `${ROUTER_PROMPT}\n\n用户问题：「${userMessage}」`,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            skillId: {
-              type: Type.STRING,
-              enum: ['order_risk', 'renew_analysis', 'customer_query', 'business_summary', 'fallback'],
-            },
-            confidence: { type: Type.NUMBER },
-            reasoning: { type: Type.STRING },
-          },
-          required: ['skillId', 'confidence', 'reasoning'],
-        },
-      },
-    });
+  const parsed = result.json as { skillId: SkillId; confidence: number; reasoning: string };
+  const confidence = Math.max(0, Math.min(1, Number(parsed.confidence) || 0));
 
-    const text = response.text;
-    if (!text) {
-      return localRoute(userMessage);
-    }
-
-    const parsed = JSON.parse(text) as {
-      skillId: SkillId;
-      confidence: number;
-      reasoning: string;
-    };
-
-    const confidence = Math.max(0, Math.min(1, parsed.confidence));
-
-    if (confidence < 0.6) {
-      const clarification = await generateClarification(ai, userMessage, parsed.reasoning);
-      return {
-        skillId: parsed.skillId,
-        confidence,
-        reasoning: parsed.reasoning,
-        needsClarification: true,
-        clarificationQuestion: clarification,
-      };
-    }
-
+  if (confidence < 0.6) {
+    const clarification = await generateClarification(userMessage, parsed.reasoning);
     return {
       skillId: parsed.skillId,
       confidence,
       reasoning: parsed.reasoning,
-      needsClarification: false,
+      needsClarification: true,
+      clarificationQuestion: clarification,
     };
-  } catch (error) {
-    console.error('[AI助手] Gemini 路由失败，降级到本地路由:', error);
-    return localRoute(userMessage);
   }
+
+  return {
+    skillId: parsed.skillId,
+    confidence,
+    reasoning: parsed.reasoning,
+    needsClarification: false,
+  };
 }
 
-async function generateClarification(
-  ai: GoogleGenAI,
-  userMessage: string,
-  reasoning: string,
-): Promise<string> {
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `用户在 WPS 365 业务平台提问了：「${userMessage}」
+async function generateClarification(userMessage: string, reasoning: string): Promise<string> {
+  const fallback = '请问您想了解哪方面的信息？订单风险、续费分析、客户信息，还是业务总结？';
+  const data = await aiCall<{ text: string }>('/ai/generate', {
+    prompt: `用户在 WPS 365 业务平台提问了：「${userMessage}」
 分类器的分析：${reasoning}
 但置信度较低，请生成一个简短的中文反问，帮助用户明确他的需求属于以下哪个方向：
 1. 订单风险分析（价格/回款/合同异常）
@@ -218,11 +215,8 @@ async function generateClarification(
 4. 业务总结（业绩/简报/统计）
 
 只返回反问文本，不要返回其他内容。`,
-    });
-    return response.text || '请问您想了解哪方面的信息？订单风险、续费分析、客户信息，还是业务总结？';
-  } catch {
-    return '请问您想了解哪方面的信息？订单风险、续费分析、客户信息，还是业务总结？';
-  }
+  });
+  return (data && data.text) || fallback;
 }
 
 /**
@@ -234,30 +228,12 @@ export async function executeSkill(
   systemPrompt: string,
   dataContext: string,
 ): Promise<string> {
-  const ai = getAI();
-
-  // 无 API Key → 使用本地数据分析
-  if (!ai) {
+  const fullPrompt = `${systemPrompt}\n\n## 当前业务数据\n${dataContext}\n\n## 用户问题\n${userMessage}`;
+  const data = await aiCall<{ text: string }>('/ai/generate', { prompt: fullPrompt });
+  if (!data) {
     return generateLocalResponse(userMessage, dataContext);
   }
-
-  try {
-    const fullPrompt = `${systemPrompt}\n\n## 当前业务数据\n${dataContext}\n\n## 用户问题\n${userMessage}`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: fullPrompt,
-    });
-
-    return response.text || '抱歉，未能生成回答，请稍后重试。';
-  } catch (error) {
-    console.error('[AI助手] 技能执行失败:', error);
-    const errMsg = error instanceof Error ? error.message : String(error);
-    if (errMsg.includes('API key') || errMsg.includes('401') || errMsg.includes('403')) {
-      return '⚠️ API Key 无效或已过期。\n\n请在项目根目录 `.env` 文件中设置有效的 Gemini API Key：\n```\nVITE_GEMINI_API_KEY=你的密钥\n```\n\n获取方式：访问 https://aistudio.google.com/apikey 免费申请。\n\n设置后需要重启开发服务器。';
-    }
-    return `抱歉，AI 调用出错：${errMsg}\n\n已为您切换到本地分析模式。`;
-  }
+  return data.text || '抱歉，未能生成回答，请稍后重试。';
 }
 
 /* ────────────── 本地数据分析（无 API Key 时降级） ────────────── */

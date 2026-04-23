@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Search, Filter, ChevronDown, X, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
-import { useAppContext } from '../../contexts/AppContext';
+import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 
 const orderStatusConfig: Record<string, { label: string; cls: string }> = {
   '已失效': { label: '已失效', cls: 'unified-tag-gray' },
@@ -14,6 +14,7 @@ const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 const PerformanceManager: React.FC = () => {
   const { performances } = useAppContext();
+  useEnsureData(['performances']);
   const [searchText, setSearchText] = useState('');
   const [searchField, setSearchField] = useState<'id' | 'orderId' | 'owner'>('id');
   const [filterStatus, setFilterStatus] = useState<string[]>([]);

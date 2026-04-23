@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
+import { buildRowPermissionWhere, checkRowPermissionForSingle } from '../rowPermissionFilter.ts';
 
 const router = Router();
 router.use(authMiddleware);
@@ -29,18 +30,38 @@ function toProduct(row: any) {
   };
 }
 
-router.get('/', checkPermission('product', 'list'), (req, res) => {
-  const { category, status, search } = req.query as Record<string, string>;
+function safePagination(page: string, size: string) {
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const limit = Math.min(Math.max(1, parseInt(size) || 50), 200);
+  return { limit, offset: (pageNum - 1) * limit, pageNum };
+}
+
+router.get('/', checkPermission('product', 'list'), (req: AuthRequest, res) => {
+  const { category, status, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
-  let sql = 'SELECT * FROM products WHERE 1=1';
+  const conds: string[] = ['1=1'];
   const params: any[] = [];
 
-  if (category) { sql += ' AND category = ?'; params.push(category); }
-  if (status) { sql += ' AND status = ?'; params.push(status); }
-  if (search) { sql += ' AND name LIKE ?'; params.push(`%${search}%`); }
+  if (category) { conds.push('category = ?'); params.push(category); }
+  if (status) { conds.push('status = ?'); params.push(status); }
+  if (search && search.trim()) {
+    conds.push('(name LIKE ? OR id LIKE ?)');
+    const k = `%${search.trim()}%`;
+    params.push(k, k);
+  }
 
-  sql += ' ORDER BY name';
-  res.json(db.prepare(sql).all(...params).map(toProduct));
+  const rowPerm = buildRowPermissionWhere(db, req.user!, 'Product');
+  const whereSql = ' WHERE ' + conds.join(' AND ') + rowPerm.sql;
+  const whereParams = [...params, ...rowPerm.params];
+
+  const totalRow = db.prepare(`SELECT COUNT(*) AS c FROM products${whereSql}`).get(...whereParams) as { c: number };
+  const total = totalRow?.c ?? 0;
+
+  const { limit, offset, pageNum } = safePagination(page, size);
+  const rows = db.prepare(`SELECT * FROM products${whereSql} ORDER BY name LIMIT ? OFFSET ?`)
+    .all(...whereParams, limit, offset);
+
+  res.json({ data: rows.map(toProduct), total, page: pageNum, size: limit });
 });
 
 router.get('/meta/channels', (_req, res) => {
@@ -65,10 +86,16 @@ router.get('/meta/opportunities', (_req, res) => {
   })));
 });
 
-router.get('/:id', checkPermission('product', 'read'), (req, res) => {
-  const row = getDb().prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
+router.get('/:id', checkPermission('product', 'read'), (req: AuthRequest, res) => {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
   if (!row) { res.status(404).json({ error: '产品不存在' }); return; }
-  res.json(toProduct(row));
+  const product = toProduct(row);
+  if (!checkRowPermissionForSingle(db, req.user!, 'Product', product)) {
+    res.status(403).json({ error: '无权查看此产品' });
+    return;
+  }
+  res.json(product);
 });
 
 router.post('/', checkPermission('product', 'create'), (req: AuthRequest, res) => {

@@ -26,11 +26,10 @@ function nextId(): string {
   return `msg_${Date.now()}_${++_msgCounter}`;
 }
 
-function makeWelcomeMessage(): ChatMessage {
-  const hasAI = isAIConfigured();
-  const modeNote = hasAI
-    ? ''
-    : '\n\n⚠️ 当前未配置 Gemini API Key，运行在**本地分析模式**。可查看数据摘要，如需 AI 深度分析请在 `.env` 中配置 `VITE_GEMINI_API_KEY`。';
+function makeWelcomeMessage(hasAI: boolean | null): ChatMessage {
+  const modeNote = hasAI === false
+    ? '\n\n⚠️ 后端未配置 GEMINI_API_KEY，当前运行在**本地分析模式**。可查看数据摘要，如需 AI 深度分析请联系管理员在服务端配置。'
+    : '';
 
   return {
     id: 'welcome',
@@ -63,12 +62,32 @@ function getQuickQuestions(pageCtx: PageContext): string[] {
 const AIAssistantDialog: React.FC<AIAssistantDialogProps> = ({ open, onClose }) => {
   const appCtx = useAppContext();
   const location = useLocation();
-  const [messages, setMessages] = useState<ChatMessage[]>([makeWelcomeMessage()]);
+  const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [makeWelcomeMessage(null)]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [activeSkill, setActiveSkill] = useState<SkillId | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    isAIConfigured().then((ok) => {
+      setAiAvailable(ok);
+      setMessages((prev) => {
+        if (prev.length === 1 && prev[0].id === 'welcome') {
+          return [makeWelcomeMessage(ok)];
+        }
+        return prev;
+      });
+    });
+  }, []);
+
+  // AI 助手往往要根据全量订单/客户作答，dialog 打开时按需懒加载
+  useEffect(() => {
+    if (!open) return;
+    appCtx.loadAllOrders?.();
+    appCtx.loadAllCustomers?.();
+  }, [open, appCtx]);
 
   // 根据当前 URL 解析页面上下文
   const pageCtx: PageContext = useMemo(
@@ -91,13 +110,13 @@ const AIAssistantDialog: React.FC<AIAssistantDialogProps> = ({ open, onClose }) 
   }, [open]);
 
   const getAppData = useCallback((): AppDataSnapshot => ({
-    orders: appCtx.orders as unknown[],
-    customers: appCtx.customers as unknown[],
+    orders: appCtx.filteredOrders as unknown[],
+    customers: appCtx.filteredCustomers as unknown[],
     opportunities: appCtx.opportunities as unknown[],
     contracts: appCtx.contracts as unknown[],
-    products: appCtx.products as unknown[],
+    products: appCtx.filteredProducts as unknown[],
     performances: appCtx.performances as unknown[],
-  }), [appCtx.orders, appCtx.customers, appCtx.opportunities, appCtx.contracts, appCtx.products, appCtx.performances]);
+  }), [appCtx.filteredOrders, appCtx.filteredCustomers, appCtx.opportunities, appCtx.contracts, appCtx.filteredProducts, appCtx.performances]);
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
@@ -172,7 +191,7 @@ const AIAssistantDialog: React.FC<AIAssistantDialogProps> = ({ open, onClose }) 
   };
 
   const handleClear = () => {
-    setMessages([makeWelcomeMessage()]);
+    setMessages([makeWelcomeMessage(aiAvailable)]);
     setActiveSkill(null);
   };
 
@@ -295,7 +314,9 @@ const AIAssistantDialog: React.FC<AIAssistantDialogProps> = ({ open, onClose }) 
             </button>
           </div>
           <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1.5 text-center">
-            {isAIConfigured() ? 'AI 助手基于 Gemini，回答仅供参考' : '本地模式 · 配置 API Key 后可启用 AI 深度分析'}
+            {aiAvailable === false
+              ? '本地模式 · 后端未配置 GEMINI_API_KEY'
+              : 'AI 助手基于 Gemini，回答仅供参考'}
           </p>
         </div>
       </div>

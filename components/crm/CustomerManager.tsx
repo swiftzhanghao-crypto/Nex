@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { Customer } from '../../types';
 import { Search, Plus, X, Filter, RotateCcw, ChevronDown, Trash2, CheckCircle } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
-import { useAppContext } from '../../contexts/AppContext';
+import { useAppContext, useEnsureData } from '../../contexts/AppContext';
+import Pagination from '../common/Pagination';
 
 // ── 筛选字段定义 ─────────────────────────────────────────────────
 const customerFilterFields: { id: string; label: string; mode: '单选' | '多选' }[] = [
@@ -23,7 +24,8 @@ interface CFilterCondition {
 }
 
 const CustomerManager: React.FC = () => {
-  const { customers, setCustomers, users } = useAppContext();
+  const { customers, setCustomers, filteredCustomers: rowFilteredCustomers, users } = useAppContext();
+  useEnsureData(['customers']);
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [searchField, setSearchField] = useState<'crmId' | 'companyName' | 'enterpriseId'>('crmId');
@@ -150,7 +152,7 @@ const CustomerManager: React.FC = () => {
   };
 
 
-  const filteredCustomers = customers.filter(c => {
+  const filteredCustomers = rowFilteredCustomers.filter(c => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || (
         searchField === 'crmId'        ? c.id.toLowerCase().includes(searchLower) :
@@ -286,8 +288,7 @@ const CustomerManager: React.FC = () => {
           <table className="w-full text-left border-separate border-spacing-0">
             <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E] sticky top-0 z-10">
               <tr>
-                <th className="pl-6 pr-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">客户编号</th>
-                <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">客户名称</th>
+                <th className="pl-6 pr-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">客户</th>
                 <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">关联企业ID</th>
                 <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">客户类型</th>
                 <th className="px-4 py-3 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E]">行业条线</th>
@@ -306,18 +307,18 @@ const CustomerManager: React.FC = () => {
                       key={customer.id}
                       className="group hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors border-b border-gray-100/50 dark:border-white/5 last:border-0"
                   >
-                    <td className="pl-6 pr-4 py-3 whitespace-nowrap">
+                    <td className="pl-6 pr-4 py-3 max-w-[300px]">
                       <button
                           onClick={() => navigate(`/customers/${customer.id}`)}
-                          className="text-sm font-mono font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline cursor-pointer"
+                          className="text-left group/name"
                       >
+                        <div className="font-medium text-gray-900 dark:text-white leading-snug group-hover/name:text-[#0071E3] dark:group-hover/name:text-[#0A84FF] transition">
+                          {customer.companyName}
+                        </div>
+                        <div className="text-xs font-mono text-gray-400 dark:text-gray-500 mt-0.5">
                           {customer.id}
+                        </div>
                       </button>
-                    </td>
-                    <td className="px-4 py-3 max-w-[240px]">
-                      <div className="font-medium text-gray-900 dark:text-white leading-snug">
-                        {customer.companyName}
-                      </div>
                     </td>
                     <td className="px-4 py-3 text-xs font-mono text-gray-500 dark:text-gray-400">
                       {enterprises.length === 0 ? (
@@ -372,33 +373,23 @@ const CustomerManager: React.FC = () => {
               })}
               {currentCustomers.length === 0 && (
                   <tr>
-                      <td colSpan={8} className="p-12 text-center text-gray-400">暂无客户数据</td>
+                      <td colSpan={7} className="p-12 text-center text-gray-400">暂无客户数据</td>
                   </tr>
               )}
             </tbody>
           </table>
         </div>
 
-        <div className="flex justify-between items-center px-5 py-3.5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5 shrink-0">
-            <span className="text-xs text-gray-500 dark:text-gray-400">共 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF]">{filteredCustomers.length}</span> 条</span>
-            <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">每页</span>
-                    <select
-                        value={itemsPerPage}
-                        onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                        className="unified-card h-7 pl-2 pr-6 text-xs font-medium text-gray-700 dark:text-gray-200 dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 outline-none appearance-none cursor-pointer hover:border-[#0071E3]/50 transition"
-                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
-                    >
-                        {[20, 50, 100].map(n => <option key={n} value={n}>{n} 条</option>)}
-                    </select>
-                </div>
-                <span className="text-xs text-gray-400 dark:text-gray-500">第 {currentPage} / {totalPages} 页</span>
-                <div className="flex items-center gap-1.5">
-                    <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium transition disabled:cursor-not-allowed">上一页</button>
-                    <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium transition disabled:cursor-not-allowed">下一页</button>
-                </div>
-            </div>
+        <div className="px-5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5 shrink-0">
+            <Pagination
+                page={currentPage}
+                size={itemsPerPage}
+                total={filteredCustomers.length}
+                onPageChange={handlePageChange}
+                onSizeChange={(s) => { setItemsPerPage(s); setCurrentPage(1); }}
+                sizeOptions={[20, 50, 100]}
+                showJumper
+            />
         </div>
       </div>
 

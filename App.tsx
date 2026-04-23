@@ -4,6 +4,7 @@ import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AppProvider, useAppContext } from './contexts/AppContext';
 import Layout from './components/layout/Layout';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import LoginModal from './components/auth/LoginModal';
 import ProductManager from './components/product/ProductManager';
 import OrderManager from './components/order/OrderManager';
 import CustomerManager from './components/crm/CustomerManager';
@@ -14,6 +15,8 @@ import OpportunityManager from './components/crm/OpportunityManager';
 import ProductDetails from './components/product/ProductDetails';
 import OrderDetails from './components/order/OrderDetails';
 import CustomerDetails from './components/crm/CustomerDetails';
+import ReportsManager from './components/crm/ReportsManager';
+import ReportsDetail from './components/crm/ReportsDetail';
 import MerchandiseDetails from './components/product/MerchandiseDetails';
 import ChannelDetails from './components/channel/ChannelDetails';
 
@@ -48,7 +51,7 @@ import SABCustomerDetail from './components/sab/SABCustomerDetail';
 
 const RequireAnyPermission: React.FC<{ permissions: string[]; children: React.ReactElement }> = ({ permissions, children }) => {
   const { currentUser, roles } = useAppContext();
-  const currentUserRole = roles.find((r) => r.id === currentUser.role);
+  const currentUserRole = roles.find((r) => currentUser.roles?.includes(r.id));
   const rolePermissions = currentUserRole?.permissions || [];
   const canAccess = rolePermissions.includes('all') || permissions.some((p) => rolePermissions.includes(p));
   return canAccess ? children : <Navigate to="/" replace />;
@@ -85,6 +88,9 @@ function AppRoutes() {
         <Route path="/channels/:id" element={<ChannelDetails />} />
 
         <Route path="/opportunities" element={<OpportunityManager />} />
+
+        <Route path="/reports" element={<ReportsManager />} />
+        <Route path="/reports/:id" element={<ReportsDetail />} />
 
         <Route path="/contracts" element={<ContractManager />} />
         <Route path="/remittances" element={<RemittanceManager />} />
@@ -139,7 +145,10 @@ function App() {
   return (
     <AppProvider>
       <Router>
-        <AppRoutes />
+        <ErrorBoundary fallbackTitle="页面加载异常">
+          <AppRoutes />
+        </ErrorBoundary>
+        <LoginModal />
       </Router>
     </AppProvider>
   );

@@ -21,7 +21,7 @@ const ProductManager: React.FC = () => {
   } = useAppContext();
   const navigate = useNavigate();
 
-  const currentUserRole = roles.find(r => r.id === currentUser.role);
+  const currentUserRole = roles.find(r => currentUser.roles?.includes(r.id));
   const permissions = currentUserRole?.permissions || [];
   const hasPermission = (perm: string) => permissions.includes('all') || permissions.includes(perm);
 
@@ -112,8 +112,8 @@ const ProductManager: React.FC = () => {
     };
 
     const newProduct: Product = {
+      ...(formData as Product),
       id: newId,
-      ...formData as Product,
       skus: [initialSku],
     };
 

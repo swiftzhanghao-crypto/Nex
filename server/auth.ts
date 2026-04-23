@@ -5,17 +5,23 @@ import type { Request, Response, NextFunction } from 'express';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const JWT_SECRET = (() => {
   const secret = process.env.JWT_SECRET;
-  if (!secret && IS_PRODUCTION) {
-    console.error('[FATAL] JWT_SECRET 环境变量未设置，生产环境不允许使用默认密钥。');
+  if (secret && secret.length >= 16) return secret;
+  if (IS_PRODUCTION) {
+    console.error('[FATAL] 生产环境必须设置长度 ≥16 的 JWT_SECRET 环境变量');
     process.exit(1);
   }
-  return secret || 'wps365-dev-secret-DO-NOT-USE-IN-PROD';
+  // 开发环境：每次启动生成临时强随机密钥（这样旧 token 启动后即失效，更安全也更明显）
+  const random = crypto.randomBytes(48).toString('hex');
+  console.warn('[auth] JWT_SECRET 未配置，已生成本次进程临时密钥（仅开发可用，重启后旧 token 失效）');
+  return random;
 })();
-const TOKEN_EXPIRY = '7d';
+
+// 默认 24h；可通过 JWT_EXPIRES_IN 覆盖。建议生产环境配 refresh token 后再缩短。
+const TOKEN_EXPIRY = (process.env.JWT_EXPIRES_IN as any) || '24h';
 
 export interface JwtPayload {
   userId: string;
-  role: string;
+  roles: string[];
 }
 
 export function signToken(payload: JwtPayload): string {
@@ -74,7 +80,7 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
 
 export function requireRole(...roles: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user || !Array.isArray(req.user.roles) || !req.user.roles.some(r => roles.includes(r))) {
       res.status(403).json({ error: '权限不足' });
       return;
     }
@@ -85,8 +91,9 @@ export function requireRole(...roles: string[]) {
 export function requireSelfOrRole(...roles: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) { res.status(401).json({ error: '未认证' }); return; }
+    const userRoles = Array.isArray(req.user.roles) ? req.user.roles : [];
     const targetId = req.params.id;
-    if (req.user.userId === targetId || roles.includes(req.user.role)) {
+    if (req.user.userId === targetId || userRoles.some(r => roles.includes(r))) {
       next();
       return;
     }

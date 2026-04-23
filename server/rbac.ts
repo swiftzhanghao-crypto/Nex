@@ -101,13 +101,17 @@ export function checkPermission(resource: string, action: string): (req: AuthReq
       res.status(401).json({ error: '未认证' });
       return;
     }
+    if (!Array.isArray(req.user.roles)) {
+      res.status(401).json({ error: '令牌格式异常，请重新登录' });
+      return;
+    }
     const allowedRoles = PERMISSION_MATRIX[key];
     if (!allowedRoles) {
       console.warn(`[rbac] unknown permission key: ${key}, denying access`);
       res.status(403).json({ error: '权限未定义' });
       return;
     }
-    if (allowedRoles.includes(req.user.role)) {
+    if (req.user.roles.some(r => allowedRoles.includes(r))) {
       next();
       return;
     }
@@ -115,10 +119,12 @@ export function checkPermission(resource: string, action: string): (req: AuthReq
   };
 }
 
-export function hasPermission(role: string, resource: string, action: string): boolean {
+export function hasPermission(roles: string | string[], resource: string, action: string): boolean {
   const key = `${resource}:${action}`;
   const allowedRoles = PERMISSION_MATRIX[key];
-  return !!allowedRoles && allowedRoles.includes(role);
+  if (!allowedRoles) return false;
+  const arr = Array.isArray(roles) ? roles : [roles];
+  return arr.some(r => allowedRoles.includes(r));
 }
 
 export { PERMISSION_MATRIX };

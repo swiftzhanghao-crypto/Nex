@@ -5,15 +5,158 @@ import {
   initialDepartments, initialRoles, initialUsers, initialChannels,
   initialStandaloneEnterprises,
 } from '../data/staticData.ts';
+import { initialSpaces, initialSpaceRoles } from '../data/spaceSeedData.ts';
 import {
   generateCustomers, generateOpportunities, generateOrders,
   generateContracts, generateRemittances, generateInvoices,
   generatePerformances, generateAuthorizations, generateDeliveryInfos,
+  generateSubscriptionChainOrders,
 } from '../data/generators.ts';
 import { hashPassword } from './auth.ts';
 
 function hash(password: string): string {
   return hashPassword(password);
+}
+
+function ensureSpaceSeedData(db: any) {
+  const insertSpace = db.prepare(`
+    INSERT OR IGNORE INTO spaces (id, name, description, icon, perm_tree, resource_config, column_config, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const s of initialSpaces) {
+    insertSpace.run(
+      s.id,
+      s.name,
+      s.description,
+      s.icon,
+      JSON.stringify(s.permTree),
+      JSON.stringify(s.resourceConfig),
+      JSON.stringify(s.columnConfig),
+      s.sortOrder ?? 0,
+    );
+  }
+
+  const insertSpaceRole = db.prepare(`
+    INSERT OR IGNORE INTO space_roles (id, space_id, name, description, permissions, row_permissions, row_logic, column_permissions, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const r of initialSpaceRoles) {
+    insertSpaceRole.run(
+      r.id,
+      r.spaceId,
+      r.name,
+      r.description,
+      JSON.stringify(r.permissions),
+      JSON.stringify(r.rowPermissions ?? []),
+      JSON.stringify(r.rowLogic ?? {}),
+      JSON.stringify(r.columnPermissions ?? []),
+      r.sortOrder ?? 0,
+    );
+  }
+
+  // 默认把一个 Admin 加为 SAB 应用管理员（幂等）
+  const sabSpace = initialSpaces.find(s => s.id === 'space_sab_insight') || initialSpaces[0];
+  const sabAdminRole = initialSpaceRoles.find(r => r.spaceId === sabSpace?.id && r.id === 'sr_sab_admin');
+  if (sabSpace && sabAdminRole) {
+    const adminUser = db.prepare(`SELECT id FROM users WHERE role = 'Admin' ORDER BY rowid ASC LIMIT 1`).get() as { id?: string } | undefined;
+    if (adminUser?.id) {
+      const existing = db.prepare(`SELECT id FROM space_members WHERE space_id = ? AND user_id = ?`).get(sabSpace.id, adminUser.id) as { id?: string } | undefined;
+      if (!existing) {
+        db.prepare(`
+          INSERT INTO space_members (id, space_id, user_id, role_id, is_admin)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(`sm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, sabSpace.id, adminUser.id, sabAdminRole.id, 1);
+      }
+    }
+  }
+}
+
+function migrateRolesToArray(db: any) {
+  const rows = db.prepare("SELECT id, role FROM users WHERE role NOT LIKE '[%'").all() as Array<{ id: string; role: string }>;
+  if (rows.length === 0) return;
+  console.log(`[seed] Migrating ${rows.length} user(s) from single role to roles array...`);
+  const update = db.prepare('UPDATE users SET role = ? WHERE id = ?');
+  for (const row of rows) {
+    update.run(JSON.stringify([row.role]), row.id);
+  }
+}
+
+function migrateSpaceTextToApp(db: any) {
+  let total = 0;
+  // 角色名称：空间管理员 → 应用管理员
+  const r1 = db.prepare("UPDATE space_roles SET name = REPLACE(name, '空间', '应用') WHERE name LIKE '%空间%'").run();
+  total += r1.changes || 0;
+  // 角色描述
+  const r2 = db.prepare("UPDATE space_roles SET description = REPLACE(description, '空间', '应用') WHERE description LIKE '%空间%'").run();
+  total += r2.changes || 0;
+  // 应用描述（resourceConfig 里的 JSON 字段）
+  const spaces = db.prepare("SELECT id, resource_config FROM spaces WHERE resource_config LIKE '%空间%'").all() as any[];
+  if (spaces.length > 0) {
+    const updRC = db.prepare('UPDATE spaces SET resource_config = ? WHERE id = ?');
+    for (const s of spaces) {
+      updRC.run(s.resource_config.replace(/空间/g, '应用'), s.id);
+    }
+    total += spaces.length;
+  }
+  if (total > 0) {
+    console.log(`[seed] Migrated "空间" → "应用" text in ${total} record(s).`);
+  }
+}
+
+function ensureSubscriptionChainOrders(db: any) {
+  const existing = db.prepare(
+    "SELECT COUNT(*) as n FROM orders WHERE order_remark = '【订阅链】与续费管理订阅同源，勿删'"
+  ).get() as { n: number };
+  if (existing.n > 0) return;
+
+  // 需要客户和产品数据从 DB 读取（Seed 阶段 static data 已入库）
+  const customers = (db.prepare('SELECT * FROM customers').all() as any[]).map((r: any) => ({
+    id: r.id, companyName: r.company_name, industry: r.industry,
+    customerType: r.customer_type, level: r.level, region: r.region,
+  }));
+  const products = (db.prepare('SELECT * FROM products').all() as any[]).map((r: any) => ({
+    id: r.id, name: r.name, category: r.category, subCategory: r.sub_category,
+    skus: JSON.parse(r.skus || '[]'),
+  }));
+  const users = (db.prepare('SELECT * FROM users').all() as any[]).map((r: any) => ({
+    id: r.id, name: r.name, roles: (() => {
+      try { return JSON.parse(r.role); } catch { return [r.role]; }
+    })(),
+  }));
+
+  const subOrders = generateSubscriptionChainOrders({
+    customers: customers as any, products: products as any, users: users as any,
+  });
+
+  if (subOrders.length === 0) return;
+
+  const ins = db.prepare(`
+    INSERT OR IGNORE INTO orders (id, customer_id, customer_name, customer_type, customer_level, customer_industry, customer_region, date, status, total, items, source, buyer_type, buyer_name, buyer_id, shipping_address, delivery_method, is_paid, payment_date, payment_method, payment_terms, approval, approval_records, sales_rep_id, sales_rep_name, biz_manager_id, biz_manager_name, order_remark, extra)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const tx = db.transaction(() => {
+    for (const o of subOrders) {
+      const extra = JSON.stringify({
+        directChannel: o.directChannel, terminalChannel: o.terminalChannel,
+        orderType: o.orderType, creatorId: o.creatorId, creatorName: o.creatorName,
+      });
+      ins.run(
+        o.id, o.customerId, o.customerName, o.customerType ?? null,
+        o.customerLevel ?? null, o.customerIndustry ?? null, o.customerRegion ?? null,
+        o.date, o.status, o.total, JSON.stringify(o.items), o.source, o.buyerType,
+        o.buyerName ?? null, o.buyerId ?? null, o.shippingAddress ?? null,
+        o.deliveryMethod ?? null, o.isPaid ? 1 : 0, o.paymentDate ?? null,
+        o.paymentMethod ?? null, o.paymentTerms ?? null,
+        JSON.stringify(o.approval), JSON.stringify(o.approvalRecords),
+        o.salesRepId ?? null, o.salesRepName ?? null,
+        o.businessManagerId ?? null, o.businessManagerName ?? null,
+        (o as any).orderRemark ?? null, extra,
+      );
+    }
+  });
+  tx();
+  console.log(`[seed] Inserted ${subOrders.length} subscription chain order(s) for 续费管理.`);
 }
 
 export function seedDatabase() {
@@ -22,6 +165,10 @@ export function seedDatabase() {
 
   const count = db.prepare('SELECT COUNT(*) as n FROM users').get() as { n: number };
   if (count.n > 0) {
+    ensureSpaceSeedData(db);
+    migrateRolesToArray(db);
+    migrateSpaceTextToApp(db);
+    ensureSubscriptionChainOrders(db);
     console.log('[seed] Database already has data, skipping seed.');
     return;
   }
@@ -35,8 +182,9 @@ export function seedDatabase() {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   for (const u of initialUsers) {
+    const rolesJson = JSON.stringify(u.roles ?? []);
     insertUser.run(u.id, u.accountId, u.name, u.email, u.phone ?? null, defaultPassword,
-      u.role, u.userType, u.status, u.avatar ?? null, u.departmentId ?? null, u.monthBadge ?? null);
+      rolesJson, u.userType, u.status, u.avatar ?? null, u.departmentId ?? null, u.monthBadge ?? null);
   }
 
   // --- Departments ---
@@ -46,10 +194,13 @@ export function seedDatabase() {
   }
 
   // --- Roles ---
-  const insertRole = db.prepare(`INSERT INTO roles (id, name, description, permissions, is_system, row_permissions, column_permissions) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  const insertRole = db.prepare(`INSERT INTO roles (id, name, description, permissions, is_system, row_permissions, row_logic, column_permissions, app_permissions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   for (const r of initialRoles) {
-    insertRole.run(r.id, r.name, r.description, JSON.stringify(r.permissions), r.isSystem ? 1 : 0,
-      JSON.stringify(r.rowPermissions ?? []), JSON.stringify(r.columnPermissions ?? []));
+    insertRole.run(
+      r.id, r.name, r.description, JSON.stringify(r.permissions), r.isSystem ? 1 : 0,
+      JSON.stringify(r.rowPermissions ?? []), JSON.stringify((r as any).rowLogic ?? {}),
+      JSON.stringify(r.columnPermissions ?? []), JSON.stringify((r as any).appPermissions ?? {}),
+    );
   }
 
   // --- Products ---
@@ -108,11 +259,17 @@ export function seedDatabase() {
     merchandises: initialMerchandises, opportunities, channels: initialChannels,
     contracts,
   });
+  // 同时生成订阅链演示订单
+  const subscriptionOrders = generateSubscriptionChainOrders({
+    customers, products: initialProducts, users: initialUsers,
+  });
+  const allOrders = [...orders, ...subscriptionOrders];
+
   const insertOrder = db.prepare(`
-    INSERT INTO orders (id, customer_id, customer_name, customer_type, customer_level, customer_industry, customer_region, date, status, total, items, source, buyer_type, buyer_name, buyer_id, shipping_address, delivery_method, is_paid, payment_date, payment_method, payment_terms, payment_record, approval, approval_records, sales_rep_id, sales_rep_name, biz_manager_id, biz_manager_name, invoice_info, acceptance_info, acceptance_config, opportunity_id, opportunity_name, original_order_id, refund_reason, refund_amount, extra)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO orders (id, customer_id, customer_name, customer_type, customer_level, customer_industry, customer_region, date, status, total, items, source, buyer_type, buyer_name, buyer_id, shipping_address, delivery_method, is_paid, payment_date, payment_method, payment_terms, payment_record, approval, approval_records, sales_rep_id, sales_rep_name, biz_manager_id, biz_manager_name, invoice_info, acceptance_info, acceptance_config, opportunity_id, opportunity_name, original_order_id, refund_reason, refund_amount, order_remark, extra)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  for (const o of orders) {
+  for (const o of allOrders) {
     const extra = JSON.stringify({
       receivingParty: o.receivingParty, receivingCompany: o.receivingCompany,
       receivingMethod: o.receivingMethod, directChannel: o.directChannel,
@@ -138,7 +295,8 @@ export function seedDatabase() {
       o.acceptanceInfo ? JSON.stringify(o.acceptanceInfo) : null,
       o.acceptanceConfig ? JSON.stringify(o.acceptanceConfig) : null,
       o.opportunityId ?? null, o.opportunityName ?? null, o.originalOrderId ?? null,
-      o.refundReason ?? null, o.refundAmount ?? null, extra);
+      o.refundReason ?? null, o.refundAmount ?? null,
+      (o as any).orderRemark ?? null, extra);
   }
 
   // --- Contracts (insert) ---
@@ -202,5 +360,8 @@ export function seedDatabase() {
       d.serviceStartDate ?? null, d.serviceEndDate ?? null);
   }
 
-  console.log(`[seed] Done. Users: ${initialUsers.length}, Customers: ${customers.length}, Orders: ${orders.length}, Products: ${initialProducts.length}, Performances: ${performances.length}, Authorizations: ${authorizations.length}, DeliveryInfos: ${deliveryInfos.length}`);
+  // --- Spaces ---
+  ensureSpaceSeedData(db);
+
+  console.log(`[seed] Done. Users: ${initialUsers.length}, Customers: ${customers.length}, Orders: ${orders.length}, Products: ${initialProducts.length}, Performances: ${performances.length}, Authorizations: ${authorizations.length}, DeliveryInfos: ${deliveryInfos.length}, Spaces: ${initialSpaces.length}`);
 }

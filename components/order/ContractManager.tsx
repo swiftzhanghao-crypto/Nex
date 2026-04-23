@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { Search, FileText, Filter, ChevronDown, X, CheckCircle, Clock, AlertCircle, Circle, RotateCcw } from 'lucide-react';
 import { Contract } from '../../types';
 
-import { useAppContext } from '../../contexts/AppContext';
+import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 
 const contractTypeLabelMap: Record<string, string> = {
   '渠道最终用户合同': '渠道最终用户合同',
@@ -25,6 +25,7 @@ const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 const ContractManager: React.FC = () => {
   const { contracts } = useAppContext();
+  useEnsureData(['contracts']);
   const [searchText, setSearchText] = useState('');
   const [searchField, setSearchField] = useState<'name' | 'code' | 'partyA'>('name');
   const [filterStatus, setFilterStatus] = useState<string[]>([]);

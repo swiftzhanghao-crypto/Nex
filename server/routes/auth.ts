@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getDb } from '../db.ts';
 import { signToken, verifyPassword, hashPassword, authMiddleware, type AuthRequest } from '../auth.ts';
+import { parseRoles } from './users.ts';
 
 const router = Router();
 
@@ -24,12 +25,13 @@ router.post('/login', (req, res) => {
     db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(upgraded, user.id);
   }
 
-  const token = signToken({ userId: user.id, role: user.role });
+  const roles = parseRoles(user.role);
+  const token = signToken({ userId: user.id, roles });
   res.json({
     token,
     user: {
       id: user.id, accountId: user.account_id, name: user.name,
-      email: user.email, phone: user.phone, role: user.role,
+      email: user.email, phone: user.phone, roles,
       userType: user.user_type, status: user.status,
       avatar: user.avatar, departmentId: user.department_id,
       monthBadge: user.month_badge,
@@ -44,7 +46,7 @@ router.get('/me', authMiddleware, (req: AuthRequest, res) => {
 
   res.json({
     id: user.id, accountId: user.account_id, name: user.name,
-    email: user.email, phone: user.phone, role: user.role,
+    email: user.email, phone: user.phone, roles: parseRoles(user.role),
     userType: user.user_type, status: user.status,
     avatar: user.avatar, departmentId: user.department_id,
     monthBadge: user.month_badge,

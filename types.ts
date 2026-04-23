@@ -336,16 +336,132 @@ export interface ColumnPermissionRule {
 
 export type BaseRowPermission = 'all' | 'custom';
 
+/** 平台角色在某个业务应用中的权限片段（与 SpaceRole 字段语义一致，用于独立应用如 SAB） */
+export interface AppScopedRolePermissions {
+    permissions: string[];
+    rowPermissions: SpaceRowPermissionRule[];
+    rowLogic?: Record<string, RowLogicConfig>;
+    columnPermissions: SpaceColumnPermissionRule[];
+}
+
 export interface RoleDefinition {
     id: string;
     name: string;
     description: string;
+    /** 主业务平台（主应用）功能权限点 */
     permissions: string[];
     isSystem?: boolean;
     baseRowPermission?: BaseRowPermission;
+    /** 主业务平台数据行/列权限 */
     rowPermissions?: RowPermissionRule[];
     rowLogic?: Record<string, RowLogicConfig>;
     columnPermissions?: ColumnPermissionRule[];
+    /**
+     * 各独立应用维度的权限（如 SAB 客户洞察：功能/行/列与「应用内角色」同源配置）
+     * key 为 spaces 表中的应用 id（如 space_sab_insight），不包含主应用
+     */
+    appPermissions?: Record<string, AppScopedRolePermissions>;
+}
+
+// ========= Space（应用）相关类型 =========
+// 每个 Space 对应一个独立应用（如 SAB 客户洞察），具有独立的权限树、角色、成员
+export interface SpacePermItem {
+    id: string;
+    label: string;
+    desc?: string;
+}
+
+export interface SpacePermCategory {
+    id: string;
+    label: string;
+    permissions: SpacePermItem[];
+}
+
+export interface SpacePermSubgroup {
+    id: string;
+    label: string;
+    permissions?: SpacePermItem[];
+    categories?: SpacePermCategory[];
+}
+
+export interface SpacePermGroup {
+    id: string;
+    label: string;
+    subgroups: SpacePermSubgroup[];
+}
+
+export interface SpaceResourceDimension {
+    id: string;
+    label: string;
+    options?: { value: string; label: string }[];
+}
+
+export interface SpaceResourceConfig {
+    id: string;
+    label: string;
+    description?: string;
+    dimensions: SpaceResourceDimension[];
+}
+
+export interface SpaceColumnItem {
+    id: string;
+    label: string;
+}
+
+export interface SpaceColumnConfig {
+    id: string;
+    label: string;
+    columns: SpaceColumnItem[];
+}
+
+export interface Space {
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    permTree: SpacePermGroup[];
+    resourceConfig: SpaceResourceConfig[];
+    columnConfig: SpaceColumnConfig[];
+    sortOrder?: number;
+}
+
+export interface SpaceRowPermissionRule {
+    id: string;
+    resource: string;
+    dimension: string;
+    operator: PermissionOperator;
+    values: string[];
+}
+
+export interface SpaceColumnPermissionRule {
+    id: string;
+    resource: string;
+    allowedColumns: string[];
+}
+
+export interface SpaceRole {
+    id: string;
+    spaceId: string;
+    name: string;
+    description: string;
+    permissions: string[];
+    rowPermissions?: SpaceRowPermissionRule[];
+    rowLogic?: Record<string, RowLogicConfig>;
+    columnPermissions?: SpaceColumnPermissionRule[];
+    sortOrder?: number;
+}
+
+export interface SpaceMember {
+    id: string;
+    spaceId: string;
+    userId: string;
+    userName?: string;
+    userEmail?: string;
+    userAvatar?: string;
+    departmentId?: string;
+    roleId: string;
+    roleName?: string;
+    isAdmin: boolean;
 }
 
 export interface User {
@@ -354,12 +470,22 @@ export interface User {
     name: string;
     email: string;
     phone?: string;
-    role: UserRole;
+    /** 平台角色（支持多角色，对应 roles 表中的 id） */
+    roles: string[];
     userType: UserType;
     status: 'Active' | 'Inactive';
     avatar?: string;
     departmentId?: string;
     monthBadge?: string;
+}
+
+/** 便捷判断：用户是否拥有某平台角色 */
+export function userHasRole(user: { roles: string[] } | null | undefined, roleId: string): boolean {
+    return !!user?.roles?.includes(roleId);
+}
+/** 便捷判断：用户是否拥有任一角色 */
+export function userHasAnyRole(user: { roles: string[] } | null | undefined, roleIds: string[]): boolean {
+    return !!user?.roles?.some(r => roleIds.includes(r));
 }
 
 export interface Department {
@@ -888,4 +1014,19 @@ export interface Subscription {
     relatedOrders: SubscriptionOrderRef[];
     salesRepName?: string;
     region?: string;
+}
+
+/** AI 助手提交的周报/日报 */
+export interface WorkReport {
+    id: string;
+    userId: string;
+    type: '周报' | '日报';
+    title: string;
+    date: string;
+    weekRange?: string;
+    summary: string;
+    htmlContent: string;
+    sections: { heading: string; bullets: string[] }[];
+    source: 'ai' | 'manual';
+    createdAt: number;
 }

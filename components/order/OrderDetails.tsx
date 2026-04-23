@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Order, OrderStatus, OrderItem, ApprovalRecord } from '../../types';
+import { Order, OrderStatus, OrderItem, ApprovalRecord, User } from '../../types';
 import { 
     ArrowLeft, Box, Printer, Award, X, Lock, CheckCircle, Truck, ClipboardCheck, 
     UploadCloud, AlertOctagon, RefreshCcw, Key, Package, Disc, Receipt, FileText, 
@@ -9,7 +9,8 @@ import {
     AlertCircle, Clock, MapPin, Target, Users, Paperclip, Scroll, Camera, ScrollText, Copy, Check, Phone, Mail, Download, Banknote, Edit3, Wallet, ChevronDown, Hash
 } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
-import { useAppContext } from '../../contexts/AppContext';
+import UserDetailPanel from '../common/UserDetailPanel';
+import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 import OrderLogDrawer from './OrderLogDrawer';
 import OrderSnapshotDrawer from './OrderSnapshotDrawer';
 import OrderContractPreview from './OrderContractPreview';
@@ -29,17 +30,18 @@ const statusMap: Record<string, string> = {
 };
 
 const OrderDetails: React.FC = () => {
-  const { orders, setOrders, products, customers, currentUser, users, departments, opportunities, contracts, roles, apiMode, refreshOrders } = useAppContext();
+  const { orders, setOrders, products, customers, filteredOrders, currentUser, users, departments, opportunities, contracts, roles, apiMode, refreshOrders } = useAppContext();
+  useEnsureData(['orders', 'customers', 'contracts']);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   
-  const currentUserRole = roles.find(r => r.id === currentUser.role);
+  const currentUserRole = roles.find(r => currentUser.roles?.includes(r.id));
   const permissions = currentUserRole?.permissions || [];
   const hasPermission = (perm: string) => permissions.includes('all') || permissions.includes(perm);
 
   const selectedOrder = useMemo(() => {
-      const o = orders.find(o => o.id === id);
+      const o = filteredOrders.find(o => o.id === id);
       if (!o) return undefined;
       return {
           ...o,
@@ -68,6 +70,20 @@ const OrderDetails: React.FC = () => {
   const [isSnapshotClosing, setIsSnapshotClosing] = useState(false);
   const [showCreatorPhone, setShowCreatorPhone] = useState(false);
   const [copiedOrderId, setCopiedOrderId] = useState(false);
+  const [detailsUser, setDetailsUser] = useState<User | null>(null);
+  const [isUserDrawerOpen, setIsUserDrawerOpen] = useState(false);
+  const [isUserDrawerClosing, setIsUserDrawerClosing] = useState(false);
+  const openUserDetail = (userId?: string) => {
+    if (!userId) return;
+    const u = users.find(uu => uu.id === userId);
+    if (!u) return;
+    setDetailsUser(u);
+    setIsUserDrawerOpen(true);
+  };
+  const closeUserDrawer = () => {
+    setIsUserDrawerClosing(true);
+    setTimeout(() => { setIsUserDrawerOpen(false); setDetailsUser(null); setIsUserDrawerClosing(false); }, 280);
+  };
   const handleCopyOrderId = () => {
       navigator.clipboard.writeText(selectedOrder?.id || '').then(() => {
           setCopiedOrderId(true);
@@ -134,7 +150,7 @@ const OrderDetails: React.FC = () => {
       id: `op-${Date.now()}`,
       operatorId: currentUser.id,
       operatorName: currentUser.name,
-      operatorRole: currentUser.role,
+      operatorRole: currentUser.roles?.join(',') || '',
       actionType,
       result,
       timestamp: new Date().toISOString(),
@@ -573,32 +589,32 @@ const OrderDetails: React.FC = () => {
 
                {/* Group 3: 人员 */}
                <div className="hidden lg:flex items-center gap-4 border-r border-gray-200 dark:border-white/10 pr-4 shrink-0">
-                   <div className="flex items-center gap-2.5">
-                       <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 shrink-0">
+                   <div className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 -m-1 rounded-lg transition-all group/user" onClick={() => openUserDetail(selectedOrder.salesRepId)}>
+                       <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 shrink-0 transition-transform group-hover/user:scale-110">
                            <img src={users.find(u => u.id === selectedOrder.salesRepId)?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${selectedOrder.salesRepName || 'Sales'}`} alt="" className="w-full h-full object-cover" />
                        </div>
                        <div>
                            <div className="text-[10px] text-gray-400 uppercase font-bold leading-none mb-1">销售</div>
-                           <div className="text-xs font-semibold text-gray-900 dark:text-white leading-none">{(selectedOrder.salesRepName || '未分配').replace(/\s*[\((（].*?[\))）]\s*/g, '').trim()}</div>
+                           <div className="text-xs font-semibold text-gray-900 dark:text-white leading-none group-hover/user:text-blue-600 transition-colors">{(selectedOrder.salesRepName || '未分配').replace(/\s*[\((（].*?[\))）]\s*/g, '').trim()}</div>
                        </div>
                    </div>
-                   <div className="flex items-center gap-2.5">
-                       <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 shrink-0">
+                   <div className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 -m-1 rounded-lg transition-all group/user" onClick={() => openUserDetail(selectedOrder.businessManagerId)}>
+                       <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 shrink-0 transition-transform group-hover/user:scale-110">
                            <img src={users.find(u => u.id === selectedOrder.businessManagerId)?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${selectedOrder.businessManagerName || 'Business'}`} alt="" className="w-full h-full object-cover" />
                        </div>
                        <div>
                            <div className="text-[10px] text-gray-400 uppercase font-bold leading-none mb-1">商务</div>
-                           <div className="text-xs font-semibold text-gray-900 dark:text-white leading-none">{(selectedOrder.businessManagerName || '未分配').replace(/\s*[\((（].*?[\))）]\s*/g, '').trim()}</div>
+                           <div className="text-xs font-semibold text-gray-900 dark:text-white leading-none group-hover/user:text-blue-600 transition-colors">{(selectedOrder.businessManagerName || '未分配').replace(/\s*[\((（].*?[\))）]\s*/g, '').trim()}</div>
                        </div>
                    </div>
                    {selectedOrder.creatorName && (
-                       <div className="flex items-center gap-2.5">
-                           <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 shrink-0">
+                       <div className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 -m-1 rounded-lg transition-all group/user" onClick={() => openUserDetail(selectedOrder.creatorId)}>
+                           <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 shrink-0 transition-transform group-hover/user:scale-110">
                                <img src={users.find(u => u.id === selectedOrder.creatorId)?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${selectedOrder.creatorName || 'Creator'}`} alt="" className="w-full h-full object-cover" />
                            </div>
                            <div>
                                <div className="text-[10px] text-gray-400 uppercase font-bold leading-none mb-1">制单人</div>
-                               <div className="text-xs font-semibold text-gray-900 dark:text-white leading-none">{selectedOrder.creatorName.replace(/\s*[\((（].*?[\))）]\s*/g, '').trim()}</div>
+                               <div className="text-xs font-semibold text-gray-900 dark:text-white leading-none group-hover/user:text-blue-600 transition-colors">{selectedOrder.creatorName.replace(/\s*[\((（].*?[\))）]\s*/g, '').trim()}</div>
                                {(() => {
                                    const phone = selectedOrder.creatorPhone || users.find(u => u.id === selectedOrder.creatorId)?.phone;
                                    if (!phone) return null;
@@ -606,7 +622,7 @@ const OrderDetails: React.FC = () => {
                                    return (
                                        <div
                                            className="text-[10px] text-gray-400 leading-none mt-0.5 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 transition-colors select-none"
-                                           onClick={() => setShowCreatorPhone(v => !v)}
+                                           onClick={(e) => { e.stopPropagation(); setShowCreatorPhone(v => !v); }}
                                            title={showCreatorPhone ? '点击隐藏' : '点击显示完整号码'}
                                        >
                                            {showCreatorPhone ? phone : masked}
@@ -2467,6 +2483,9 @@ const OrderDetails: React.FC = () => {
           );
       })()}
 
+      {isUserDrawerOpen && detailsUser && (
+        <UserDetailPanel user={detailsUser} isClosing={isUserDrawerClosing} onClose={closeUserDrawer} roles={roles} departments={departments} users={users} readonly />
+      )}
     </>
   );
 };
