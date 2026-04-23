@@ -336,16 +336,31 @@ export interface ColumnPermissionRule {
 
 export type BaseRowPermission = 'all' | 'custom';
 
+/** 平台角色在某个业务应用中的权限片段（与 SpaceRole 字段语义一致，用于独立应用如 SAB） */
+export interface AppScopedRolePermissions {
+    permissions: string[];
+    rowPermissions: SpaceRowPermissionRule[];
+    rowLogic?: Record<string, RowLogicConfig>;
+    columnPermissions: SpaceColumnPermissionRule[];
+}
+
 export interface RoleDefinition {
     id: string;
     name: string;
     description: string;
+    /** 主业务平台（主应用）功能权限点 */
     permissions: string[];
     isSystem?: boolean;
     baseRowPermission?: BaseRowPermission;
+    /** 主业务平台数据行/列权限 */
     rowPermissions?: RowPermissionRule[];
     rowLogic?: Record<string, RowLogicConfig>;
     columnPermissions?: ColumnPermissionRule[];
+    /**
+     * 各独立应用维度的权限（如 SAB 客户洞察：功能/行/列与「应用内角色」同源配置）
+     * key 为 spaces 表中的应用 id（如 space_sab_insight），不包含主应用
+     */
+    appPermissions?: Record<string, AppScopedRolePermissions>;
 }
 
 // ========= Space（应用）相关类型 =========

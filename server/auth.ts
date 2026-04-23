@@ -80,7 +80,7 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
 
 export function requireRole(...roles: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.user || !req.user.roles.some(r => roles.includes(r))) {
+    if (!req.user || !Array.isArray(req.user.roles) || !req.user.roles.some(r => roles.includes(r))) {
       res.status(403).json({ error: '权限不足' });
       return;
     }
@@ -91,8 +91,9 @@ export function requireRole(...roles: string[]) {
 export function requireSelfOrRole(...roles: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) { res.status(401).json({ error: '未认证' }); return; }
+    const userRoles = Array.isArray(req.user.roles) ? req.user.roles : [];
     const targetId = req.params.id;
-    if (req.user.userId === targetId || req.user.roles.some(r => roles.includes(r))) {
+    if (req.user.userId === targetId || userRoles.some(r => roles.includes(r))) {
       next();
       return;
     }

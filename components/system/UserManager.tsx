@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom';
-import { User, UserType, RoleDefinition, PermissionDimension, RowPermissionRule, ColumnPermissionRule, PermissionResource, BaseRowPermission, Department, RowLogicConfig, Space } from '../../types';
+import { User, UserType, RoleDefinition, PermissionDimension, RowPermissionRule, ColumnPermissionRule, PermissionResource, BaseRowPermission, Department, RowLogicConfig, Space, SpaceRole, AppScopedRolePermissions } from '../../types';
 import { Search, Plus, Shield, User as UserIcon, Briefcase, Truck, Edit, Building2, X, Mail, Phone, CheckCircle, Calendar, Hash, Lock, CheckSquare, Settings, Save, Trash2, Database, Check, ChevronDown, ChevronRight, Columns, Copy, Globe, GripVertical, IdCard, MapPin, Clock, Box, Eye } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import UserDetailPanel from '../common/UserDetailPanel';
@@ -14,7 +14,9 @@ import { useFunctionalPermissions } from './userManager/useFunctionalPermissions
 import { useUserDrawer } from './userManager/useUserDrawer';
 import { useRowPermissionHelpers } from './userManager/useRowPermissionHelpers';
 import SpaceRoleManager from './SpaceRoleManager';
-import { spaceApi } from '../../services/api';
+import SpaceRoleDetail from './space/SpaceRoleDetail';
+import { spaceApi, userApi } from '../../services/api';
+import { defaultAppScopedPermissions } from '../../utils/mergeRolePermissions';
 
 interface UserManagerProps {
   defaultTab?: 'USERS' | 'ROLES';
@@ -30,6 +32,8 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   const [newSpaceName, setNewSpaceName] = useState('');
   const [newSpaceDesc, setNewSpaceDesc] = useState('');
   const [creatingSpace, setCreatingSpace] = useState(false);
+  /** 平台角色下：主业务平台 vs 各应用 的权限配置范围 */
+  const [platformPermScope, setPlatformPermScope] = useState<string>('__main__');
 
   // User permission search state
   const [userPermSearch, setUserPermSearch] = useState('');
@@ -269,29 +273,57 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   // --- Role Handlers ---
   const handleSelectRole = (role: RoleDefinition) => {
       setSelectedRoleId(role.id);
-      setRoleForm({ ...role });
+      setRoleForm({ ...role, appPermissions: { ...(role.appPermissions || {}) } });
+      setPlatformPermScope('__main__');
       setIsEditingRole(false);
   };
 
   const handleCreateRole = () => {
       setSelectedRoleId('new');
-      setRoleForm({ name: '', description: '', permissions: [], rowPermissions: [], rowLogic: {} });
+      setRoleForm({ name: '', description: '', permissions: [], rowPermissions: [], rowLogic: {}, appPermissions: {} });
+      setPlatformPermScope('__main__');
       setIsEditingRole(true);
   };
 
-  const handleSaveRole = () => {
+  const handleSaveRole = async () => {
       if (!roleForm.name) return;
+      const payload = {
+        name: roleForm.name!,
+        description: roleForm.description || '',
+        permissions: roleForm.permissions || [],
+        rowPermissions: roleForm.rowPermissions || [],
+        rowLogic: roleForm.rowLogic || {},
+        columnPermissions: roleForm.columnPermissions || [],
+        appPermissions: roleForm.appPermissions || {},
+      };
       if (selectedRoleId && selectedRoleId !== 'new') {
           setRoles(prev => prev.map(r => r.id === selectedRoleId ? { ...r, ...roleForm } as RoleDefinition : r));
+          if (apiMode) {
+            try {
+              await userApi.updateRole(selectedRoleId, payload);
+            } catch (e: any) {
+              alert(e?.message || '保存平台角色到服务器失败');
+            }
+          }
       } else {
           const newId = `role-${Date.now()}`;
           const newRole: RoleDefinition = {
               ...(roleForm as RoleDefinition),
               id: newId,
               isSystem: false,
+              ...payload,
           };
+          if (apiMode) {
+            try {
+              const created = await userApi.createPlatformRole(payload);
+              newRole.id = created.id;
+            } catch (e: any) {
+              alert(e?.message || '创建平台角色失败');
+              return;
+            }
+          }
           setRoles(prev => [...prev, newRole]);
-          setSelectedRoleId(newId);
+          setSelectedRoleId(newRole.id);
       }
       setIsEditingRole(false);
   };
@@ -320,12 +352,36 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
           rowPermissions: role.rowPermissions?.map(r => ({ ...r, id: `rule-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` })) || [],
           rowLogic: role.rowLogic ? JSON.parse(JSON.stringify(role.rowLogic)) : {},
           columnPermissions: role.columnPermissions?.map(r => ({ ...r })) || [],
+          appPermissions: role.appPermissions ? JSON.parse(JSON.stringify(role.appPermissions)) : {},
       };
       setRoles(prev => [...prev, copiedRole]);
       setSelectedRoleId(newId);
       setRoleForm({ ...copiedRole });
+      setPlatformPermScope('__main__');
       setIsEditingRole(true);
   };
+
+  /** 平台角色在「非主应用」Tab 下嵌入 SpaceRoleDetail 的合成角色 */
+  const platformEmbedRole: SpaceRole | null = useMemo(() => {
+    if (platformPermScope === '__main__') return null;
+    const sp = spaces.find(s => s.id === platformPermScope);
+    if (!sp) return null;
+    const ap: AppScopedRolePermissions = {
+      ...defaultAppScopedPermissions(),
+      ...(roleForm as RoleDefinition).appPermissions?.[platformPermScope],
+    };
+    return {
+      id: `platform-embed-${platformPermScope}`,
+      spaceId: platformPermScope,
+      name: (roleForm.name as string) || '平台角色',
+      description: (roleForm.description as string) || '',
+      permissions: ap.permissions,
+      rowPermissions: ap.rowPermissions,
+      rowLogic: ap.rowLogic || {},
+      columnPermissions: ap.columnPermissions,
+      sortOrder: 0,
+    };
+  }, [platformPermScope, spaces, roleForm.appPermissions, roleForm.name, roleForm.description]);
 
   const {
     getDependentPermIds,
@@ -1057,7 +1113,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                       </>
                   ) : selectedRoleId ? (
                       isEditingRole ? (
-                          <>
+                          <div className="flex flex-col flex-1 min-h-0">
                               <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center">
                                   <div>
                                       <input 
@@ -1081,7 +1137,30 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                   </div>
                               </div>
                               
-                              <div className="flex-1 overflow-auto">
+                              <div className="px-6 py-2.5 flex flex-wrap items-center gap-2 border-b border-gray-100 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.03] shrink-0">
+                                <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mr-1">配置范围</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setPlatformPermScope('__main__')}
+                                  className={`px-3 py-1 rounded-full text-xs font-medium border transition ${platformPermScope === '__main__' ? 'bg-[#0071E3] text-white border-[#0071E3]' : 'bg-white dark:bg-black/40 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:border-gray-300'}`}
+                                >
+                                  主业务平台
+                                </button>
+                                {spaces.map(s => (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    onClick={() => setPlatformPermScope(s.id)}
+                                    className={`px-3 py-1 rounded-full text-xs font-medium border transition ${platformPermScope === s.id ? 'bg-[#0071E3] text-white border-[#0071E3]' : 'bg-white dark:bg-black/40 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:border-gray-300'}`}
+                                  >
+                                    {s.name}
+                                  </button>
+                                ))}
+                              </div>
+
+                              <div className="flex-1 overflow-auto min-h-0 flex flex-col">
+                              {platformPermScope === '__main__' ? (
+                              <>
                               {/* Tabs - sticky */}
                               <div className="sticky top-0 z-20 bg-white dark:bg-[#1C1C1E] px-6 pt-4 pb-0 border-b border-gray-100 dark:border-white/10">
                                   <div className="flex gap-6">
@@ -1954,8 +2033,43 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                               </div>
                               )}
                           </div>
-                          </div>
                           </>
+                      ) : platformEmbedRole && spaces.find(s => s.id === platformPermScope) ? (
+                          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                              <SpaceRoleDetail
+                                key={platformPermScope}
+                                space={spaces.find(s => s.id === platformPermScope)!}
+                                role={platformEmbedRole}
+                                localOnly
+                                canEdit={!roleForm.isSystem}
+                                apiMode={apiMode}
+                                onSaved={sr => {
+                                  if (!sr) return;
+                                  setRoleForm(prev => ({
+                                    ...prev,
+                                    appPermissions: {
+                                      ...((prev as RoleDefinition).appPermissions || {}),
+                                      [platformPermScope]: {
+                                        permissions: sr.permissions ?? [],
+                                        rowPermissions: sr.rowPermissions ?? [],
+                                        rowLogic: sr.rowLogic ?? {},
+                                        columnPermissions: sr.columnPermissions ?? [],
+                                      },
+                                    },
+                                  }));
+                                }}
+                                members={[]}
+                                allUsers={users}
+                                initialEditing
+                              />
+                          </div>
+                      ) : (
+                          <div className="flex-1 min-h-0 flex items-center justify-center text-sm text-gray-400">
+                              未找到该应用，请从上方重新选择
+                          </div>
+                      )}
+                          </div>
+                          </div>
                       ) : (
                           <>
                               <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center">

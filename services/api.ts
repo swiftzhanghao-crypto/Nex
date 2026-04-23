@@ -87,6 +87,7 @@ export const userApi = {
   update: (id: string, data: any) => request<any>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   departments: () => request<any[]>('/users/meta/departments'),
   roles: () => request<any[]>('/users/meta/roles'),
+  createPlatformRole: (data: any) => request<any>('/users/meta/roles', { method: 'POST', body: JSON.stringify(data) }),
   updateRole: (id: string, data: any) => request<any>(`/users/meta/roles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   reorderRoles: (orderedIds: string[]) => request<any>('/users/meta/roles-order', { method: 'PUT', body: JSON.stringify({ orderedIds }) }),
 };

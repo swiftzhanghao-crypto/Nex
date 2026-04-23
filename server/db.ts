@@ -52,7 +52,9 @@ export function initSchema() {
       permissions        TEXT NOT NULL DEFAULT '[]',
       is_system          INTEGER NOT NULL DEFAULT 0,
       row_permissions    TEXT NOT NULL DEFAULT '[]',
+      row_logic          TEXT NOT NULL DEFAULT '{}',
       column_permissions TEXT NOT NULL DEFAULT '[]',
+      app_permissions    TEXT NOT NULL DEFAULT '{}',
       sort_order         INTEGER NOT NULL DEFAULT 0
     );
 
@@ -338,5 +340,10 @@ export function initSchema() {
   catch { /* column already exists */ }
 
   try { db.exec("ALTER TABLE orders ADD COLUMN order_remark TEXT"); }
+  catch { /* column already exists */ }
+
+  try { db.exec("ALTER TABLE roles ADD COLUMN row_logic TEXT NOT NULL DEFAULT '{}'"); }
+  catch { /* column already exists */ }
+  try { db.exec("ALTER TABLE roles ADD COLUMN app_permissions TEXT NOT NULL DEFAULT '{}'"); }
   catch { /* column already exists */ }
 }

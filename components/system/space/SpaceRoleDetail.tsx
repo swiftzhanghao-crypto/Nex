@@ -108,6 +108,11 @@ interface Props {
   onMockRemoveMember?: (memberId: string) => void;
   initialEditing?: boolean;
   onCancelNew?: () => void;
+  /**
+   * 嵌入「平台角色」配置时使用：只通过 onSaved 回写本地 state，不调用空间角色 API
+   *（平台角色在 users/meta/roles 中统一落库）
+   */
+  localOnly?: boolean;
 }
 
 const EMPTY_ROLE: Partial<SpaceRole> = {
@@ -124,6 +129,7 @@ const SpaceRoleDetail: React.FC<Props> = ({
   members = [], allUsers = [], onMembersChange,
   onMockAddMember, onMockRemoveMember,
   initialEditing = false, onCancelNew,
+  localOnly = false,
 }) => {
   const isNew = role === null;
   const [isEditing, setIsEditing] = useState(isNew || initialEditing);
@@ -133,6 +139,12 @@ const SpaceRoleDetail: React.FC<Props> = ({
   const [saving, setSaving] = useState(false);
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [memberSearchTerm, setMemberSearchTerm] = useState('');
+
+  useEffect(() => {
+    if (localOnly) {
+      setIsEditing(true);
+    }
+  }, [localOnly]);
 
   useEffect(() => {
     if (isNew) {
@@ -207,6 +219,19 @@ const SpaceRoleDetail: React.FC<Props> = ({
     if (!form.name?.trim()) { alert('请输入角色名称'); return; }
     setSaving(true);
     try {
+      if (localOnly) {
+        const payload = {
+          name: form.name,
+          description: form.description ?? '',
+          permissions: form.permissions ?? [],
+          rowPermissions: form.rowPermissions ?? [],
+          rowLogic: form.rowLogic ?? {},
+          columnPermissions: form.columnPermissions ?? [],
+        };
+        onSaved({ ...(role as SpaceRole), ...payload, id: role?.id || 'embed' } as SpaceRole);
+        setIsEditing(false);
+        return;
+      }
       if (apiMode) {
         const payload = {
           name: form.name,
@@ -302,6 +327,15 @@ const SpaceRoleDetail: React.FC<Props> = ({
         <>
           <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center">
             <div>
+              {localOnly ? (
+                <div>
+                  <p className="text-sm font-bold text-gray-800 dark:text-gray-100">应用内权限（{space.name}）</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    为当前<strong className="text-gray-700 dark:text-gray-200">平台角色</strong>配置在本应用中的功能、行、列权限；与「应用角色」使用同一套权限树与资源定义。
+                  </p>
+                </div>
+              ) : (
+                <>
               <input
                 value={form.name || ''}
                 onChange={e => setFormPatch(prev => ({ ...prev, name: e.target.value }))}
@@ -315,6 +349,8 @@ const SpaceRoleDetail: React.FC<Props> = ({
                 className="text-sm text-gray-500 dark:text-gray-400 bg-transparent outline-none w-full mt-1 placeholder-gray-300"
                 placeholder="角色描述..."
               />
+                </>
+              )}
             </div>
             <div className="flex gap-2">
               <button

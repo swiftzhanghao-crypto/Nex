@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ExternalLink, Minus, Trash2, ClipboardCheck, Radar, Search, List, ArrowLeft, Smartphone, RefreshCcw, Sparkles, Bot, Pin } from 'lucide-react';
 import manualContent from '../../docs/产品说明文档.md?raw';
@@ -14,6 +14,7 @@ import WPSLogo from '../common/WPSLogo';
 import MobilePreview from '../mobile/MobilePreview';
 import AIAssistantDrawer from '../ai/AIAssistantDrawer';
 import GlobalSearchModal from './GlobalSearchModal';
+import { mergeAllPlatformPermissionIds } from '../../utils/mergeRolePermissions';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -295,8 +296,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
-  const currentUserRole = roles.find(r => currentUser.roles?.includes(r.id));
-  const permissions = currentUserRole?.permissions || [];
+  const currentUserRoleDefs = useMemo(
+    () => roles.filter(r => currentUser.roles?.includes(r.id)),
+    [roles, currentUser],
+  );
+  const permissions = useMemo(
+    () => mergeAllPlatformPermissionIds(currentUserRoleDefs),
+    [currentUserRoleDefs],
+  );
   const hasPermission = (perm: string) => permissions.includes('all') || permissions.includes(perm);
   const canAccessSabInsight = hasPermission('sab_insight_view') || hasPermission('customer_view');
 

@@ -70,12 +70,7 @@ router.get('/meta/departments', (_req, res) => {
 
 router.get('/meta/roles', (_req, res) => {
   const rows = getDb().prepare('SELECT * FROM roles ORDER BY sort_order ASC, rowid ASC').all() as any[];
-  res.json(rows.map(r => ({
-    id: r.id, name: r.name, description: r.description,
-    permissions: safeJsonParse(r.permissions, []), isSystem: !!r.is_system,
-    rowPermissions: safeJsonParse(r.row_permissions, []),
-    columnPermissions: safeJsonParse(r.column_permissions, []),
-  })));
+  res.json(rows.map(roleRowToClient));
 });
 
 router.put('/meta/roles-order', checkPermission('role', 'update'), (req: AuthRequest, res) => {
@@ -141,12 +136,34 @@ function safeJsonParse(str: string | null | undefined, fallback: any = {}) {
   catch { return fallback; }
 }
 
+function roleRowToClient(row: any) {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    permissions: safeJsonParse(row.permissions, []),
+    isSystem: !!row.is_system,
+    rowPermissions: safeJsonParse(row.row_permissions, []),
+    rowLogic: safeJsonParse(row.row_logic, {}),
+    columnPermissions: safeJsonParse(row.column_permissions, []),
+    appPermissions: safeJsonParse(row.app_permissions, {}),
+  };
+}
+
 router.put('/meta/roles/:id', checkPermission('role', 'update'), (req: AuthRequest, res) => {
   const db = getDb();
-  const { name, description, permissions, rowPermissions, columnPermissions } = req.body;
-  db.prepare(`UPDATE roles SET name=?, description=?, permissions=?, row_permissions=?, column_permissions=? WHERE id=?`)
-    .run(name, description, JSON.stringify(permissions ?? []),
-      JSON.stringify(rowPermissions ?? []), JSON.stringify(columnPermissions ?? []), req.params.id);
+  const { name, description, permissions, rowPermissions, rowLogic, columnPermissions, appPermissions } = req.body;
+  db.prepare(`UPDATE roles SET name=?, description=?, permissions=?, row_permissions=?, row_logic=?, column_permissions=?, app_permissions=? WHERE id=?`)
+    .run(
+      name,
+      description,
+      JSON.stringify(permissions ?? []),
+      JSON.stringify(rowPermissions ?? []),
+      JSON.stringify(rowLogic ?? {}),
+      JSON.stringify(columnPermissions ?? []),
+      JSON.stringify(appPermissions ?? {}),
+      req.params.id,
+    );
 
   const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
@@ -157,24 +174,22 @@ router.put('/meta/roles/:id', checkPermission('role', 'update'), (req: AuthReque
 
 router.post('/meta/roles', checkPermission('role', 'create'), (req: AuthRequest, res) => {
   const db = getDb();
-  const { name, description, permissions, rowPermissions, columnPermissions } = req.body;
+  const { name, description, permissions, rowPermissions, rowLogic, columnPermissions, appPermissions } = req.body;
   const id = `role-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
-  db.prepare(`INSERT INTO roles (id, name, description, permissions, is_system, row_permissions, column_permissions) VALUES (?, ?, ?, ?, 0, ?, ?)`)
-    .run(id, name, description || '', JSON.stringify(permissions ?? []),
-      JSON.stringify(rowPermissions ?? []), JSON.stringify(columnPermissions ?? []));
+  db.prepare(`INSERT INTO roles (id, name, description, permissions, is_system, row_permissions, row_logic, column_permissions, app_permissions) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)`)
+    .run(
+      id, name, description || '', JSON.stringify(permissions ?? []),
+      JSON.stringify(rowPermissions ?? []), JSON.stringify(rowLogic ?? {}),
+      JSON.stringify(columnPermissions ?? []), JSON.stringify(appPermissions ?? {}),
+    );
 
   const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, userName, 'CREATE', 'Role', id, `创建角色 ${name}`);
 
   const row = db.prepare('SELECT * FROM roles WHERE id = ?').get(id) as any;
-  res.status(201).json({
-    id: row.id, name: row.name, description: row.description,
-    permissions: safeJsonParse(row.permissions, []), isSystem: false,
-    rowPermissions: safeJsonParse(row.row_permissions, []),
-    columnPermissions: safeJsonParse(row.column_permissions, []),
-  });
+  res.status(201).json({ ...roleRowToClient(row), isSystem: false });
 });
 
 router.post('/meta/roles/:id/copy', checkPermission('role', 'copy'), (req: AuthRequest, res) => {
@@ -185,20 +200,17 @@ router.post('/meta/roles/:id/copy', checkPermission('role', 'copy'), (req: AuthR
   const newId = `role-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const newName = req.body.name || `${source.name} (副本)`;
 
-  db.prepare(`INSERT INTO roles (id, name, description, permissions, is_system, row_permissions, column_permissions) VALUES (?, ?, ?, ?, 0, ?, ?)`)
-    .run(newId, newName, source.description, source.permissions, source.row_permissions, source.column_permissions);
+  const rl = source.row_logic != null ? source.row_logic : '{}';
+  const ap = source.app_permissions != null ? source.app_permissions : '{}';
+  db.prepare(`INSERT INTO roles (id, name, description, permissions, is_system, row_permissions, row_logic, column_permissions, app_permissions) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)`)
+    .run(newId, newName, source.description, source.permissions, source.row_permissions, rl, source.column_permissions, ap);
 
   const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, userName, 'COPY', 'Role', newId, `从 ${source.name} 复制角色 ${newName}`);
 
   const row = db.prepare('SELECT * FROM roles WHERE id = ?').get(newId) as any;
-  res.status(201).json({
-    id: row.id, name: row.name, description: row.description,
-    permissions: safeJsonParse(row.permissions, []), isSystem: false,
-    rowPermissions: safeJsonParse(row.row_permissions, []),
-    columnPermissions: safeJsonParse(row.column_permissions, []),
-  });
+  res.status(201).json({ ...roleRowToClient(row), isSystem: false });
 });
 
 router.delete('/meta/roles/:id', checkPermission('role', 'delete'), (req: AuthRequest, res) => {

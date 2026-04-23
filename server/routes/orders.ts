@@ -141,7 +141,8 @@ router.post('/', checkPermission('order', 'create'), validateBody(orderCreateSch
   const id = o.id || `ORD-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
   // ---- 服务端绑定身份字段，避免客户端冒充他人创建订单 ----
-  const isAdminOrManager = req.user!.roles.some(r => ['Admin', 'Business', 'Commerce'].includes(r));
+  const userRoles = Array.isArray(req.user!.roles) ? req.user!.roles : [];
+  const isAdminOrManager = userRoles.some(r => ['Admin', 'Business', 'Commerce'].includes(r));
   const currentUserName = getUserName(db, req.user!.userId);
 
   // 销售代表：普通 Sales 必须为自己；管理员/商务可以为他人指定
@@ -219,9 +220,10 @@ router.put('/:id', checkPermission('order', 'update'), validateBody(orderUpdateS
     return;
   }
 
-  const isAdmin = req.user!.roles.includes('Admin');
+  const updRoles = Array.isArray(req.user!.roles) ? req.user!.roles : [];
+  const isAdmin = updRoles.includes('Admin');
   const isOwner = existing.sales_rep_id === req.user!.userId;
-  const isManager = req.user!.roles.some(r => ['Business', 'Commerce'].includes(r));
+  const isManager = updRoles.some(r => ['Business', 'Commerce'].includes(r));
   if (!isAdmin && !isOwner && !isManager) {
     res.status(403).json({ error: '无权修改此订单' });
     return;

@@ -200,7 +200,8 @@ export function filterByRowPermissions(
   resource: PermissionResource,
   data: any[],
 ): any[] {
-  const rules = getRowRules(db, user.roles, resource);
+  const safeRoles = Array.isArray(user.roles) ? user.roles : [];
+  const rules = getRowRules(db, safeRoles, resource);
   if (rules.length === 0) return data;
 
   const userDeptMap = buildUserDeptMap(db);
@@ -411,7 +412,8 @@ export function buildRowPermissionWhere(
   user: { userId: string; roles: string[] },
   resource: PermissionResource,
 ): { sql: string; params: any[] } {
-  const rules = getRowRules(db, user.roles, resource);
+  const roles = Array.isArray(user.roles) ? user.roles : [];
+  const rules = getRowRules(db, roles, resource);
   if (rules.length === 0) return { sql: '', params: [] };
 
   const userDeptMap = buildUserDeptMap(db);

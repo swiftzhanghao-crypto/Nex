@@ -194,10 +194,13 @@ export function seedDatabase() {
   }
 
   // --- Roles ---
-  const insertRole = db.prepare(`INSERT INTO roles (id, name, description, permissions, is_system, row_permissions, column_permissions) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  const insertRole = db.prepare(`INSERT INTO roles (id, name, description, permissions, is_system, row_permissions, row_logic, column_permissions, app_permissions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   for (const r of initialRoles) {
-    insertRole.run(r.id, r.name, r.description, JSON.stringify(r.permissions), r.isSystem ? 1 : 0,
-      JSON.stringify(r.rowPermissions ?? []), JSON.stringify(r.columnPermissions ?? []));
+    insertRole.run(
+      r.id, r.name, r.description, JSON.stringify(r.permissions), r.isSystem ? 1 : 0,
+      JSON.stringify(r.rowPermissions ?? []), JSON.stringify((r as any).rowLogic ?? {}),
+      JSON.stringify(r.columnPermissions ?? []), JSON.stringify((r as any).appPermissions ?? {}),
+    );
   }
 
   // --- Products ---

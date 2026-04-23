@@ -1348,7 +1348,7 @@ const OrderManager: React.FC = () => {
                 onPageChange={setCurrentPage}
                 onSizeChange={(s) => { setItemsPerPage(s); setCurrentPage(1); }}
                 sizeOptions={[20, 50, 100]}
-                showJumper
+                compact
                 className="!py-0"
             />
         </div>

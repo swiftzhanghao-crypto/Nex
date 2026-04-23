@@ -171,7 +171,9 @@ export type LazyDataKey =
  */
 export function useEnsureData(keys: LazyDataKey[]) {
     const ctx = useAppContext();
+    const { needsLogin } = ctx;
     useEffect(() => {
+        if (needsLogin) return;
         keys.forEach((k) => {
             switch (k) {
                 case 'orders': ctx.loadAllOrders(); break;
@@ -186,7 +188,7 @@ export function useEnsureData(keys: LazyDataKey[]) {
             }
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [keys.join(',')]);
+    }, [keys.join(','), needsLogin]);
 }
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -491,6 +493,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const { token, user } = await authApi.login(email, password);
         setToken(token);
         setCurrentUser(user);
+        // 重置 lazy-load 标记，让之前因 401 失败的加载在 needsLogin 变为 false 后重试
+        loadedOnceRef.current = {};
+        inFlightRef.current = {};
         setNeedsLogin(false);
         await loadBootstrap();
     }, [loadBootstrap]);
