@@ -416,6 +416,8 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
   const mockOrders: Order[] = [];
   const statuses = Object.values(OrderStatus);
   const sources: OrderSource[] = ['Sales', 'ChannelPortal', 'OnlineStore', 'APISync'];
+  const SUBUNIT_ORDER_TARGET = 35;
+  let subUnitOrderCreated = 0;
 
   for (let i = 1; i <= 100; i++) {
     const customer = customers[i % customers.length];
@@ -577,34 +579,42 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
     const subUnitContacts = ['张明', '李华', '王芳', '赵磊', '陈静', '刘洋', '周强', '吴敏'];
     const subUnitModes = ['separate_auth_separate_eid', 'separate_auth_unified_eid', 'unified_auth_with_list'] as const;
     const otherCusts = customers.filter(c => c.id !== customer.id);
-    if (i % 5 !== 0 && otherCusts.length > 0) {
-      for (let ai = 0; ai < orderItems.length; ai++) {
-        const itm = orderItems[ai];
-        const subCount = Math.min([2, 3, 2, 3, 4][(i + ai) % 5], otherCusts.length);
-        const baseQ = Math.floor(itm.quantity / subCount);
-        const rem = itm.quantity - baseQ * subCount;
-        orderItems[ai] = {
-          ...itm,
-          subUnitAuthMode: subUnitModes[(i + ai) % 3],
-          subUnits: Array.from({ length: subCount }, (_, si) => {
-            const sc = otherCusts[(i + ai + si) % otherCusts.length];
-            const ent = sc.enterprises && sc.enterprises.length > 0 ? sc.enterprises[si % sc.enterprises.length] : null;
-            return {
-              id: `su_${i}_${ai}_${si}`,
-              unitName: sc.companyName,
-              enterpriseId: ent?.id || '-',
-              enterpriseName: ent?.name || sc.companyName,
-              authCount: String(baseQ + (si < rem ? 1 : 0)),
-              itContact: subUnitContacts[(i + ai + si) % subUnitContacts.length],
-              phone: `1${['38', '39', '56', '77', '88'][(i + ai + si) % 5]}${String(10000000 + i * 100 + ai * 10 + si).slice(0, 8)}`,
-              email: sc.contacts[0]?.email || `it${si + 1}@company.com`,
-              customerType: sc.customerType || '企业客户',
-              industryLine: sc.industryLine || sc.industry || '-',
-              sellerContact: '李海瑞 (00019829)',
-            };
-          }),
-        };
-      }
+    const shouldForceSubUnit = (
+      buyerType !== 'SelfDeal' &&
+      otherCusts.length > 0 &&
+      subUnitOrderCreated < SUBUNIT_ORDER_TARGET &&
+      // 分布均匀；接近末尾则兜底补足数量，确保稳定 30+ 条
+      (i % 2 === 1 || (100 - i) < (SUBUNIT_ORDER_TARGET - subUnitOrderCreated))
+    );
+
+    if (shouldForceSubUnit) {
+      const itm = orderItems[0];
+      const subCount = Math.min([2, 3, 2, 3, 4][i % 5], otherCusts.length);
+      const baseQ = Math.floor(itm.quantity / subCount);
+      const rem = itm.quantity - baseQ * subCount;
+      orderItems.length = 1;
+      orderItems[0] = {
+        ...itm,
+        subUnitAuthMode: subUnitModes[i % 3],
+        subUnits: Array.from({ length: subCount }, (_, si) => {
+          const sc = otherCusts[(i + si) % otherCusts.length];
+          const ent = sc.enterprises && sc.enterprises.length > 0 ? sc.enterprises[si % sc.enterprises.length] : null;
+          return {
+            id: `su_${i}_0_${si}`,
+            unitName: sc.companyName,
+            enterpriseId: ent?.id || '-',
+            enterpriseName: ent?.name || sc.companyName,
+            authCount: String(baseQ + (si < rem ? 1 : 0)),
+            itContact: subUnitContacts[(i + si) % subUnitContacts.length],
+            phone: `1${['38', '39', '56', '77', '88'][(i + si) % 5]}${String(10000000 + i * 100 + si).slice(0, 8)}`,
+            email: sc.contacts[0]?.email || `it${si + 1}@company.com`,
+            customerType: sc.customerType || '企业客户',
+            industryLine: sc.industryLine || sc.industry || '-',
+            sellerContact: '李海瑞 (00019829)',
+          };
+        }),
+      };
+      subUnitOrderCreated++;
     }
 
     const total = orderItems.reduce((sum, it) => sum + it.priceAtPurchase * it.quantity, 0);

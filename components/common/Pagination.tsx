@@ -1,5 +1,4 @@
-import React, { useMemo } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import React from 'react';
 
 export interface PaginationProps {
   /** 当前页号（从 1 开始） */
@@ -12,147 +11,105 @@ export interface PaginationProps {
   onPageChange: (page: number) => void;
   /** 改变每页大小回调（不传则不展示 size 选择器） */
   onSizeChange?: (size: number) => void;
-  /** 可选的 page size 列表，默认 [10, 20, 50, 100] */
+  /** 可选的 page size 列表，默认 [20, 50, 100] */
   sizeOptions?: number[];
-  /** 是否显示「跳至第 X 页」 */
-  showJumper?: boolean;
-  /** 紧凑模式（隐藏中间页码、size 选择器） */
-  compact?: boolean;
+  /** 总数描述后缀，默认「条」，如「条订阅」「条商机」 */
+  totalLabel?: string;
+  /** 已选中信息，传入后会在总数后面追加显示 */
+  selectedCount?: number;
+  /** 自定义外层 className（覆盖默认的 padding/border 等） */
   className?: string;
+  /** loading 中禁用全部按钮 */
   loading?: boolean;
+  /** 隐藏左侧「共 N 条」，用于调用方自行渲染总数 */
+  hideTotal?: boolean;
 }
 
-/** 生成显示的页码序列：1 ... cur-2 cur-1 cur cur+1 cur+2 ... last */
-function buildPageList(current: number, totalPages: number): (number | '...')[] {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1);
-  }
-  const pages: (number | '...')[] = [1];
-  const left = Math.max(2, current - 2);
-  const right = Math.min(totalPages - 1, current + 2);
-  if (left > 2) pages.push('...');
-  for (let i = left; i <= right; i++) pages.push(i);
-  if (right < totalPages - 1) pages.push('...');
-  pages.push(totalPages);
-  return pages;
-}
-
+/**
+ * 全站统一分页器：
+ * 左侧显示总条数（含可选「已选 N 条」），右侧依次为：每页大小选择器、当前页指示、上一页 / 下一页。
+ *
+ * 默认外层使用列表表脚的灰底分隔线样式，调用方一般无需再包一层。
+ * 如需嵌入到自定义容器中，可传入 `className=""` 覆盖默认样式。
+ */
 const Pagination: React.FC<PaginationProps> = ({
   page,
   size,
   total,
   onPageChange,
   onSizeChange,
-  sizeOptions = [10, 20, 50, 100],
-  showJumper = false,
-  compact = false,
-  className = '',
+  sizeOptions = [20, 50, 100],
+  totalLabel = '条',
+  selectedCount,
+  className,
   loading = false,
+  hideTotal = false,
 }) => {
   const totalPages = Math.max(1, Math.ceil(total / Math.max(1, size)));
-  const pageList = useMemo(() => buildPageList(page, totalPages), [page, totalPages]);
-
-  const start = total === 0 ? 0 : (page - 1) * size + 1;
-  const end = Math.min(page * size, total);
+  const safePage = Math.min(Math.max(1, page), totalPages);
 
   const goto = (p: number) => {
     if (loading) return;
-    if (p < 1 || p > totalPages || p === page) return;
+    if (p < 1 || p > totalPages || p === safePage) return;
     onPageChange(p);
   };
 
-  return (
-    <div className={`flex flex-wrap items-center justify-between gap-3 px-2 py-3 text-sm ${className}`}>
-      <div className="text-gray-500 dark:text-gray-400">
-        {total === 0 ? '暂无数据' : <>共 <span className="font-medium text-gray-700 dark:text-gray-200">{total}</span> 条 · 第 {start}-{end} 条</>}
-      </div>
+  const wrapperCls = className ?? 'flex justify-between items-center px-5 py-3.5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5';
 
-      <div className="flex items-center gap-2">
-        {!compact && onSizeChange && (
-          <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-            <span>每页</span>
+  return (
+    <div className={wrapperCls}>
+      {!hideTotal && (
+        <span className="text-xs text-gray-500 dark:text-gray-400">
+          共 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF]">{total}</span> {totalLabel}
+          {selectedCount != null && selectedCount > 0 && (
+            <span className="ml-2">（已选 <span className="font-semibold text-[#0071E3]">{selectedCount}</span> 条）</span>
+          )}
+        </span>
+      )}
+
+      <div className="flex items-center gap-3">
+        {onSizeChange && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">每页</span>
             <select
               value={size}
               onChange={(e) => onSizeChange(Number(e.target.value))}
               disabled={loading}
-              className="rounded border border-gray-200 dark:border-white/10 bg-transparent px-1.5 py-0.5 text-xs text-gray-700 dark:text-gray-200 outline-none focus:border-blue-500 disabled:opacity-50"
+              className="unified-card h-7 pl-2 pr-6 text-xs font-medium text-gray-700 dark:text-gray-200 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 outline-none appearance-none cursor-pointer hover:border-[#0071E3]/50 transition disabled:opacity-50"
+              style={{
+                backgroundImage:
+                  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 6px center',
+              }}
             >
               {sizeOptions.map((s) => (
-                <option key={s} value={s}>{s}</option>
+                <option key={s} value={s}>{s} 条</option>
               ))}
             </select>
-            <span>条</span>
           </div>
         )}
 
-        <div className="flex items-center gap-0.5">
+        <span className="text-xs text-gray-400 dark:text-gray-500">第 {safePage} / {totalPages} 页</span>
+
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => goto(page - 1)}
-            disabled={loading || page <= 1}
-            className="p-1.5 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
-            aria-label="上一页"
+            onClick={() => goto(safePage - 1)}
+            disabled={loading || safePage <= 1}
+            className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium transition disabled:cursor-not-allowed"
           >
-            <ChevronLeft className="w-4 h-4" />
+            上一页
           </button>
-
-          {!compact && pageList.map((p, idx) =>
-            p === '...' ? (
-              <span key={`gap-${idx}`} className="px-1.5 text-gray-400">…</span>
-            ) : (
-              <button
-                key={p}
-                type="button"
-                onClick={() => goto(p)}
-                disabled={loading}
-                className={`min-w-[28px] px-2 py-1 rounded text-xs font-medium transition ${
-                  p === page
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'
-                }`}
-              >
-                {p}
-              </button>
-            ),
-          )}
-
-          {compact && (
-            <span className="px-2 text-xs text-gray-500">
-              {page} / {totalPages}
-            </span>
-          )}
-
           <button
             type="button"
-            onClick={() => goto(page + 1)}
-            disabled={loading || page >= totalPages}
-            className="p-1.5 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
-            aria-label="下一页"
+            onClick={() => goto(safePage + 1)}
+            disabled={loading || safePage >= totalPages}
+            className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium transition disabled:cursor-not-allowed"
           >
-            <ChevronRight className="w-4 h-4" />
+            下一页
           </button>
         </div>
-
-        {showJumper && totalPages > 1 && (
-          <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-            <span>跳至</span>
-            <input
-              type="number"
-              min={1}
-              max={totalPages}
-              defaultValue={page}
-              key={page}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const v = Number((e.target as HTMLInputElement).value);
-                  if (!Number.isNaN(v)) goto(v);
-                }
-              }}
-              className="w-12 rounded border border-gray-200 dark:border-white/10 bg-transparent px-1.5 py-0.5 text-xs text-gray-700 dark:text-gray-200 outline-none focus:border-blue-500"
-            />
-            <span>页</span>
-          </div>
-        )}
       </div>
     </div>
   );

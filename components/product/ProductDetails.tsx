@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Product, InstallPackage, LinkedService, SalesScopeRow } from '../../types';
 import { ArrowLeft, Package, ShieldCheck, Edit3, Plus, Trash2, List, Check, Box, Zap, User as UserIcon, Shield, Clock, Calendar, ToggleLeft, ToggleRight, Key, Sliders, Tag, PackageOpen, ChevronRight, ChevronDown, Home, CreditCard, Save, X, Download, Copy, BookOpen, Link2, Search, Building2, Cpu, FileText, Globe, Gift } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
+import Pagination from '../common/Pagination';
 import { useAppContext } from '../../contexts/AppContext';
 import { ALL_INSTALL_PKG_ROWS } from '../../data/staticData';
 
@@ -19,6 +20,8 @@ const SALES_ORG_OPTIONS = [
 ];
 
 const TAX_REFUND_OPTIONS = ['非退税', '退税', '即征即退', '先征后退'];
+
+const BUSINESS_TAG_OPTIONS = ['生态', '数科', '金山志远', '公有云', '流版套件', '私有云', 'AI', 'IM'];
 
 const ProductDetails: React.FC = () => {
   const { products, setProducts, filteredProducts, authTypes, atomicCapabilities, apiMode } = useAppContext();
@@ -157,7 +160,6 @@ const ProductDetails: React.FC = () => {
     return all.filter(p => (p.packageType || 'public') === pkgTab);
   }, [productForm?.installPackages, pkgTab]);
 
-  const pkgTotalPages = Math.max(1, Math.ceil(filteredPkgs.length / pkgPageSize));
   const pagedPkgs = filteredPkgs.slice((pkgPage - 1) * pkgPageSize, pkgPage * pkgPageSize);
 
   if (!product || !productForm) return <div className="p-10 text-center">Product Not Found</div>;
@@ -693,16 +695,12 @@ const ProductDetails: React.FC = () => {
                   </div>
 
                   {filteredPkgs.length > 0 && (
-                  <div className="flex items-center justify-between px-5 py-3.5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">共 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF]">{filteredPkgs.length}</span> 条</span>
-                    {pkgTotalPages > 1 && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-xs text-gray-400">{pkgPage} / {pkgTotalPages} 页</span>
-                      <button onClick={() => setPkgPage(p => Math.max(1, p - 1))} disabled={pkgPage <= 1} className="unified-card px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition">上一页</button>
-                      <button onClick={() => setPkgPage(p => Math.min(pkgTotalPages, p + 1))} disabled={pkgPage >= pkgTotalPages} className="unified-card px-3 py-1.5 text-xs font-medium hover:bg-gray-50 dark:hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition">下一页</button>
-                    </div>
-                    )}
-                  </div>
+                    <Pagination
+                      page={pkgPage}
+                      size={pkgPageSize}
+                      total={filteredPkgs.length}
+                      onPageChange={setPkgPage}
+                    />
                   )}
                 </div>
               </div>
@@ -808,7 +806,32 @@ const ProductDetails: React.FC = () => {
                     <h3 className="text-sm font-bold text-gray-900 dark:text-white">关联业务标签</h3>
                   </div>
                   <div className="px-6 py-5">
-                    {(productForm.tags?.length || 0) > 0 ? (
+                    {isEditingProduct ? (
+                      <div className="flex flex-wrap gap-2">
+                        {BUSINESS_TAG_OPTIONS.map(tag => {
+                          const selected = (productForm.tags || []).includes(tag);
+                          return (
+                            <button
+                              key={tag}
+                              type="button"
+                              onClick={() => {
+                                const current = productForm.tags || [];
+                                const next = selected ? current.filter(t => t !== tag) : [...current, tag];
+                                setProductForm({ ...productForm, tags: next });
+                              }}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                                selected
+                                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-700'
+                                  : 'bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20'
+                              }`}
+                            >
+                              {selected && <Check className="w-3 h-3" />}
+                              {tag}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (productForm.tags?.length || 0) > 0 ? (
                       <div className="flex flex-wrap gap-2">
                         {productForm.tags!.map(tag => (
                           <span key={tag} className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-white/10">

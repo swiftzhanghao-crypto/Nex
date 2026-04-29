@@ -4,26 +4,10 @@ import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
 import { buildRowPermissionWhere, checkRowPermissionForSingle } from '../rowPermissionFilter.ts';
 import { validateBody, customerCreateSchema, customerUpdateSchema } from '../validate.ts';
+import { safeJsonParse, safePagination, getUserName } from '../utils.ts';
 
 const router = Router();
 router.use(authMiddleware);
-
-function safeJsonParse(str: string | null | undefined, fallback: any = {}) {
-  if (!str) return fallback;
-  try { return JSON.parse(str); }
-  catch { return fallback; }
-}
-
-function safePagination(page: string, size: string) {
-  const pageNum = Math.max(1, parseInt(page) || 1);
-  const limit = Math.min(Math.max(1, parseInt(size) || 50), 200);
-  return { limit, offset: (pageNum - 1) * limit, pageNum };
-}
-
-function getUserName(db: any, userId: string): string {
-  const row = db.prepare('SELECT name FROM users WHERE id = ?').get(userId) as any;
-  return row?.name || '';
-}
 
 function toCustomer(row: any) {
   return {

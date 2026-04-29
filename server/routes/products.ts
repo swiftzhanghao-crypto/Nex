@@ -3,20 +3,10 @@ import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
 import { buildRowPermissionWhere, checkRowPermissionForSingle } from '../rowPermissionFilter.ts';
+import { safeJsonParse, getUserName, safePagination } from '../utils.ts';
 
 const router = Router();
 router.use(authMiddleware);
-
-function safeJsonParse(str: string | null | undefined, fallback: any = {}) {
-  if (!str) return fallback;
-  try { return JSON.parse(str); }
-  catch { return fallback; }
-}
-
-function getUserName(db: any, userId: string): string {
-  const row = db.prepare('SELECT name FROM users WHERE id = ?').get(userId) as any;
-  return row?.name || '';
-}
 
 function toProduct(row: any) {
   return {
@@ -28,12 +18,6 @@ function toProduct(row: any) {
     installPackages: safeJsonParse(row.install_pkgs, []),
     licenseTemplate: row.license_tpl ? safeJsonParse(row.license_tpl) : undefined,
   };
-}
-
-function safePagination(page: string, size: string) {
-  const pageNum = Math.max(1, parseInt(page) || 1);
-  const limit = Math.min(Math.max(1, parseInt(size) || 50), 200);
-  return { limit, offset: (pageNum - 1) * limit, pageNum };
 }
 
 router.get('/', checkPermission('product', 'list'), (req: AuthRequest, res) => {

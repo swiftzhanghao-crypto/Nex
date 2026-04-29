@@ -1,19 +1,10 @@
 import { Router } from 'express';
 import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
+import { safeJsonParse, getUserName } from '../utils.ts';
 
 const router = Router();
 router.use(authMiddleware);
-
-function safeJsonParse<T = any>(str: string | null | undefined, fallback: T): T {
-  if (!str) return fallback;
-  try { return JSON.parse(str) as T; } catch { return fallback; }
-}
-
-function getUserName(db: any, userId: string): string {
-  const row = db.prepare('SELECT name FROM users WHERE id = ?').get(userId) as any;
-  return row?.name || '';
-}
 
 /** 全局 Admin 或该应用的 is_admin=1 成员可以管理应用配置 */
 function requireSpaceAdmin(spaceId: string, userId: string, userRoles: string[]): boolean {
@@ -70,9 +61,15 @@ router.post('/', (req: AuthRequest, res) => {
     return;
   }
   const db = getDb();
-  const { name, description, icon, permTree, resourceConfig, columnConfig } = req.body;
+  const { name, description, icon, permTree, resourceConfig, columnConfig, adminUserId } = req.body;
   if (!name) { res.status(400).json({ error: '应用名称必填' }); return; }
+  const targetAdminId = adminUserId || req.user!.userId;
+  const adminExists = db.prepare('SELECT id FROM users WHERE id = ?').get(targetAdminId) as any;
+  if (!adminExists) { res.status(400).json({ error: '指定的应用管理员用户不存在' }); return; }
+
   const id = `space_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const genId = (prefix: string) => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
   db.prepare(`
     INSERT INTO spaces (id, name, description, icon, perm_tree, resource_config, column_config, sort_order)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -81,6 +78,19 @@ router.post('/', (req: AuthRequest, res) => {
     JSON.stringify(resourceConfig ?? []),
     JSON.stringify(columnConfig ?? []),
     0);
+
+  const adminRoleId = genId('sr');
+  db.prepare(`
+    INSERT INTO space_roles (id, space_id, name, description, permissions, row_permissions, row_logic, column_permissions, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(adminRoleId, id, '应用管理员', '拥有该应用内所有权限，可管理角色、成员与配置', '[]', '[]', '{}', '[]', 0);
+
+  const memberId = genId('sm');
+  db.prepare(`
+    INSERT INTO space_members (id, space_id, user_id, role_id, is_admin)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(memberId, id, targetAdminId, adminRoleId, 1);
+
   const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, userName, 'CREATE', 'Space', id, `创建应用 ${name}`);
@@ -206,6 +216,16 @@ router.delete('/:id/roles/:roleId', (req: AuthRequest, res) => {
     return;
   }
   const db = getDb();
+  const roleRow = db.prepare('SELECT * FROM space_roles WHERE id = ? AND space_id = ?')
+    .get(req.params.roleId, spaceId) as any;
+  if (!roleRow) {
+    res.status(404).json({ error: '角色不存在' });
+    return;
+  }
+  if (roleRow.sort_order === 0 && roleRow.name === '应用管理员') {
+    res.status(400).json({ error: '应用管理员角色不可删除' });
+    return;
+  }
   const memberCount = db.prepare('SELECT COUNT(*) AS n FROM space_members WHERE role_id = ?')
     .get(req.params.roleId) as { n: number };
   if (memberCount.n > 0) {

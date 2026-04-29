@@ -4,13 +4,14 @@ import ReactDOM from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Order, OrderStatus, OrderItem, User, ApprovalRecord, OrderSource, OrderDraft, Subscription, SubscriptionLineProductSnapshot } from '../../types';
 import { subscriptionMostUrgentProductSnapshot } from '../../utils/subscriptionLineProduct';
-import { Search, Plus, Trash2, Disc, CheckCircle, FileText, CreditCard, Truck, X, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, FileCheck, CheckSquare, Package, Settings, Filter, ChevronDown, Calendar, Shield, RotateCcw, Save, ChevronRight, Copy, Check } from 'lucide-react';
+import { Search, Plus, Trash2, Disc, CheckCircle, FileText, CreditCard, Truck, X, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, FileCheck, CheckSquare, Package, Settings, Filter, ChevronDown, Calendar, Shield, RotateCcw, Save, ChevronRight, Copy, Check, Building2 } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import OrderCreateWizard from './OrderCreateWizard';
 import StatusFilterCard from './StatusFilterCard';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import ColumnConfigModal from './ColumnConfigModal';
 import UserDetailPanel from '../common/UserDetailPanel';
+import EmployeeCardModal from '../common/EmployeeCardModal';
 import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 import Pagination from '../common/Pagination';
 
@@ -30,6 +31,7 @@ const availableFilterFields = [
     { id: 'orderStatus', label: '订单状态', defaultMode: '多选' as FilterMode },
     { id: 'paymentStatus', label: '付款状态', defaultMode: '多选' as FilterMode },
     { id: 'stockStatus', label: '备货状态', defaultMode: '多选' as FilterMode },
+    { id: 'subUnitAuth', label: '下级单位授权', defaultMode: '多选' as FilterMode },
     { id: 'orderDate', label: '提单时间', defaultMode: '时间段' as FilterMode },
     { id: 'shippedDate', label: '发货时间', defaultMode: '时间段' as FilterMode },
     { id: 'orderAmount', label: '订单应付金额', defaultMode: '金额范围' as FilterMode },
@@ -76,7 +78,7 @@ const paymentMethodMap: Record<string, string> = {
 };
 
 const OrderManager: React.FC = () => {
-  const { orders, setOrders, products, customers, filteredOrders: ctxFilteredOrders, currentUser, users, departments, opportunities, channels, roles, standaloneEnterprises, orderDrafts, setOrderDrafts, apiMode, refreshOrders } = useAppContext();
+  const { orders, setOrders, products, customers, filteredOrders: ctxFilteredOrders, currentUser, users, setUsers, departments, opportunities, channels, roles, standaloneEnterprises, orderDrafts, setOrderDrafts, apiMode, refreshOrders } = useAppContext();
   useEnsureData(['orders', 'customers', 'opportunities']);
   const navigate = useNavigate();
   const location = useLocation();
@@ -129,7 +131,7 @@ const OrderManager: React.FC = () => {
   // appliedFilters 是已点击「查询」后真正生效的筛选条件
   const [appliedFilters, setAppliedFilters] = useState<FilterCondition[]>([]);
 
-  const multiCheckboxFields = ['orderSource', 'orderType', 'orderStatus', 'paymentStatus', 'stockStatus'];
+  const multiCheckboxFields = ['orderSource', 'orderType', 'orderStatus', 'paymentStatus', 'stockStatus', 'subUnitAuth'];
   const personPickerFields = ['businessManager'];
   const dateFilterFields = ['orderDate', 'shippedDate'];
   const amountFilterFields = ['orderAmount'];
@@ -171,14 +173,20 @@ const OrderManager: React.FC = () => {
       const sourceKeys = [...new Set([...Object.keys(orderSourceLabelMap), ...orders.map(o => o.source as string).filter(Boolean)])];
       if (fieldId === 'orderSource') return sourceKeys.map(s => ({ value: s, label: orderSourceLabelMap[s as string] || s }));
       if (fieldId === 'orderType') {
-          const fallback = ['新购订单', '续费订单', '增购订单', '降配订单', '退款订单'];
-          return [...new Set([...fallback, ...orders.map(o => o.orderType as string).filter(Boolean)])].map(t => ({ value: t, label: t }));
+          // 订单类型：使用订单列表展示的 buyerType（直签/渠道/自成交/兑换码），不是“新购/增购/续费”等订购性质
+          return Object.entries(buyerTypeMap).map(([value, label]) => ({ value, label }));
       }
       if (fieldId === 'orderStatus') return Object.entries(statusMap).map(([k, v]) => ({ value: k, label: v }));
       if (fieldId === 'paymentStatus') return [{ value: 'paid', label: '已支付' }, { value: 'unpaid', label: '待支付' }];
       if (fieldId === 'stockStatus') return [
           { value: 'pending', label: '待处理' }, { value: 'processing', label: '备货中' },
           { value: 'pendingShip', label: '待发货' }, { value: 'shipped', label: '已发货' }, { value: 'completed', label: '已完成' }
+      ];
+      if (fieldId === 'subUnitAuth') return [
+          { value: 'no_subunit', label: '无下级单位授权' },
+          { value: 'separate_auth_separate_eid', label: '授权分别呈现，企业ID分别管理' },
+          { value: 'separate_auth_unified_eid', label: '授权分别呈现，企业ID统一管理' },
+          { value: 'unified_auth_with_list', label: '授权和企业ID统一管理并提供下级清单' },
       ];
       return [];
   };
@@ -270,6 +278,7 @@ const OrderManager: React.FC = () => {
   const [detailsUser, setDetailsUser] = useState<User | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isDrawerClosing, setIsDrawerClosing] = useState(false);
+  const [isEmployeeCardOpen, setIsEmployeeCardOpen] = useState(false);
 
   const closeDrawer = () => {
       setIsDrawerClosing(true);
@@ -342,7 +351,7 @@ const OrderManager: React.FC = () => {
               case 'id': return o.id;
               case 'customer': return o.customerName;
               case 'buyer': return o.buyerName || o.customerName;
-              case 'products': return (o.items || []).map(it => `${it.productName || ''}${it.skuName ? '/' + it.skuName : ''}${it.licenseType ? '/' + it.licenseType : ''} ×${it.quantity}`).join('; ');
+              case 'products': return (o.items || []).map(it => `${it.productName || ''}${it.skuName ? '/' + it.skuName : ''}${it.licenseType ? '/' + it.licenseType : ''} ×${it.quantity}${it.subUnits && it.subUnits.length > 0 ? ` [下级×${it.subUnits.length}]` : ''}`).join('; ');
               case 'sales': return o.salesRepName || '-';
               case 'businessManager': return o.businessManagerName || '-';
               case 'department': { const u = users.find(uu => uu.id === o.salesRepId); return getDepartmentPath(u?.departmentId); }
@@ -457,6 +466,7 @@ const OrderManager: React.FC = () => {
     if (filterStatus === 'STOCK_PKG') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && !!order.isAuthConfirmed && !order.isPackageConfirmed;
     if (filterStatus === 'STOCK_SHIP') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && !!order.isPackageConfirmed && !order.isShippingConfirmed;
     if (filterStatus === 'STOCK_CD') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && !!order.isShippingConfirmed && !order.isCDBurned;
+    if (filterStatus === 'HAS_SUBUNIT') matchesStatus = (order.items || []).some(it => it.subUnits && it.subUnits.length > 0);
 
     const searchLower = searchTerm.toLowerCase();
     const safeItems = order.items || [];
@@ -494,7 +504,7 @@ const OrderManager: React.FC = () => {
             }
             case 'orderType': {
                 const vals = Array.isArray(filter.value) ? filter.value : [filter.value];
-                return vals.includes('全部') || vals.includes('不限') || vals.includes(order.orderType ?? '');
+                return vals.includes('全部') || vals.includes('不限') || vals.includes(order.buyerType ?? '');
             }
             case 'paymentStatus': {
                 const paymentVal = order.isPaid ? 'paid' : 'unpaid';
@@ -554,6 +564,17 @@ const OrderManager: React.FC = () => {
                 const max = av.max !== '' ? Number(av.max) : null;
                 if (min === null && max === null) return true;
                 return (min === null || order.total >= min) && (max === null || order.total <= max);
+            }
+            case 'subUnitAuth': {
+                const vals = Array.isArray(filter.value) ? filter.value as string[] : [filter.value as string];
+                if (vals.length === 0) return true;
+                const hasSubUnit = (order.items || []).some(it => it.subUnitAuthMode && it.subUnitAuthMode !== 'none' && it.subUnits && it.subUnits.length > 0);
+                const itemMode = (order.items || []).find(it => it.subUnitAuthMode && it.subUnitAuthMode !== 'none')?.subUnitAuthMode;
+                return vals.some(v => {
+                    if (v === 'has_subunit') return hasSubUnit;
+                    if (v === 'no_subunit') return !hasSubUnit;
+                    return itemMode === v;
+                });
             }
             case 'delayTime': {
                 const dv = filter.value as { start: string; end: string };
@@ -964,6 +985,7 @@ const OrderManager: React.FC = () => {
             {exceptionStatuses.filter(step => hasPermission(step.permission)).map((step) => (
                 <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} variant={step.id === OrderStatus.CANCELLED ? 'muted' : 'danger'} onClick={() => setFilterStatus(step.id)} />
             ))}
+            <StatusFilterCard id="HAS_SUBUNIT" label="含下级单位" icon={Building2} count={orders.filter(o => (o.items || []).some(it => it.subUnits && it.subUnits.length > 0)).length} isActive={filterStatus === 'HAS_SUBUNIT'} onClick={() => setFilterStatus('HAS_SUBUNIT')} />
         </div>
 
         <div className="unified-card overflow-hidden">
@@ -1119,6 +1141,7 @@ const OrderManager: React.FC = () => {
                                           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                               {item.skuName && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">{item.skuName}</span>}
                                               {item.licenseType && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg">{item.licenseType}</span>}
+                                              {item.subUnits && item.subUnits.length > 0 && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg">下级×{item.subUnits.length}</span>}
                                           </div>
                                       </div>
                                   ))}
@@ -1309,7 +1332,9 @@ const OrderManager: React.FC = () => {
                       case 'action':
                         return (
                           <td key={colId} className={`px-3 py-2.5 text-right whitespace-nowrap sticky right-[52px] z-20 ${stickyBg} shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors overflow-visible`}>
-                              {getAction(order)}
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                {getAction(order)}
+                              </div>
                           </td>
                         );
                       default:
@@ -1325,22 +1350,22 @@ const OrderManager: React.FC = () => {
           </table>
         </div>
         
-        <div className="flex justify-between items-center px-5 py-3.5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5">
-            <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-500 dark:text-gray-400">共 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF]">{filteredOrders.length}</span> 条</span>
-                <button
-                    onClick={handleCopyTable}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition ${
-                        tableCopied
-                            ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
-                            : 'bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/10'
-                    }`}
-                    title="复制当前页表格数据（可粘贴到 Excel）"
-                >
-                    {tableCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                    {tableCopied ? '已复制' : '复制表格'}
-                </button>
-            </div>
+        <div className="flex items-center px-5 py-3.5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5">
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              共 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF]">{filteredOrders.length}</span> 条
+            </span>
+            <button
+                onClick={handleCopyTable}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition ml-4 ${
+                    tableCopied
+                        ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
+                        : 'bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/10'
+                }`}
+                title="复制当前页表格数据（可粘贴到 Excel）"
+            >
+                {tableCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                {tableCopied ? '已复制' : '复制表格'}
+            </button>
             <Pagination
                 page={safePage}
                 size={itemsPerPage}
@@ -1348,8 +1373,8 @@ const OrderManager: React.FC = () => {
                 onPageChange={setCurrentPage}
                 onSizeChange={(s) => { setItemsPerPage(s); setCurrentPage(1); }}
                 sizeOptions={[20, 50, 100]}
-                compact
-                className="!py-0"
+                className="flex items-center gap-3 ml-auto"
+                hideTotal
             />
         </div>
       </div>
@@ -1382,6 +1407,7 @@ const OrderManager: React.FC = () => {
                               <div className="flex items-center gap-1.5 flex-wrap">
                                   {item.skuName && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">{item.skuName}</span>}
                                   {item.licenseType && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg">{item.licenseType}</span>}
+                                  {item.subUnits && item.subUnits.length > 0 && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg">下级×{item.subUnits.length}</span>}
                               </div>
                           </div>
                       ))}
@@ -1492,7 +1518,7 @@ const OrderManager: React.FC = () => {
                                                 </span>
                                             ) : <span className="text-gray-400">点击选择…</span>
                                         ) : (
-                                            <span className={`truncate ${selectedArr.length === 0 ? 'text-gray-400' : 'text-gray-700 dark:text-gray-200'}`}>
+                                            <span className={`text-left truncate ${selectedArr.length === 0 ? 'text-gray-400' : 'text-gray-700 dark:text-gray-200'}`}>
                                                 {selectedArr.length === 0 ? '点击选择…' : selectedArr.map(v => checkboxOpts.find(o => o.value === v)?.label || v).join('、')}
                                             </span>
                                         )}
@@ -1606,11 +1632,11 @@ const OrderManager: React.FC = () => {
                               {opts.map(opt => {
                                   const checked = selectedArr.includes(opt.value);
                                   return (
-                                      <button key={opt.value} onMouseDown={(e) => { e.stopPropagation(); toggleMultiValue(f.id, opt.value); }} className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition ${checked ? 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3]' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'}`}>
+                                      <button key={opt.value} onMouseDown={(e) => { e.stopPropagation(); toggleMultiValue(f.id, opt.value); }} className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition ${checked ? 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3]' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'}`}>
                                           <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition ${checked ? 'bg-[#0071E3] border-[#0071E3]' : 'border-gray-300 dark:border-gray-500'}`}>
                                               {checked && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                                           </span>
-                                          {opt.label}
+                                          <span className="text-left">{opt.label}</span>
                                       </button>
                                   );
                               })}
@@ -1721,7 +1747,22 @@ const OrderManager: React.FC = () => {
       />
 
       {isDrawerOpen && detailsUser && (
-        <UserDetailPanel user={detailsUser} isClosing={isDrawerClosing} onClose={closeDrawer} roles={roles} departments={departments} users={users} readonly />
+        <UserDetailPanel
+          user={detailsUser}
+          isClosing={isDrawerClosing}
+          onClose={closeDrawer}
+          roles={roles}
+          departments={departments}
+          users={users}
+          onEmployeeCard={() => setIsEmployeeCardOpen(true)}
+          onSave={(updated) => {
+            setUsers(prev => prev.map(u => u.id === detailsUser.id ? { ...u, ...updated } as User : u));
+            setDetailsUser(prev => prev ? { ...prev, ...updated } as User : prev);
+          }}
+        />
+      )}
+      {isEmployeeCardOpen && detailsUser && (
+        <EmployeeCardModal user={detailsUser} roles={roles} departments={departments} users={users} onClose={() => setIsEmployeeCardOpen(false)} />
       )}
 
       {isColumnConfigOpen && (

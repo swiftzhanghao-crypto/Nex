@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Search, X, ChevronDown, Receipt, Calendar, SlidersHorizontal } from 'lucide-react';
 import { useAppContext, useEnsureData } from '../../contexts/AppContext';
+import Pagination from '../common/Pagination';
 
 const statusConfig: Record<string, { label: string; dot: string; text: string; bg: string; darkBg: string; darkText: string }> = {
   PENDING:    { label: '待开票', dot: 'bg-amber-400',  text: 'text-amber-600',  bg: 'bg-amber-50',  darkBg: 'dark:bg-amber-900/20',  darkText: 'dark:text-amber-400' },
@@ -50,7 +51,6 @@ const InvoiceManager: React.FC = () => {
     return result;
   }, [invoices, searchText, dateStart, dateEnd, filterStatus, filterApplyType]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const toggleSelect = (id: string) => setSelectedIds(prev => {
@@ -297,47 +297,15 @@ const InvoiceManager: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination Footer */}
         {filtered.length > 0 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-white/5">
-            <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-              <span>共 <strong className="text-gray-700 dark:text-gray-200">{filtered.length}</strong> 条</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <select
-                value={pageSize}
-                onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                className="bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 outline-none cursor-pointer mr-1"
-              >
-                {PAGE_SIZE_OPTIONS.map(n => <option key={n} value={n}>{n}条/页</option>)}
-              </select>
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition"
-              >‹</button>
-              {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                let page = i + 1;
-                if (totalPages > 7) {
-                  if (currentPage <= 4) page = i + 1;
-                  else if (currentPage >= totalPages - 3) page = totalPages - 6 + i;
-                  else page = currentPage - 3 + i;
-                }
-                return (
-                  <button key={page} onClick={() => setCurrentPage(page)}
-                    className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-medium transition ${
-                      currentPage === page ? 'bg-[#0071E3] text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10'
-                    }`}
-                  >{page}</button>
-                );
-              })}
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition"
-              >›</button>
-            </div>
-          </div>
+          <Pagination
+            page={currentPage}
+            size={pageSize}
+            total={filtered.length}
+            onPageChange={setCurrentPage}
+            onSizeChange={s => { setPageSize(s); setCurrentPage(1); }}
+            sizeOptions={PAGE_SIZE_OPTIONS}
+          />
         )}
       </div>
     </div>

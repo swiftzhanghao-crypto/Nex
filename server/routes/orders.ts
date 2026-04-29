@@ -3,7 +3,8 @@ import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
 import { buildRowPermissionWhere, checkRowPermissionForSingle } from '../rowPermissionFilter.ts';
-import { validateBody, orderCreateSchema, orderUpdateSchema } from '../validate.ts';
+import { validateBody, orderCreateSchema, orderUpdateSchema, validateSubUnits } from '../validate.ts';
+import { safeJsonParse, safePagination, getUserName, sanitizeOrderItemsSubUnits } from '../utils.ts';
 
 const router = Router();
 router.use(authMiddleware);
@@ -43,37 +44,22 @@ function validateStatusTransition(from: string, to: string): boolean {
   return allowed.includes(toStatus);
 }
 
-function safeJsonParse(str: string | null | undefined, fallback: any = {}) {
-  if (!str) return fallback;
-  try { return JSON.parse(str); }
-  catch { return fallback; }
-}
-
-function safePagination(page: string, size: string): { limit: number; offset: number; pageNum: number } {
-  const pageNum = Math.max(1, parseInt(page) || 1);
-  const limit = Math.min(Math.max(1, parseInt(size) || 50), 200);
-  return { limit, offset: (pageNum - 1) * limit, pageNum };
-}
-
-function getUserName(db: any, userId: string): string {
-  const row = db.prepare('SELECT name FROM users WHERE id = ?').get(userId) as any;
-  return row?.name || '';
-}
-
 function toOrder(row: any) {
-  const extra = safeJsonParse(row.extra, {});
+  const extra = safeJsonParse(row.extra);
+  const rawItems = safeJsonParse(row.items, []);
+  const items = sanitizeOrderItemsSubUnits(rawItems, row.buyer_type);
   return {
     id: row.id, customerId: row.customer_id, customerName: row.customer_name,
     customerType: row.customer_type, customerLevel: row.customer_level,
     customerIndustry: row.customer_industry, customerRegion: row.customer_region,
     date: row.date, status: normalizeOrderStatus(row.status), total: row.total ?? 0,
-    items: safeJsonParse(row.items, []), source: row.source,
+    items, source: row.source,
     buyerType: row.buyer_type, buyerName: row.buyer_name, buyerId: row.buyer_id,
     shippingAddress: row.shipping_address, deliveryMethod: row.delivery_method,
     isPaid: !!row.is_paid, paymentDate: row.payment_date,
     paymentMethod: row.payment_method, paymentTerms: row.payment_terms,
     paymentRecord: row.payment_record ? safeJsonParse(row.payment_record) : undefined,
-    approval: safeJsonParse(row.approval, {}), approvalRecords: safeJsonParse(row.approval_records, []),
+    approval: safeJsonParse(row.approval), approvalRecords: safeJsonParse(row.approval_records, []),
     salesRepId: row.sales_rep_id, salesRepName: row.sales_rep_name,
     businessManagerId: row.biz_manager_id, businessManagerName: row.biz_manager_name,
     invoiceInfo: row.invoice_info ? safeJsonParse(row.invoice_info) : undefined,
@@ -164,6 +150,12 @@ router.post('/', checkPermission('order', 'create'), validateBody(orderCreateSch
   const creatorId = req.user!.userId;
   const creatorName = currentUserName;
 
+  const subUnitError = validateSubUnits(o.items);
+  if (subUnitError) {
+    res.status(400).json({ error: subUnitError });
+    return;
+  }
+
   const extra = JSON.stringify({
     receivingParty: o.receivingParty, receivingCompany: o.receivingCompany,
     receivingMethod: o.receivingMethod, directChannel: o.directChannel,
@@ -236,9 +228,17 @@ router.put('/:id', checkPermission('order', 'update'), validateBody(orderUpdateS
     return;
   }
   // creatorId 始终保持原值，禁止前端覆盖
-  const existingExtra = safeJsonParse(existing.extra, {});
+  const existingExtra = safeJsonParse(existing.extra);
   const lockedCreatorId = existingExtra.creatorId || existing.created_by_user || null;
   const lockedCreatorName = existingExtra.creatorName || null;
+
+  if (o.items) {
+    const subUnitError = validateSubUnits(o.items);
+    if (subUnitError) {
+      res.status(400).json({ error: subUnitError });
+      return;
+    }
+  }
 
   const existingStatus = normalizeOrderStatus(existingOrder.status);
   const targetStatus = normalizeOrderStatus(o.status ?? existingStatus);
@@ -328,8 +328,8 @@ router.post('/:id/approve', checkPermission('order', 'approve'), (req: AuthReque
     return;
   }
 
-  const approval = safeJsonParse(existing.approval, {});
-  const records = safeJsonParse(existing.approval_records, []);
+  const approval = safeJsonParse(existing.approval);
+  const records: Array<Record<string, unknown>> = safeJsonParse(existing.approval_records, []);
 
   const approvalFieldMap: Record<string, string> = {
     'Sales': 'salesApproved',
@@ -449,6 +449,54 @@ router.get('/:id/logs', checkPermission('order', 'read'), (req: AuthRequest, res
     id: r.id, userId: r.user_id, userName: r.user_name,
     action: r.action, detail: r.detail, createdAt: r.created_at,
   })));
+});
+
+/**
+ * 下级单位维度查询：汇总所有订单中的下级单位数据，支持按 unitName/enterpriseId 搜索。
+ * 返回扁平化列表，每条记录关联到具体订单和产品行。
+ */
+router.get('/sub-units/list', checkPermission('order', 'list'), (req: AuthRequest, res) => {
+  const db = getDb();
+  const { keyword, page = '1', size = '50' } = req.query as Record<string, string>;
+
+  const rowPerm = buildRowPermissionWhere(db, req.user!, 'Order');
+  const whereSql = ' WHERE 1=1' + rowPerm.sql;
+  const whereParams = [...rowPerm.params];
+
+  const rows = db.prepare(`SELECT id, customer_name, items, sales_rep_name, date, status FROM orders${whereSql} ORDER BY date DESC`)
+    .all(...whereParams) as any[];
+
+  const results: any[] = [];
+  for (const row of rows) {
+    const rawItems: any[] = safeJsonParse(row.items, []);
+    const items: any[] = sanitizeOrderItemsSubUnits(rawItems, (row as any).buyer_type);
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item.subUnits || item.subUnits.length === 0) continue;
+      for (const su of item.subUnits) {
+        if (keyword) {
+          const kw = keyword.toLowerCase();
+          if (!(su.unitName || '').toLowerCase().includes(kw) &&
+              !(su.enterpriseId || '').toLowerCase().includes(kw) &&
+              !(su.enterpriseName || '').toLowerCase().includes(kw)) continue;
+        }
+        results.push({
+          orderId: row.id,
+          customerName: row.customer_name,
+          productName: item.productName || '',
+          quantity: item.quantity,
+          salesRepName: row.sales_rep_name,
+          orderDate: row.date,
+          orderStatus: normalizeOrderStatus(row.status),
+          ...su,
+        });
+      }
+    }
+  }
+
+  const total = results.length;
+  const { limit, offset, pageNum } = safePagination(page, size);
+  res.json({ data: results.slice(offset, offset + limit), total, page: pageNum, size: limit });
 });
 
 export default router;

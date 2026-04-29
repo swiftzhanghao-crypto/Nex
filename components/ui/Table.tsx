@@ -107,6 +107,10 @@ export function EmptyState({ message = '暂无数据', colSpan, icon, className 
 }
 
 // ── 分页条 ────────────────────────────────────────────────
+// 兼容旧 API（current / pageSize / onChange）的薄包装，内部转发到全站统一的
+// `components/common/Pagination`。新代码请直接使用 `components/common/Pagination`。
+
+import UnifiedPagination from '../common/Pagination';
 
 interface PaginationProps {
   current: number;
@@ -116,27 +120,12 @@ interface PaginationProps {
 }
 
 export function Pagination({ current, total, pageSize, onChange }: PaginationProps) {
-  const totalPages = Math.ceil(total / pageSize);
-  if (totalPages <= 1) return null;
-
   return (
-    <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 dark:border-white/10 text-xs text-gray-500 dark:text-gray-400">
-      <span>共 <strong className="text-gray-700 dark:text-gray-200">{total}</strong> 条</span>
-      <div className="flex items-center gap-2">
-        <button
-          disabled={current <= 1}
-          onClick={() => onChange(current - 1)}
-          className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium transition disabled:cursor-not-allowed"
-        >上一页</button>
-        <span className="text-gray-600 dark:text-gray-300 font-medium">
-          {current} / {totalPages}
-        </span>
-        <button
-          disabled={current >= totalPages}
-          onClick={() => onChange(current + 1)}
-          className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium transition disabled:cursor-not-allowed"
-        >下一页</button>
-      </div>
-    </div>
+    <UnifiedPagination
+      page={current}
+      size={pageSize}
+      total={total}
+      onPageChange={onChange}
+    />
   );
 }

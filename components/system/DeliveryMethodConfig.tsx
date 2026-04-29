@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { Plus, Settings, Info, ChevronDown, ChevronUp, Pencil, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Settings, Info, ChevronDown, ChevronUp, Pencil, Trash2, X } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
+import Pagination from '../common/Pagination';
 
 interface DeliveryRule {
   id: string;
@@ -144,7 +145,6 @@ const DeliveryMethodConfig: React.FC = () => {
     setTimeout(() => setToast(''), 2500);
   }, []);
 
-  const totalPages = Math.max(1, Math.ceil(rules.length / pageSize));
   const pagedRules = useMemo(() => rules.slice((page - 1) * pageSize, page * pageSize), [rules, page, pageSize]);
 
   const openDefaultModal = () => {
@@ -307,31 +307,14 @@ const DeliveryMethodConfig: React.FC = () => {
           </tbody>
         </table>
 
-        {/* Pagination — 与订单列表一致 */}
         {rules.length > 0 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200/50 dark:border-white/10">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400 dark:text-gray-500">共 <span className="font-mono text-gray-600 dark:text-gray-300">{rules.length}</span> 条</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">每页</span>
-                <select
-                  value={pageSize}
-                  onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-                  className="unified-card h-7 pl-2 pr-6 text-xs font-medium text-gray-700 dark:text-gray-200 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 outline-none appearance-none cursor-pointer transition"
-                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
-                >
-                  {[20, 50, 100].map(n => <option key={n} value={n}>{n} 条</option>)}
-                </select>
-              </div>
-              <span className="text-xs text-gray-400 dark:text-gray-500">第 {page} / {totalPages} 页</span>
-              <div className="flex items-center gap-1.5">
-                <button onClick={() => setPage(p => p - 1)} disabled={page <= 1} className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium transition disabled:cursor-not-allowed">上一页</button>
-                <button onClick={() => setPage(p => p + 1)} disabled={page >= totalPages} className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium transition disabled:cursor-not-allowed">下一页</button>
-              </div>
-            </div>
-          </div>
+          <Pagination
+            page={page}
+            size={pageSize}
+            total={rules.length}
+            onPageChange={setPage}
+            onSizeChange={s => { setPageSize(s); setPage(1); }}
+          />
         )}
       </div>
 

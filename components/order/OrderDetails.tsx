@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import UserDetailPanel from '../common/UserDetailPanel';
+import EmployeeCardModal from '../common/EmployeeCardModal';
 import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 import OrderLogDrawer from './OrderLogDrawer';
 import OrderSnapshotDrawer from './OrderSnapshotDrawer';
@@ -30,7 +31,7 @@ const statusMap: Record<string, string> = {
 };
 
 const OrderDetails: React.FC = () => {
-  const { orders, setOrders, products, customers, filteredOrders, currentUser, users, departments, opportunities, contracts, roles, apiMode, refreshOrders } = useAppContext();
+  const { orders, setOrders, products, customers, filteredOrders, currentUser, users, setUsers, departments, opportunities, contracts, roles, apiMode, refreshOrders } = useAppContext();
   useEnsureData(['orders', 'customers', 'contracts']);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -63,6 +64,7 @@ const OrderDetails: React.FC = () => {
   const [certView, setCertView] = useState<'paper' | 'structured'>('paper');
   const [selectedItemForDetails, setSelectedItemForDetails] = useState<OrderItem | null>(null);
   const [selectedItemIndex, setSelectedItemIndex] = useState<number>(0);
+  const [itemDrawerInitialTab, setItemDrawerInitialTab] = useState<'INFO' | 'SUBUNIT'>('INFO');
   const [isItemDetailsClosing, setIsItemDetailsClosing] = useState(false);
   const [isLogDrawerOpen, setIsLogDrawerOpen] = useState(false);
   const [isLogDrawerClosing, setIsLogDrawerClosing] = useState(false);
@@ -73,6 +75,7 @@ const OrderDetails: React.FC = () => {
   const [detailsUser, setDetailsUser] = useState<User | null>(null);
   const [isUserDrawerOpen, setIsUserDrawerOpen] = useState(false);
   const [isUserDrawerClosing, setIsUserDrawerClosing] = useState(false);
+  const [isEmployeeCardOpen, setIsEmployeeCardOpen] = useState(false);
   const openUserDetail = (userId?: string) => {
     if (!userId) return;
     const u = users.find(uu => uu.id === userId);
@@ -751,6 +754,7 @@ const OrderDetails: React.FC = () => {
                               <tr>
                                   <th className="px-5 py-4 pl-6 text-center w-16 whitespace-nowrap">明细编号</th>
                                   <th className="px-5 py-4">产品信息</th>
+                                  <th className="px-5 py-4">下级单位授权</th>
                                   <th className="px-5 py-4 text-center">数量</th>
                                   <th className="px-5 py-4 text-center">授权/服务期限</th>
                                   <th className="px-5 py-4 text-right">单价</th>
@@ -768,7 +772,7 @@ const OrderDetails: React.FC = () => {
                                   >
                                       <td className="px-5 py-5 pl-6 text-center">
                                           <button
-                                              onClick={() => { setSelectedItemForDetails(item); setSelectedItemIndex(idx); }}
+                                              onClick={() => { setItemDrawerInitialTab('INFO'); setSelectedItemForDetails(item); setSelectedItemIndex(idx); }}
                                               className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-xs font-bold font-mono text-[#0071E3] dark:text-[#0A84FF] transition-all"
                                           >
                                               {lineNo}
@@ -782,9 +786,27 @@ const OrderDetails: React.FC = () => {
                                               {item.productName}
                                           </button>
                                           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                                              {item.skuName && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">{item.skuName}</span>}
-                                              {item.licenseType && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg">{item.licenseType}</span>}
+                                              {item.skuName && <span className="inline-flex px-2 py-0.5 text-xs font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">{item.skuName}</span>}
+                                              {item.licenseType && <span className="inline-flex px-2 py-0.5 text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg">{item.licenseType}</span>}
                                           </div>
+                                      </td>
+                                      <td className="px-5 py-5">
+                                          {item.subUnitAuthMode && item.subUnitAuthMode !== 'none' && item.subUnits && item.subUnits.length > 0 ? (
+                                              <button
+                                                  onClick={() => { setItemDrawerInitialTab('SUBUNIT'); setSelectedItemForDetails(item); setSelectedItemIndex(idx); }}
+                                                  className="flex items-center gap-1.5 cursor-pointer group/sub"
+                                              >
+                                                  <span className="inline-flex flex-col px-2 py-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg text-left leading-relaxed group-hover/sub:bg-indigo-100 dark:group-hover/sub:bg-indigo-900/40 transition-colors">
+                                                      {item.subUnitAuthMode === 'separate_auth_separate_eid' ? <><span>授权分别呈现</span><span>企业ID分别管理</span></>
+                                                        : item.subUnitAuthMode === 'separate_auth_unified_eid' ? <><span>授权分别呈现</span><span>企业ID统一管理</span></>
+                                                        : item.subUnitAuthMode === 'unified_auth_with_list' ? <><span>授权和企业ID统一管理</span><span>并提供下级清单</span></>
+                                                        : item.subUnitAuthMode}
+                                                  </span>
+                                                  <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-full shrink-0 group-hover/sub:bg-purple-100 dark:group-hover/sub:bg-purple-900/40 transition-colors" title="下级单位数量">{item.subUnits.length}</span>
+                                              </button>
+                                          ) : (
+                                              <span className="text-gray-300 dark:text-gray-600">-</span>
+                                          )}
                                       </td>
                                       <td className="px-5 py-5 text-center dark:text-white font-medium">x {item.quantity}</td>
                                       <td className="px-5 py-5 text-center">
@@ -2370,6 +2392,14 @@ const OrderDetails: React.FC = () => {
         }}
         products={products}
         selectedOrder={selectedOrder}
+        editable={['DRAFT', 'PENDING_APPROVAL', 'PENDING_CONFIRM'].includes(selectedOrder.status)}
+        customers={customers}
+        onUpdateItem={(idx, updatedItem) => {
+          const newItems = [...selectedOrder.items];
+          newItems[idx] = updatedItem;
+          updateOrder({ ...selectedOrder, items: newItems });
+        }}
+        initialTab={itemDrawerInitialTab}
       />
       {/* Contract Preview Modal */}
       <OrderContractPreview
@@ -2484,7 +2514,22 @@ const OrderDetails: React.FC = () => {
       })()}
 
       {isUserDrawerOpen && detailsUser && (
-        <UserDetailPanel user={detailsUser} isClosing={isUserDrawerClosing} onClose={closeUserDrawer} roles={roles} departments={departments} users={users} readonly />
+        <UserDetailPanel
+          user={detailsUser}
+          isClosing={isUserDrawerClosing}
+          onClose={closeUserDrawer}
+          roles={roles}
+          departments={departments}
+          users={users}
+          onEmployeeCard={() => setIsEmployeeCardOpen(true)}
+          onSave={(updated) => {
+            setUsers(prev => prev.map(u => u.id === detailsUser.id ? { ...u, ...updated } as User : u));
+            setDetailsUser(prev => prev ? { ...prev, ...updated } as User : prev);
+          }}
+        />
+      )}
+      {isEmployeeCardOpen && detailsUser && (
+        <EmployeeCardModal user={detailsUser} roles={roles} departments={departments} users={users} onClose={() => setIsEmployeeCardOpen(false)} />
       )}
     </>
   );

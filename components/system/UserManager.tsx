@@ -1,13 +1,15 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom';
-import { User, UserType, RoleDefinition, PermissionDimension, RowPermissionRule, ColumnPermissionRule, PermissionResource, BaseRowPermission, Department, RowLogicConfig, Space, SpaceRole, AppScopedRolePermissions } from '../../types';
-import { Search, Plus, Shield, User as UserIcon, Briefcase, Truck, Edit, Building2, X, Mail, Phone, CheckCircle, Calendar, Hash, Lock, CheckSquare, Settings, Save, Trash2, Database, Check, ChevronDown, ChevronRight, Columns, Copy, Globe, GripVertical, IdCard, MapPin, Clock, Box, Eye } from 'lucide-react';
+import { User, UserType, RoleDefinition, PermissionDimension, RowPermissionRule, ColumnPermissionRule, PermissionResource, Department, Space, SpaceRole, SpaceMember, AppScopedRolePermissions } from '../../types';
+import { Search, Plus, Shield, User as UserIcon, Edit, Building2, X, CheckCircle, Lock, CheckSquare, Settings, Save, Trash2, Database, Check, ChevronDown, ChevronRight, Columns, Copy, Globe, GripVertical, Box, Eye } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import UserDetailPanel from '../common/UserDetailPanel';
+import EmployeeCardModal from '../common/EmployeeCardModal';
 import { useAppContext } from '../../contexts/AppContext';
-import { columnConfig, permissionTree, permissionModules, resourceConfig, PermSubgroup, PermGroup, PermCategory, resourceFunctionalPermMap, getRequiredPermIdsForResource, getSubgroupPermIds, getSubgroupPermItems } from './permissionConfig';
+import { columnConfig, permissionTree, resourceConfig, getSubgroupPermIds } from './permissionConfig';
 import { useRoleDrag } from './userManager/useRoleDrag';
+import { useUserDrag } from './userManager/useUserDrag';
 import { usePermissionTreeExpansion } from './userManager/usePermissionTreeExpansion';
 import { useRowPermissionRules } from './userManager/useRowPermissionRules';
 import { useFunctionalPermissions } from './userManager/useFunctionalPermissions';
@@ -17,6 +19,7 @@ import SpaceRoleManager from './SpaceRoleManager';
 import SpaceRoleDetail from './space/SpaceRoleDetail';
 import { spaceApi, userApi } from '../../services/api';
 import { defaultAppScopedPermissions } from '../../utils/mergeRolePermissions';
+import Pagination from '../common/Pagination';
 
 interface UserManagerProps {
   defaultTab?: 'USERS' | 'ROLES';
@@ -25,12 +28,15 @@ interface UserManagerProps {
 const MAIN_SPACE_ID = '__main__';
 
 const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
-  const { users, setUsers, departments, roles, setRoles, channels, apiMode, spaces, setSpaces, refreshSpaces } = useAppContext();
+  const { users, setUsers, departments, roles, setRoles, channels, apiMode, spaces, setSpaces, refreshSpaces, currentUser } = useAppContext();
   const [activeTab, setActiveTab] = useState<'USERS' | 'ROLES'>(defaultTab);
   const [activeSpaceId, setActiveSpaceId] = useState<string>(MAIN_SPACE_ID);
   const [showCreateSpace, setShowCreateSpace] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState('');
   const [newSpaceDesc, setNewSpaceDesc] = useState('');
+  const [newSpaceAdminId, setNewSpaceAdminId] = useState('');
+  const [newSpaceAdminSearch, setNewSpaceAdminSearch] = useState('');
+  const [showAdminDropdown, setShowAdminDropdown] = useState(false);
   const [creatingSpace, setCreatingSpace] = useState(false);
   /** 平台角色下：主业务平台 vs 各应用 的权限配置范围 */
   const [platformPermScope, setPlatformPermScope] = useState<string>('__main__');
@@ -57,6 +63,8 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [roleSearchTerm, setRoleSearchTerm] = useState('');
+  const [isRoleSearchOpen, setIsRoleSearchOpen] = useState(false);
+  const roleSearchInputRef = useRef<HTMLInputElement>(null);
 
   const {
     dragRoleId,
@@ -66,6 +74,15 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
     handleRoleDrop,
     handleRoleDragEnd,
   } = useRoleDrag(roles, setRoles, apiMode);
+
+  const {
+    dragUserId,
+    dragOverUserId,
+    handleUserDragStart,
+    handleUserDragOver,
+    handleUserDrop,
+    handleUserDragEnd,
+  } = useUserDrag(users, setUsers, apiMode);
 
   const {
     detailsUser,
@@ -329,8 +346,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   };
 
   const handleDeleteRole = (id: string) => {
-      const role = roles.find(r => r.id === id);
-      if (role?.isSystem) return alert("系统内置角色不可删除。");
+      if (id === 'Admin') return alert("管理员角色不可删除。");
       if (users.some(u => u.roles?.includes(id))) return alert("该角色下仍有用户，无法删除。");
       if (confirm("确定要删除此角色吗？")) {
           setRoles(prev => prev.filter(r => r.id !== id));
@@ -384,7 +400,6 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   }, [platformPermScope, spaces, roleForm.appPermissions, roleForm.name, roleForm.description]);
 
   const {
-    getDependentPermIds,
     togglePermission,
     toggleModule,
     toggleSubgroupPerms,
@@ -396,14 +411,6 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
     allPermsInSubgroup,
     allPermsInCategory,
   );
-
-  const toggleModuleExpand = (moduleId: string) => {
-      if (expandedModules.includes(moduleId)) {
-          setExpandedModules(expandedModules.filter(id => id !== moduleId));
-      } else {
-          setExpandedModules([...expandedModules, moduleId]);
-      }
-  };
 
   const handleRemoveUserFromRole = (userId: string) => {
       if (!selectedRoleId) return;
@@ -596,15 +603,29 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   };
 
   // Pagination & Filtering
-  const filteredUsers = users.filter(u => 
-      u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.accountId.includes(searchTerm)
-  );
+  const filteredUsers = useMemo(() => {
+      const q = searchTerm.toLowerCase();
+      if (!q) return users;
+      return users.filter(u =>
+          u.name.toLowerCase().includes(q) ||
+          u.email.toLowerCase().includes(q) ||
+          u.accountId.includes(searchTerm)
+      );
+  }, [users, searchTerm]);
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
+  // 搜索条件变化或数据变化导致总页数缩减时，自动回到第一页/最后一页，避免出现空表
+  useEffect(() => {
+      if (currentPage > totalPages) setCurrentPage(1);
+  }, [totalPages, currentPage]);
+  useEffect(() => {
+      setCurrentPage(1);
+  }, [searchTerm]);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentUsers = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const currentUsers = useMemo(
+      () => filteredUsers.slice(indexOfFirstItem, indexOfLastItem),
+      [filteredUsers, indexOfFirstItem, indexOfLastItem],
+  );
   const handlePageChange = (page: number) => setCurrentPage(page);
 
   // User permission search
@@ -653,24 +674,71 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight">
             {activeTab === 'USERS' ? '用户管理' : '角色管理'}
         </h1>
+
+        {/* 用户 Tab: 搜索 + 新增 放在标题同行 */}
+        {activeTab === 'USERS' && (
+          <div className="flex items-center gap-3 ml-auto">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                placeholder="搜索用户..."
+                className="w-64 pl-9 pr-4 py-2 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white transition-all"
+              />
+            </div>
+            <button onClick={() => handleOpenModal()} className="bg-[#0071E3] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-[#0062CC] transition shadow-sm whitespace-nowrap">
+              <Plus className="w-4 h-4" /> 新增用户
+            </button>
+          </div>
+        )}
+
         {activeTab === 'ROLES' && (
           <div className="flex items-center gap-1 ml-2">
             {[
               { id: MAIN_SPACE_ID, label: '平台角色', icon: Globe },
               ...spaces.map(s => ({ id: s.id, label: s.name, icon: Box, isApp: true })),
             ].map(item => (
-              <button
-                key={item.id}
-                onClick={() => { setActiveSpaceId(item.id); handleClearPermUser(); }}
-                className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 transition border ${
-                  activeSpaceId === item.id
-                    ? 'bg-[#0071E3] text-white border-[#0071E3] shadow-sm'
-                    : 'bg-white dark:bg-white/5 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 hover:text-gray-800 dark:hover:text-gray-200'
-                }`}
-              >
-                <item.icon className="w-3 h-3" />
-                {item.label}
-              </button>
+              <div key={item.id} className="relative group/tab flex items-center">
+                <button
+                  onClick={() => { setActiveSpaceId(item.id); handleClearPermUser(); }}
+                  className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 transition border ${
+                    activeSpaceId === item.id
+                      ? 'bg-[#0071E3] text-white border-[#0071E3] shadow-sm'
+                      : 'bg-white dark:bg-white/5 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 hover:text-gray-800 dark:hover:text-gray-200'
+                  }`}
+                >
+                  <item.icon className="w-3 h-3" />
+                  {item.label}
+                </button>
+                {'isApp' in item && item.isApp && (
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!window.confirm(`确定要删除应用「${item.label}」吗？\n该操作将同时删除应用下的所有角色和成员，且不可恢复。`)) return;
+                      try {
+                        if (apiMode) {
+                          await spaceApi.delete(item.id);
+                          await refreshSpaces();
+                        } else {
+                          setSpaces(prev => prev.filter(s => s.id !== item.id));
+                          try {
+                            localStorage.removeItem(`spaceMock:roles:${item.id}`);
+                            localStorage.removeItem(`spaceMock:members:${item.id}`);
+                          } catch {}
+                        }
+                        if (activeSpaceId === item.id) setActiveSpaceId(MAIN_SPACE_ID);
+                      } catch (err: any) {
+                        alert(err?.message || '删除失败');
+                      }
+                    }}
+                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover/tab:opacity-100 transition-opacity shadow-sm hover:bg-red-600 z-10"
+                    title={`删除应用 ${item.label}`}
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                )}
+              </div>
             ))}
             <button
               onClick={() => setShowCreateSpace(true)}
@@ -747,33 +815,40 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       {/* --- USERS TAB --- */}
       {activeTab === 'USERS' && (
           <div className="unified-card dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 flex flex-col animate-fade-in flex-1">
-              <div className="p-4 border-b border-gray-100 dark:border-white/10 flex justify-between items-center">
-                  <div className="relative flex-1 max-w-sm">
-                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
-                      <input 
-                          value={searchTerm}
-                          onChange={e => setSearchTerm(e.target.value)}
-                          placeholder="搜索用户..."
-                          className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white"
-                      />
-                  </div>
-                  <button onClick={() => handleOpenModal()} className="bg-[#0071E3] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-[#0062CC] transition shadow-sm"><Plus className="w-4 h-4"/> 新增用户</button>
-              </div>
               <div className="flex-1 overflow-auto">
                   <table className="w-full text-left">
                       <thead className="unified-table-header dark: sticky top-0 backdrop-blur">
                           <tr>
+                              {!searchTerm && <th className="w-8 p-4 pl-3"></th>}
                               <th className="p-4 pl-6">用户</th>
                               <th className="p-4">账号ID</th>
                               <th className="p-4">部门</th>
                               <th className="p-4">类型</th>
                               <th className="p-4">状态</th>
-                              <th className="p-4 text-right pr-6">操作</th>
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 dark:divide-white/5 text-sm">
                           {currentUsers.map(user => (
-                              <tr key={user.id} className="group hover:bg-gray-50 dark:hover:bg-white/5 transition">
+                              <tr
+                                key={user.id}
+                                draggable={!searchTerm}
+                                onDragStart={e => handleUserDragStart(e, user.id)}
+                                onDragOver={e => handleUserDragOver(e, user.id)}
+                                onDrop={e => handleUserDrop(e, user.id)}
+                                onDragEnd={handleUserDragEnd}
+                                className={`group hover:bg-gray-50 dark:hover:bg-white/5 transition ${
+                                  dragUserId === user.id ? 'opacity-40' : ''
+                                } ${
+                                  dragOverUserId === user.id && dragUserId !== user.id ? 'ring-2 ring-blue-400 dark:ring-blue-500 ring-inset bg-blue-50/50 dark:bg-blue-900/10' : ''
+                                }`}
+                              >
+                                  {!searchTerm && (
+                                    <td className="w-8 p-4 pl-3">
+                                      <div className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors">
+                                        <GripVertical className="w-4 h-4" />
+                                      </div>
+                                    </td>
+                                  )}
                                    <td className="p-4 pl-6">
                                       <div className="flex items-center gap-3">
                                           <div className="relative flex-shrink-0">
@@ -795,26 +870,19 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                   </td>
                                   <td className="p-4 font-mono text-gray-600 dark:text-gray-300">{user.accountId}</td>
                                   <td className="p-4 text-gray-600 dark:text-gray-300">{getDepartmentName(user.departmentId)}</td>
-                                  <td className="p-4"><span className={`px-2 py-0.5 text-[10px] rounded border ${user.userType === 'Internal' ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400' : 'bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-900/30 dark:border-orange-800 dark:text-orange-400'}`}>{user.userType}</span></td>
-                                  <td className="p-4"><span className={`flex items-center gap-1.5 text-xs font-medium ${user.status === 'Active' ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`}><div className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-green-500' : 'bg-gray-400'}`}></div> {user.status}</span></td>
-                                  <td className="p-4 text-right pr-6"><button onClick={(e) => handleAvatarClick(e, user)} className="p-2 text-gray-400 hover:text-[#0071E3] dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition"><Edit className="w-4 h-4"/></button></td>
+                                  <td className="p-4"><span className={`px-2 py-0.5 rounded-md text-xs font-bold border ${user.userType === 'Internal' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800' : 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800'}`}>{user.userType === 'Internal' ? '内部员工' : '外部协作'}</span></td>
+                                  <td className="p-4"><span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold ${user.status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400'}`}><div className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-green-500' : 'bg-gray-400'}`} />{user.status === 'Active' ? '已启用' : '已停用'}</span></td>
                               </tr>
                           ))}
                       </tbody>
                   </table>
               </div>
-              {totalPages > 1 && (
-                  <div className="p-4 border-t border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5">
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                          共 {filteredUsers.length} 条数据
-                      </div>
-                      <div className="flex items-center gap-4">
-                          <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="px-3 py-1 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-sm disabled:opacity-50">上一页</button>
-                          <span className="text-xs text-gray-500">Page {currentPage} of {totalPages}</span>
-                          <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} className="px-3 py-1 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-sm disabled:opacity-50">下一页</button>
-                      </div>
-                  </div>
-              )}
+              <Pagination
+                  page={currentPage}
+                  size={itemsPerPage}
+                  total={filteredUsers.length}
+                  onPageChange={handlePageChange}
+              />
           </div>
       )}
 
@@ -826,20 +894,33 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
           <div className="flex gap-6 flex-1 min-h-0 animate-fade-in">
               {/* Role List */}
               <div className="unified-card w-1/4 min-w-[250px] dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 flex flex-col">
-                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5">
-                      <h3 className="font-bold text-gray-800 dark:text-white">角色列表</h3>
-                      <button onClick={handleCreateRole} className="p-1.5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full text-gray-500 dark:text-gray-400"><Plus className="w-4 h-4"/></button>
-                  </div>
-                  <div className="px-3 pt-3 pb-1">
-                      <div className="relative">
-                          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"/>
+                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 bg-gray-50 dark:bg-white/5">
+                      {isRoleSearchOpen ? (
+                        <div className="relative flex-1 animate-fade-in">
+                          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
                           <input
-                              value={roleSearchTerm}
-                              onChange={e => setRoleSearchTerm(e.target.value)}
-                              placeholder="搜索角色..."
-                              className="w-full pl-8 pr-3 py-1.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white placeholder:text-gray-400"
+                            ref={roleSearchInputRef}
+                            value={roleSearchTerm}
+                            onChange={e => setRoleSearchTerm(e.target.value)}
+                            onBlur={() => { if (!roleSearchTerm) setIsRoleSearchOpen(false); }}
+                            onKeyDown={e => { if (e.key === 'Escape') { setRoleSearchTerm(''); setIsRoleSearchOpen(false); } }}
+                            placeholder="搜索角色..."
+                            autoFocus
+                            className="w-full pl-8 pr-7 py-1 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/30 dark:text-white placeholder:text-gray-400 transition-all"
                           />
-                      </div>
+                          <button onClick={() => { setRoleSearchTerm(''); setIsRoleSearchOpen(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <h3 className="font-bold text-gray-800 dark:text-white flex-1">角色列表</h3>
+                      )}
+                      {!isRoleSearchOpen && (
+                        <button onClick={() => { setIsRoleSearchOpen(true); setTimeout(() => roleSearchInputRef.current?.focus(), 0); }} className="p-1.5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full text-gray-500 dark:text-gray-400" title="搜索角色">
+                          <Search className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button onClick={handleCreateRole} className="p-1.5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full text-gray-500 dark:text-gray-400 shrink-0"><Plus className="w-4 h-4"/></button>
                   </div>
                   <div className="flex-1 overflow-auto p-2 space-y-0.5">
                       {roles.filter(r => !roleSearchTerm || r.name.toLowerCase().includes(roleSearchTerm.toLowerCase())).map(role => (
@@ -866,7 +947,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                               <div className="flex-1 flex justify-between items-center min-w-0">
                                   <div className="font-medium text-sm truncate">{role.name}</div>
                                   <div className="flex items-center gap-1 flex-shrink-0">
-                                      {role.isSystem && <Shield className="w-3 h-3 opacity-50"/>}
+                                      {role.id === 'Admin' && <Shield className="w-3 h-3 opacity-50"/>}
                                       <button 
                                           onClick={(e) => { e.stopPropagation(); handleCopyRole(role); }}
                                           className="p-1 text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -874,7 +955,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                       >
                                           <Copy className="w-3.5 h-3.5" />
                                       </button>
-                                      {!role.isSystem && (
+                                      {role.id !== 'Admin' && (
                                           <button 
                                               onClick={(e) => { e.stopPropagation(); handleDeleteRole(role.id); }}
                                               className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -2076,12 +2157,12 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                   <div>
                                       <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                           {roleForm.name}
-                                          {roleForm.isSystem && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs rounded-full font-normal">内置</span>}
+                                          {selectedRoleId === 'Admin' && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs rounded-full font-normal">内置</span>}
                                       </h2>
                                       <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{roleForm.description || '暂无描述'}</p>
                                   </div>
                                   <div className="flex gap-2">
-                                      {!roleForm.isSystem && (
+                                      {selectedRoleId !== 'Admin' && (
                                           <button onClick={() => handleDeleteRole(selectedRoleId)} className="px-3 py-1.5 border border-red-200 dark:border-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition flex items-center gap-1"><Trash2 className="w-4 h-4"/> 删除</button>
                                       )}
                                       <button onClick={() => { const r = roles.find(r => r.id === selectedRoleId); if (r) handleCopyRole(r); }} className="px-3 py-1.5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition flex items-center gap-1"><Copy className="w-4 h-4"/> 复制</button>
@@ -2485,199 +2566,9 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       )}
 
       {/* Employee Card Modal */}
-      {isEmployeeCardOpen && detailsUser && (() => {
-        const dept = departments.find(d => d.id === detailsUser.departmentId);
-        const primaryRoleId = detailsUser.roles?.[0];
-        const roleDef = primaryRoleId ? roles.find(r => r.id === primaryRoleId) : undefined;
-        const getDeptPath = (deptId?: string): string => {
-          if (!deptId) return '—';
-          const parts: string[] = [];
-          let cur = deptId;
-          while (cur) {
-            const d = departments.find(dd => dd.id === cur);
-            if (!d) break;
-            parts.unshift(d.name);
-            cur = d.parentId || '';
-          }
-          return parts.join('/') || '—';
-        };
-
-        const seed = detailsUser.accountId ? parseInt(detailsUser.accountId, 10) : 55005;
-        const entryYear = 2020 + (seed % 6);
-        const entryMonth = ((seed % 12) + 1).toString().padStart(2, '0');
-        const entryDay = ((seed % 28) + 1).toString().padStart(2, '0');
-        const entryDate = `${entryYear}-${entryMonth}-${entryDay}`;
-        const confirmDate = `${entryYear + 1}-${entryMonth}-${entryDay}`;
-        const seniority = new Date().getFullYear() - entryYear;
-
-        const positionMap: Record<string, string> = {
-          Admin: '系统管理员', Sales: '销售经理', Business: '商务经理', Technical: '技术工程师',
-          FinanceManager: '财务经理', ProductManager: '产品经理', SalesRep: '销售代表', ChannelManager: '渠道经理',
-          'sales-rep': '销售代表', 'finance-mgr': '财务经理', 'product-mgr': '产品经理', 'channel-mgr': '渠道经理',
-        };
-        const position = (primaryRoleId && positionMap[primaryRoleId]) || roleDef?.name || '员工';
-
-        const levelMap: Record<string, string> = {
-          Admin: 'P8', Sales: 'P7', Business: 'P6', Technical: 'P7',
-          FinanceManager: 'P7', ProductManager: 'P7', SalesRep: 'P5', ChannelManager: 'P6',
-        };
-        const level = (primaryRoleId && levelMap[primaryRoleId]) || `P${5 + (seed % 4)}`;
-
-        const sequenceMap: Record<string, string> = {
-          Admin: '管理 - 综合', Sales: '销售 - 直销', Business: '商务 - 运营', Technical: '产研 - 研发',
-          FinanceManager: '职能 - 财务', ProductManager: '产研 - 产品', SalesRep: '销售 - 直销', ChannelManager: '销售 - 渠道',
-        };
-        const sequence = (primaryRoleId && sequenceMap[primaryRoleId]) || '产研 - 产品';
-
-        const cities = ['北京市', '珠海市', '武汉市', '长沙市', '成都市', '上海市', '深圳市'];
-        const city = cities[seed % cities.length];
-
-        const companies = ['珠海金山办公软件股份有限公司', '北京金山办公软件有限公司', '武汉金山办公软件有限公司'];
-        const company = companies[seed % companies.length];
-
-        const hrbps = ['李红梅', '王丽华', '张晓敏', '刘芳', '陈雪'];
-        const hrbp = hrbps[seed % hrbps.length];
-
-        const supervisors = users.filter(u => u.id !== detailsUser.id && u.departmentId === detailsUser.departmentId);
-        const supervisor = supervisors.length > 0 ? supervisors[seed % supervisors.length]?.name : '—';
-
-        const jobRecords = [
-          { date: `${new Date().getFullYear()}-03-01`, reason: '调动 - 公司内部调动', category: '正式员工-社招', seq: sequence, pos: `${position} ${level}`, deptName: getDeptPath(detailsUser.departmentId) },
-          { date: `${entryYear + 1}-03-01`, reason: `调动 - 批量调岗 - ${entryYear + 1}年组织架构调整`, category: '正式员工-社招', seq: sequence, pos: `${position} ${level}`, deptName: dept?.name ? `业务委员会/营销管理中心/${dept.name}` : '—' },
-          { date: confirmDate, reason: '转正', category: '正式员工-社招', seq: sequence, pos: `${position} ${level}`, deptName: dept?.name ? `${dept.name}/数据管理组` : '—' },
-        ];
-
-        return (
-          <ModalPortal>
-          <div className="fixed inset-0 z-[600] flex items-center justify-center p-4" onClick={() => setIsEmployeeCardOpen(false)}>
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in" />
-            <div
-              className="relative bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col border border-gray-200 dark:border-white/10"
-              onClick={e => e.stopPropagation()}
-              style={{ animation: 'empCardIn 0.35s cubic-bezier(0.16,1,0.3,1)' }}
-            >
-              {/* Card Header — blue banner */}
-              <div className="bg-gradient-to-r from-[#2563EB] to-[#3B82F6] px-6 pt-6 pb-16 relative">
-                <button onClick={() => setIsEmployeeCardOpen(false)} className="absolute top-4 right-4 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Profile section overlapping banner */}
-              <div className="px-6 -mt-12 flex items-end gap-5 relative z-10">
-                <div className="w-[88px] h-[88px] rounded-2xl border-4 border-white dark:border-[#1C1C1E] shadow-lg overflow-hidden bg-gray-100 shrink-0">
-                  <img src={detailsUser.avatar} alt={detailsUser.name} className="w-full h-full object-cover" />
-                </div>
-                <div className="pb-1 min-w-0">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">{detailsUser.name}</h2>
-                  <div className="flex items-center gap-2 flex-wrap mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    <span>{position} {level}</span>
-                    <span className="text-gray-300">|</span>
-                    <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{city}</span>
-                    <span className="text-gray-300">|</span>
-                    <span>{detailsUser.userType === 'Internal' ? '正式员工' : '外部协作'}</span>
-                    <span className="text-gray-300">|</span>
-                    <span className="text-[#2563EB]">{detailsUser.email}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Scrollable body */}
-              <div className="flex-1 overflow-y-auto px-6 pb-6 pt-6 space-y-6">
-
-                {/* 基本信息 */}
-                <section>
-                  <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-white/10">基本信息</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
-                    {[
-                      { label: '员工号', value: detailsUser.accountId },
-                      { label: '人员类别', value: detailsUser.userType === 'Internal' ? '正式员工-社招' : '外部协作' },
-                      { label: '部门全路径', value: getDeptPath(detailsUser.departmentId), colSpan: true },
-                      { label: '族群序列', value: sequence },
-                      { label: '岗位', value: `${position} ${level}` },
-                      { label: '实际工作地', value: city },
-                      { label: '公司', value: company, colSpan: true },
-                      { label: '直接上级', value: supervisor, highlight: true },
-                      { label: 'HRBP', value: hrbp, highlight: true },
-                    ].map((f, i) => (
-                      <div
-                        key={i}
-                        className={`flex items-start gap-3 py-1.5 ${f.colSpan ? 'md:col-span-2' : ''}`}
-                      >
-                        <div className="w-28 shrink-0 text-xs text-gray-400 dark:text-gray-500 pt-0.5">{f.label}</div>
-                        <div className={`flex-1 min-w-0 text-sm font-medium break-words ${f.highlight ? 'text-[#2563EB] dark:text-blue-400' : 'text-gray-800 dark:text-gray-200'}`}>
-                          {f.value || '—'}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                {/* 入职信息 */}
-                <section>
-                  <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-white/10">入职信息</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
-                    {[
-                      { label: '入职日期', value: entryDate },
-                      { label: '首次加入日期', value: entryDate },
-                      { label: '是否二次入职', value: seed % 5 === 0 ? '是' : '否' },
-                      { label: '司龄（年）', value: String(seniority) },
-                      { label: '是否转正', value: '是' },
-                      { label: '转正日期', value: confirmDate },
-                    ].map((f, i) => (
-                      <div key={i} className="flex items-start gap-3 py-1.5">
-                        <div className="w-28 shrink-0 text-xs text-gray-400 dark:text-gray-500 pt-0.5">{f.label}</div>
-                        <div className="flex-1 min-w-0 text-sm font-medium text-gray-800 dark:text-gray-200 break-words">
-                          {f.value || '—'}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                {/* 任职记录 */}
-                <section>
-                  <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-white/10">任职记录</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                      <thead>
-                        <tr className="border-b border-gray-200 dark:border-white/10 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          <th className="py-2.5 pr-4 font-semibold whitespace-nowrap">开始日期</th>
-                          <th className="py-2.5 pr-4 font-semibold whitespace-nowrap">变动原因</th>
-                          <th className="py-2.5 pr-4 font-semibold whitespace-nowrap">员工类别</th>
-                          <th className="py-2.5 pr-4 font-semibold whitespace-nowrap">族群序列</th>
-                          <th className="py-2.5 pr-4 font-semibold whitespace-nowrap">岗位</th>
-                          <th className="py-2.5 font-semibold whitespace-nowrap">部门</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                        {jobRecords.map((rec, i) => (
-                          <tr key={i} className="text-gray-700 dark:text-gray-300">
-                            <td className="py-2.5 pr-4 font-mono text-gray-500 whitespace-nowrap">{rec.date}</td>
-                            <td className="py-2.5 pr-4 whitespace-nowrap">{rec.reason}</td>
-                            <td className="py-2.5 pr-4 whitespace-nowrap">{rec.category}</td>
-                            <td className="py-2.5 pr-4 whitespace-nowrap">{rec.seq}</td>
-                            <td className="py-2.5 pr-4 whitespace-nowrap">{rec.pos}</td>
-                            <td className="py-2.5 max-w-[260px] truncate" title={rec.deptName}>{rec.deptName}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              </div>
-            </div>
-          </div>
-
-          <style>{`
-            @keyframes empCardIn {
-              from { opacity: 0; transform: scale(0.92) translateY(20px); }
-              to { opacity: 1; transform: scale(1) translateY(0); }
-            }
-          `}</style>
-          </ModalPortal>
-        );
-      })()}
+      {isEmployeeCardOpen && detailsUser && (
+        <EmployeeCardModal user={detailsUser} roles={roles} departments={departments} users={users} onClose={() => setIsEmployeeCardOpen(false)} />
+      )}
 
       {/* Add User to Role Modal */}
       {isAddUserModalOpen && (
@@ -2736,17 +2627,23 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
       )}
 
       {/* 创建应用弹窗 */}
-      {showCreateSpace && (
+      {showCreateSpace && (() => {
+        const resetCreateSpace = () => { setShowCreateSpace(false); setNewSpaceName(''); setNewSpaceDesc(''); setNewSpaceAdminId(''); setNewSpaceAdminSearch(''); setShowAdminDropdown(false); };
+        const selectedAdmin = users.find(u => u.id === newSpaceAdminId);
+        const adminCandidates = users
+          .filter(u => u.status === 'Active')
+          .filter(u => !newSpaceAdminSearch || u.name.toLowerCase().includes(newSpaceAdminSearch.toLowerCase()) || u.email.toLowerCase().includes(newSpaceAdminSearch.toLowerCase()));
+        return (
         <ModalPortal>
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[500] p-4 animate-fade-in">
             <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-md flex flex-col animate-modal-enter border-white/10">
               <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50 dark:bg-white/5">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2"><Box className="w-5 h-5" /> 添加应用</h3>
-                <button onClick={() => { setShowCreateSpace(false); setNewSpaceName(''); setNewSpaceDesc(''); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5" /></button>
+                <button onClick={resetCreateSpace} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5" /></button>
               </div>
               <div className="p-6 space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">应用名称</label>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">应用名称 <span className="text-red-500">*</span></label>
                   <input
                     value={newSpaceName}
                     onChange={e => setNewSpaceName(e.target.value)}
@@ -2765,16 +2662,67 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                     className="w-full p-3 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white placeholder-gray-300 resize-none"
                   />
                 </div>
+                <div className="relative">
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">应用管理员 <span className="text-red-500">*</span></label>
+                  {selectedAdmin ? (
+                    <div className="flex items-center gap-2 p-3 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl">
+                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                        {selectedAdmin.name.slice(0, 1)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{selectedAdmin.name}</div>
+                        <div className="text-xs text-gray-400 truncate">{selectedAdmin.email}</div>
+                      </div>
+                      <button onClick={() => { setNewSpaceAdminId(''); setNewSpaceAdminSearch(''); }} className="p-1 text-gray-400 hover:text-red-500 transition shrink-0">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          value={newSpaceAdminSearch}
+                          onChange={e => { setNewSpaceAdminSearch(e.target.value); setShowAdminDropdown(true); }}
+                          onFocus={() => setShowAdminDropdown(true)}
+                          placeholder="搜索并选择管理员..."
+                          className="w-full pl-9 pr-3 p-3 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-500/20"
+                        />
+                      </div>
+                      {showAdminDropdown && (
+                        <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/10 rounded-xl shadow-xl z-10 max-h-48 overflow-auto">
+                          {adminCandidates.length === 0 ? (
+                            <div className="p-3 text-xs text-gray-400 text-center">无匹配用户</div>
+                          ) : adminCandidates.slice(0, 20).map(u => (
+                            <button
+                              key={u.id}
+                              onClick={() => { setNewSpaceAdminId(u.id); setNewSpaceAdminSearch(''); setShowAdminDropdown(false); }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition text-left"
+                            >
+                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                                {u.name.slice(0, 1)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm text-gray-900 dark:text-white truncate">{u.name}</div>
+                                <div className="text-xs text-gray-400 truncate">{u.email}</div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="p-6 pt-0 flex justify-end gap-3">
                 <button
-                  onClick={() => { setShowCreateSpace(false); setNewSpaceName(''); setNewSpaceDesc(''); }}
+                  onClick={resetCreateSpace}
                   className="px-5 py-2.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition"
                 >取消</button>
                 <button
                   onClick={async () => {
                     if (!newSpaceName.trim()) { alert('请输入应用名称'); return; }
-                    // 检查重名
+                    if (!newSpaceAdminId) { alert('请选择应用管理员'); return; }
                     if (spaces.some(s => s.name === newSpaceName.trim())) {
                       alert('已存在同名应用');
                       return;
@@ -2786,14 +2734,15 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                         const created = await spaceApi.create({
                           name: newSpaceName.trim(),
                           description: newSpaceDesc.trim(),
+                          adminUserId: newSpaceAdminId,
                           permTree: [], resourceConfig: [], columnConfig: [],
                         });
                         await refreshSpaces();
                         createdId = (created as any).id;
                       } else {
-                        // Mock 模式：本地构造 Space 写入 context，并持久化到 localStorage
+                        const genId = (prefix: string) => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
                         const newSpace: Space = {
-                          id: `space_mock_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+                          id: genId('space_mock'),
                           name: newSpaceName.trim(),
                           description: newSpaceDesc.trim(),
                           icon: 'Box',
@@ -2802,6 +2751,31 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                           columnConfig: [],
                           sortOrder: spaces.length,
                         };
+                        const adminRole: SpaceRole = {
+                          id: genId('sr'),
+                          spaceId: newSpace.id,
+                          name: '应用管理员',
+                          description: '拥有该应用内所有权限，可管理角色、成员与配置',
+                          permissions: [],
+                          rowPermissions: [],
+                          columnPermissions: [],
+                          sortOrder: 0,
+                        };
+                        try { localStorage.setItem(`spaceMock:roles:${newSpace.id}`, JSON.stringify([adminRole])); } catch {}
+                        const adminUser = users.find(u => u.id === newSpaceAdminId);
+                        if (adminUser) {
+                          const adminMember: SpaceMember = {
+                            id: genId('sm'),
+                            spaceId: newSpace.id,
+                            userId: adminUser.id,
+                            roleId: adminRole.id,
+                            isAdmin: true,
+                            userName: adminUser.name,
+                            userEmail: adminUser.email,
+                            roleName: adminRole.name,
+                          };
+                          try { localStorage.setItem(`spaceMock:members:${newSpace.id}`, JSON.stringify([adminMember])); } catch {}
+                        }
                         setSpaces(prev => {
                           const next = [...prev, newSpace];
                           try { localStorage.setItem('spaceMock:list', JSON.stringify(next)); } catch {}
@@ -2809,9 +2783,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                         });
                         createdId = newSpace.id;
                       }
-                      setShowCreateSpace(false);
-                      setNewSpaceName('');
-                      setNewSpaceDesc('');
+                      resetCreateSpace();
                       setActiveSpaceId(createdId);
                     } catch (e: any) {
                       alert(e?.message || '创建失败');
@@ -2819,14 +2791,15 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                       setCreatingSpace(false);
                     }
                   }}
-                  disabled={creatingSpace || !newSpaceName.trim()}
+                  disabled={creatingSpace || !newSpaceName.trim() || !newSpaceAdminId}
                   className="px-5 py-2.5 bg-[#0071E3] text-white rounded-full text-sm font-medium hover:bg-[#0062CC] transition shadow-sm disabled:opacity-40"
                 >{creatingSpace ? '创建中...' : '创建应用'}</button>
               </div>
             </div>
           </div>
         </ModalPortal>
-      )}
+        );
+      })()}
 
     </div>
   );

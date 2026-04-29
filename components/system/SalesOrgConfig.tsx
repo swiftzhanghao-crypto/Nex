@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { Search, ChevronLeft, ChevronRight, X, Building2, AlertCircle } from 'lucide-react';
+import { Search, X, Building2, AlertCircle } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
+import Pagination from '../common/Pagination';
 
 interface SalesOrg {
   id: string;
@@ -89,7 +90,6 @@ const SalesOrgConfig: React.FC = () => {
     });
   }, [orgs, searchTerm, filterType, filterStatus]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pagedData = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize]);
 
   const pendingCount = orgs.filter(o => o.status === '待补充').length;
@@ -212,49 +212,14 @@ const SalesOrgConfig: React.FC = () => {
           </tbody>
         </table>
 
-        {/* Pagination */}
         {filtered.length > 0 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-white/5">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              共 <span className="text-blue-600 dark:text-blue-400 font-bold">{filtered.length}</span> 条
-            </span>
-            <div className="flex items-center gap-1.5">
-              <select
-                value={pageSize}
-                onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-                className="h-7 px-1.5 border border-gray-200 dark:border-white/10 rounded text-xs bg-transparent text-gray-600 dark:text-gray-400 outline-none"
-              >
-                <option value={20}>20条/页</option>
-                <option value={50}>50条/页</option>
-                <option value={100}>100条/页</option>
-              </select>
-              <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="w-7 h-7 flex items-center justify-center rounded border border-gray-200 dark:border-white/10 text-gray-500 disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-white/5 transition">
-                <ChevronLeft className="w-3.5 h-3.5"/>
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                <button key={p} onClick={() => setPage(p)} className={`w-7 h-7 flex items-center justify-center rounded text-xs font-medium transition ${page === p ? 'bg-blue-600 text-white' : 'border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5'}`}>
-                  {p}
-                </button>
-              ))}
-              <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="w-7 h-7 flex items-center justify-center rounded border border-gray-200 dark:border-white/10 text-gray-500 disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-white/5 transition">
-                <ChevronRight className="w-3.5 h-3.5"/>
-              </button>
-              <span className="text-xs text-gray-400 ml-2">前往</span>
-              <input
-                type="number"
-                min={1}
-                max={totalPages}
-                className="w-10 h-7 border border-gray-200 dark:border-white/10 rounded text-xs text-center bg-transparent text-gray-700 dark:text-gray-300"
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    const v = parseInt((e.target as HTMLInputElement).value);
-                    if (v >= 1 && v <= totalPages) setPage(v);
-                  }
-                }}
-              />
-              <span className="text-xs text-gray-400">页</span>
-            </div>
-          </div>
+          <Pagination
+            page={page}
+            size={pageSize}
+            total={filtered.length}
+            onPageChange={setPage}
+            onSizeChange={s => { setPageSize(s); setPage(1); }}
+          />
         )}
       </div>
 

@@ -33,6 +33,7 @@ export function useProductCascade(products: Product[]) {
   const [tempPurchaseNature, setTempPurchaseNature] = useState<PurchaseNature>('New');
   const [tempPurchaseNature365, setTempPurchaseNature365] = useState<PurchaseNature>('New');
   const [tempSubUnitMode, setTempSubUnitMode] = useState<SubUnitAuthMode>('none');
+  const [tempEcoProductName, setTempEcoProductName] = useState('');
 
   const categoryTree = useMemo(() => {
     const onShelf = products.filter(p => p.status === 'OnShelf');
@@ -95,6 +96,7 @@ export function useProductCascade(products: Product[]) {
     setTempPkgCpu('');
     setTempPkgOs('');
     setTempPkgLink('');
+    setTempEcoProductName('');
     if (tempProductId) {
       const prod = products.find(p => p.id === tempProductId);
       const activeSkus = prod?.skus.filter(s => s.status === 'Active') || [];
@@ -170,6 +172,8 @@ export function useProductCascade(products: Product[]) {
     setTempPurchaseNature365,
     tempSubUnitMode,
     setTempSubUnitMode,
+    tempEcoProductName,
+    setTempEcoProductName,
     categoryTree,
     selectedCategoryLabel,
     selectedProduct,

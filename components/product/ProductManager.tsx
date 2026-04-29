@@ -5,6 +5,7 @@ import { Plus, Search, Sparkles, Loader2, X, Key, Package as PackageIcon, Rotate
 import { generateProductDescription, suggestCategory } from '../../services/geminiService';
 import { useNavigate } from 'react-router-dom';
 import ModalPortal from '../common/ModalPortal';
+import Pagination from '../common/Pagination';
 import { useAppContext } from '../../contexts/AppContext';
 
 const tabPermissionMap: Record<string, string> = {
@@ -553,41 +554,28 @@ const ProductManager: React.FC = () => {
 
           {/* Shared Pagination */}
           <div className="flex justify-between items-center px-5 py-3 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5">
-              <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">共 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF]">{filteredItems.length}</span> 条</span>
-                  {activeTab === 'SPU' && (
-                      <button
-                          onClick={handleCopyTable}
-                          className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border transition ${
-                              tableCopied
-                                  ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
-                                  : 'bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/10'
-                          }`}
-                          title="复制当前页表格数据（可粘贴到 Excel）"
-                      >
-                          {tableCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                          {tableCopied ? '已复制' : '复制表格'}
-                      </button>
-                  )}
-              </div>
-              <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">每页</span>
-                      <select
-                          value={itemsPerPage}
-                          onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                          className="unified-card h-7 pl-2 pr-6 text-xs font-medium text-gray-700 dark:text-gray-200 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 outline-none appearance-none cursor-pointer transition"
-                          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
-                      >
-                          {[20, 50, 100].map(n => <option key={n} value={n}>{n} 条</option>)}
-                      </select>
-                  </div>
-                  <span className="text-xs text-gray-400 dark:text-gray-500">第 {safePage} / {totalPages} 页</span>
-                  <div className="flex items-center gap-1.5">
-                      <button onClick={() => setCurrentPage(p => p - 1)} disabled={safePage === 1} className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium transition disabled:cursor-not-allowed">上一页</button>
-                      <button onClick={() => setCurrentPage(p => p + 1)} disabled={safePage === totalPages} className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium transition disabled:cursor-not-allowed">下一页</button>
-                  </div>
-              </div>
+              {activeTab === 'SPU' ? (
+                  <button
+                      onClick={handleCopyTable}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border transition ${
+                          tableCopied
+                              ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
+                              : 'bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/10'
+                      }`}
+                      title="复制当前页表格数据（可粘贴到 Excel）"
+                  >
+                      {tableCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                      {tableCopied ? '已复制' : '复制表格'}
+                  </button>
+              ) : <span />}
+              <Pagination
+                  page={safePage}
+                  size={itemsPerPage}
+                  total={filteredItems.length}
+                  onPageChange={setCurrentPage}
+                  onSizeChange={s => { setItemsPerPage(s); setCurrentPage(1); }}
+                  className="flex items-center gap-3"
+              />
           </div>
       </div>
 

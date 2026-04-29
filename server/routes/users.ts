@@ -2,19 +2,13 @@ import { Router } from 'express';
 import { getDb } from '../db.ts';
 import { authMiddleware, requireSelfOrRole, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
+import { parseRoles, getUserName, safePagination, safeJsonParse } from '../utils.ts';
+
+// 重新导出 parseRoles 以兼容老的 import 路径（如 server/routes/auth.ts）
+export { parseRoles };
 
 const router = Router();
 router.use(authMiddleware);
-
-/** 兼容旧格式：DB 列原为 'Admin'，新格式为 '["Admin","Sales"]' */
-export function parseRoles(raw: string | null): string[] {
-  if (!raw) return [];
-  const s = raw.trim();
-  if (s.startsWith('[')) {
-    try { return JSON.parse(s) as string[]; } catch { return [s]; }
-  }
-  return [s];
-}
 
 function toUser(row: any) {
   return {
@@ -24,17 +18,6 @@ function toUser(row: any) {
     avatar: row.avatar, departmentId: row.department_id,
     monthBadge: row.month_badge,
   };
-}
-
-function getUserName(db: any, userId: string): string {
-  const row = db.prepare('SELECT name FROM users WHERE id = ?').get(userId) as any;
-  return row?.name || '';
-}
-
-function safePagination(page: string, size: string) {
-  const pageNum = Math.max(1, parseInt(page) || 1);
-  const limit = Math.min(Math.max(1, parseInt(size) || 50), 200);
-  return { limit, offset: (pageNum - 1) * limit, pageNum };
 }
 
 router.get('/', checkPermission('user', 'list'), (req, res) => {
@@ -57,10 +40,32 @@ router.get('/', checkPermission('user', 'list'), (req, res) => {
   const total = totalRow?.c ?? 0;
 
   const { limit, offset, pageNum } = safePagination(page, size);
-  const rows = db.prepare(`SELECT * FROM users${whereSql} ORDER BY name LIMIT ? OFFSET ?`)
+  const rows = db.prepare(`SELECT * FROM users${whereSql} ORDER BY sort_order ASC, rowid ASC LIMIT ? OFFSET ?`)
     .all(...params, limit, offset);
 
   res.json({ data: rows.map(toUser), total, page: pageNum, size: limit });
+});
+
+router.put('/order', checkPermission('user', 'update'), (req: AuthRequest, res) => {
+  const db = getDb();
+  const { orderedIds } = req.body as { orderedIds?: unknown };
+  if (!Array.isArray(orderedIds) || orderedIds.some((id) => typeof id !== 'string')) {
+    res.status(400).json({ error: 'orderedIds 必须为字符串数组' });
+    return;
+  }
+  const update = db.prepare('UPDATE users SET sort_order = ? WHERE id = ?');
+  const tx = db.transaction((ids: string[]) => {
+    ids.forEach((id, idx) => update.run(idx, id));
+  });
+  try {
+    tx(orderedIds as string[]);
+    const userName = getUserName(db, req.user!.userId);
+    db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(req.user!.userId, userName, 'REORDER', 'User', '-', `重排用户顺序`);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: '保存用户顺序失败' });
+  }
 });
 
 router.get('/meta/departments', (_req, res) => {
@@ -126,34 +131,29 @@ router.put('/:id', requireSelfOrRole('Admin'), (req: AuthRequest, res) => {
     `).run(name, email, phone ?? null, rolesVal ?? '["Sales"]', userType ?? 'Internal', status ?? 'Active', departmentId ?? null, req.params.id);
   }
   const row = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+  if (!row) { res.status(404).json({ error: '用户不存在' }); return; }
   res.json(toUser(row));
 });
 
 // --- Roles ---
-function safeJsonParse(str: string | null | undefined, fallback: any = {}) {
-  if (!str) return fallback;
-  try { return JSON.parse(str); }
-  catch { return fallback; }
-}
-
 function roleRowToClient(row: any) {
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    permissions: safeJsonParse(row.permissions, []),
+    permissions: safeJsonParse<string[]>(row.permissions, []),
     isSystem: !!row.is_system,
-    rowPermissions: safeJsonParse(row.row_permissions, []),
-    rowLogic: safeJsonParse(row.row_logic, {}),
-    columnPermissions: safeJsonParse(row.column_permissions, []),
-    appPermissions: safeJsonParse(row.app_permissions, {}),
+    rowPermissions: safeJsonParse<unknown[]>(row.row_permissions, []),
+    rowLogic: safeJsonParse<Record<string, unknown>>(row.row_logic, {}),
+    columnPermissions: safeJsonParse<unknown[]>(row.column_permissions, []),
+    appPermissions: safeJsonParse<Record<string, unknown>>(row.app_permissions, {}),
   };
 }
 
 router.put('/meta/roles/:id', checkPermission('role', 'update'), (req: AuthRequest, res) => {
   const db = getDb();
   const { name, description, permissions, rowPermissions, rowLogic, columnPermissions, appPermissions } = req.body;
-  db.prepare(`UPDATE roles SET name=?, description=?, permissions=?, row_permissions=?, row_logic=?, column_permissions=?, app_permissions=? WHERE id=?`)
+  const result = db.prepare(`UPDATE roles SET name=?, description=?, permissions=?, row_permissions=?, row_logic=?, column_permissions=?, app_permissions=? WHERE id=?`)
     .run(
       name,
       description,
@@ -164,12 +164,18 @@ router.put('/meta/roles/:id', checkPermission('role', 'update'), (req: AuthReque
       JSON.stringify(appPermissions ?? {}),
       req.params.id,
     );
+  if (result.changes === 0) {
+    res.status(404).json({ error: '角色不存在' });
+    return;
+  }
 
   const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, userName, 'UPDATE', 'Role', req.params.id, `更新角色 ${name}`);
 
-  res.json({ ok: true });
+  // 与 POST/COPY 及空间角色 PUT 一致：返回服务端规范化后的完整对象，方便客户端直接同步
+  const row = db.prepare('SELECT * FROM roles WHERE id = ?').get(req.params.id) as any;
+  res.json(roleRowToClient(row));
 });
 
 router.post('/meta/roles', checkPermission('role', 'create'), (req: AuthRequest, res) => {
@@ -217,7 +223,7 @@ router.delete('/meta/roles/:id', checkPermission('role', 'delete'), (req: AuthRe
   const db = getDb();
   const role = db.prepare('SELECT * FROM roles WHERE id = ?').get(req.params.id) as any;
   if (!role) { res.status(404).json({ error: '角色不存在' }); return; }
-  if (role.is_system) { res.status(400).json({ error: '系统内置角色不可删除' }); return; }
+  if (req.params.id === 'Admin') { res.status(400).json({ error: '管理员角色不可删除' }); return; }
 
   const userCount = db.prepare("SELECT COUNT(*) as n FROM users WHERE role = ? OR role LIKE '%\"' || ? || '\"%'").get(req.params.id, req.params.id) as { n: number };
   if (userCount.n > 0) { res.status(400).json({ error: '该角色下仍有用户，无法删除' }); return; }

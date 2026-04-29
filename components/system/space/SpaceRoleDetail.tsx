@@ -10,6 +10,8 @@ import { useFunctionalPermissions } from '../userManager/useFunctionalPermission
 import type { PermGroup } from '../permissionConfig';
 import { getSubgroupPermIds } from '../permissionConfig';
 import ModalPortal from '../../common/ModalPortal';
+import PermissionReadonlyTree from '../../common/PermissionReadonlyTree';
+import { RowPermResourceBlock, ColPermResourceBlock } from '../../common/RowPermReadonly';
 
 /* ── 维度值多选下拉 ── */
 const DimensionDropdown: React.FC<{
@@ -876,34 +878,11 @@ const SpaceRoleDetail: React.FC<Props> = ({
                     {space.resourceConfig.map(res => {
                       const rules = role?.rowPermissions?.filter(r => r.resource === res.id) || [];
                       if (rules.length === 0) return null;
-                      return (
-                        <div key={res.id} className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
-                          <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50/60 dark:bg-amber-900/10">
-                            <Database className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                            <span className="font-bold text-sm text-gray-800 dark:text-gray-100">{res.label}</span>
-                            <span className="text-xs text-amber-500 ml-auto">{rules.length} 条规则</span>
-                          </div>
-                          <div className="bg-white dark:bg-[#1C1C1E]">
-                            {rules.map(rule => {
-                              const dimCfg = res.dimensions.find(d => d.id === rule.dimension);
-                              const getValLabel = (v: string) => dimCfg?.options?.find(o => o.value === v)?.label || v;
-                              return (
-                                <div key={rule.id} className="flex items-center gap-3 px-4 py-2.5">
-                                  <span className="text-xs font-bold text-gray-500 min-w-[64px]">{dimCfg?.label || rule.dimension}</span>
-                                  <span className="text-xs font-medium text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded">{rule.operator === 'contains' ? '包含' : '等于'}</span>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {rule.values.length > 0 ? rule.values.map(v => (
-                                      <span key={v} className="px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 text-xs font-medium border border-amber-100 dark:border-amber-800/30">{getValLabel(v)}</span>
-                                    )) : (
-                                      <span className="text-xs text-gray-400 italic">未指定值</span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
+                      const getValLabel = (dim: string, v: string) => {
+                        const d = res.dimensions.find(dd => dd.id === dim);
+                        return d?.options?.find(o => o.value === v)?.label || v;
+                      };
+                      return <RowPermResourceBlock key={res.id} resCfg={res} rules={rules} logic={role?.rowLogic} getValLabel={getValLabel} />;
                     })}
                   </div>
                 )}
@@ -918,29 +897,7 @@ const SpaceRoleDetail: React.FC<Props> = ({
                     {space.columnConfig.map(res => {
                       const rule = role?.columnPermissions?.find(r => r.resource === res.id);
                       if (!rule) return null;
-                      return (
-                        <div key={res.id} className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
-                          <div className="flex items-center gap-2 px-4 py-2.5 bg-purple-50/50 dark:bg-purple-900/10">
-                            <Columns className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                            <span className="font-bold text-sm text-gray-800 dark:text-gray-100">{res.label}</span>
-                            <span className="text-xs text-purple-500 ml-auto">{rule.allowedColumns?.length || 0}/{res.columns.length} 列可见</span>
-                          </div>
-                          <div className="p-3 space-y-2">
-                            {res.columns.map(col => {
-                              const allowed = rule.allowedColumns?.includes(col.id);
-                              return (
-                                <div key={col.id} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border ${allowed ? 'bg-purple-50 dark:bg-purple-900/15 border-purple-200 dark:border-purple-800/40' : 'bg-gray-50 dark:bg-white/[0.02] border-gray-100 dark:border-white/10'}`}>
-                                  <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${allowed ? 'bg-purple-500 border-purple-500' : 'border-gray-300 dark:border-gray-600'}`}>
-                                    {allowed && <Check className="w-2.5 h-2.5 text-white" />}
-                                  </div>
-                                  <span className={`text-sm font-medium ${allowed ? 'text-purple-700 dark:text-purple-300' : 'text-gray-400 dark:text-gray-500 line-through'}`}>{col.label}</span>
-                                  {allowed && <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-500 dark:text-purple-400 font-bold">可见</span>}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
+                      return <ColPermResourceBlock key={res.id} colCfg={res} rule={rule} />;
                     })}
                   </div>
                 ) : (
@@ -1021,82 +978,17 @@ const SpaceRoleDetail: React.FC<Props> = ({
 export default SpaceRoleDetail;
 
 // =========================================================================
-// 功能权限只读视图
+// 功能权限只读视图（薄包装：复用通用 PermissionReadonlyTree，保留外部 API 兼容）
 // =========================================================================
 const ViewFunctionalPerms: React.FC<{
   tree: PermGroup[]; perms: string[];
-  allPermsInSubgroup: (sg: any) => string[];
-  allPermsInGroup: (g: any) => string[];
-  allPermsInCategory: (cat: any) => string[];
-  getCheckState: (ids: string[], current: string[]) => 'all' | 'some' | 'none';
-}> = ({ tree, perms, allPermsInSubgroup, allPermsInGroup, allPermsInCategory, getCheckState }) => {
-  if (perms.length === 0) {
-    return (
-      <div className="text-center py-10 text-gray-400 text-sm border border-dashed border-gray-200 dark:border-white/10 rounded-lg animate-fade-in">
-        <CheckSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
-        暂未配置任何功能权限
-      </div>
-    );
-  }
-  return (
-    <div className="animate-fade-in border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden bg-white dark:bg-[#1C1C1E]">
-      {tree.map((group, gIdx) => {
-        const groupPerms = allPermsInGroup(group);
-        const groupState = getCheckState(groupPerms, perms);
-        if (groupState === 'none') return null;
-        return (
-          <div key={group.id} className={gIdx > 0 ? 'border-t border-gray-100 dark:border-white/10' : ''}>
-            <div className="flex items-center gap-2.5 px-4 py-2 bg-blue-50/50 dark:bg-blue-900/10">
-              <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${groupState === 'all' ? 'bg-blue-600 border-blue-600' : 'bg-blue-400/60 border-blue-400'}`}><Check className="w-2.5 h-2.5 text-white" /></div>
-              <span className="font-bold text-sm text-gray-800 dark:text-gray-100">{group.label}</span>
-              <span className="text-[11px] text-blue-500 ml-auto font-mono">{groupPerms.filter(id => perms.includes(id)).length}/{groupPerms.length}</span>
-            </div>
-            {group.subgroups.map(sg => {
-              const sgPerms = allPermsInSubgroup(sg);
-              const sgState = getCheckState(sgPerms, perms);
-              if (sgState === 'none') return null;
-              return (
-                <div key={sg.id}>
-                  <div className="flex items-center gap-2.5 py-1.5 pr-4" style={{ paddingLeft: 36 }}>
-                    <div className="w-px h-4 bg-gray-200 dark:bg-white/10 -ml-[1px] mr-1 shrink-0" />
-                    <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${sgState === 'all' ? 'bg-blue-600 border-blue-600' : 'bg-blue-400/60 border-blue-400'}`}><Check className="w-2 h-2 text-white" /></div>
-                    <span className="text-[13px] font-semibold text-gray-700 dark:text-gray-300">{sg.label}</span>
-                    <span className="text-[11px] text-gray-400 font-mono">{sgPerms.filter(id => perms.includes(id)).length}/{sgPerms.length}</span>
-                  </div>
-                  {sg.categories && sg.categories.map(cat => {
-                    const catIds = allPermsInCategory(cat);
-                    const catState = getCheckState(catIds, perms);
-                    if (catState === 'none') return null;
-                    return (
-                      <div key={cat.id}>
-                        <div className="flex items-center gap-2 py-1 pr-4" style={{ paddingLeft: 56 }}>
-                          <div className="w-px h-3 bg-gray-200 dark:bg-white/10 -ml-[1px] mr-0.5 shrink-0" />
-                          <div className={`w-2.5 h-2.5 rounded border flex items-center justify-center shrink-0 ${catState === 'all' ? 'bg-blue-600 border-blue-600' : 'bg-blue-400/60 border-blue-400'}`}><Check className="w-1.5 h-1.5 text-white" /></div>
-                          <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">{cat.label}</span>
-                        </div>
-                        {cat.permissions.filter(p => perms.includes(p.id)).map(perm => (
-                          <div key={perm.id} className="flex items-center gap-2.5 py-0.5 pr-4" style={{ paddingLeft: 76 }}>
-                            <div className="w-px h-3 bg-gray-200 dark:bg-white/10 -ml-[1px] mr-0.5 shrink-0" />
-                            <div className="w-3 h-3 rounded border bg-blue-600 border-blue-600 flex items-center justify-center shrink-0"><Check className="w-2 h-2 text-white" /></div>
-                            <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">{perm.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })}
-                  {!sg.categories && sg.permissions && sg.permissions.filter(p => perms.includes(p.id)).map(perm => (
-                    <div key={perm.id} className="flex items-center gap-2.5 py-1 pr-4" style={{ paddingLeft: 64 }}>
-                      <div className="w-px h-3.5 bg-gray-200 dark:bg-white/10 -ml-[1px] mr-1 shrink-0" />
-                      <div className="w-3 h-3 rounded border bg-blue-600 border-blue-600 flex items-center justify-center shrink-0"><Check className="w-2 h-2 text-white" /></div>
-                      <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">{perm.label}</span>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
-    </div>
-  );
-};
+  // 以下 helpers 当前不再使用，保留 props 以最小化调用方变更
+  allPermsInSubgroup?: (sg: any) => string[];
+  allPermsInGroup?: (g: any) => string[];
+  allPermsInCategory?: (cat: any) => string[];
+  getCheckState?: (ids: string[], current: string[]) => 'all' | 'some' | 'none';
+}> = ({ tree, perms }) => (
+  <div className="animate-fade-in">
+    <PermissionReadonlyTree tree={tree} grantedIds={perms} />
+  </div>
+);

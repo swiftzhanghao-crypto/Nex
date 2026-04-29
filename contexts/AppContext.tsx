@@ -9,9 +9,9 @@ import type {
 } from '../types';
 import { initialSpaces } from '../data/spaceSeedData';
 import {
-    filterOrdersByRowPermissions,
-    filterCustomersByRowPermissions,
-    filterProductsByRowPermissions,
+    filterOrdersByRowPermissionsMulti,
+    filterCustomersByRowPermissionsMulti,
+    filterProductsByRowPermissionsMulti,
 } from '../utils/rowPermissionFilter';
 
 import {
@@ -507,27 +507,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setError(null);
     }, [clearApiData]);
 
-    // 多角色：取用户所有平台角色定义，行权限取并集
+    // 多角色：取用户所有平台角色定义，行权限按角色取并集（任一角色可见即可见），与功能权限合并口径一致
     const currentUserRoles = useMemo(() =>
         roles.filter(r => currentUser.roles?.includes(r.id)),
         [roles, currentUser.roles]
     );
-    // 兼容：很多地方还只接受单个 RoleDefinition，取第一个（优先级最高的）
-    const currentUserRole = currentUserRoles[0] ?? undefined;
 
     const filteredOrders = useMemo(() =>
-        filterOrdersByRowPermissions(orders, currentUserRole, currentUser, users, departments),
-        [orders, currentUserRole, currentUser, users, departments]
+        filterOrdersByRowPermissionsMulti(orders, currentUserRoles, currentUser, users, departments),
+        [orders, currentUserRoles, currentUser, users, departments]
     );
 
     const filteredCustomers = useMemo(() =>
-        filterCustomersByRowPermissions(customers, currentUserRole, currentUser, users, departments),
-        [customers, currentUserRole, currentUser, users, departments]
+        filterCustomersByRowPermissionsMulti(customers, currentUserRoles, currentUser, users, departments),
+        [customers, currentUserRoles, currentUser, users, departments]
     );
 
     const filteredProducts = useMemo(() =>
-        filterProductsByRowPermissions(products, currentUserRole, currentUser, users, departments),
-        [products, currentUserRole, currentUser, users, departments]
+        filterProductsByRowPermissionsMulti(products, currentUserRoles, currentUser, users, departments),
+        [products, currentUserRoles, currentUser, users, departments]
     );
 
     const value: AppContextType = {

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, X, ChevronDown, ChevronLeft, ChevronRight, Plus, Pencil, Save } from 'lucide-react';
+import { Search, Filter, X, ChevronDown, Plus, Pencil, Save } from 'lucide-react';
 import { InstallPackageRow, INSTALL_PKG_PUBLIC_ROWS, INSTALL_PKG_PRIVATE_ROWS } from '../../data/staticData';
+import Pagination from '../common/Pagination';
 
 type PkgRow = InstallPackageRow;
 
@@ -144,20 +145,6 @@ const InstallPackageManager: React.FC = () => {
 
   const updateField = (field: keyof Omit<PkgRow, 'packageType'>, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const visiblePages = () => {
-    const pages: (number | '...')[] = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      pages.push(1);
-      if (safeCurrentPage > 3) pages.push('...');
-      for (let i = Math.max(2, safeCurrentPage - 1); i <= Math.min(totalPages - 1, safeCurrentPage + 1); i++) pages.push(i);
-      if (safeCurrentPage < totalPages - 2) pages.push('...');
-      pages.push(totalPages);
-    }
-    return pages;
   };
 
   const TABLE_COLS = ['安装包编号', '交付物编号', '交付物名称', '产品编号', '产品条线', '产品类型', '产品名称', '产品规格', '发布平台', '操作系统', 'CPU', '操作'];
@@ -372,68 +359,14 @@ const InstallPackageManager: React.FC = () => {
             </table>
           </div>
 
-          {/* Pagination */}
-          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5 shrink-0">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              共 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF] font-mono">{filtered.length}</span> 条
-            </span>
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <button
-                  onClick={() => { setPageSizeOpen(v => !v); setCpuDropOpen(false); setPlatformDropOpen(false); setOsDropOpen(false); }}
-                  className="h-7 flex items-center gap-1 px-2.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition"
-                >
-                  {pageSize}条/页 <ChevronDown className="w-3 h-3 text-gray-400" />
-                </button>
-                {pageSizeOpen && (
-                  <div className="absolute bottom-full mb-1 left-0 z-50 unified-card dark:bg-[#1C1C1E] shadow-xl min-w-[100px] py-1">
-                    {PAGE_SIZE_OPTIONS.map(s => (
-                      <button key={s} onClick={() => { setPageSize(s); setPageSizeOpen(false); setCurrentPage(1); }}
-                        className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-white/5 transition ${pageSize === s ? 'text-[#0071E3] dark:text-[#0A84FF] font-semibold' : 'text-gray-700 dark:text-gray-200'}`}>
-                        {s}条/页
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={safeCurrentPage === 1}
-                  className="h-7 w-7 flex items-center justify-center rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-500 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/5 transition disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
-                {visiblePages().map((p, i) =>
-                  p === '...' ? (
-                    <span key={`ellipsis-${i}`} className="w-7 text-center text-xs text-gray-400">…</span>
-                  ) : (
-                    <button
-                      key={p}
-                      onClick={() => setCurrentPage(p as number)}
-                      className={`h-7 min-w-[28px] px-1.5 rounded-lg text-xs font-medium transition border ${
-                        safeCurrentPage === p
-                          ? 'bg-[#0071E3] dark:bg-[#0A84FF] text-white border-[#0071E3] dark:border-[#0A84FF]'
-                          : 'border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  )
-                )}
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={safeCurrentPage === totalPages}
-                  className="h-7 w-7 flex items-center justify-center rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-500 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/5 transition disabled:cursor-not-allowed"
-                >
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <span className="text-xs text-gray-400 dark:text-gray-500">第 {safeCurrentPage} / {totalPages} 页</span>
-            </div>
-          </div>
+          <Pagination
+            page={safeCurrentPage}
+            size={pageSize}
+            total={filtered.length}
+            onPageChange={setCurrentPage}
+            onSizeChange={s => { setPageSize(s); setCurrentPage(1); }}
+            sizeOptions={PAGE_SIZE_OPTIONS}
+          />
         </div>
       </div>
 

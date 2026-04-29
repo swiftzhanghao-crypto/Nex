@@ -3,8 +3,9 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { Order, OrderStatus, OrderItem, ActivationMethod, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, DeliveryMethod, OrderDraft, ConversionOrder, CustomerContact, PurchaseNature, SubUnitAuthMode, OnlineDeliveryEntry, Subscription, SubscriptionLineProductSnapshot } from '../../types';
 import { initialConversionOrders, ALL_INSTALL_PKG_ROWS } from '../../data/staticData';
-import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Network, Globe, Radio, RefreshCcw, Wallet, Zap, Box, Settings, MapPin, Briefcase, XCircle, Search, Save, ScrollText, Phone, Mail, Users, Banknote, Calendar, Check, ChevronRight, ChevronDown, Pencil, Key, Building2, Sparkles, Upload, Download, Wrench } from 'lucide-react';
+import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Network, Globe, Radio, RefreshCcw, Wallet, Zap, Box, Settings, MapPin, Briefcase, XCircle, Search, Save, ScrollText, Phone, Mail, Users, Banknote, Calendar, Check, ChevronRight, ChevronDown, Pencil, Key, Building2, Sparkles, Upload, Download, Wrench, Tag } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
+import Pagination from '../common/Pagination';
 import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 import {
   inferOrderLinePurchaseNatureFromSubscription,
@@ -115,6 +116,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     tempPurchaseNature, setTempPurchaseNature,
     tempPurchaseNature365, setTempPurchaseNature365,
     tempSubUnitMode, setTempSubUnitMode,
+    tempEcoProductName, setTempEcoProductName,
     categoryTree, selectedCategoryLabel,
     selectedProduct, selectedSku, selectedOption,
     selectedLicenseType, selectedLicensePeriodType, showLicensePeriod,
@@ -289,6 +291,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       if (orderSource !== 'OnlineStore' && orderSource !== 'APISync' && orderSource !== 'Sales') {
         setOrderSource('Sales');
       }
+      // 自成交订单不支持下级单位授权：切换到自成交时清空配置，避免误带入
+      setTempSubUnitMode('none');
+      setTempSubUnits([]);
     }
     if (buyerType !== 'SelfDeal') {
       setEnableConversion(false);
@@ -577,8 +582,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         enterpriseId: resolvedEntId || undefined,
         enterpriseName: enterpriseName,
         capabilitiesSnapshot,
-        subUnitAuthMode: tempSubUnitMode !== 'none' ? tempSubUnitMode : undefined,
-        subUnits: tempSubUnitMode !== 'none' && tempSubUnits.length > 0 ? tempSubUnits : undefined,
+        subUnitAuthMode: (buyerType !== 'SelfDeal' && tempSubUnitMode !== 'none') ? tempSubUnitMode : undefined,
+        subUnits: (buyerType !== 'SelfDeal' && tempSubUnitMode !== 'none' && tempSubUnits.length > 0) ? tempSubUnits : undefined,
+        ecoProductName: selectedProduct.tags?.includes('生态') && tempEcoProductName ? tempEcoProductName : undefined,
     };
     if (editingItemIndex === null && tempPurchaseNature === 'New' && tempPurchaseNature365 === 'New') {
       newItem = withInferredPurchaseNature(newItem);
@@ -658,6 +664,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     setTempPurchaseNature365('New');
     setTempSubUnitMode('none');
     setTempSubUnits([]);
+    setTempEcoProductName('');
     setShowAddProductModal(false);
   };
 
@@ -698,6 +705,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setTempPurchaseNature365((item.purchaseNature365 as PurchaseNature) || 'New');
       setTempSubUnitMode((item.subUnitAuthMode as SubUnitAuthMode) || 'none');
       setTempSubUnits((item.subUnits as SubUnitLocal[]) || []);
+      setTempEcoProductName(item.ecoProductName || '');
       if (item.licensePeriod && item.licensePeriod !== '永久') {
           const match = item.licensePeriod.match(/^(\d+)(年|月|日)$/);
           if (match) {
@@ -1747,7 +1755,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                 <td className="p-3 pl-4 text-center">
                                                     <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 text-xs font-bold font-mono text-[#0071E3] dark:text-[#0A84FF]">{String(idx + 1).padStart(3, '0')}</span>
                                                 </td>
-                                                <td className="p-3"><div className="font-bold text-gray-900 dark:text-white text-sm">{item.productName}</div><div className="text-xs text-gray-500 mt-0.5">{item.skuName}</div>{rowLocked && <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">（来自订阅，不可更换产品）</div>}</td>
+                                                <td className="p-3"><div className="font-bold text-gray-900 dark:text-white text-sm">{item.productName}</div><div className="text-xs text-gray-500 mt-0.5">{item.skuName}</div>{item.ecoProductName && <div className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1"><Tag className="w-2.5 h-2.5"/>生态: {item.ecoProductName}</div>}{rowLocked && <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">（来自订阅，不可更换产品）</div>}</td>
                                                 <td className="p-3"><span className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-bold ${purchaseNatureBadgeClass((item.purchaseNature || 'New') as PurchaseNature)}`}>{purchaseNatureDisplay((item.purchaseNature || 'New') as PurchaseNature)}</span></td>
                                                 <td className="p-3"><span className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-bold ${purchaseNatureBadgeClass((item.purchaseNature365 || 'New') as PurchaseNature)}`}>{purchaseNatureDisplay((item.purchaseNature365 || 'New') as PurchaseNature)}</span></td>
                                                 <td className="p-3"><span className="text-xs bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-lg text-gray-600 dark:text-gray-300 font-medium">{item.pricingOptionName || '默认'}</span></td>
@@ -1996,9 +2004,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     <input type="number" className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm" min="1" value={tempQuantity} onChange={e => setTempQuantity(Number(e.target.value))} />
                                 </div>
 
-                                {showLicensePeriod && (
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-teal-600 uppercase flex items-center gap-1">授权/服务期限</label>
+                                    {showLicensePeriod ? (
                                     <div className="flex gap-2">
                                         <input
                                             type="number"
@@ -2018,11 +2026,15 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             <option value="日">日</option>
                                         </select>
                                     </div>
+                                    ) : (
+                                    <div className="w-full p-3 bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-900/30 rounded-xl text-sm font-medium text-teal-700 dark:text-teal-400">
+                                        永久
+                                    </div>
+                                    )}
                                 </div>
-                                )}
-                                
+
                                 <div className="space-y-2">
-                                    <label className="text-xs font-bold text-orange-500 uppercase flex items-center gap-1"><ArrowUpRight className="w-3 h-3"/> 最终单价 (可议价)</label>
+                                    <label className="text-xs font-bold text-orange-500 uppercase flex items-center gap-1"><ArrowUpRight className="w-3 h-3"/> 单价</label>
                                     <div className="relative">
                                         <input 
                                             type="number" 
@@ -2038,6 +2050,21 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 </div>
 
                                 <div className="space-y-2">
+                                    <label className="text-xs font-bold text-orange-400 uppercase flex items-center gap-1">计价单价</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            className="w-full p-3 pr-16 bg-gray-50 dark:bg-black border border-orange-100 dark:border-orange-900/20 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 transition text-sm font-medium text-orange-500"
+                                            value={negotiatedPrice !== null ? negotiatedPrice : (selectedOption?.price || selectedSku?.price || 0)}
+                                            readOnly
+                                        />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-orange-300 font-medium pointer-events-none">
+                                            {showLicensePeriod ? `元/${tempLicensePeriodUnit}` : '元'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
                                     <label className="text-xs font-bold text-red-500 uppercase flex items-center gap-1">产品金额</label>
                                     {(() => {
                                         const unitPrice = negotiatedPrice !== null ? negotiatedPrice : (selectedOption?.price || selectedSku?.price || 0);
@@ -2045,22 +2072,48 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             ? (tempLicensePeriodUnit === '年' ? Number(tempLicensePeriodNum) : tempLicensePeriodUnit === '月' ? Number(tempLicensePeriodNum) / 12 : Number(tempLicensePeriodNum) / 365)
                                             : 1;
                                         const totalAmount = unitPrice * tempQuantity * periodMultiplier;
+                                        const divisor = tempQuantity * periodMultiplier;
                                         return (
-                                            <div className="w-full p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-xl text-sm font-bold text-red-600 dark:text-red-400 text-right font-mono">
-                                                ¥{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                {showLicensePeriod && tempLicensePeriodNum ? (
-                                                    <span className="text-[10px] font-normal text-red-400 dark:text-red-500 ml-2">
-                                                        ({unitPrice.toLocaleString()} × {tempQuantity} × {tempLicensePeriodNum}{tempLicensePeriodUnit})
-                                                    </span>
-                                                ) : tempQuantity > 1 ? (
-                                                    <span className="text-[10px] font-normal text-red-400 dark:text-red-500 ml-2">
-                                                        ({unitPrice.toLocaleString()} × {tempQuantity})
-                                                    </span>
-                                                ) : null}
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    className="w-full p-3 pr-10 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-xl outline-none focus:ring-2 focus:ring-red-200 transition text-sm font-bold text-red-600 dark:text-red-400 text-right font-mono"
+                                                    value={Math.round(totalAmount * 100) / 100}
+                                                    onChange={e => {
+                                                        const val = Number(e.target.value);
+                                                        if (!isFinite(val) || divisor === 0) return;
+                                                        setNegotiatedPrice(Math.round((val / divisor) * 100) / 100);
+                                                    }}
+                                                    min="0"
+                                                    step="0.01"
+                                                />
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-red-400 font-medium pointer-events-none">¥</span>
+                                                {(showLicensePeriod && tempLicensePeriodNum ? true : tempQuantity > 1) && (
+                                                    <div className="text-[10px] font-normal text-red-400 dark:text-red-500 mt-1.5 text-right">
+                                                        反推单价: ¥{unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        {showLicensePeriod && tempLicensePeriodNum
+                                                            ? ` × ${tempQuantity} × ${tempLicensePeriodNum}${tempLicensePeriodUnit}`
+                                                            : ` × ${tempQuantity}`
+                                                        }
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })()}
                                 </div>
+
+                                {selectedProduct?.tags?.includes('生态') && (
+                                <div className="col-span-2 space-y-2">
+                                    <label className="text-xs font-bold text-emerald-600 uppercase flex items-center gap-1"><Tag className="w-3 h-3"/> 生态产品名称</label>
+                                    <input
+                                        type="text"
+                                        className="w-full p-3 bg-gray-50 dark:bg-black border border-emerald-200 dark:border-emerald-900/30 rounded-xl outline-none focus:ring-2 focus:ring-emerald-200 transition text-sm text-emerald-700 dark:text-emerald-400 placeholder:text-gray-400"
+                                        placeholder="请输入生态产品具体名称"
+                                        value={tempEcoProductName}
+                                        onChange={e => setTempEcoProductName(e.target.value)}
+                                    />
+                                </div>
+                                )}
 
                                 </div>
                             </div>
@@ -2513,15 +2566,24 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             })()}
 
                             {/* ═══ 下级单位授权 ═══ */}
+                            {(buyerType !== 'SelfDeal' && selectedProduct?.subUnitLicenseAllowed !== false) && (
                             <div className="space-y-4">
-                                <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-white/10">
-                                    <div className="flex items-center gap-2">
-                                        <Building2 className="w-4 h-4 text-indigo-500"/>
-                                        <span className="text-sm font-bold text-gray-900 dark:text-white">下级单位授权</span>
-                                    </div>
+                                <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-white/10">
+                                    <Building2 className="w-4 h-4 text-indigo-500"/>
+                                    <span className="text-sm font-bold text-gray-900 dark:text-white">下级单位授权</span>
+                                    {selectedProduct?.subUnitLicenseAllowed === true && (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 font-bold border border-green-100 dark:border-green-800">产品已启用</span>
+                                    )}
+                                </div>
+                                <div className="flex items-start gap-4 flex-wrap">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 flex items-start gap-1.5"><span className="text-blue-500 shrink-0 mt-px">ⓘ</span><span>选此方式表示由交付邮件的接收方在同一企业ID下查看一份电子授权信息（包含下级清单）；金山将交付邮件发送至线上收货"指定接收邮箱"</span></p>
+                                    <p className="text-xs text-orange-500 dark:text-orange-400 flex items-start gap-1.5 shrink-0"><span className="shrink-0 mt-px">⚠</span><span>下级单位【卖方业务联系人】需要与主订单【卖方业务联系人】保持一致，否则存在退单可能性</span></p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-xs font-bold text-gray-500 dark:text-gray-400 shrink-0">按下级单位授权</span>
                                     <select
                                         value={tempSubUnitMode}
-                                        onChange={e => { setTempSubUnitMode(e.target.value as SubUnitAuthMode); if (e.target.value === 'none') setTempSubUnits([]); }}
+                                        onChange={e => { const mode = e.target.value as SubUnitAuthMode; setTempSubUnitMode(mode); if (mode === 'none') { setTempSubUnits([]); } else if (tempSubUnits.length === 0) { setTempSubUnits([{ id: `su_${Date.now()}_0`, unitName: '', enterpriseId: '', enterpriseName: '-', authCount: '', itContact: '', phone: '', email: '', customerType: '-', industryLine: '-', sellerContact: '-' }, { id: `su_${Date.now()}_1`, unitName: '', enterpriseId: '', enterpriseName: '-', authCount: '', itContact: '', phone: '', email: '', customerType: '-', industryLine: '-', sellerContact: '-' }]); } }}
                                         className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black text-xs font-medium text-gray-700 dark:text-gray-300 outline-none focus:border-indigo-400 transition min-w-[280px]"
                                     >
                                         <option value="none">无下级单位</option>
@@ -2537,7 +2599,18 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     return (
                                     <div>
                                         <div className="px-5 py-2.5 flex items-center justify-between gap-3">
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex-1">
+                                                {hasSubData && (
+                                                    <div className={`inline-flex items-center gap-2 text-[11px] font-bold px-2.5 py-1 rounded-lg border ${matched ? 'bg-green-50 dark:bg-green-900/20 text-green-600 border-green-200' : 'bg-red-50 dark:bg-red-900/20 text-red-600 border-red-200'}`}>
+                                                        <span>合计: {subTotal}</span>
+                                                        <span className="text-gray-300">|</span>
+                                                        <span>明细数量: {tempQuantity}</span>
+                                                        <span className="text-gray-300">|</span>
+                                                        <span>{matched ? '✓ 匹配' : '✗ 不匹配'}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
                                                 <button onClick={addTempSubUnit} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition">
                                                     <Plus className="w-3 h-3"/> 新增下级单位
                                                 </button>
@@ -2548,23 +2621,18 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                     <Download className="w-3 h-3"/> 下载模板
                                                 </button>
                                             </div>
-                                            {hasSubData && (
-                                                <div className={`flex items-center gap-2 text-[11px] font-bold px-2.5 py-1 rounded-lg border ${matched ? 'bg-green-50 dark:bg-green-900/20 text-green-600 border-green-200' : 'bg-red-50 dark:bg-red-900/20 text-red-600 border-red-200'}`}>
-                                                    <span>合计: {subTotal}</span>
-                                                    <span className="text-gray-300">|</span>
-                                                    <span>明细数量: {tempQuantity}</span>
-                                                    <span className="text-gray-300">|</span>
-                                                    <span>{matched ? '✓ 匹配' : '✗ 不匹配'}</span>
-                                                </div>
-                                            )}
                                         </div>
+                                        {(() => {
+                                            const isUnifiedEid = tempSubUnitMode === 'separate_auth_unified_eid' || tempSubUnitMode === 'unified_auth_with_list';
+                                            const colCount = isUnifiedEid ? 10 : 12;
+                                            return (
                                         <div className="overflow-x-auto max-h-[260px] overflow-y-auto">
-                                            <table className="w-full text-left text-xs" style={{ minWidth: 1100 }}>
+                                            <table className="w-full text-left text-xs" style={{ minWidth: isUnifiedEid ? 900 : 1100 }}>
                                                 <thead className="sticky top-0 z-10"><tr className="bg-indigo-100/80 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300">
                                                     <th className="p-2 pl-5 w-8 text-center">#</th>
                                                     <th className="p-2 whitespace-nowrap">客户下级单位名称</th>
-                                                    <th className="p-2 whitespace-nowrap">企业ID</th>
-                                                    <th className="p-2 whitespace-nowrap">企业名称</th>
+                                                    {!isUnifiedEid && <th className="p-2 whitespace-nowrap">企业ID</th>}
+                                                    {!isUnifiedEid && <th className="p-2 whitespace-nowrap">企业名称</th>}
                                                     <th className="p-2 whitespace-nowrap">授权数量</th>
                                                     <th className="p-2 whitespace-nowrap">IT联系人</th>
                                                     <th className="p-2 whitespace-nowrap">手机</th>
@@ -2572,7 +2640,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                     <th className="p-2 whitespace-nowrap">客户类型</th>
                                                     <th className="p-2 whitespace-nowrap">行业条线</th>
                                                     <th className="p-2 whitespace-nowrap">卖方联系人</th>
-                                                    <th className="p-2 pr-5 text-center">操作</th>
+                                                    <th className="p-2 pr-5 text-center whitespace-nowrap">操作</th>
                                                 </tr></thead>
                                                 <tbody className="divide-y divide-indigo-100 dark:divide-indigo-800/20">
                                                     {tempSubUnits.map((unit, si) => (
@@ -2584,8 +2652,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                                 {customers.filter(c => c.id !== newOrderCustomer).map(c => <option key={c.id} value={c.companyName}>{c.companyName}</option>)}
                                                             </select>
                                                         </td>
-                                                        <td className="p-2">{(() => { const uc = customers.find(c => c.companyName === unit.unitName); const ents = uc?.enterprises; return ents && ents.length > 0 ? (<select value={unit.enterpriseId} onChange={e => { const ent = ents.find(en => en.id === e.target.value); updateTempSubUnit(unit.id, 'enterpriseId', e.target.value); updateTempSubUnit(unit.id, 'enterpriseName', ent?.name || '-'); }} className={`w-full min-w-[90px] px-2 py-1 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400 ${!unit.enterpriseId ? 'border-red-300' : 'border-gray-200 dark:border-white/10'}`}><option value="">选择</option>{ents.map(ent => <option key={ent.id} value={ent.id}>{ent.id} ({ent.name})</option>)}</select>) : <span className="text-[10px] text-gray-400">{unit.unitName ? '无关联企业' : '请先选择'}</span>; })()}</td>
-                                                        <td className="p-2 text-gray-500">{unit.enterpriseName}</td>
+                                                        {!isUnifiedEid && <td className="p-2">{(() => { const uc = customers.find(c => c.companyName === unit.unitName); const ents = uc?.enterprises; return ents && ents.length > 0 ? (<select value={unit.enterpriseId} onChange={e => { const ent = ents.find(en => en.id === e.target.value); updateTempSubUnit(unit.id, 'enterpriseId', e.target.value); updateTempSubUnit(unit.id, 'enterpriseName', ent?.name || '-'); }} className={`w-full min-w-[90px] px-2 py-1 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400 ${!unit.enterpriseId ? 'border-red-300' : 'border-gray-200 dark:border-white/10'}`}><option value="">选择</option>{ents.map(ent => <option key={ent.id} value={ent.id}>{ent.id} ({ent.name})</option>)}</select>) : <span className="text-[10px] text-gray-400">{unit.unitName ? '无关联企业' : '请先选择'}</span>; })()}</td>}
+                                                        {!isUnifiedEid && <td className="p-2 text-gray-500">{unit.enterpriseName}</td>}
                                                         <td className="p-2"><input type="number" min={1} value={unit.authCount} onChange={e => updateTempSubUnit(unit.id, 'authCount', e.target.value)} placeholder="数量" className={`w-full min-w-[60px] px-2 py-1 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400 ${!unit.authCount ? 'border-red-300' : 'border-gray-200 dark:border-white/10'}`}/></td>
                                                         <td className="p-2"><input value={unit.itContact} onChange={e => updateTempSubUnit(unit.id, 'itContact', e.target.value)} placeholder="联系人" className="w-full min-w-[80px] px-2 py-1 border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400"/></td>
                                                         <td className="p-2"><input value={unit.phone} onChange={e => updateTempSubUnit(unit.id, 'phone', e.target.value)} placeholder="手机号" className="w-full min-w-[90px] px-2 py-1 border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400"/></td>
@@ -2593,17 +2661,20 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                         <td className="p-2 text-gray-400 whitespace-nowrap">{unit.customerType}</td>
                                                         <td className="p-2 text-gray-400 whitespace-nowrap">{unit.industryLine}</td>
                                                         <td className="p-2 text-gray-400 whitespace-nowrap">{unit.sellerContact}</td>
-                                                        <td className="p-2 pr-5 text-center"><button onClick={() => removeTempSubUnit(unit.id)} className="text-red-500 hover:text-red-700 text-xs font-bold hover:underline">删除</button></td>
+                                                        <td className="p-2 pr-5 text-center whitespace-nowrap"><button onClick={() => removeTempSubUnit(unit.id)} className="text-red-500 hover:text-red-700 text-xs font-bold hover:underline">删除</button></td>
                                                     </tr>
                                                     ))}
-                                                    {tempSubUnits.length === 0 && <tr><td colSpan={12} className="px-3 py-6 text-center text-gray-400 text-xs">暂无下级单位，请点击"新增下级单位"或"批量导入"添加</td></tr>}
+                                                    {tempSubUnits.length === 0 && <tr><td colSpan={colCount} className="px-3 py-6 text-center text-gray-400 text-xs">暂无下级单位，请点击"新增下级单位"或"批量导入"添加</td></tr>}
                                                 </tbody>
                                             </table>
                                         </div>
+                                            );
+                                        })()}
                                     </div>
                                     );
                                 })()}
                             </div>
+                            )}
                             <input ref={tempSubUnitImportRef} type="file" accept=".csv,.txt" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleTempSubUnitImport(f); e.target.value = ''; }} />
 
                             </div>
@@ -3333,8 +3404,6 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         APPROVED: 'unified-tag-green !rounded-full',
                                         REJECTED: 'unified-tag-red !rounded-full',
                                     };
-                                    const totalFiltered = filtered.length;
-                                    const totalPages = Math.ceil(totalFiltered / CONTRACT_PAGE_SIZE);
                                     const paginated = filtered.slice((contractPickerPage - 1) * CONTRACT_PAGE_SIZE, contractPickerPage * CONTRACT_PAGE_SIZE);
                                     return paginated.map(c => {
                                         const isSelected = linkedContractIds.includes(c.id);
@@ -3398,51 +3467,15 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             const totalFiltered = contracts.filter(c =>
                                 !q || c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || (c.partyA || '').toLowerCase().includes(q) || (c.partyB || '').toLowerCase().includes(q)
                             ).length;
-                            const totalPages = Math.ceil(totalFiltered / CONTRACT_PAGE_SIZE);
-                            if (totalPages <= 1) return null;
+                            if (totalFiltered <= CONTRACT_PAGE_SIZE) return null;
                             return (
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs text-gray-400">共 {totalFiltered} 条</span>
-                                    <button
-                                        onClick={() => setContractPickerPage(p => Math.max(1, p - 1))}
-                                        disabled={contractPickerPage <= 1}
-                                        className="px-2.5 py-1 text-xs font-medium rounded-lg border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
-                                    >
-                                        上一页
-                                    </button>
-                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
-                                        .filter(p => p === 1 || p === totalPages || Math.abs(p - contractPickerPage) <= 2)
-                                        .reduce<(number | '...')[]>((acc, p, idx, arr) => {
-                                            if (idx > 0 && p - (arr[idx - 1]) > 1) acc.push('...');
-                                            acc.push(p);
-                                            return acc;
-                                        }, [])
-                                        .map((p, i) =>
-                                            p === '...' ? (
-                                                <span key={`e${i}`} className="text-xs text-gray-400 px-1">…</span>
-                                            ) : (
-                                                <button
-                                                    key={p}
-                                                    onClick={() => setContractPickerPage(p)}
-                                                    className={`w-7 h-7 text-xs font-bold rounded-lg transition ${
-                                                        contractPickerPage === p
-                                                            ? 'bg-[#0071E3] text-white shadow'
-                                                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'
-                                                    }`}
-                                                >
-                                                    {p}
-                                                </button>
-                                            )
-                                        )
-                                    }
-                                    <button
-                                        onClick={() => setContractPickerPage(p => Math.min(totalPages, p + 1))}
-                                        disabled={contractPickerPage >= totalPages}
-                                        className="px-2.5 py-1 text-xs font-medium rounded-lg border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
-                                    >
-                                        下一页
-                                    </button>
-                                </div>
+                                <Pagination
+                                    page={contractPickerPage}
+                                    size={CONTRACT_PAGE_SIZE}
+                                    total={totalFiltered}
+                                    onPageChange={setContractPickerPage}
+                                    className="flex items-center gap-3"
+                                />
                             );
                         })()}
                         <button

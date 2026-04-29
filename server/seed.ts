@@ -13,6 +13,7 @@ import {
   generateSubscriptionChainOrders,
 } from '../data/generators.ts';
 import { hashPassword } from './auth.ts';
+import { safeJsonParse, sanitizeOrderItemsSubUnits } from './utils.ts';
 
 function hash(password: string): string {
   return hashPassword(password);
@@ -54,19 +55,64 @@ function ensureSpaceSeedData(db: any) {
     );
   }
 
-  // 默认把一个 Admin 加为 SAB 应用管理员（幂等）
-  const sabSpace = initialSpaces.find(s => s.id === 'space_sab_insight') || initialSpaces[0];
-  const sabAdminRole = initialSpaceRoles.find(r => r.spaceId === sabSpace?.id && r.id === 'sr_sab_admin');
-  if (sabSpace && sabAdminRole) {
-    const adminUser = db.prepare(`SELECT id FROM users WHERE role = 'Admin' ORDER BY rowid ASC LIMIT 1`).get() as { id?: string } | undefined;
-    if (adminUser?.id) {
-      const existing = db.prepare(`SELECT id FROM space_members WHERE space_id = ? AND user_id = ?`).get(sabSpace.id, adminUser.id) as { id?: string } | undefined;
-      if (!existing) {
-        db.prepare(`
-          INSERT INTO space_members (id, space_id, user_id, role_id, is_admin)
-          VALUES (?, ?, ?, ?, ?)
-        `).run(`sm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, sabSpace.id, adminUser.id, sabAdminRole.id, 1);
-      }
+  // 为每个 Space 分配成员（幂等）
+  const insertMember = db.prepare(`
+    INSERT OR IGNORE INTO space_members (id, space_id, user_id, role_id, is_admin)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  const memberExists = db.prepare(`SELECT id FROM space_members WHERE space_id = ? AND user_id = ?`);
+
+  const allDbUsers = db.prepare(`SELECT id, role FROM users`).all() as Array<{ id: string; role: string }>;
+  const parseRole = (r: string): string[] => { try { return JSON.parse(r); } catch { return [r]; } };
+
+  const addMember = (spaceId: string, userId: string, roleId: string, isAdmin: number) => {
+    if (memberExists.get(spaceId, userId)) return;
+    insertMember.run(`sm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, spaceId, userId, roleId, isAdmin);
+  };
+
+  // --- SAB 客户洞察成员 ---
+  const sabRoles = initialSpaceRoles.filter(r => r.spaceId === 'space_sab_insight');
+  const sabAdmin = sabRoles.find(r => r.id === 'sr_sab_admin');
+  const sabAnalyst = sabRoles.find(r => r.id === 'sr_sab_analyst');
+  const sabSales = sabRoles.find(r => r.id === 'sr_sab_sales');
+  const sabDataOps = sabRoles.find(r => r.id === 'sr_sab_data_ops');
+  const sabViewer = sabRoles.find(r => r.id === 'sr_sab_viewer');
+
+  for (const u of allDbUsers) {
+    const roles = parseRole(u.role);
+    if (roles.includes('Admin') && sabAdmin) {
+      addMember('space_sab_insight', u.id, sabAdmin.id, 1);
+    } else if (roles.includes('Sales') && sabAnalyst) {
+      addMember('space_sab_insight', u.id, sabAnalyst.id, 0);
+    } else if ((roles.includes('SalesRep') || roles.includes('sales-rep')) && sabSales) {
+      addMember('space_sab_insight', u.id, sabSales.id, 0);
+    } else if (roles.includes('Business') && sabDataOps) {
+      addMember('space_sab_insight', u.id, sabDataOps.id, 0);
+    } else if ((roles.includes('ChannelManager') || roles.includes('channel-mgr')) && sabViewer) {
+      addMember('space_sab_insight', u.id, sabViewer.id, 0);
+    }
+  }
+
+  // --- 线索中台成员 ---
+  const leadRoles = initialSpaceRoles.filter(r => r.spaceId === 'space_lead_hub');
+  const leadAdmin = leadRoles.find(r => r.id === 'sr_lead_admin');
+  const leadOps = leadRoles.find(r => r.id === 'sr_lead_ops');
+  const leadSales = leadRoles.find(r => r.id === 'sr_lead_sales');
+  const leadMarketing = leadRoles.find(r => r.id === 'sr_lead_marketing');
+  const leadViewer = leadRoles.find(r => r.id === 'sr_lead_viewer');
+
+  for (const u of allDbUsers) {
+    const roles = parseRole(u.role);
+    if (roles.includes('Admin') && leadAdmin) {
+      addMember('space_lead_hub', u.id, leadAdmin.id, 1);
+    } else if (roles.includes('Sales') && leadOps) {
+      addMember('space_lead_hub', u.id, leadOps.id, 0);
+    } else if ((roles.includes('SalesRep') || roles.includes('sales-rep')) && leadSales) {
+      addMember('space_lead_hub', u.id, leadSales.id, 0);
+    } else if ((roles.includes('ProductManager') || roles.includes('product-mgr')) && leadMarketing) {
+      addMember('space_lead_hub', u.id, leadMarketing.id, 0);
+    } else if ((roles.includes('ChannelManager') || roles.includes('channel-mgr') || roles.includes('Business')) && leadViewer) {
+      addMember('space_lead_hub', u.id, leadViewer.id, 0);
     }
   }
 }
@@ -100,6 +146,58 @@ function migrateSpaceTextToApp(db: any) {
   }
   if (total > 0) {
     console.log(`[seed] Migrated "空间" → "应用" text in ${total} record(s).`);
+  }
+}
+
+function migrateSpaceAdminRoleName(db: any) {
+  const r = db.prepare(
+    "UPDATE space_roles SET name = '应用管理员' WHERE sort_order = 0 AND name != '应用管理员'"
+  ).run();
+  if (r.changes > 0) {
+    console.log(`[seed] Renamed ${r.changes} first role(s) to "应用管理员".`);
+  }
+}
+
+function migrateOrdersRemoveSubUnitsWhenMultiItems(db: any) {
+  const rows = db.prepare("SELECT id, items FROM orders WHERE items LIKE '%subUnits%' OR items LIKE '%subUnitAuthMode%'").all() as Array<{ id: string; items: string }>;
+  if (rows.length === 0) return;
+
+  const update = db.prepare('UPDATE orders SET items = ?, updated_at=datetime(\'now\') WHERE id = ?');
+  let changed = 0;
+
+  for (const r of rows) {
+    const rawItems = safeJsonParse(r.items, []);
+    if (!Array.isArray(rawItems) || rawItems.length <= 1) continue;
+    const cleaned = sanitizeOrderItemsSubUnits(rawItems);
+    if (cleaned === rawItems) continue;
+    update.run(JSON.stringify(cleaned), r.id);
+    changed++;
+  }
+
+  if (changed > 0) {
+    console.log(`[seed] Cleaned sub-unit auth fields for ${changed} multi-item order(s).`);
+  }
+}
+
+function migrateOrdersRemoveSubUnitsForSelfDeal(db: any) {
+  const rows = db.prepare(
+    "SELECT id, items FROM orders WHERE buyer_type = 'SelfDeal' AND (items LIKE '%subUnits%' OR items LIKE '%subUnitAuthMode%')"
+  ).all() as Array<{ id: string; items: string }>;
+  if (rows.length === 0) return;
+
+  const update = db.prepare('UPDATE orders SET items = ?, updated_at=datetime(\'now\') WHERE id = ?');
+  let changed = 0;
+
+  for (const r of rows) {
+    const rawItems = safeJsonParse(r.items, []);
+    const cleaned = sanitizeOrderItemsSubUnits(rawItems, 'SelfDeal');
+    if (cleaned === rawItems) continue;
+    update.run(JSON.stringify(cleaned), r.id);
+    changed++;
+  }
+
+  if (changed > 0) {
+    console.log(`[seed] Cleaned sub-unit auth fields for ${changed} SelfDeal order(s).`);
   }
 }
 
@@ -168,6 +266,9 @@ export function seedDatabase() {
     ensureSpaceSeedData(db);
     migrateRolesToArray(db);
     migrateSpaceTextToApp(db);
+    migrateSpaceAdminRoleName(db);
+    migrateOrdersRemoveSubUnitsWhenMultiItems(db);
+    migrateOrdersRemoveSubUnitsForSelfDeal(db);
     ensureSubscriptionChainOrders(db);
     console.log('[seed] Database already has data, skipping seed.');
     return;

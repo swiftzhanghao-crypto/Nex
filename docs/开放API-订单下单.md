@@ -182,6 +182,80 @@ POST /v1/orders
 
 **快照策略**：`productName`、`skuName`、`capabilitiesSnapshot` 等展示字段建议**仅由服务端在落库时从主数据生成**，外部请求不必传；若传入则可用于**对账校验**（与主数据不一致时返回 `422`）。
 
+#### 3.2.12 下级单位授权 `items[].subUnits`（数组，可选）
+
+当订单行需要将席位/授权数拆分给多个下级组织时使用。需同时指定 `subUnitAuthMode`。
+
+**行级字段**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `subUnitAuthMode` | string | 条件 | 授权模式，当存在 `subUnits` 时必填。可选值见下方枚举。 |
+| `subUnits` | array | 条件 | 下级单位列表，当 `subUnitAuthMode` 不为 `none` 时必填。 |
+
+**`subUnitAuthMode` 枚举**
+
+| 值 | 含义 |
+|----|------|
+| `none` | 无下级单位（默认） |
+| `separate_auth_separate_eid` | 授权分别呈现，企业ID分别管理 |
+| `separate_auth_unified_eid` | 授权分别呈现，企业ID统一管理 |
+| `unified_auth_with_list` | 授权和企业ID统一管理并提供下级清单 |
+
+**`subUnits[]` 对象字段**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | string | 否 | 下级单位行 ID，不传时服务端自动生成 |
+| `unitName` | string | 是 | 下级单位名称 |
+| `enterpriseId` | string | 是 | 下级单位企业 ID |
+| `enterpriseName` | string | 否 | 企业名称 |
+| `authCount` | integer/string | 是 | 授权数量，正整数。**所有 `subUnits` 的 `authCount` 之和必须等于行 `quantity`**，否则返回 `400` |
+| `itContact` | string | 是 | IT 联系人姓名 |
+| `phone` | string | 是 | 联系人手机号 |
+| `email` | string | 否 | 联系人邮箱 |
+| `customerType` | string | 否 | 客户类型（如"企业客户"、"学校"等） |
+| `industryLine` | string | 否 | 行业条线 |
+| `sellerContact` | string | 否 | 卖方联系人 |
+
+**校验规则**：
+
+- `subUnits[].authCount` 之和 **必须等于** 所在行的 `quantity`，否则返回 `400`
+- `unitName`、`enterpriseId`、`itContact`、`phone` 为必填，缺失返回 `400`
+- `authCount` 必须为正整数
+
+**示例**：
+
+```json
+{
+  "productId": "AB0000841",
+  "skuId": "SKU-001",
+  "quantity": 300,
+  "priceAtPurchase": 499,
+  "subUnitAuthMode": "separate_auth_separate_eid",
+  "subUnits": [
+    {
+      "unitName": "北京分公司",
+      "enterpriseId": "ENT001",
+      "enterpriseName": "某集团北京分公司",
+      "authCount": 200,
+      "itContact": "张三",
+      "phone": "13800138001",
+      "email": "zhangsan@example.com"
+    },
+    {
+      "unitName": "上海分公司",
+      "enterpriseId": "ENT002",
+      "enterpriseName": "某集团上海分公司",
+      "authCount": 100,
+      "itContact": "李四",
+      "phone": "13800138002",
+      "email": "lisi@example.com"
+    }
+  ]
+}
+```
+
 ---
 
 ## 4. 枚举说明

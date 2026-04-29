@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { OrderItem, Product, SubUnit } from '../../types';
-import { X, Box, CreditCard, Truck, Package, Disc, AlertCircle, ShieldCheck, RefreshCcw, Building2 } from 'lucide-react';
+import { X, Box, CreditCard, Truck, Package, Disc, AlertCircle, ShieldCheck, RefreshCcw, Building2, Download } from 'lucide-react';
 
 interface Props {
   item: OrderItem | null;
@@ -9,14 +9,80 @@ interface Props {
   onClose: () => void;
   products: Product[];
   selectedOrder: any;
+  editable?: boolean;
+  customers?: any[];
+  onUpdateItem?: (itemIndex: number, updatedItem: OrderItem) => void;
+  initialTab?: 'INFO' | 'SUBUNIT';
 }
 
-const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, onClose, products, selectedOrder }) => {
-  const [itemDetailTab, setItemDetailTab] = useState<'INFO' | 'SUBUNIT'>('INFO');
+const SUB_UNIT_MODE_LABELS: Record<string, string> = {
+  separate_auth_separate_eid: '授权分别呈现，企业ID分别管理',
+  separate_auth_unified_eid: '授权分别呈现，企业ID统一管理',
+  unified_auth_with_list: '授权和企业ID统一管理并提供下级清单',
+};
+
+const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, onClose, products, selectedOrder, customers, initialTab }) => {
+  const [itemDetailTab, setItemDetailTab] = useState<'INFO' | 'SUBUNIT'>(initialTab || 'INFO');
+  useEffect(() => { if (initialTab) setItemDetailTab(initialTab); }, [initialTab]);
+
   if (!item) return null;
   const selectedItemForDetails = item;
   const selectedItemIndex = itemIndex;
   const isItemDetailsClosing = isClosing;
+  const canExportSubUnits = Boolean(selectedItemForDetails.subUnits && selectedItemForDetails.subUnits.length > 0);
+
+  const exportSubUnitsToExcel = async () => {
+    if (!canExportSubUnits) return;
+    const XLSX = await import('xlsx');
+    const units = selectedItemForDetails.subUnits as SubUnit[];
+
+    const rows = units.map((u, idx) => ({
+      序号: idx + 1,
+      单位名称: u.unitName || '',
+      企业ID: u.enterpriseId || '',
+      企业名称: u.enterpriseName || '',
+      授权数量: u.authCount ?? '',
+      IT联系人: u.itContact || '',
+      手机: u.phone || '',
+      邮箱: u.email || '',
+      客户类型: u.customerType || '',
+      行业线: u.industryLine || '',
+      卖方联系人: u.sellerContact || '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 6 },  // 序号
+      { wch: 24 }, // 单位名称
+      { wch: 16 }, // 企业ID
+      { wch: 26 }, // 企业名称
+      { wch: 10 }, // 授权数量
+      { wch: 12 }, // IT联系人
+      { wch: 14 }, // 手机
+      { wch: 26 }, // 邮箱
+      { wch: 10 }, // 客户类型
+      { wch: 14 }, // 行业线
+      { wch: 18 }, // 卖方联系人
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '下级单位清单');
+
+    const orderId = (selectedOrder?.id || '订单').toString().replace(/[\\/:*?"<>|]/g, '_');
+    const itemNo = String((selectedItemIndex ?? 0) + 1).padStart(3, '0');
+    const fileName = `${orderId}-明细${itemNo}-下级单位清单.xlsx`;
+
+    const array = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+    const blob = new Blob([array], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <>
@@ -365,9 +431,20 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
                                           <Building2 className="w-5 h-5 text-indigo-500" />
                                           <h4 className="text-base font-semibold text-gray-900 dark:text-white">下级单位授权</h4>
                                       </div>
-                                      <span className="text-xs px-3 py-1 rounded-lg font-bold border bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800">
-                                          {{ separate_auth_separate_eid: '授权分别呈现，企业ID分别管理', separate_auth_unified_eid: '授权分别呈现，企业ID统一管理', unified_auth_with_list: '授权和企业ID统一管理并提供下级清单' }[selectedItemForDetails.subUnitAuthMode] || selectedItemForDetails.subUnitAuthMode}
-                                      </span>
+                                      <div className="flex items-center gap-2">
+                                          {canExportSubUnits && (
+                                              <button
+                                                  onClick={exportSubUnitsToExcel}
+                                                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-gray-200 transition"
+                                              >
+                                                  <Download className="w-3.5 h-3.5" />
+                                                  导出清单
+                                              </button>
+                                          )}
+                                          <span className="text-xs px-3 py-1 rounded-lg font-bold border bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800">
+                                              {SUB_UNIT_MODE_LABELS[selectedItemForDetails.subUnitAuthMode] || selectedItemForDetails.subUnitAuthMode}
+                                          </span>
+                                      </div>
                                   </div>
                                   {selectedItemForDetails.subUnits && selectedItemForDetails.subUnits.length > 0 ? (
                                       <div className="overflow-x-auto">
@@ -410,8 +487,8 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
                                   {selectedItemForDetails.subUnits && selectedItemForDetails.subUnits.length > 0 && (
                                       <div className="px-5 py-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between text-xs">
                                           <span className="text-gray-500">共 {selectedItemForDetails.subUnits.length} 个下级单位</span>
-                                          <span className={`font-bold ${(selectedItemForDetails.subUnits as SubUnit[]).reduce((s, u) => s + (parseInt(u.authCount) || 0), 0) === selectedItemForDetails.quantity ? 'text-green-600' : 'text-red-600'}`}>
-                                              合计: {(selectedItemForDetails.subUnits as SubUnit[]).reduce((s, u) => s + (parseInt(u.authCount) || 0), 0)} / 明细数量: {selectedItemForDetails.quantity}
+                                          <span className={`font-bold ${(selectedItemForDetails.subUnits as SubUnit[]).reduce((s, u) => s + (parseInt(String(u.authCount)) || 0), 0) === selectedItemForDetails.quantity ? 'text-green-600' : 'text-red-600'}`}>
+                                              合计: {(selectedItemForDetails.subUnits as SubUnit[]).reduce((s, u) => s + (parseInt(String(u.authCount)) || 0), 0)} / 明细数量: {selectedItemForDetails.quantity}
                                           </span>
                                       </div>
                                   )}

@@ -204,3 +204,75 @@ export function filterProductsByRowPermissions(
         rules.every(rule => evaluateProductRule(rule, product, currentUser, deptAndChildrenIds, users))
     );
 }
+
+// ─── 多角色合并版本：行可见 = 用户任一角色允许可见（取并集）────────────────
+//
+// 设计说明：
+// 单角色内部多条规则之间是「AND」（逐条筛选收窄）；
+// 不同角色之间是「OR」（任一角色放行即可见），与功能权限并集口径一致。
+// 任意一个角色没有针对该资源配置规则（即 baseRowPermission='all' 且无规则），表示该角色可见全部，整体直接返回原数据。
+export function filterOrdersByRowPermissionsMulti(
+    orders: Order[],
+    roles: RoleDefinition[],
+    currentUser: User,
+    users: User[],
+    departments: Department[],
+): Order[] {
+    if (roles.length === 0) return orders;
+    const perRoleRules = roles.map(r => getRowRulesForResource(r, 'Order'));
+    if (perRoleRules.some(rules => rules.length === 0)) return orders;
+
+    const deptAndChildrenIds = currentUser.departmentId
+        ? getDescendantDeptIds(departments, currentUser.departmentId)
+        : [];
+
+    return orders.filter(order =>
+        perRoleRules.some(rules =>
+            rules.every(rule => evaluateOrderRule(rule, order, currentUser, deptAndChildrenIds, users))
+        )
+    );
+}
+
+export function filterCustomersByRowPermissionsMulti(
+    customers: Customer[],
+    roles: RoleDefinition[],
+    currentUser: User,
+    users: User[],
+    departments: Department[],
+): Customer[] {
+    if (roles.length === 0) return customers;
+    const perRoleRules = roles.map(r => getRowRulesForResource(r, 'Customer'));
+    if (perRoleRules.some(rules => rules.length === 0)) return customers;
+
+    const deptAndChildrenIds = currentUser.departmentId
+        ? getDescendantDeptIds(departments, currentUser.departmentId)
+        : [];
+
+    return customers.filter(customer =>
+        perRoleRules.some(rules =>
+            rules.every(rule => evaluateCustomerRule(rule, customer, currentUser, deptAndChildrenIds, users))
+        )
+    );
+}
+
+export function filterProductsByRowPermissionsMulti(
+    products: Product[],
+    roles: RoleDefinition[],
+    currentUser: User,
+    users: User[],
+    departments: Department[],
+): Product[] {
+    if (roles.length === 0) return products;
+    const perRoleRules = roles.map(r => getRowRulesForResource(r, 'Product'));
+    if (perRoleRules.some(rules => rules.length === 0)) return products;
+
+    const deptAndChildrenIds = currentUser.departmentId
+        ? getDescendantDeptIds(departments, currentUser.departmentId)
+        : [];
+
+    return products.filter(product =>
+        perRoleRules.some(rules =>
+            rules.every(rule => evaluateProductRule(rule, product, currentUser, deptAndChildrenIds, users))
+        )
+    );
+}

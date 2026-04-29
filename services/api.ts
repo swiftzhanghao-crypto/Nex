@@ -1,3 +1,5 @@
+import type { User, RoleDefinition, Department, Space, SpaceRole, SpaceMember } from '../types';
+
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 let _token: string | null = localStorage.getItem('auth_token');
@@ -66,10 +68,10 @@ function buildQuery(params?: Record<string, string | number | boolean | null | u
 // ---- Auth ----
 export const authApi = {
   login: (email: string, password: string) =>
-    request<{ token: string; user: any }>('/auth/login', {
+    request<{ token: string; user: User }>('/auth/login', {
       method: 'POST', body: JSON.stringify({ email, password }),
     }),
-  me: () => request<any>('/auth/me'),
+  me: () => request<User>('/auth/me'),
 };
 
 // ---- Users ----
@@ -80,16 +82,30 @@ export interface UserListParams extends PaginationParams {
   departmentId?: string;
 }
 
+export type UserUpdatePayload = Partial<Pick<User, 'name' | 'email' | 'phone' | 'roles' | 'userType' | 'status' | 'departmentId'>>;
+export type RoleCreatePayload = Partial<Omit<RoleDefinition, 'id' | 'isSystem'>>;
+export type RoleUpdatePayload = Partial<Omit<RoleDefinition, 'id' | 'isSystem'>>;
+
 export const userApi = {
   list: (params?: UserListParams) =>
-    request<PaginatedResult<any>>(`/users${buildQuery(params as any)}`),
-  get: (id: string) => request<any>(`/users/${id}`),
-  update: (id: string, data: any) => request<any>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  departments: () => request<any[]>('/users/meta/departments'),
-  roles: () => request<any[]>('/users/meta/roles'),
-  createPlatformRole: (data: any) => request<any>('/users/meta/roles', { method: 'POST', body: JSON.stringify(data) }),
-  updateRole: (id: string, data: any) => request<any>(`/users/meta/roles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  reorderRoles: (orderedIds: string[]) => request<any>('/users/meta/roles-order', { method: 'PUT', body: JSON.stringify({ orderedIds }) }),
+    request<PaginatedResult<User>>(`/users${buildQuery(params as Record<string, string | number | boolean | null | undefined>)}`),
+  get: (id: string) => request<User>(`/users/${id}`),
+  update: (id: string, data: UserUpdatePayload) =>
+    request<User>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  departments: () => request<Department[]>('/users/meta/departments'),
+  roles: () => request<RoleDefinition[]>('/users/meta/roles'),
+  createPlatformRole: (data: RoleCreatePayload) =>
+    request<RoleDefinition>('/users/meta/roles', { method: 'POST', body: JSON.stringify(data) }),
+  updateRole: (id: string, data: RoleUpdatePayload) =>
+    request<RoleDefinition>(`/users/meta/roles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  copyRole: (id: string, name?: string) =>
+    request<RoleDefinition>(`/users/meta/roles/${id}/copy`, { method: 'POST', body: JSON.stringify({ name }) }),
+  deleteRole: (id: string) =>
+    request<void>(`/users/meta/roles/${id}`, { method: 'DELETE' }),
+  reorderRoles: (orderedIds: string[]) =>
+    request<{ ok: true }>('/users/meta/roles-order', { method: 'PUT', body: JSON.stringify({ orderedIds }) }),
+  reorderUsers: (orderedIds: string[]) =>
+    request<{ ok: true }>('/users/order', { method: 'PUT', body: JSON.stringify({ orderedIds }) }),
 };
 
 // ---- Orders ----
@@ -108,6 +124,8 @@ export const orderApi = {
   update: (id: string, data: any) => request<any>(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => request<void>(`/orders/${id}`, { method: 'DELETE' }),
   logs: (id: string) => request<any[]>(`/orders/${id}/logs`),
+  subUnitList: (params?: { keyword?: string; page?: number; size?: number }) =>
+    request<PaginatedResult<any>>(`/orders/sub-units/list${buildQuery(params as any)}`),
 };
 
 // ---- Customers ----
@@ -190,26 +208,33 @@ export const financeApi = {
 };
 
 // ---- Spaces ----
+export type SpaceCreatePayload = Partial<Omit<Space, 'id'>> & { adminUserId?: string };
+export type SpaceUpdatePayload = Partial<Omit<Space, 'id'>>;
+export type SpaceRoleCreatePayload = Partial<Omit<SpaceRole, 'id' | 'spaceId'>>;
+export type SpaceRoleUpdatePayload = Partial<Omit<SpaceRole, 'id' | 'spaceId'>>;
+
 export const spaceApi = {
-  list: () => request<any[]>('/spaces'),
-  get: (id: string) => request<any>(`/spaces/${id}`),
-  create: (data: any) => request<any>('/spaces', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => request<any>(`/spaces/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  list: () => request<Space[]>('/spaces'),
+  get: (id: string) => request<Space>(`/spaces/${id}`),
+  create: (data: SpaceCreatePayload) =>
+    request<Space>('/spaces', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: SpaceUpdatePayload) =>
+    request<Space>(`/spaces/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => request<void>(`/spaces/${id}`, { method: 'DELETE' }),
 
-  listRoles: (spaceId: string) => request<any[]>(`/spaces/${spaceId}/roles`),
-  createRole: (spaceId: string, data: any) =>
-    request<any>(`/spaces/${spaceId}/roles`, { method: 'POST', body: JSON.stringify(data) }),
-  updateRole: (spaceId: string, roleId: string, data: any) =>
-    request<any>(`/spaces/${spaceId}/roles/${roleId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  listRoles: (spaceId: string) => request<SpaceRole[]>(`/spaces/${spaceId}/roles`),
+  createRole: (spaceId: string, data: SpaceRoleCreatePayload) =>
+    request<SpaceRole>(`/spaces/${spaceId}/roles`, { method: 'POST', body: JSON.stringify(data) }),
+  updateRole: (spaceId: string, roleId: string, data: SpaceRoleUpdatePayload) =>
+    request<SpaceRole>(`/spaces/${spaceId}/roles/${roleId}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteRole: (spaceId: string, roleId: string) =>
     request<void>(`/spaces/${spaceId}/roles/${roleId}`, { method: 'DELETE' }),
 
-  listMembers: (spaceId: string) => request<any[]>(`/spaces/${spaceId}/members`),
+  listMembers: (spaceId: string) => request<SpaceMember[]>(`/spaces/${spaceId}/members`),
   addMember: (spaceId: string, data: { userId: string; roleId: string; isAdmin?: boolean }) =>
-    request<any>(`/spaces/${spaceId}/members`, { method: 'POST', body: JSON.stringify(data) }),
+    request<SpaceMember>(`/spaces/${spaceId}/members`, { method: 'POST', body: JSON.stringify(data) }),
   updateMember: (spaceId: string, memberId: string, data: { roleId?: string; isAdmin?: boolean }) =>
-    request<any>(`/spaces/${spaceId}/members/${memberId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    request<SpaceMember>(`/spaces/${spaceId}/members/${memberId}`, { method: 'PUT', body: JSON.stringify(data) }),
   removeMember: (spaceId: string, memberId: string) =>
     request<void>(`/spaces/${spaceId}/members/${memberId}`, { method: 'DELETE' }),
 };

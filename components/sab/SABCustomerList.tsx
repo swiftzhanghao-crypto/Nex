@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronDown, Filter, Settings } from 'lucide-react';
 import { mockCustomers, type CustomerRow } from './sabData';
+import Pagination from '../common/Pagination';
 
 type QuickToolbar = 'deal' | 'auth' | 'renew' | null;
 
@@ -222,8 +223,7 @@ export const SABCustomerList: React.FC = () => {
     return null;
   }, [quickToolbar, preset]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageClamped = Math.min(page, totalPages);
+  const pageClamped = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
   const pageSlice = useMemo(() => {
     const start = (pageClamped - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
@@ -463,37 +463,12 @@ export const SABCustomerList: React.FC = () => {
               </table>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-t border-gray-200/50 dark:border-white/10 bg-gray-50/80 dark:bg-white/5 shrink-0">
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                共 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF]">{filtered.length}</span> 条
-                {filtered.length !== mockCustomers.length && (
-                  <>
-                    （全部 {mockCustomers.length} 条）
-                  </>
-                )}
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={pageClamped <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="h-8 px-3 rounded-lg text-xs font-medium border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 transition disabled:cursor-not-allowed"
-                >
-                  上一页
-                </button>
-                <span className="text-xs text-gray-400 dark:text-gray-500">
-                  第 {pageClamped} / {totalPages} 页
-                </span>
-                <button
-                  type="button"
-                  disabled={pageClamped >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  className="h-8 px-3 rounded-lg text-xs font-medium border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 transition disabled:cursor-not-allowed"
-                >
-                  下一页
-                </button>
-              </div>
-            </div>
+            <Pagination
+              page={pageClamped}
+              size={pageSize}
+              total={filtered.length}
+              onPageChange={setPage}
+            />
           </div>
         </div>
       </div>

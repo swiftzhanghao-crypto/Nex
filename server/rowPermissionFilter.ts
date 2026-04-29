@@ -1,3 +1,5 @@
+import { safeJsonParse } from './utils.ts';
+
 type RowRule = {
   resource?: string;
   dimension?: string;
@@ -5,12 +7,6 @@ type RowRule = {
 };
 
 type PermissionResource = 'Order' | 'Customer' | 'Product';
-
-function safeJsonParse(str: string | null | undefined, fallback: any = {}) {
-  if (!str) return fallback;
-  try { return JSON.parse(str); }
-  catch { return fallback; }
-}
 
 export function getRowRules(db: any, roleId: string | string[], resource: PermissionResource): RowRule[] {
   const ids = Array.isArray(roleId) ? roleId : [roleId];

@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, ChevronDown, X, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
+import { Search, Filter, ChevronDown, X, TrendingUp } from 'lucide-react';
 import { useAppContext, useEnsureData } from '../../contexts/AppContext';
+import Pagination from '../common/Pagination';
 
 const orderStatusConfig: Record<string, { label: string; cls: string }> = {
   '已失效': { label: '已失效', cls: 'unified-tag-gray' },
@@ -52,7 +53,6 @@ const PerformanceManager: React.FC = () => {
     return result;
   }, [performances, searchText, searchField, filterStatus, filterService]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const allSelected = paged.length > 0 && paged.every(p => selectedIds.has(p.id));
 
@@ -282,36 +282,14 @@ const PerformanceManager: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02]">
-          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-            <span>每页</span>
-            <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }} className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs font-bold outline-none">
-              {PAGE_SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <span>条 · 第 {currentPage}/{totalPages} 页</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-30 transition">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              let page: number;
-              if (totalPages <= 5) { page = i + 1; }
-              else if (currentPage <= 3) { page = i + 1; }
-              else if (currentPage >= totalPages - 2) { page = totalPages - 4 + i; }
-              else { page = currentPage - 2 + i; }
-              return (
-                <button key={page} onClick={() => setCurrentPage(page)} className={`w-8 h-8 rounded-lg text-xs font-bold transition ${page === currentPage ? 'bg-[#0071E3] text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10'}`}>
-                  {page}
-                </button>
-              );
-            })}
-            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-30 transition">
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        <Pagination
+          page={currentPage}
+          size={pageSize}
+          total={filtered.length}
+          onPageChange={setCurrentPage}
+          onSizeChange={s => { setPageSize(s); setCurrentPage(1); }}
+          sizeOptions={PAGE_SIZE_OPTIONS}
+        />
       </div>
     </div>
   );

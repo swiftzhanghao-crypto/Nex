@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Search, X, ChevronDown, Banknote, Calendar, Filter, SlidersHorizontal } from 'lucide-react';
 import { useAppContext, useEnsureData } from '../../contexts/AppContext';
+import Pagination from '../common/Pagination';
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
@@ -50,7 +51,6 @@ const RemittanceManager: React.FC = () => {
     return result;
   }, [remittances, searchText, dateStart, dateEnd, filterType, filterMethod]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const toggleSelect = (id: string) => {
@@ -337,57 +337,19 @@ const RemittanceManager: React.FC = () => {
         </div>
 
         {/* Footer: count + pagination */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-white/5">
-          <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-            <span>共 <strong className="text-gray-700 dark:text-gray-200">{filtered.length}</strong> 条</span>
-            {filtered.length > 0 && (
-              <span className="text-xs text-gray-400">合计：<span className="text-orange-500 dark:text-orange-400 font-semibold">{formatAmount(totalAmount)}</span></span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 mr-2">
-              <select
-                value={pageSize}
-                onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                className="bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 outline-none cursor-pointer"
-              >
-                {PAGE_SIZE_OPTIONS.map(n => <option key={n} value={n}>{n}条/页</option>)}
-              </select>
-            </div>
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition"
-            >‹</button>
-            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-              let page = i + 1;
-              if (totalPages > 7) {
-                if (currentPage <= 4) page = i + 1;
-                else if (currentPage >= totalPages - 3) page = totalPages - 6 + i;
-                else page = currentPage - 3 + i;
-              }
-              return (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-medium transition ${
-                    currentPage === page
-                      ? 'bg-[#0071E3] text-white shadow-sm'
-                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10'
-                  }`}
-                >{page}</button>
-              );
-            })}
-            {totalPages > 7 && currentPage < totalPages - 3 && <span className="text-gray-400 text-xs">...</span>}
-            {totalPages > 7 && currentPage < totalPages - 3 && (
-              <button onClick={() => setCurrentPage(totalPages)} className="w-7 h-7 flex items-center justify-center rounded-lg text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 transition">{totalPages}</button>
-            )}
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition"
-            >›</button>
-          </div>
+        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5">
+          {filtered.length > 0 ? (
+            <span className="text-xs text-gray-400">合计：<span className="text-orange-500 dark:text-orange-400 font-semibold">{formatAmount(totalAmount)}</span></span>
+          ) : <span />}
+          <Pagination
+            page={currentPage}
+            size={pageSize}
+            total={filtered.length}
+            onPageChange={setCurrentPage}
+            onSizeChange={s => { setPageSize(s); setCurrentPage(1); }}
+            sizeOptions={PAGE_SIZE_OPTIONS}
+            className="flex items-center gap-3"
+          />
         </div>
       </div>
     </div>

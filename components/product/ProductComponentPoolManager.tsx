@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Search, Filter, X, ChevronLeft, ChevronRight, Plus, Copy, Pencil, Ban, CheckCircle2, ChevronDown } from 'lucide-react';
+import { Search, Filter, X, Plus, Copy, Pencil, Ban, CheckCircle2, ChevronDown } from 'lucide-react';
 import { useAppContext } from '../../contexts/AppContext';
 import type { AtomicCapability, ComponentNature, CapabilityType } from '../../types';
 import ModalPortal from '../common/ModalPortal';
+import Pagination from '../common/Pagination';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
@@ -52,8 +53,7 @@ const ProductComponentPoolManager: React.FC = () => {
     });
   }, [sorted, searchText, filterNature, filterType, filterEnabled]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const safePage = Math.min(page, totalPages);
+  const safePage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
   const pagedData = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const activeFilterCount = [filterNature, filterType, filterEnabled].filter(Boolean).length;
@@ -258,36 +258,14 @@ const ProductComponentPoolManager: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination */}
-        <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700 gap-3">
-          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-            <span>共 {filtered.length} 条</span>
-            <span className="mx-1">|</span>
-            <span>每页</span>
-            <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }} className="px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white text-xs">
-              {PAGE_SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <span>条</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <button disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-              let pn: number;
-              if (totalPages <= 7) { pn = i + 1; }
-              else if (safePage <= 4) { pn = i + 1; }
-              else if (safePage >= totalPages - 3) { pn = totalPages - 6 + i; }
-              else { pn = safePage - 3 + i; }
-              return (
-                <button key={pn} onClick={() => setPage(pn)} className={`min-w-[32px] h-8 rounded-lg text-xs font-medium transition-colors ${pn === safePage ? 'bg-blue-600 text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>{pn}</button>
-              );
-            })}
-            <button disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        <Pagination
+          page={safePage}
+          size={pageSize}
+          total={filtered.length}
+          onPageChange={setPage}
+          onSizeChange={s => { setPageSize(s); setPage(1); }}
+          sizeOptions={PAGE_SIZE_OPTIONS}
+        />
       </div>
 
       {/* Edit/Add Modal */}

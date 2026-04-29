@@ -69,6 +69,14 @@ app.use(((err: any, _req: any, res: any, _next: any) => {
 }) as any);
 
 const distDir = path.resolve(__dirname, '..', 'dist');
+
+app.get('/permission-board', (_req, res) => {
+  res.sendFile(path.join(distDir, 'permission-board-4.html'));
+});
+app.get('/permission-board-4.html', (_req, res) => {
+  res.redirect(301, '/permission-board');
+});
+
 app.use(express.static(distDir));
 app.use((_req, res) => {
   res.sendFile(path.join(distDir, 'index.html'));

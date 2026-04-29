@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
+import { safePagination, getUserName } from '../utils.ts';
 
 const router = Router();
 router.use(authMiddleware);
@@ -15,17 +16,6 @@ function toOpportunity(row: any) {
     finalUserRevenue: row.final_user_rev, closeDate: row.close_date,
     ownerId: row.owner_id, ownerName: row.owner_name, createdAt: row.created_at,
   };
-}
-
-function safePagination(page: string, size: string) {
-  const pageNum = Math.max(1, parseInt(page) || 1);
-  const limit = Math.min(Math.max(1, parseInt(size) || 50), 200);
-  return { limit, offset: (pageNum - 1) * limit, pageNum };
-}
-
-function getUserName(db: any, userId: string): string {
-  const row = db.prepare('SELECT name FROM users WHERE id = ?').get(userId) as any;
-  return row?.name || '';
 }
 
 const VALID_STAGES = ['需求判断', '方案报价', '商务谈判', '赢单', '输单'];

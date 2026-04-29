@@ -189,7 +189,6 @@ const CustomerManager: React.FC = () => {
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentCustomers = filteredCustomers.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
 
   const handlePageChange = (pageNumber: number) => {
     setCurrentPage(pageNumber);
@@ -380,17 +379,13 @@ const CustomerManager: React.FC = () => {
           </table>
         </div>
 
-        <div className="px-5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5 shrink-0">
-            <Pagination
-                page={currentPage}
-                size={itemsPerPage}
-                total={filteredCustomers.length}
-                onPageChange={handlePageChange}
-                onSizeChange={(s) => { setItemsPerPage(s); setCurrentPage(1); }}
-                sizeOptions={[20, 50, 100]}
-                showJumper
-            />
-        </div>
+        <Pagination
+            page={currentPage}
+            size={itemsPerPage}
+            total={filteredCustomers.length}
+            onPageChange={handlePageChange}
+            onSizeChange={(s) => { setItemsPerPage(s); setCurrentPage(1); }}
+        />
       </div>
 
       {/* ── 企业 ID 弹出层 ─────────────────────────────── */}

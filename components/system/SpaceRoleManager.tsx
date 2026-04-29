@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Search, Shield, Trash2, Settings, Save, X, Copy, GripVertical } from 'lucide-react';
 import type { Space, SpaceMember, SpaceRole } from '../../types';
 import { useAppContext } from '../../contexts/AppContext';
@@ -43,6 +43,8 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [roleSearchTerm, setRoleSearchTerm] = useState('');
+  const [isRoleSearchOpen, setIsRoleSearchOpen] = useState(false);
+  const roleSearchInputRef = useRef<HTMLInputElement>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [isEditingRole, setIsEditingRole] = useState(false);
 
@@ -115,7 +117,14 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
     setIsEditingRole(false);
   };
 
+  const isAdminRole = (role: SpaceRole) => role.sortOrder === 0 && role.name === '应用管理员';
+
   const handleDeleteRole = async (roleId: string) => {
+    const target = spaceRoles.find(r => r.id === roleId);
+    if (target && isAdminRole(target)) {
+      alert('应用管理员角色不可删除');
+      return;
+    }
     if (!window.confirm('确定删除此角色？')) return;
     if (!apiMode) {
       // Mock：本地删除并联动清理该角色下的成员
@@ -302,28 +311,41 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
           {/* Role List */}
           <div className="unified-card w-1/4 min-w-[250px] dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 flex flex-col">
             <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 bg-gray-50 dark:bg-white/5">
-              <h3 className="font-bold text-gray-800 dark:text-white flex-1">应用角色</h3>
+              {isRoleSearchOpen ? (
+                <div className="relative flex-1 animate-fade-in">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    ref={roleSearchInputRef}
+                    value={roleSearchTerm}
+                    onChange={e => setRoleSearchTerm(e.target.value)}
+                    onBlur={() => { if (!roleSearchTerm) setIsRoleSearchOpen(false); }}
+                    onKeyDown={e => { if (e.key === 'Escape') { setRoleSearchTerm(''); setIsRoleSearchOpen(false); } }}
+                    placeholder="搜索角色..."
+                    autoFocus
+                    className="w-full pl-8 pr-7 py-1 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/30 dark:text-white placeholder:text-gray-400 transition-all"
+                  />
+                  <button onClick={() => { setRoleSearchTerm(''); setIsRoleSearchOpen(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <h3 className="font-bold text-gray-800 dark:text-white flex-1">应用角色</h3>
+              )}
+              {!isRoleSearchOpen && (
+                <button onClick={() => { setIsRoleSearchOpen(true); setTimeout(() => roleSearchInputRef.current?.focus(), 0); }} className="p-1.5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full text-gray-500 dark:text-gray-400" title="搜索角色">
+                  <Search className="w-4 h-4" />
+                </button>
+              )}
               {canManage && (
                 <>
-                  <button onClick={handleCreateRole} className="p-1.5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full text-gray-500 dark:text-gray-400" title="新建角色">
+                  <button onClick={handleCreateRole} className="p-1.5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full text-gray-500 dark:text-gray-400 shrink-0" title="新建角色">
                     <Plus className="w-4 h-4" />
                   </button>
-                  <button onClick={() => setShowSettings(true)} className="p-1.5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full text-gray-500 dark:text-gray-400" title="应用设置">
+                  <button onClick={() => setShowSettings(true)} className="p-1.5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full text-gray-500 dark:text-gray-400 shrink-0" title="应用设置">
                     <Settings className="w-4 h-4" />
                   </button>
                 </>
               )}
-            </div>
-            <div className="px-3 pt-3 pb-1">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  value={roleSearchTerm}
-                  onChange={e => setRoleSearchTerm(e.target.value)}
-                  placeholder="搜索角色..."
-                  className="w-full pl-8 pr-3 py-1.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white placeholder:text-gray-400"
-                />
-              </div>
             </div>
             <div className="flex-1 overflow-auto p-2 space-y-0.5">
               {spaceRoles
@@ -352,6 +374,7 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
                     <div className="flex-1 flex justify-between items-center min-w-0">
                       <div className="font-medium text-sm truncate">{role.name}</div>
                       <div className="flex items-center gap-1 flex-shrink-0">
+                        {isAdminRole(role) && <Shield className="w-3 h-3 opacity-50" />}
                         {canManage && (
                           <>
                             <button
@@ -361,12 +384,14 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
                             >
                               <Copy className="w-3.5 h-3.5" />
                             </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDeleteRole(role.id); }}
-                              className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {!isAdminRole(role) && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteRole(role.id); }}
+                                className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </>
                         )}
                       </div>

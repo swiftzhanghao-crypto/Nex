@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Search, X, Building2, ChevronDown } from 'lucide-react';
+import Pagination from '../common/Pagination';
 
 interface OpsEnterprise {
     id: string;
@@ -54,7 +55,6 @@ const OpsEnterpriseManager: React.FC = () => {
         return matchSearch && matchSource && matchPkg;
     });
 
-    const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
     const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
     const handleSearch = (v: string) => { setSearchTerm(v); setCurrentPage(1); };
@@ -200,28 +200,13 @@ const OpsEnterpriseManager: React.FC = () => {
                     </table>
                 </div>
 
-                {/* 分页 */}
-                <div className="flex justify-between items-center px-5 py-3.5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5 shrink-0">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">共 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF]">{filtered.length}</span> 条</span>
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">每页</span>
-                            <select
-                                value={itemsPerPage}
-                                onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                                className="unified-card h-7 pl-2 pr-6 text-xs font-medium text-gray-700 dark:text-gray-200 dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 outline-none appearance-none cursor-pointer hover:border-[#0071E3]/50 transition"
-                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
-                            >
-                                {[20, 50, 100].map(n => <option key={n} value={n}>{n} 条</option>)}
-                            </select>
-                        </div>
-                        <span className="text-xs text-gray-400 dark:text-gray-500">第 {currentPage} / {totalPages} 页</span>
-                        <div className="flex items-center gap-1.5">
-                            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium transition disabled:cursor-not-allowed">上一页</button>
-                            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="unified-card px-3 py-1.5 dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-medium transition disabled:cursor-not-allowed">下一页</button>
-                        </div>
-                    </div>
-                </div>
+                <Pagination
+                    page={currentPage}
+                    size={itemsPerPage}
+                    total={filtered.length}
+                    onPageChange={setCurrentPage}
+                    onSizeChange={s => { setItemsPerPage(s); setCurrentPage(1); }}
+                />
             </div>
         </div>
     );

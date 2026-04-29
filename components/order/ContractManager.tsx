@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Search, FileText, Filter, ChevronDown, X, CheckCircle, Clock, AlertCircle, Circle, RotateCcw } from 'lucide-react';
 import { Contract } from '../../types';
+import Pagination from '../common/Pagination';
 
 import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 
@@ -60,7 +61,6 @@ const ContractManager: React.FC = () => {
     return result;
   }, [contracts, searchText, searchField, filterStatus, filterType]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const toggleSelect = (id: string) => {
@@ -342,52 +342,15 @@ const ContractManager: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         {filtered.length > 0 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-white/5">
-            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-              <span>每页</span>
-              <select
-                value={pageSize}
-                onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                className="bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 outline-none cursor-pointer"
-              >
-                {PAGE_SIZE_OPTIONS.map(n => <option key={n} value={n}>{n} 条</option>)}
-              </select>
-              <span>共 <strong className="text-gray-700 dark:text-gray-200">{filtered.length}</strong> 条</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition"
-              >上一页</button>
-              {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                let page = i + 1;
-                if (totalPages > 7) {
-                  if (currentPage <= 4) page = i + 1;
-                  else if (currentPage >= totalPages - 3) page = totalPages - 6 + i;
-                  else page = currentPage - 3 + i;
-                }
-                return (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`w-8 h-8 rounded-lg text-xs font-medium transition ${
-                      currentPage === page
-                        ? 'bg-[#0071E3] text-white shadow-sm'
-                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10'
-                    }`}
-                  >{page}</button>
-                );
-              })}
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition"
-              >下一页</button>
-            </div>
-          </div>
+          <Pagination
+            page={currentPage}
+            size={pageSize}
+            total={filtered.length}
+            onPageChange={setCurrentPage}
+            onSizeChange={s => { setPageSize(s); setCurrentPage(1); }}
+            sizeOptions={PAGE_SIZE_OPTIONS}
+          />
         )}
       </div>
     </div>

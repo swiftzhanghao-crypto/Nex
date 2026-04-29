@@ -85,6 +85,9 @@ export interface OrderItem extends MerchandiseItem {
     /** 授权开始日（与 licenseEndDate 成对使用，如来自订阅续费/增购） */
     licenseStartDate?: string;
 
+    // Eco product name (when product tag includes '生态')
+    ecoProductName?: string;
+
     // After-sale info
     afterSaleWarrantyPeriod?: string;
 
@@ -194,6 +197,7 @@ export interface Product {
     taxRefundType?: string;
     linkedServices?: LinkedService[];
     salesScope?: SalesScopeRow[];
+    subUnitLicenseAllowed?: boolean;
 }
 
 export interface SalesScopeRow {
@@ -771,7 +775,7 @@ export interface SubUnit {
     unitName: string;
     enterpriseId: string;
     enterpriseName: string;
-    authCount: string;
+    authCount: number | string;
     itContact: string;
     phone: string;
     email: string;
