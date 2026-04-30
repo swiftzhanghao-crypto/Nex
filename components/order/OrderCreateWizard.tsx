@@ -98,7 +98,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     isCategoryPickerOpen, setIsCategoryPickerOpen,
     categoryPickerRef,
     tempProductId, setTempProductId,
-    tempSkuId, setTempSkuId,
+    tempSkuId, setTempSkuId, setTempSkuIdFromOption,
     tempPricingOptionId, setTempPricingOptionId,
     tempQuantity, setTempQuantity,
     tempActivationMethod, setTempActivationMethod,
@@ -1946,37 +1946,65 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-gray-500 uppercase">规格</label>
-                                    <select 
-                                        className={`w-full p-3 border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50 disabled:cursor-not-allowed ${!tempProductId ? 'bg-gray-100 dark:bg-white/5' : 'bg-white dark:bg-[#1C1C1E]'}`}
-                                        value={tempSkuId} 
-                                        onChange={e => setTempSkuId(e.target.value)}
-                                        disabled={!tempProductId}
-                                    >
-                                        <option value="">-- {tempProductId ? '请选择规格' : '自动带出'} --</option>
-                                        {selectedProduct?.skus.filter(s => s.status === 'Active').map(s => (
-                                            <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
-                                        ))}
-                                    </select>
+                                    {(() => {
+                                        const activeSkus = selectedProduct?.skus.filter(s => s.status === 'Active') || [];
+                                        const uniqueNames = Array.from(new Set(activeSkus.map(s => s.name)));
+                                        if (!tempProductId) {
+                                            return <div className="w-full p-3 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400 cursor-not-allowed">自动带出</div>;
+                                        }
+                                        if (uniqueNames.length <= 1) {
+                                            return <div className="w-full p-3 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-700 dark:text-gray-300 cursor-default">{uniqueNames[0] || '默认'}</div>;
+                                        }
+                                        return (
+                                            <select
+                                                className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
+                                                value={tempSkuId}
+                                                onChange={e => setTempSkuId(e.target.value)}
+                                            >
+                                                <option value="">-- 请选择规格 --</option>
+                                                {activeSkus.map(s => (
+                                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                                ))}
+                                            </select>
+                                        );
+                                    })()}
                                 </div>
 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-gray-500 uppercase">授权类型</label>
-                                    {selectedSku?.pricingOptions && selectedSku.pricingOptions.length > 0 ? (
-                                        <select 
-                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm" 
-                                            value={tempPricingOptionId} 
-                                            onChange={e => setTempPricingOptionId(e.target.value)}
-                                        >
-                                            <option value="">-- 请选择授权类型 --</option>
-                                            {selectedSku.pricingOptions.map(opt => (
-                                                <option key={opt.id} value={opt.id}>{opt.title}</option>
-                                            ))}
-                                        </select>
-                                    ) : (
-                                        <div className="w-full p-3 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400 cursor-not-allowed">
-                                            {tempSkuId ? '该规格无授权类型' : '请先选择规格'}
-                                        </div>
-                                    )}
+                                    {(() => {
+                                        const activeSkus = selectedProduct?.skus.filter(s => s.status === 'Active') || [];
+                                        const uniqueNames = Array.from(new Set(activeSkus.map(s => s.name)));
+                                        const allOptions = activeSkus.flatMap(s => (s.pricingOptions || []).map(opt => ({ ...opt, skuId: s.id, skuCode: s.code })));
+                                        const relevantOptions = uniqueNames.length > 1 && tempSkuId
+                                            ? allOptions.filter(o => o.skuId === tempSkuId)
+                                            : allOptions;
+                                        if (!tempProductId) {
+                                            return <div className="w-full p-3 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400 cursor-not-allowed">请先选择产品</div>;
+                                        }
+                                        if (relevantOptions.length === 0) {
+                                            return <div className="w-full p-3 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400 cursor-not-allowed">该产品无授权类型</div>;
+                                        }
+                                        return (
+                                            <select
+                                                className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
+                                                value={tempPricingOptionId}
+                                                onChange={e => {
+                                                    const optId = e.target.value;
+                                                    setTempPricingOptionId(optId);
+                                                    const matched = allOptions.find(o => o.id === optId);
+                                                    if (matched && matched.skuId !== tempSkuId) {
+                                                        setTempSkuIdFromOption(matched.skuId);
+                                                    }
+                                                }}
+                                            >
+                                                <option value="">-- 请选择授权类型 --</option>
+                                                {relevantOptions.map(opt => (
+                                                    <option key={opt.id} value={opt.id}>{opt.title} ({opt.skuCode})</option>
+                                                ))}
+                                            </select>
+                                        );
+                                    })()}
                                 </div>
 
                                 <div className="space-y-2">
@@ -2663,7 +2691,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 <button onClick={() => { setShowAddProductModal(false); setEditingItemIndex(null); }} className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition">取消</button>
                                 <button
                                     onClick={handleAddItem}
-                                    disabled={!tempProductId || !tempSkuId || ((selectedSku?.pricingOptions?.length ?? 0) > 0 && !tempPricingOptionId)}
+                                    disabled={!tempProductId || !tempSkuId || !tempPricingOptionId}
                                     className="px-8 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-xl text-sm font-bold flex items-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-apple"
                                 >
                                     {editingItemIndex !== null ? <><Check className="w-4 h-4"/> 保存修改</> : <><Plus className="w-4 h-4"/> 加入清单</>}

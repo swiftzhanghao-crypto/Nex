@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ActivationMethod, PurchaseNature, SubUnitAuthMode, Product } from '../../../types';
 import type { SubUnitLocal } from './subUnitCsv';
 
@@ -100,7 +100,13 @@ export function useProductCascade(products: Product[]) {
     if (tempProductId) {
       const prod = products.find(p => p.id === tempProductId);
       const activeSkus = prod?.skus.filter(s => s.status === 'Active') || [];
-      if (activeSkus.length === 1) setTempSkuId(activeSkus[0].id);
+      const uniqueNames = Array.from(new Set(activeSkus.map(s => s.name)));
+      if (activeSkus.length === 1) {
+        setTempSkuId(activeSkus[0].id);
+      } else if (uniqueNames.length > 1 && activeSkus.length > 0) {
+        // Multiple distinct spec names — user picks spec first
+      }
+      // When all SKUs share same name, SKU will be determined by authorization type selection
     }
   }, [tempProductId, products]);
 
@@ -110,13 +116,23 @@ export function useProductCascade(products: Product[]) {
     setTempPkgLink('');
   }, [tempPkgType]);
 
+  const skuSetByOptionRef = useRef(false);
   useEffect(() => {
+    if (skuSetByOptionRef.current) {
+      skuSetByOptionRef.current = false;
+      return;
+    }
     setTempPricingOptionId('');
     setNegotiatedPrice(null);
     if (selectedSku?.pricingOptions && selectedSku.pricingOptions.length === 1) {
       setTempPricingOptionId(selectedSku.pricingOptions[0].id);
     }
   }, [tempSkuId, selectedSku]);
+
+  const setTempSkuIdFromOption = useCallback((skuId: string) => {
+    skuSetByOptionRef.current = true;
+    setTempSkuId(skuId);
+  }, []);
 
   useEffect(() => {
     if (selectedOption) {
@@ -138,6 +154,7 @@ export function useProductCascade(products: Product[]) {
     setTempProductId,
     tempSkuId,
     setTempSkuId,
+    setTempSkuIdFromOption,
     tempPricingOptionId,
     setTempPricingOptionId,
     tempQuantity,
