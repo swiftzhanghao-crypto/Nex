@@ -1929,7 +1929,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     )}
                                 </div>
 
-                                <div className="space-y-2">
+                                <div className="space-y-2 col-span-2">
                                     <label className="text-xs font-bold text-gray-500 uppercase">选择产品</label>
                                     <select 
                                         className={`w-full p-3 border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50 disabled:cursor-not-allowed ${!tempCategory ? 'bg-gray-100 dark:bg-white/5' : 'bg-white dark:bg-[#1C1C1E]'}`}
@@ -1938,51 +1938,25 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         disabled={!tempCategory}
                                     >
                                         <option value="">-- {tempCategory ? '请选择产品' : '请先选择分类'} --</option>
-                                        {products.filter(p => p.status === 'OnShelf' && p.subCategory === tempCategory).map(p => (
-                                            <option key={p.id} value={p.id}>{p.name}</option>
-                                        ))}
+                                        {products.filter(p => p.status === 'OnShelf' && p.subCategory === tempCategory).map(p => {
+                                            const activeSkus = p.skus.filter(s => s.status === 'Active');
+                                            const specName = activeSkus.length > 0 ? activeSkus[0].name : '';
+                                            return (
+                                                <option key={p.id} value={p.id}>{p.name}{specName ? ` / ${specName}` : ''}</option>
+                                            );
+                                        })}
                                     </select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">规格</label>
-                                    {(() => {
-                                        const activeSkus = selectedProduct?.skus.filter(s => s.status === 'Active') || [];
-                                        const uniqueNames = Array.from(new Set(activeSkus.map(s => s.name)));
-                                        if (!tempProductId) {
-                                            return <div className="w-full p-3 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400 cursor-not-allowed">自动带出</div>;
-                                        }
-                                        if (uniqueNames.length <= 1) {
-                                            return <div className="w-full p-3 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-700 dark:text-gray-300 cursor-default">{uniqueNames[0] || '默认'}</div>;
-                                        }
-                                        return (
-                                            <select
-                                                className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
-                                                value={tempSkuId}
-                                                onChange={e => setTempSkuId(e.target.value)}
-                                            >
-                                                <option value="">-- 请选择规格 --</option>
-                                                {activeSkus.map(s => (
-                                                    <option key={s.id} value={s.id}>{s.name}</option>
-                                                ))}
-                                            </select>
-                                        );
-                                    })()}
                                 </div>
 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-gray-500 uppercase">授权类型</label>
                                     {(() => {
                                         const activeSkus = selectedProduct?.skus.filter(s => s.status === 'Active') || [];
-                                        const uniqueNames = Array.from(new Set(activeSkus.map(s => s.name)));
                                         const allOptions = activeSkus.flatMap(s => (s.pricingOptions || []).map(opt => ({ ...opt, skuId: s.id, skuCode: s.code })));
-                                        const relevantOptions = uniqueNames.length > 1 && tempSkuId
-                                            ? allOptions.filter(o => o.skuId === tempSkuId)
-                                            : allOptions;
                                         if (!tempProductId) {
                                             return <div className="w-full p-3 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400 cursor-not-allowed">请先选择产品</div>;
                                         }
-                                        if (relevantOptions.length === 0) {
+                                        if (allOptions.length === 0) {
                                             return <div className="w-full p-3 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400 cursor-not-allowed">该产品无授权类型</div>;
                                         }
                                         return (
@@ -1999,7 +1973,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                 }}
                                             >
                                                 <option value="">-- 请选择授权类型 --</option>
-                                                {relevantOptions.map(opt => (
+                                                {allOptions.map(opt => (
                                                     <option key={opt.id} value={opt.id}>{opt.title} ({opt.skuCode})</option>
                                                 ))}
                                             </select>
