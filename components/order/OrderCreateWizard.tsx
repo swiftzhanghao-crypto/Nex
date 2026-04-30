@@ -1332,7 +1332,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     })() : (
                                         <button
                                             onClick={() => setIsOppPickerOpen(true)}
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border-2 border-dashed border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400 dark:text-gray-500 hover:border-[#0071E3] dark:hover:border-[#FF2D55] hover:text-[#0071E3] dark:hover:text-[#FF2D55] transition flex items-center justify-center gap-2"
+                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border-2 border-dashed border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400 dark:text-gray-500 hover:border-[#0071E3] dark:hover:border-[#FF2D55] hover:text-[#0071E3] dark:hover:text-[#FF2D55] transition flex items-center justify-center gap-2"
                                         >
                                             <Briefcase className="w-4 h-4"/> 点击选择商机
                                         </button>
@@ -1360,7 +1360,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">企业 ID <span className="text-red-500">*</span></label>
                                     <div className="relative">
                                         <select
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm"
+                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm"
                                             value={orderEnterpriseId}
                                             onChange={e => handleSelfDealEnterpriseChange(e.target.value)}
                                         >
@@ -1424,7 +1424,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         value={agentCode}
                                         onChange={e => setAgentCode(e.target.value)}
                                         placeholder="请输入代理商编号"
-                                        className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm text-sm text-gray-800 dark:text-white placeholder:text-gray-400"
+                                        className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm text-gray-800 dark:text-white placeholder:text-gray-400"
                                     />
                                 </div>
                                 )}
@@ -1433,7 +1433,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 <>
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">选择客户 <span className="text-red-500">*</span></label>
-                                    <select className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={newOrderCustomer} onChange={e => handleCustomerChange(e.target.value)}>
+                                    <select className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={newOrderCustomer} onChange={e => handleCustomerChange(e.target.value)}>
                                         <option value="">-- 请选择客户 --</option>
                                         {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
                                     </select>
@@ -1452,7 +1452,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     {subscriptionLock && (
                                         <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-1">来自订阅续费/增购，客户不可更换。</p>
                                     )}
-                                    <select disabled={!!subscriptionLock} className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm disabled:opacity-60 disabled:cursor-not-allowed" value={newOrderCustomer} onChange={e => handleCustomerChange(e.target.value)}>
+                                    <select disabled={!!subscriptionLock} className={`w-full p-3 border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm disabled:opacity-60 disabled:cursor-not-allowed ${subscriptionLock ? 'bg-gray-100 dark:bg-white/5' : 'bg-white dark:bg-[#1C1C1E]'}`} value={newOrderCustomer} onChange={e => handleCustomerChange(e.target.value)}>
                                         <option value="">-- 请选择客户 --</option>
                                         {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
                                     </select>
@@ -1464,7 +1464,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">买方名称（客户）</label>
                                     <select
-                                        className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm"
+                                        className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm"
                                         value={selectedBuyerNameId}
                                         onChange={e => setSelectedBuyerNameId(e.target.value)}
                                     >
@@ -1478,18 +1478,18 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     <>
                                     <div className="space-y-2">
                                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300">买方名称（代理商） <span className="text-red-500">*</span></label>
-                                        <select className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={selectedChannelId} onChange={e => setSelectedChannelId(e.target.value)}>
+                                        <select className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={selectedChannelId} onChange={e => setSelectedChannelId(e.target.value)}>
                                             <option value="">-- 选择渠道商 --</option>
                                             {channels.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                         </select>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300">直接下级渠道</label>
-                                        <input type="text" className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" placeholder="买方订购本订单产品的渠道商" value={directChannel} onChange={e => setDirectChannel(e.target.value)} />
+                                        <input type="text" className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" placeholder="买方订购本订单产品的渠道商" value={directChannel} onChange={e => setDirectChannel(e.target.value)} />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300">终端渠道</label>
-                                        <input type="text" className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" placeholder="向最终用户销售本订单产品的渠道，与直接下级渠道不同时需要填写" value={terminalChannel} onChange={e => setTerminalChannel(e.target.value)} />
+                                        <input type="text" className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" placeholder="向最终用户销售本订单产品的渠道，与直接下级渠道不同时需要填写" value={terminalChannel} onChange={e => setTerminalChannel(e.target.value)} />
                                     </div>
                                     </>
                                 )}
@@ -1497,14 +1497,14 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 <>
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">销售负责人</label>
-                                    <select className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={salesRepId} onChange={e => setSalesRepId(e.target.value)}>
+                                    <select className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={salesRepId} onChange={e => setSalesRepId(e.target.value)}>
                                         <option value="">-- 分配销售人员 --</option>
                                         {salesUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                                     </select>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">商务负责人</label>
-                                    <select className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={businessManagerId} onChange={e => setBusinessManagerId(e.target.value)}>
+                                    <select className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={businessManagerId} onChange={e => setBusinessManagerId(e.target.value)}>
                                         <option value="">-- 分配商务人员 --</option>
                                         {users.filter(u => u.roles?.includes('Business') || u.roles?.includes('Admin')).map(u => <option key={u.id} value={u.id}>{u.name.replace(/\s*\(.*?\)/g, '')}</option>)}
                                     </select>
@@ -1526,7 +1526,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             value={sellerName}
                                             onChange={e => setSellerName(e.target.value)}
                                             placeholder="选择商机后自动带入，也可手动填写"
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm text-gray-800 dark:text-white placeholder:text-gray-400"
+                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm text-gray-800 dark:text-white placeholder:text-gray-400"
                                         />
                                     )}
                                 </div>
@@ -1742,13 +1742,13 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             {newOrderItems.length > 0 ? (
                                 <table className="w-full text-left text-sm min-w-[600px]">
                                     <thead className="unified-table-header">
-                                        <tr><th className="p-3 pl-4 text-center w-16 whitespace-nowrap">明细编号</th><th className="p-3">产品/规格</th><th className="p-3">订购性质</th><th className="p-3">365订购性质</th><th className="p-3">授权类型</th><th className="p-3 text-center">数量</th><th className="p-3 text-center">授权/服务期限</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-3">激活方式</th>}<th className="p-3">安装包</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-3">关联企业</th>}<th className="p-3 text-right">单价</th><th className="p-3 text-right">小计</th><th className="p-3 text-center">操作</th></tr>
+                                        <tr><th className="p-3 pl-4 text-center w-16 whitespace-nowrap">明细编号</th><th className="p-3">产品/规格</th><th className="p-3">订购性质</th><th className="p-3">365订购性质</th><th className="p-3">授权类型</th><th className="p-3 text-center">数量</th><th className="p-3 text-center">授权/服务期限</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-3">激活方式</th>}<th className="p-3 text-right">单价</th><th className="p-3 text-right">小计</th><th className="p-3 text-center">操作</th></tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                                         {newOrderItems.map((item, idx) => {
                                             const rowLocked = !!subscriptionLock && idx === 0;
                                             const addonTimeLocked = rowLocked && subscriptionLock?.mode === 'addon';
-                                            const lineColSpan = 11 + (buyerType === 'Customer' || buyerType === 'Channel' ? 2 : 0);
+                                            const lineColSpan = 10 + (buyerType === 'Customer' || buyerType === 'Channel' ? 1 : 0);
                                             return (
                                             <React.Fragment key={idx}>
                                             <tr className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
@@ -1775,26 +1775,6 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                 </td>
                                                 {(buyerType === 'Customer' || buyerType === 'Channel') && (
                                                     <td className="p-3"><span className="text-xs text-gray-700 dark:text-gray-300">{({ Account: '账号激活', SerialKey: '序列号激活', AccountAndSerialKey: '账号+序列号', LicenseKey: '授权码激活', Online: '在线激活', Dongle: '硬件加密狗' } as Record<string, string>)[item.activationMethod || 'Account'] || '账号激活'}</span></td>
-                                                )}
-                                                <td className="p-3 max-w-[180px]">
-                                                    <div className="space-y-1">
-                                                        {item.installPackageType && (
-                                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${item.installPackageType === '通用' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'}`}>{item.installPackageType}</span>
-                                                        )}
-                                                        {item.installPackageName && <div className="text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-lg font-medium">{item.installPackageName}</div>}
-                                                        {item.installPackageLink && <a href={item.installPackageLink} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:underline truncate block" title={item.installPackageLink}>🔗 定制安装包链接</a>}
-                                                        {!item.installPackageType && !item.installPackageName && <span className="text-gray-300 dark:text-gray-600 text-xs">-</span>}
-                                                    </div>
-                                                </td>
-                                                {(buyerType === 'Customer' || buyerType === 'Channel') && (
-                                                    <td className="p-3 max-w-[140px]">
-                                                        {item.enterpriseName ? (
-                                                            <div>
-                                                                <div className="text-xs font-medium text-indigo-600 dark:text-indigo-400">{item.enterpriseName}</div>
-                                                                <div className="text-[10px] text-gray-400 font-mono mt-0.5">{item.enterpriseId}</div>
-                                                            </div>
-                                                        ) : <span className="text-gray-300 dark:text-gray-600 text-xs">-</span>}
-                                                    </td>
                                                 )}
                                                 <td className="p-3 text-right"><span className="text-sm font-medium text-gray-900 dark:text-white" style={{fontVariantNumeric:'tabular-nums'}}>¥{item.priceAtPurchase.toLocaleString()}</span></td>
                                                 <td className="p-3 text-right font-bold text-red-600 dark:text-red-400">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
@@ -1906,7 +1886,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     <button
                                         type="button"
                                         onClick={() => { setIsCategoryPickerOpen(!isCategoryPickerOpen); if (!isCategoryPickerOpen && !tempHoverCategory && categoryTree.length > 0) setTempHoverCategory(categoryTree[0].label); }}
-                                        className={`w-full p-3 bg-gray-50 dark:bg-black border rounded-xl outline-none text-sm text-left flex items-center justify-between transition ${isCategoryPickerOpen ? 'ring-2 ring-[#0071E3] border-[#0071E3]' : 'border-gray-200 dark:border-white/10'}`}
+                                        className={`w-full p-3 bg-white dark:bg-[#1C1C1E] border rounded-xl outline-none text-sm text-left flex items-center justify-between transition ${isCategoryPickerOpen ? 'ring-2 ring-[#0071E3] border-[#0071E3]' : 'border-gray-200 dark:border-white/10'}`}
                                     >
                                         <span className={tempCategory ? 'text-gray-900 dark:text-white' : 'text-gray-400'}>{selectedCategoryLabel || '-- 请选择分类 --'}</span>
                                         <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isCategoryPickerOpen ? 'rotate-180' : ''}`}/>
@@ -1952,7 +1932,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-gray-500 uppercase">选择产品</label>
                                     <select 
-                                        className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50" 
+                                        className={`w-full p-3 border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50 disabled:cursor-not-allowed ${!tempCategory ? 'bg-gray-100 dark:bg-white/5' : 'bg-white dark:bg-[#1C1C1E]'}`}
                                         value={tempProductId} 
                                         onChange={e => setTempProductId(e.target.value)}
                                         disabled={!tempCategory}
@@ -1967,7 +1947,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-gray-500 uppercase">规格</label>
                                     <select 
-                                        className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50" 
+                                        className={`w-full p-3 border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50 disabled:cursor-not-allowed ${!tempProductId ? 'bg-gray-100 dark:bg-white/5' : 'bg-white dark:bg-[#1C1C1E]'}`}
                                         value={tempSkuId} 
                                         onChange={e => setTempSkuId(e.target.value)}
                                         disabled={!tempProductId}
@@ -1983,7 +1963,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     <label className="text-xs font-bold text-gray-500 uppercase">授权类型</label>
                                     {selectedSku?.pricingOptions && selectedSku.pricingOptions.length > 0 ? (
                                         <select 
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm" 
+                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm" 
                                             value={tempPricingOptionId} 
                                             onChange={e => setTempPricingOptionId(e.target.value)}
                                         >
@@ -1993,7 +1973,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             ))}
                                         </select>
                                     ) : (
-                                        <div className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400">
+                                        <div className="w-full p-3 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400 cursor-not-allowed">
                                             {tempSkuId ? '该规格无授权类型' : '请先选择规格'}
                                         </div>
                                     )}
@@ -2001,7 +1981,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-gray-500 uppercase">数量</label>
-                                    <input type="number" className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm" min="1" value={tempQuantity} onChange={e => setTempQuantity(Number(e.target.value))} />
+                                    <input type="number" className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm" min="1" value={tempQuantity} onChange={e => setTempQuantity(Number(e.target.value))} />
                                 </div>
 
                                 <div className="space-y-2">
@@ -2012,12 +1992,12 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             type="number"
                                             min="1"
                                             placeholder="请输入"
-                                            className="flex-1 p-3 bg-gray-50 dark:bg-black border border-teal-200 dark:border-teal-900/30 rounded-xl outline-none focus:ring-2 focus:ring-teal-200 transition text-sm font-medium text-teal-700 dark:text-teal-400"
+                                            className="flex-1 p-3 bg-white dark:bg-[#1C1C1E] border border-teal-200 dark:border-teal-900/30 rounded-xl outline-none focus:ring-2 focus:ring-teal-200 transition text-sm font-medium text-teal-700 dark:text-teal-400"
                                             value={tempLicensePeriodNum}
                                             onChange={e => setTempLicensePeriodNum(e.target.value === '' ? '' : Number(e.target.value))}
                                         />
                                         <select
-                                            className="w-20 p-3 bg-gray-50 dark:bg-black border border-teal-200 dark:border-teal-900/30 rounded-xl outline-none focus:ring-2 focus:ring-teal-200 transition text-sm font-medium text-teal-700 dark:text-teal-400"
+                                            className="w-20 p-3 bg-white dark:bg-[#1C1C1E] border border-teal-200 dark:border-teal-900/30 rounded-xl outline-none focus:ring-2 focus:ring-teal-200 transition text-sm font-medium text-teal-700 dark:text-teal-400"
                                             value={tempLicensePeriodUnit}
                                             onChange={e => setTempLicensePeriodUnit(e.target.value as '年' | '月' | '日')}
                                         >
@@ -2038,7 +2018,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     <div className="relative">
                                         <input 
                                             type="number" 
-                                            className="w-full p-3 pr-16 bg-gray-50 dark:bg-black border border-orange-200 dark:border-orange-900/30 rounded-xl outline-none focus:ring-2 focus:ring-orange-200 transition text-sm font-bold text-orange-600" 
+                                            className="w-full p-3 pr-16 bg-white dark:bg-[#1C1C1E] border border-orange-200 dark:border-orange-900/30 rounded-xl outline-none focus:ring-2 focus:ring-orange-200 transition text-sm font-bold text-orange-600" 
                                             value={negotiatedPrice !== null ? negotiatedPrice : ''} 
                                             onChange={e => setNegotiatedPrice(Number(e.target.value))} 
                                             placeholder={`基准: ¥${selectedOption?.price || selectedSku?.price || 0}`} 
@@ -2054,7 +2034,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     <div className="relative">
                                         <input
                                             type="number"
-                                            className="w-full p-3 pr-16 bg-gray-50 dark:bg-black border border-orange-100 dark:border-orange-900/20 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 transition text-sm font-medium text-orange-500"
+                                            className="w-full p-3 pr-16 bg-gray-100 dark:bg-white/5 border border-orange-100 dark:border-orange-900/20 rounded-xl outline-none transition text-sm font-medium text-orange-500 cursor-not-allowed"
                                             value={negotiatedPrice !== null ? negotiatedPrice : (selectedOption?.price || selectedSku?.price || 0)}
                                             readOnly
                                         />
@@ -2107,7 +2087,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     <label className="text-xs font-bold text-emerald-600 uppercase flex items-center gap-1"><Tag className="w-3 h-3"/> 生态产品名称</label>
                                     <input
                                         type="text"
-                                        className="w-full p-3 bg-gray-50 dark:bg-black border border-emerald-200 dark:border-emerald-900/30 rounded-xl outline-none focus:ring-2 focus:ring-emerald-200 transition text-sm text-emerald-700 dark:text-emerald-400 placeholder:text-gray-400"
+                                        className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-emerald-200 dark:border-emerald-900/30 rounded-xl outline-none focus:ring-2 focus:ring-emerald-200 transition text-sm text-emerald-700 dark:text-emerald-400 placeholder:text-gray-400"
                                         placeholder="请输入生态产品具体名称"
                                         value={tempEcoProductName}
                                         onChange={e => setTempEcoProductName(e.target.value)}
@@ -2237,7 +2217,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             min={1}
                                             value={tempMediaCount}
                                             onChange={e => setTempMediaCount(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))}
-                                            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 outline-none transition"
+                                            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 outline-none transition"
                                             placeholder="请输入介质数量"
                                         />
                                     </div>
@@ -2307,7 +2287,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                 <div className="space-y-1.5">
                                                     <label className="text-xs font-bold text-gray-500 uppercase">CPU</label>
                                                     <select
-                                                        className="w-full p-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
+                                                        className="w-full p-2.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
                                                         value={tempPkgCpu}
                                                         onChange={e => { setTempPkgCpu(e.target.value); setTempPkgOs(''); }}
                                                     >
@@ -2320,7 +2300,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                 <div className="space-y-1.5">
                                                     <label className="text-xs font-bold text-gray-500 uppercase">操作系统</label>
                                                     <select
-                                                        className="w-full p-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
+                                                        className="w-full p-2.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
                                                         value={tempPkgOs}
                                                         onChange={e => setTempPkgOs(e.target.value)}
                                                     >
@@ -2342,7 +2322,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                         <div className="space-y-1.5">
                                                             <label className="text-xs font-bold text-gray-500 uppercase">发布平台</label>
                                                             <select
-                                                                className="w-full p-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
+                                                                className="w-full p-2.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
                                                                 value={tempPkgCpu}
                                                                 onChange={e => { setTempPkgCpu(e.target.value); setTempPkgOs(''); }}
                                                             >
@@ -2353,7 +2333,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                         <div className="space-y-1.5">
                                                             <label className="text-xs font-bold text-gray-500 uppercase">操作系统</label>
                                                             <select
-                                                                className="w-full p-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50"
+                                                                className={`w-full p-2.5 border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50 disabled:cursor-not-allowed ${!tempPkgCpu ? 'bg-gray-100 dark:bg-white/5' : 'bg-white dark:bg-[#1C1C1E]'}`}
                                                                 value={tempPkgOs}
                                                                 onChange={e => setTempPkgOs(e.target.value)}
                                                                 disabled={!tempPkgCpu}
@@ -2372,7 +2352,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                             value={tempPkgLink}
                                                             onChange={e => setTempPkgLink(e.target.value)}
                                                             placeholder="请粘贴定制安装包下载链接"
-                                                            className="flex-1 p-2.5 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm text-gray-800 dark:text-white placeholder:text-gray-400"
+                                                            className="flex-1 p-2.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm text-gray-800 dark:text-white placeholder:text-gray-400"
                                                         />
                                                         {tempPkgLink && (
                                                             <button onClick={() => setTempPkgLink('')} className="px-3 text-xs text-gray-400 hover:text-gray-600 border border-gray-200 dark:border-white/10 rounded-xl transition">清除</button>
@@ -2417,7 +2397,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         <label className="text-xs font-bold text-cyan-500 uppercase flex items-center gap-1"><UserIcon className="w-3 h-3"/> 被授权方</label>
                                         <input
                                             type="text"
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-cyan-200 dark:border-cyan-900/30 rounded-xl outline-none focus:ring-2 focus:ring-cyan-200 transition text-sm text-cyan-700 dark:text-cyan-400"
+                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-cyan-200 dark:border-cyan-900/30 rounded-xl outline-none focus:ring-2 focus:ring-cyan-200 transition text-sm text-cyan-700 dark:text-cyan-400"
                                             placeholder="默认取客户名称"
                                             value={tempLicensee}
                                             onChange={e => setTempLicensee(e.target.value)}
@@ -2428,7 +2408,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-indigo-500 uppercase flex items-center gap-1"><Briefcase className="w-3 h-3"/> 关联企业 ID</label>
                                         <select
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-indigo-200 dark:border-indigo-900/30 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200 transition text-sm text-indigo-700 dark:text-indigo-400"
+                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-indigo-200 dark:border-indigo-900/30 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200 transition text-sm text-indigo-700 dark:text-indigo-400"
                                             value={tempEnterpriseId}
                                             onChange={e => setTempEnterpriseId(e.target.value)}
                                         >
@@ -2444,7 +2424,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         <label className="text-xs font-bold text-teal-500 uppercase flex items-center gap-1"><Briefcase className="w-3 h-3"/> 供货组织</label>
                                         <input
                                             type="text"
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-teal-200 dark:border-teal-900/30 rounded-xl outline-none focus:ring-2 focus:ring-teal-200 transition text-sm text-teal-700 dark:text-teal-400"
+                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-teal-200 dark:border-teal-900/30 rounded-xl outline-none focus:ring-2 focus:ring-teal-200 transition text-sm text-teal-700 dark:text-teal-400"
                                             placeholder="自动带出"
                                             value={sellerName}
                                             onChange={e => setSellerName(e.target.value)}
@@ -2479,7 +2459,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         <select
                                             value={tempPurchaseNature}
                                             onChange={e => setTempPurchaseNature(e.target.value as PurchaseNature)}
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-blue-200 transition text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-blue-200 transition text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
                                         >
                                             <option value="New">新购</option>
                                             <option value="Renewal">续费</option>
@@ -2492,7 +2472,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         <select
                                             value={tempPurchaseNature365}
                                             onChange={e => setTempPurchaseNature365(e.target.value as PurchaseNature)}
-                                            className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-blue-200 transition text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-blue-200 transition text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
                                         >
                                             <option value="New">新购</option>
                                             <option value="Renewal">续费</option>
@@ -2584,7 +2564,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     <select
                                         value={tempSubUnitMode}
                                         onChange={e => { const mode = e.target.value as SubUnitAuthMode; setTempSubUnitMode(mode); if (mode === 'none') { setTempSubUnits([]); } else if (tempSubUnits.length === 0) { setTempSubUnits([{ id: `su_${Date.now()}_0`, unitName: '', enterpriseId: '', enterpriseName: '-', authCount: '', itContact: '', phone: '', email: '', customerType: '-', industryLine: '-', sellerContact: '-' }, { id: `su_${Date.now()}_1`, unitName: '', enterpriseId: '', enterpriseName: '-', authCount: '', itContact: '', phone: '', email: '', customerType: '-', industryLine: '-', sellerContact: '-' }]); } }}
-                                        className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black text-xs font-medium text-gray-700 dark:text-gray-300 outline-none focus:border-indigo-400 transition min-w-[280px]"
+                                        className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-xs font-medium text-gray-700 dark:text-gray-300 outline-none focus:border-indigo-400 transition min-w-[280px]"
                                     >
                                         <option value="none">无下级单位</option>
                                         <option value="separate_auth_separate_eid">授权分别呈现，企业ID分别管理</option>
@@ -2730,7 +2710,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             maxLength={20}
                                             value={reuseSerialNumber}
                                             onChange={e => setReuseSerialNumber(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase())}
-                                            className={`w-full p-3 bg-gray-50 dark:bg-black border rounded-xl text-sm outline-none dark:text-white font-mono tracking-widest focus:ring-2 transition ${
+                                            className={`w-full p-3 bg-white dark:bg-[#1C1C1E] border rounded-xl text-sm outline-none dark:text-white font-mono tracking-widest focus:ring-2 transition ${
                                                 reuseSerialNumber.length === 20
                                                     ? 'border-green-300 dark:border-green-700 focus:ring-green-500/20'
                                                     : reuseSerialNumber.length > 0
@@ -2824,7 +2804,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                     type="date"
                                                     value={expectedPaymentDate}
                                                     onChange={e => setExpectedPaymentDate(e.target.value)}
-                                                    className="w-full md:w-64 p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm"
+                                                    className="w-full md:w-64 p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm"
                                                 />
                                                 <p className="text-[10px] text-gray-400 dark:text-gray-500">信用额度模式下，全部款项将在上述日期前一次性付清。</p>
                                             </div>
@@ -3000,7 +2980,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         <div>
                                             <label className="text-[10px] font-bold text-gray-400 block mb-1">收货方</label>
                                             <select
-                                                className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
+                                                className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
                                                 value={receivingParty}
                                                 onChange={e => setReceivingParty(e.target.value)}
                                             >
@@ -3012,7 +2992,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         <div>
                                             <label className="text-[10px] font-bold text-gray-400 block mb-1">收货单位名称</label>
                                             <input
-                                                className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
+                                                className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
                                                 value={receivingCompany}
                                                 onChange={e => setReceivingCompany(e.target.value)}
                                                 placeholder="请输入收货单位全称..."
@@ -3023,7 +3003,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                 <label className="text-[10px] font-bold text-gray-400 block mb-1">联系电话</label>
                                                 <input
                                                     type="tel"
-                                                    className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
+                                                    className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
                                                     value={shippingPhone}
                                                     onChange={e => setShippingPhone(e.target.value)}
                                                     placeholder="请输入收货联系电话..."
@@ -3033,7 +3013,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                 <label className="text-[10px] font-bold text-gray-400 block mb-1">联系邮箱</label>
                                                 <input
                                                     type="email"
-                                                    className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
+                                                    className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
                                                     value={shippingEmail}
                                                     onChange={e => setShippingEmail(e.target.value)}
                                                     placeholder="请输入收货联系邮箱..."
@@ -3043,7 +3023,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         <div>
                                             <label className="text-[10px] font-bold text-gray-400 block mb-1">收货地址</label>
                                             <textarea
-                                                className="w-full p-3 bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20 h-20 resize-none"
+                                                className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20 h-20 resize-none"
                                                 value={shippingAddress}
                                                 onChange={e => setShippingAddress(e.target.value)}
                                                 placeholder="请输入详细收货地址..."

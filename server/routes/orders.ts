@@ -162,6 +162,8 @@ router.post('/', checkPermission('order', 'create'), validateBody(orderCreateSch
     terminalChannel: o.terminalChannel, orderType: o.orderType,
     creatorId, creatorName, creatorPhone: o.creatorPhone,
     industryLine: o.industryLine, province: o.province, city: o.city, district: o.district,
+    settlementMethod: o.settlementMethod, settlementType: o.settlementType,
+    expectedPaymentDate: o.expectedPaymentDate, installmentPlans: o.installmentPlans,
   });
 
   const nextStatus = normalizeOrderStatus(o.status || 'PENDING_APPROVAL');
@@ -268,6 +270,8 @@ router.put('/:id', checkPermission('order', 'update'), validateBody(orderUpdateS
     isShippingConfirmed: merged.isShippingConfirmed, shippingConfirmedDate: merged.shippingConfirmedDate,
     isCDBurned: merged.isCDBurned, cdBurnedDate: merged.cdBurnedDate,
     shippedDate: merged.shippedDate, carrier: merged.carrier, trackingNumber: merged.trackingNumber,
+    settlementMethod: merged.settlementMethod, settlementType: merged.settlementType,
+    expectedPaymentDate: merged.expectedPaymentDate, installmentPlans: merged.installmentPlans,
   });
 
   const updateOrder = db.prepare(`

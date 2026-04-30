@@ -238,6 +238,8 @@ function ensureSubscriptionChainOrders(db: any) {
       const extra = JSON.stringify({
         directChannel: o.directChannel, terminalChannel: o.terminalChannel,
         orderType: o.orderType, creatorId: o.creatorId, creatorName: o.creatorName,
+        settlementMethod: (o as any).settlementMethod, settlementType: (o as any).settlementType,
+        expectedPaymentDate: (o as any).expectedPaymentDate, installmentPlans: (o as any).installmentPlans,
       });
       ins.run(
         o.id, o.customerId, o.customerName, o.customerType ?? null,
@@ -342,12 +344,13 @@ export function seedDatabase() {
   // --- Opportunities (generated) ---
   const opportunities = generateOpportunities(customers);
   const insertOpp = db.prepare(`
-    INSERT INTO opportunities (id, crm_id, name, customer_id, customer_name, product_type, stage, probability, department, amount, expected_revenue, final_user_rev, close_date, owner_id, owner_name, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO opportunities (id, crm_id, name, customer_id, customer_name, product_type, products, stage, probability, department, amount, expected_revenue, final_user_rev, close_date, owner_id, owner_name, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   for (const o of opportunities) {
     insertOpp.run(o.id, o.crmId ?? null, o.name, o.customerId, o.customerName,
-      o.productType ?? null, o.stage, o.probability, o.department ?? null, o.amount ?? null,
+      o.productType ?? null, o.products ? JSON.stringify(o.products) : null,
+      o.stage, o.probability, o.department ?? null, o.amount ?? null,
       o.expectedRevenue, o.finalUserRevenue ?? null, o.closeDate, o.ownerId, o.ownerName, o.createdAt);
   }
 
@@ -382,6 +385,8 @@ export function seedDatabase() {
       isShippingConfirmed: o.isShippingConfirmed, shippingConfirmedDate: o.shippingConfirmedDate,
       isCDBurned: o.isCDBurned, cdBurnedDate: o.cdBurnedDate,
       shippedDate: o.shippedDate, carrier: o.carrier, trackingNumber: o.trackingNumber,
+      settlementMethod: (o as any).settlementMethod, settlementType: (o as any).settlementType,
+      expectedPaymentDate: (o as any).expectedPaymentDate, installmentPlans: (o as any).installmentPlans,
     });
     insertOrder.run(o.id, o.customerId, o.customerName, o.customerType ?? null,
       o.customerLevel ?? null, o.customerIndustry ?? null, o.customerRegion ?? null,

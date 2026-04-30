@@ -1471,6 +1471,8 @@ export function generateSubscriptionChainOrders(params: SubscriptionChainOrderPa
         creatorName: '苏雪松',
         creatorPhone: '17610166961',
         orderRemark: SUBSCRIPTION_CHAIN_ORDER_REMARK,
+        settlementMethod: (['cash', 'credit', 'prepaid', 'cash', 'credit'] as const)[(ci + si) % 5],
+        settlementType: (['cash', 'credit', 'prepaid', 'cash', 'credit'] as const)[(ci + si) % 5] === 'credit' ? 'installment' : 'once',
       });
     }
   }
@@ -1569,6 +1571,8 @@ export function generateSubscriptionChainOrders(params: SubscriptionChainOrderPa
           creatorName: '苏雪松',
           creatorPhone: '17610166961',
           orderRemark: SUBSCRIPTION_CHAIN_ORDER_REMARK,
+          settlementMethod: (['cash', 'credit', 'prepaid'] as const)[si % 3],
+          settlementType: (['cash', 'credit', 'prepaid'] as const)[si % 3] === 'credit' ? 'installment' : 'once',
         });
       }
     }
@@ -1675,6 +1679,8 @@ export function generateSubscriptionChainOrders(params: SubscriptionChainOrderPa
         creatorName: '苏雪松',
         creatorPhone: '17610166961',
         orderRemark: SUBSCRIPTION_CHAIN_ORDER_REMARK,
+        settlementMethod: (['cash', 'credit', 'prepaid'] as const)[i % 3],
+        settlementType: (['cash', 'credit', 'prepaid'] as const)[i % 3] === 'credit' ? 'installment' : 'once',
       });
     }
   }

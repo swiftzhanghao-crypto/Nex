@@ -8,9 +8,12 @@ const router = Router();
 router.use(authMiddleware);
 
 function toOpportunity(row: any) {
+  let products;
+  try { products = row.products ? JSON.parse(row.products) : undefined; } catch { products = undefined; }
   return {
     id: row.id, crmId: row.crm_id, name: row.name, customerId: row.customer_id,
     customerName: row.customer_name, productType: row.product_type,
+    products,
     stage: row.stage, probability: row.probability, department: row.department,
     amount: row.amount, expectedRevenue: row.expected_revenue,
     finalUserRevenue: row.final_user_rev, closeDate: row.close_date,
@@ -58,10 +61,11 @@ router.post('/', checkPermission('opportunity', 'create'), (req: AuthRequest, re
   }
 
   db.prepare(`
-    INSERT INTO opportunities (id, crm_id, name, customer_id, customer_name, product_type, stage, probability, department, amount, expected_revenue, final_user_rev, close_date, owner_id, owner_name, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO opportunities (id, crm_id, name, customer_id, customer_name, product_type, products, stage, probability, department, amount, expected_revenue, final_user_rev, close_date, owner_id, owner_name, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, o.crmId ?? null, o.name, o.customerId, o.customerName,
-    o.productType ?? null, o.stage || '需求判断', o.probability ?? 0, o.department ?? null,
+    o.productType ?? null, o.products ? JSON.stringify(o.products) : null,
+    o.stage || '需求判断', o.probability ?? 0, o.department ?? null,
     o.amount ?? null, o.expectedRevenue ?? 0, o.finalUserRevenue ?? null,
     o.closeDate, o.ownerId, o.ownerName, new Date().toISOString());
 
@@ -87,10 +91,11 @@ router.put('/:id', checkPermission('opportunity', 'update'), (req: AuthRequest, 
   }
 
   db.prepare(`
-    UPDATE opportunities SET crm_id=?, name=?, customer_id=?, customer_name=?, product_type=?, stage=?, probability=?, department=?, amount=?, expected_revenue=?, final_user_rev=?, close_date=?, owner_id=?, owner_name=?
+    UPDATE opportunities SET crm_id=?, name=?, customer_id=?, customer_name=?, product_type=?, products=?, stage=?, probability=?, department=?, amount=?, expected_revenue=?, final_user_rev=?, close_date=?, owner_id=?, owner_name=?
     WHERE id=?
   `).run(o.crmId ?? null, o.name, o.customerId, o.customerName,
-    o.productType ?? null, o.stage, o.probability, o.department ?? null,
+    o.productType ?? null, o.products ? JSON.stringify(o.products) : null,
+    o.stage, o.probability, o.department ?? null,
     o.amount ?? null, o.expectedRevenue ?? 0, o.finalUserRevenue ?? null,
     o.closeDate, o.ownerId, o.ownerName, id);
 

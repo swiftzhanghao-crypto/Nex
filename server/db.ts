@@ -115,6 +115,7 @@ export function initSchema() {
       customer_id       TEXT NOT NULL,
       customer_name     TEXT NOT NULL,
       product_type      TEXT,
+      products          TEXT,
       stage             TEXT NOT NULL DEFAULT '需求判断',
       probability       REAL NOT NULL DEFAULT 0,
       department        TEXT,

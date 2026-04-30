@@ -1166,7 +1166,7 @@ const OrderDetails: React.FC = () => {
             </div>
 
             {/* Settlement Method */}
-            {hasPermission('order_detail_settlement') && selectedOrder.settlementMethod && (
+            {hasPermission('order_detail_settlement') && (
             <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
                 <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 cursor-pointer select-none" onClick={() => toggleSection('settlement')}>
                     <Banknote className="w-5 h-5 text-emerald-500" />
@@ -1174,15 +1174,18 @@ const OrderDetails: React.FC = () => {
                     <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('settlement') ? '-rotate-90' : ''}`} />
                 </div>
                 {!isSectionCollapsed('settlement') && <div className="px-5 py-4 space-y-4">
+                    {selectedOrder.settlementMethod ? (<>
                     <div className="flex items-center gap-3 flex-wrap">
                         <div className="flex items-center gap-2">
                             <span className="text-sm text-gray-500 dark:text-gray-400">结算方式：</span>
                             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
                                 selectedOrder.settlementMethod === 'credit'
                                     ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700/40'
+                                    : selectedOrder.settlementMethod === 'prepaid'
+                                    ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700/40'
                                     : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700/40'
                             }`}>
-                                {selectedOrder.settlementMethod === 'credit' ? '信用额度' : '现结销售'}
+                                {selectedOrder.settlementMethod === 'credit' ? '信用额度' : selectedOrder.settlementMethod === 'prepaid' ? '预付款' : '现结销售'}
                             </span>
                         </div>
                         {selectedOrder.settlementMethod === 'credit' && (
@@ -1207,6 +1210,9 @@ const OrderDetails: React.FC = () => {
                     {selectedOrder.settlementMethod === 'cash' && (
                         <div className="text-xs text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-white/5 px-3 py-2 rounded-lg">现结销售：订单全部款项将在发货前一次性结清，无需分期。</div>
                     )}
+                    {selectedOrder.settlementMethod === 'prepaid' && (
+                        <div className="text-xs text-gray-400 dark:text-gray-500 bg-amber-50 dark:bg-amber-900/10 px-3 py-2 rounded-lg">预付款：客户已预付全款或部分款项，订单将优先安排发货。</div>
+                    )}
                     {selectedOrder.settlementMethod === 'credit' && selectedOrder.settlementType === 'installment' && selectedOrder.installmentPlans && selectedOrder.installmentPlans.length > 0 && (
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
@@ -1220,7 +1226,7 @@ const OrderDetails: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50 dark:divide-white/5">
-                                    {selectedOrder.installmentPlans.map((plan, idx) => (
+                                    {selectedOrder.installmentPlans.map((plan: any, idx: number) => (
                                         <tr key={idx} className="group text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                             <td className="px-5 py-5 pl-6 text-gray-700 dark:text-gray-300 font-medium">第{idx + 1}期</td>
                                             <td className="px-5 py-5 text-right font-mono font-bold text-gray-900 dark:text-white">¥{plan.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
@@ -1232,6 +1238,9 @@ const OrderDetails: React.FC = () => {
                                 </tbody>
                             </table>
                         </div>
+                    )}
+                    </>) : (
+                        <div className="text-sm text-gray-400 dark:text-gray-500">未设置结算方式</div>
                     )}
                 </div>}
             </div>
