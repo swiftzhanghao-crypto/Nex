@@ -242,12 +242,14 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
   const enableSubUnitAuth = newOrderItems.some(it => it.subUnitAuthMode && it.subUnitAuthMode !== 'none');
 
+  const skipDeliveryStep = buyerType === 'SelfDeal' || buyerType === 'RedeemCode';
   const wizardSteps = [
       { id: 1, label: '订单类型', desc: '来源与模式', icon: Layers },
       { id: 2, label: '客户信息', desc: '客户/商机', icon: UserIcon },
       { id: 3, label: '产品配置', desc: '规格/价格', icon: ShoppingBag },
-      { id: 4, label: '交付信息', desc: '备注/验收', icon: ClipboardCheck },
+      ...(!skipDeliveryStep ? [{ id: 4, label: '交付信息', desc: '备注/验收', icon: ClipboardCheck }] : []),
   ];
+  const lastStep = skipDeliveryStep ? 3 : 4;
 
   const selectedCustomerObj = customers.find(c => c.id === newOrderCustomer);
 
@@ -861,8 +863,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     if (!initialDraft) return;
     isRestoringDraftRef.current = true;
     const d = initialDraft;
-    setCurrentStep(d.currentStep);
     setBuyerType(d.buyerType);
+    const draftMaxStep = (d.buyerType === 'SelfDeal' || d.buyerType === 'RedeemCode') ? 3 : 4;
+    setCurrentStep(Math.min(d.currentStep, draftMaxStep));
     setOrderSource(d.orderSource);
     setOrderRemark(d.orderRemark || '');
     setLinkedContractIds(d.linkedContractIds || []);
@@ -929,21 +932,23 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         alert(`产品"${invalidItem.productName}"的数量或价格无效，请检查后再提交。`);
         return;
     }
-    if (serialNumberRequirement !== '生成新序列号' && reuseSerialNumber.length !== 20) {
-        alert(`选择"${serialNumberRequirement}"时需要填写 20 位序列号（当前 ${reuseSerialNumber.length} 位），请补全后再提交。`);
-        return;
-    }
-    if (settlementMethod === 'credit' && settlementType === 'installment' && installmentPlans.length < 2) {
-        alert('分期付款至少需要 2 期，请添加更多分期计划。');
-        return;
-    }
-    for (let pi = 0; pi < newOrderItems.length; pi++) {
-        const rows = productAcceptanceRows.filter(r => r.productIdx === pi);
-        if (rows.some(r => r.method === '分期验收')) {
-            const totalPct = rows.reduce((s, r) => s + r.percentage, 0);
-            if (Math.abs(totalPct - 100) > 0.01) {
-                alert(`产品"${newOrderItems[pi].productName}"的分期验收比例合计为 ${totalPct}%，必须等于 100%，请调整后再提交。`);
-                return;
+    if (!skipDeliveryStep) {
+        if (serialNumberRequirement !== '生成新序列号' && reuseSerialNumber.length !== 20) {
+            alert(`选择"${serialNumberRequirement}"时需要填写 20 位序列号（当前 ${reuseSerialNumber.length} 位），请补全后再提交。`);
+            return;
+        }
+        if (settlementMethod === 'credit' && settlementType === 'installment' && installmentPlans.length < 2) {
+            alert('分期付款至少需要 2 期，请添加更多分期计划。');
+            return;
+        }
+        for (let pi = 0; pi < newOrderItems.length; pi++) {
+            const rows = productAcceptanceRows.filter(r => r.productIdx === pi);
+            if (rows.some(r => r.method === '分期验收')) {
+                const totalPct = rows.reduce((s, r) => s + r.percentage, 0);
+                if (Math.abs(totalPct - 100) > 0.01) {
+                    alert(`产品"${newOrderItems[pi].productName}"的分期验收比例合计为 ${totalPct}%，必须等于 100%，请调整后再提交。`);
+                    return;
+                }
             }
         }
     }
@@ -1045,7 +1050,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         itContactId: selectedItContactId || undefined,
         linkedContractIds: buyerType !== 'SelfDeal' && linkedContractIds.length > 0 ? linkedContractIds : undefined,
         linkedContractNames: buyerType !== 'SelfDeal' && linkedContractIds.length > 0 ? linkedContractIds.map(id => contracts.find(c => c.id === id)?.name || id) : undefined,
-        settlementMethod: settlementMethod || undefined,
+        settlementMethod: skipDeliveryStep ? 'cash' : (settlementMethod || undefined),
         settlementType: settlementMethod === 'credit' ? settlementType : undefined,
         expectedPaymentDate: settlementMethod === 'credit' && settlementType === 'once' && expectedPaymentDate ? expectedPaymentDate : undefined,
         installmentPlans: settlementMethod === 'credit' && settlementType === 'installment' && installmentPlans.length > 0 ? installmentPlans : undefined,
@@ -3184,7 +3189,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                     )}
                 </div>
                 <div className="flex gap-3">
-                    {currentStep < 4 ? (
+                    {currentStep < lastStep ? (
                         <button 
                             disabled={
                                 (currentStep === 1 && !buyerType) ||
