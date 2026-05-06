@@ -1029,8 +1029,8 @@ const OrderDetails: React.FC = () => {
                               <div className="mt-2 pt-2 border-t border-gray-100 dark:border-white/10">
                                   <div className="text-[12px] font-bold text-gray-400 dark:text-gray-500 tracking-wider mb-1.5">订单联系人</div>
                                   <div className="space-y-1.5">
-                                      {renderContact(pct, '采购', { bg: 'bg-blue-50/60 dark:bg-blue-900/10', ring: 'border-blue-100/80 dark:border-blue-800/30', avatar: 'bg-blue-100 dark:bg-blue-900/40', text: 'text-blue-600 dark:text-blue-400' })}
-                                      {renderContact(ict, 'IT', { bg: 'bg-purple-50/60 dark:bg-purple-900/10', ring: 'border-purple-100/80 dark:border-purple-800/30', avatar: 'bg-purple-100 dark:bg-purple-900/40', text: 'text-purple-600 dark:text-purple-400' })}
+                                      {renderContact(pct, selectedOrder.buyerType === 'SelfDeal' || selectedOrder.buyerType === 'RedeemCode' ? '联系人' : '采购', { bg: 'bg-blue-50/60 dark:bg-blue-900/10', ring: 'border-blue-100/80 dark:border-blue-800/30', avatar: 'bg-blue-100 dark:bg-blue-900/40', text: 'text-blue-600 dark:text-blue-400' })}
+                                      {selectedOrder.buyerType !== 'SelfDeal' && selectedOrder.buyerType !== 'RedeemCode' && renderContact(ict, 'IT', { bg: 'bg-purple-50/60 dark:bg-purple-900/10', ring: 'border-purple-100/80 dark:border-purple-800/30', avatar: 'bg-purple-100 dark:bg-purple-900/40', text: 'text-purple-600 dark:text-purple-400' })}
                                   </div>
                               </div>
                           );

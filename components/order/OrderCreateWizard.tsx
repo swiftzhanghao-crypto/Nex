@@ -1542,17 +1542,17 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-2">
                                 <Users className="w-4 h-4 text-teal-500"/> 订单联系人
                             </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* 采购联系人 */}
+                            <div className={`grid grid-cols-1 ${buyerType !== 'SelfDeal' && buyerType !== 'RedeemCode' ? 'md:grid-cols-2' : ''} gap-4`}>
+                                {/* 采购联系人 / 自成交时显示为"联系人" */}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">采购联系人 <span className="text-red-500">*</span></label>
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">{buyerType === 'SelfDeal' || buyerType === 'RedeemCode' ? '联系人' : '采购联系人'} <span className="text-red-500">*</span></label>
                                     <div className="flex items-center gap-2">
                                         <select
                                             value={selectedPurchasingContactId}
                                             onChange={e => setSelectedPurchasingContactId(e.target.value)}
                                             className="flex-1 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-[#2C2C2E] text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 outline-none transition"
                                         >
-                                            <option value="">请选择采购联系人</option>
+                                            <option value="">{buyerType === 'SelfDeal' || buyerType === 'RedeemCode' ? '请选择联系人' : '请选择采购联系人'}</option>
                                             {purchasingContacts.map(c => (
                                                 <option key={c.id} value={c.id}>{c.name}{c.isPrimary ? '（主要）' : ''}{c.position ? ` · ${c.position}` : ''}</option>
                                             ))}
@@ -1577,7 +1577,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     })()}
                                 </div>
 
-                                {/* IT 联系人 */}
+                                {/* IT 联系人（自成交/兑换码订单不显示） */}
+                                {buyerType !== 'SelfDeal' && buyerType !== 'RedeemCode' && (
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">IT 联系人 <span className="text-red-500">*</span></label>
                                     <div className="flex items-center gap-2">
@@ -1610,6 +1611,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         );
                                     })()}
                                 </div>
+                                )}
                             </div>
                         </div>
                         )}
@@ -3196,10 +3198,12 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             }
                             onClick={() => {
                                 if (currentStep === 2) {
+                                    const hideItContact = buyerType === 'SelfDeal' || buyerType === 'RedeemCode';
+                                    const purchasingLabel = hideItContact ? '联系人' : '采购联系人';
                                     const missingPurchasing = purchasingContacts.length > 0 && !selectedPurchasingContactId;
-                                    const missingIT = itContacts.length > 0 && !selectedItContactId;
+                                    const missingIT = !hideItContact && itContacts.length > 0 && !selectedItContactId;
                                     if (missingPurchasing || missingIT) {
-                                        alert(`请选择${missingPurchasing ? '采购联系人' : ''}${missingPurchasing && missingIT ? '和' : ''}${missingIT ? 'IT 联系人' : ''}`);
+                                        alert(`请选择${missingPurchasing ? purchasingLabel : ''}${missingPurchasing && missingIT ? '和' : ''}${missingIT ? 'IT 联系人' : ''}`);
                                         return;
                                     }
                                 }
