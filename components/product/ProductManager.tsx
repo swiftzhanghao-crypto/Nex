@@ -248,7 +248,7 @@ const ProductManager: React.FC = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">产品管理</h1>
         {activeTab === 'SPU' && (
-            <button onClick={handleOpenModal} className="unified-button-primary">
+            <button onClick={() => navigate('/products/create')} className="unified-button-primary">
                 <Plus className="w-4 h-4" /> 新增产品
             </button>
         )}

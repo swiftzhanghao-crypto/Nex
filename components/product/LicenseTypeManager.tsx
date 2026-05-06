@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { Plus, GripVertical, RotateCcw, Save, ChevronLeft, Download, X } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext } from '../../contexts/AppContext';
+import { inferDefaultPurchaseUnit, inferDefaultAuxPurchaseUnit } from '../../utils/authTypeDefaults';
 
 interface FieldCfg {
   displayMode: string;
@@ -26,6 +27,11 @@ interface AuthType {
   period: string;
   nccBiz: string;
   nccIncome: string;
+  hasUpgradeWarranty: boolean;
+  /** 购买单位，如：套、台、件 */
+  purchaseUnit: string;
+  /** 辅助购买单位，仅周期性授权类型可填，如：用户数、并发数 */
+  auxPurchaseUnit?: string;
   order: number;
   enabled: boolean;
   fieldCfg: Record<string, FieldCfg>;
@@ -79,6 +85,9 @@ const FIELD_GROUPS: FieldGroup[] = [
 
 const TOTAL_FIELDS = FIELD_GROUPS.reduce((sum, g) => sum + g.fields.length, 0);
 
+const PURCHASE_UNIT_OPTIONS = ['套', '用户', '获得授权主体', '人天', '人月', '次', '个', '年', '客户', '件'];
+const AUX_PURCHASE_UNIT_OPTIONS = ['用户', '套', '个', '客户', '次'];
+
 function initFieldCfg(f: FieldDef): FieldCfg {
   const dm = f.dt === 'fixed' ? 'fixed' : (f.dt === 'conditional' ? 'conditional' : 'show');
   return {
@@ -95,7 +104,9 @@ function createAuthTypes(sourceData: { id: string; name: string; period: string;
   return sourceData.map((at, i) => {
     const fieldCfg: Record<string, FieldCfg> = {};
     FIELD_GROUPS.forEach(g => g.fields.forEach(f => { fieldCfg[f.key] = initFieldCfg(f); }));
-    return { ...at, order: i + 1, enabled: true, fieldCfg };
+    const purchaseUnit = inferDefaultPurchaseUnit(at.name);
+    const auxPurchaseUnit = at.period === '周期性' ? inferDefaultAuxPurchaseUnit(at.name, at.period) : undefined;
+    return { ...at, hasUpgradeWarranty: false, purchaseUnit, auxPurchaseUnit, order: i + 1, enabled: true, fieldCfg };
   });
 }
 
@@ -139,7 +150,7 @@ const LicenseTypeManager: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCopyModal, setShowCopyModal] = useState(false);
   const [copySourceId, setCopySourceId] = useState('');
-  const [addForm, setAddForm] = useState({ name: '', period: '周期性', nccBiz: '', nccIncome: '' });
+  const [addForm, setAddForm] = useState({ name: '', period: '周期性', nccBiz: '', nccIncome: '', hasUpgradeWarranty: '否' as '是' | '否', purchaseUnit: '', auxPurchaseUnit: '' });
   const [addErrors, setAddErrors] = useState<Record<string, string>>({});
   const [copyName, setCopyName] = useState('');
   const [copyError, setCopyError] = useState('');
@@ -234,17 +245,31 @@ const LicenseTypeManager: React.FC = () => {
     else if (authTypes.some(a => a.name === addForm.name.trim())) errors.name = `授权名称「${addForm.name.trim()}」已存在，不允许重名`;
     if (!addForm.nccBiz.trim()) errors.nccBiz = '请输入NCC业务类型';
     if (!addForm.nccIncome.trim()) errors.nccIncome = '请输入NCC收入类型';
+    if (!addForm.purchaseUnit.trim()) errors.purchaseUnit = '请选择购买单位';
+    if (addForm.period === '周期性' && !addForm.auxPurchaseUnit.trim()) errors.auxPurchaseUnit = '周期性授权需选择辅助购买单位';
     setAddErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
     const fieldCfg: Record<string, FieldCfg> = {};
     FIELD_GROUPS.forEach(g => g.fields.forEach(f => { fieldCfg[f.key] = initFieldCfg(f); }));
     const maxOrder = authTypes.reduce((m, a) => Math.max(m, a.order), 0);
-    setAuthTypes(prev => [...prev, { id: `custom_${Date.now()}`, name: addForm.name.trim(), period: addForm.period, nccBiz: addForm.nccBiz.trim(), nccIncome: addForm.nccIncome.trim(), order: maxOrder + 1, enabled: true, fieldCfg }]);
+    setAuthTypes(prev => [...prev, {
+      id: `custom_${Date.now()}`,
+      name: addForm.name.trim(),
+      period: addForm.period,
+      nccBiz: addForm.nccBiz.trim(),
+      nccIncome: addForm.nccIncome.trim(),
+      hasUpgradeWarranty: addForm.hasUpgradeWarranty === '是',
+      purchaseUnit: addForm.purchaseUnit.trim(),
+      auxPurchaseUnit: addForm.period === '周期性' ? addForm.auxPurchaseUnit.trim() : undefined,
+      order: maxOrder + 1,
+      enabled: true,
+      fieldCfg,
+    }]);
     setShowAddModal(false);
-    setAddForm({ name: '', period: '周期性', nccBiz: '', nccIncome: '' });
+    setAddForm({ name: '', period: '周期性', nccBiz: '', nccIncome: '', hasUpgradeWarranty: '否', purchaseUnit: '', auxPurchaseUnit: '' });
     setAddErrors({});
-    showToast(`已新增授权方式「${addForm.name.trim()}」`);
+    showToast(`已新增授权类型「${addForm.name.trim()}」`);
   };
 
   const openCopy = (id: string) => {
@@ -298,7 +323,7 @@ const LicenseTypeManager: React.FC = () => {
   };
 
   const exportConfig = () => {
-    const out = authTypes.map(at => ({ name: at.name, period: at.period, order: at.order, enabled: at.enabled, nccBiz: at.nccBiz, nccIncome: at.nccIncome, fields: at.fieldCfg }));
+    const out = authTypes.map(at => ({ name: at.name, period: at.period, order: at.order, enabled: at.enabled, nccBiz: at.nccBiz, nccIncome: at.nccIncome, hasUpgradeWarranty: at.hasUpgradeWarranty, purchaseUnit: at.purchaseUnit, auxPurchaseUnit: at.auxPurchaseUnit, fields: at.fieldCfg }));
     const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -337,16 +362,49 @@ const LicenseTypeManager: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
           <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl p-3">
             <div className="text-xs text-gray-400 mb-1">授权方式</div>
-            <div className="text-sm font-medium text-gray-800 dark:text-white">{detailAt.name}</div>
+            <div className="text-sm font-medium text-gray-800 dark:text-white truncate" title={detailAt.name}>{detailAt.name}</div>
           </div>
           <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl p-3">
             <div className="text-xs text-gray-400 mb-1">周期属性</div>
-            <select value={detailAt.period} onChange={e => updateAtProp(detailAt.id, 'period', e.target.value)} className="text-sm font-medium bg-transparent border border-gray-200 dark:border-white/10 rounded px-2 py-1 w-full text-gray-800 dark:text-white">
+            <select
+              value={detailAt.period}
+              onChange={e => {
+                const period = e.target.value;
+                setAuthTypes(prev => prev.map(a => a.id === detailAt.id ? { ...a, period, auxPurchaseUnit: period === '周期性' ? a.auxPurchaseUnit : undefined } : a));
+              }}
+              className="text-sm font-medium bg-transparent border border-gray-200 dark:border-white/10 rounded px-2 py-1 w-full text-gray-800 dark:text-white"
+            >
               <option value="周期性">周期性</option><option value="非周期性">非周期性</option>
             </select>
+          </div>
+          <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl p-3">
+            <div className="text-xs text-gray-400 mb-1">购买单位</div>
+            <select
+              value={detailAt.purchaseUnit || ''}
+              onChange={e => setAuthTypes(prev => prev.map(a => a.id === detailAt.id ? { ...a, purchaseUnit: e.target.value } : a))}
+              className="text-sm font-medium bg-transparent border border-gray-200 dark:border-white/10 rounded px-2 py-1 w-full text-gray-800 dark:text-white"
+            >
+              <option value="">请选择</option>
+              {PURCHASE_UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </div>
+          <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl p-3">
+            <div className="text-xs text-gray-400 mb-1">辅助购买单位</div>
+            {detailAt.period === '周期性' ? (
+              <select
+                value={detailAt.auxPurchaseUnit || ''}
+                onChange={e => setAuthTypes(prev => prev.map(a => a.id === detailAt.id ? { ...a, auxPurchaseUnit: e.target.value } : a))}
+                className="text-sm font-medium bg-transparent border border-gray-200 dark:border-white/10 rounded px-2 py-1 w-full text-gray-800 dark:text-white"
+              >
+                <option value="">请选择</option>
+                {AUX_PURCHASE_UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            ) : (
+              <div className="text-xs text-gray-300 italic px-2 py-1">非周期性不适用</div>
+            )}
           </div>
           <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl p-3">
             <div className="text-xs text-gray-400 mb-1">NCC业务类型</div>
@@ -355,6 +413,17 @@ const LicenseTypeManager: React.FC = () => {
           <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl p-3">
             <div className="text-xs text-gray-400 mb-1">NCC收入类型</div>
             <input value={detailAt.nccIncome} onChange={e => updateAtProp(detailAt.id, 'nccIncome', e.target.value)} className="text-sm font-medium bg-transparent border border-gray-200 dark:border-white/10 rounded px-2 py-1 w-full text-gray-800 dark:text-white" placeholder="请输入" />
+          </div>
+          <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl p-3">
+            <div className="text-xs text-gray-400 mb-1">含升级保障</div>
+            <select
+              value={detailAt.hasUpgradeWarranty ? '是' : '否'}
+              onChange={e => setAuthTypes(prev => prev.map(a => a.id === detailAt.id ? { ...a, hasUpgradeWarranty: e.target.value === '是' } : a))}
+              className="text-sm font-medium bg-transparent border border-gray-200 dark:border-white/10 rounded px-2 py-1 w-full text-gray-800 dark:text-white"
+            >
+              <option value="否">否</option>
+              <option value="是">是</option>
+            </select>
           </div>
           <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl p-3">
             <div className="text-xs text-gray-400 mb-1">状态</div>
@@ -534,19 +603,22 @@ const LicenseTypeManager: React.FC = () => {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 dark:bg-black/20 text-xs text-gray-400 font-semibold uppercase">
-              <th className="px-2 py-2.5 text-center w-[4%]"></th>
-              <th className="px-4 py-2.5 text-center w-[5%]">序号</th>
-              <th className="px-4 py-2.5 text-left w-[23%]">授权方式</th>
-              <th className="px-4 py-2.5 text-center w-[10%]">周期性</th>
-              <th className="px-4 py-2.5 text-center w-[15%]">NCC业务类型</th>
-              <th className="px-4 py-2.5 text-center w-[15%]">NCC收入类型</th>
-              <th className="px-4 py-2.5 text-center w-[10%]">状态</th>
-              <th className="px-4 py-2.5 text-center w-[12%]">操作</th>
+              <th className="px-2 py-2.5 text-center w-[3%]"></th>
+              <th className="px-4 py-2.5 text-center w-[4%]">序号</th>
+              <th className="px-4 py-2.5 text-left w-[16%]">授权方式</th>
+              <th className="px-4 py-2.5 text-center w-[7%]">周期性</th>
+              <th className="px-4 py-2.5 text-center w-[8%]">购买单位</th>
+              <th className="px-4 py-2.5 text-center w-[8%]">辅助购买单位</th>
+              <th className="px-4 py-2.5 text-center w-[12%]">NCC业务类型</th>
+              <th className="px-4 py-2.5 text-center w-[12%]">NCC收入类型</th>
+              <th className="px-4 py-2.5 text-center w-[7%]">含升级保障</th>
+              <th className="px-4 py-2.5 text-center w-[7%]">状态</th>
+              <th className="px-4 py-2.5 text-center w-[10%]">操作</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
-              <tr><td colSpan={8} className="py-16 text-center text-gray-400 text-sm">暂无匹配的授权方式</td></tr>
+              <tr><td colSpan={11} className="py-16 text-center text-gray-400 text-sm">暂无匹配的授权方式</td></tr>
             )}
             {filtered.map(at => (
               <tr
@@ -567,8 +639,11 @@ const LicenseTypeManager: React.FC = () => {
                 <td className="px-4 py-3 text-center"><span className="text-xs text-gray-400 font-medium tabular-nums">{at.order}</span></td>
                 <td className="px-4 py-3"><span className="font-medium text-gray-800 dark:text-white">{at.name}</span></td>
                 <td className="px-4 py-3 text-center"><Badge text={at.period} color={at.period === '周期性' ? 'blue' : 'amber'} /></td>
+                <td className="px-4 py-3 text-center">{at.purchaseUnit ? <span className="text-xs text-gray-700 dark:text-gray-300 font-medium">{at.purchaseUnit}</span> : <span className="text-gray-300">—</span>}</td>
+                <td className="px-4 py-3 text-center">{at.auxPurchaseUnit ? <span className="text-xs text-gray-700 dark:text-gray-300 font-medium">{at.auxPurchaseUnit}</span> : <span className="text-gray-300">—</span>}</td>
                 <td className="px-4 py-3 text-center">{at.nccBiz ? <Badge text={at.nccBiz} color={at.nccBiz === '可持续授权' ? 'green' : 'gray'} /> : <span className="text-gray-300">—</span>}</td>
                 <td className="px-4 py-3 text-center">{at.nccIncome ? <Badge text={at.nccIncome} color="gray" /> : <span className="text-gray-300">—</span>}</td>
+                <td className="px-4 py-3 text-center"><Badge text={at.hasUpgradeWarranty ? '是' : '否'} color={at.hasUpgradeWarranty ? 'blue' : 'gray'} /></td>
                 <td className="px-4 py-3 text-center"><Toggle checked={at.enabled} onChange={v => toggleEnabled(at.id, v)} /></td>
                 <td className="px-4 py-3 text-center">
                   <button onClick={e => { e.stopPropagation(); setDetailId(at.id); }} className="text-xs text-blue-600 dark:text-blue-400 hover:underline mr-2">配置</button>
@@ -584,29 +659,98 @@ const LicenseTypeManager: React.FC = () => {
       {showAddModal && (
         <ModalPortal>
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowAddModal(false)}>
-            <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl p-6 w-[420px] shadow-2xl" onClick={e => e.stopPropagation()}>
-              <div className="flex justify-between items-center mb-4"><h3 className="text-lg font-bold text-gray-900 dark:text-white">新增授权方式</h3><button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button></div>
-              <div className="space-y-3">
+            <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl p-6 w-[460px] shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-4"><h3 className="text-lg font-bold text-gray-900 dark:text-white">新增授权类型</h3><button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button></div>
+              <div className="space-y-4">
+                {/* 基础信息 */}
                 <div>
-                  <label className="text-xs font-bold text-gray-500 mb-1 block">授权名称 <span className="text-red-500">*</span></label>
-                  <input value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm bg-transparent text-gray-800 dark:text-white" placeholder="请输入授权名称" />
-                  {addErrors.name && <div className="text-xs text-red-500 mt-1">{addErrors.name}</div>}
+                  <div className="text-[11px] font-bold text-gray-400 mb-2 uppercase tracking-wider">基础信息</div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 mb-1 block">授权名称 <span className="text-red-500">*</span></label>
+                      <input value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm bg-transparent text-gray-800 dark:text-white" placeholder="请输入授权名称" />
+                      {addErrors.name && <div className="text-xs text-red-500 mt-1">{addErrors.name}</div>}
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 mb-1 block">周期性 <span className="text-red-500">*</span></label>
+                      <select
+                        value={addForm.period}
+                        onChange={e => {
+                          const period = e.target.value;
+                          setAddForm(p => ({
+                            ...p,
+                            period,
+                            auxPurchaseUnit: period === '周期性' ? p.auxPurchaseUnit : '',
+                          }));
+                        }}
+                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-transparent text-gray-800 dark:text-white"
+                      >
+                        <option value="周期性">周期性</option><option value="非周期性">非周期性</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
+
+                {/* 单位配置 */}
                 <div>
-                  <label className="text-xs font-bold text-gray-500 mb-1 block">周期性 <span className="text-red-500">*</span></label>
-                  <select value={addForm.period} onChange={e => setAddForm(p => ({ ...p, period: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-transparent text-gray-800 dark:text-white">
-                    <option value="周期性">周期性</option><option value="非周期性">非周期性</option>
-                  </select>
+                  <div className="text-[11px] font-bold text-gray-400 mb-2 uppercase tracking-wider">默认单位配置</div>
+                  <div className={`grid gap-3 ${addForm.period === '周期性' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 mb-1 block">购买单位 <span className="text-red-500">*</span></label>
+                      <select
+                        value={addForm.purchaseUnit}
+                        onChange={e => setAddForm(p => ({ ...p, purchaseUnit: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-transparent text-gray-800 dark:text-white"
+                      >
+                        <option value="">请选择</option>
+                        {PURCHASE_UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                      {addErrors.purchaseUnit && <div className="text-xs text-red-500 mt-1">{addErrors.purchaseUnit}</div>}
+                    </div>
+                    {addForm.period === '周期性' && (
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 mb-1 block">辅助购买单位 <span className="text-red-500">*</span></label>
+                        <select
+                          value={addForm.auxPurchaseUnit}
+                          onChange={e => setAddForm(p => ({ ...p, auxPurchaseUnit: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-transparent text-gray-800 dark:text-white"
+                        >
+                          <option value="">请选择</option>
+                          {AUX_PURCHASE_UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                        {addErrors.auxPurchaseUnit && <div className="text-xs text-red-500 mt-1">{addErrors.auxPurchaseUnit}</div>}
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                {/* 业务属性 */}
                 <div>
-                  <label className="text-xs font-bold text-gray-500 mb-1 block">NCC业务类型 <span className="text-red-500">*</span></label>
-                  <input value={addForm.nccBiz} onChange={e => setAddForm(p => ({ ...p, nccBiz: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm bg-transparent text-gray-800 dark:text-white" placeholder="如：可持续授权、永久性授权" />
-                  {addErrors.nccBiz && <div className="text-xs text-red-500 mt-1">{addErrors.nccBiz}</div>}
+                  <div className="text-[11px] font-bold text-gray-400 mb-2 uppercase tracking-wider">业务属性</div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 mb-1 block">含升级保障 <span className="text-red-500">*</span></label>
+                    <select value={addForm.hasUpgradeWarranty} onChange={e => setAddForm(p => ({ ...p, hasUpgradeWarranty: e.target.value as '是' | '否' }))} className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-transparent text-gray-800 dark:text-white">
+                      <option value="否">否</option>
+                      <option value="是">是</option>
+                    </select>
+                  </div>
                 </div>
+
+                {/* 财务属性 */}
                 <div>
-                  <label className="text-xs font-bold text-gray-500 mb-1 block">NCC收入类型 <span className="text-red-500">*</span></label>
-                  <input value={addForm.nccIncome} onChange={e => setAddForm(p => ({ ...p, nccIncome: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm bg-transparent text-gray-800 dark:text-white" placeholder="如：授权-数量授权、授权-场地授权" />
-                  {addErrors.nccIncome && <div className="text-xs text-red-500 mt-1">{addErrors.nccIncome}</div>}
+                  <div className="text-[11px] font-bold text-gray-400 mb-2 uppercase tracking-wider">财务属性</div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 mb-1 block">NCC业务类型 <span className="text-red-500">*</span></label>
+                      <input value={addForm.nccBiz} onChange={e => setAddForm(p => ({ ...p, nccBiz: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm bg-transparent text-gray-800 dark:text-white" placeholder="如：可持续授权、永久性授权" />
+                      {addErrors.nccBiz && <div className="text-xs text-red-500 mt-1">{addErrors.nccBiz}</div>}
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 mb-1 block">NCC收入类型 <span className="text-red-500">*</span></label>
+                      <input value={addForm.nccIncome} onChange={e => setAddForm(p => ({ ...p, nccIncome: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm bg-transparent text-gray-800 dark:text-white" placeholder="如：授权-数量授权、授权-场地授权" />
+                      {addErrors.nccIncome && <div className="text-xs text-red-500 mt-1">{addErrors.nccIncome}</div>}
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="flex justify-end gap-2 mt-5">

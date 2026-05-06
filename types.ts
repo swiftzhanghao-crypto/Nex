@@ -8,6 +8,12 @@ export interface AuthTypeData {
     period: string;
     nccBiz: string;
     nccIncome: string;
+    /** 是否含升级保障 */
+    hasUpgradeWarranty?: boolean;
+    /** 默认购买单位（如：套、用户、人月） */
+    purchaseUnit?: string;
+    /** 默认辅助购买单位，仅周期性授权类型 */
+    auxPurchaseUnit?: string;
 }
 
 export type ActivationMethod = 'LicenseKey' | 'Online' | 'Dongle' | 'Account' | 'SerialKey' | 'AccountAndSerialKey';
@@ -158,6 +164,29 @@ export interface InstallPackage {
     enabled?: boolean;
     packageType?: 'public' | 'private';
     source?: string;
+    // ===== 私有云安装包独有字段（对接运维聚合平台带出） =====
+    /** 部署包 ID（私有云：用户填，系统校验后带出其他字段） */
+    deployPackageId?: string;
+    /** 部署包名称 */
+    deployPackageName?: string;
+    /** 版本类型 */
+    versionType?: string;
+    /** 包产品类型 */
+    packageProductType?: string;
+    /** 版本号 */
+    versionNumber?: string;
+    /** 包类型（如：基础包、补丁包等） */
+    packageKind?: string;
+}
+
+/** 私有云部署包（来自运维聚合平台） */
+export interface DeployPackageInfo {
+    id: string;
+    name: string;
+    versionType: string;
+    packageProductType: string;
+    versionNumber: string;
+    packageKind: string;
 }
 
 export interface Product {
@@ -176,6 +205,8 @@ export interface Product {
         showLicenseScope: boolean;
     };
     productType?: string;
+    /** 产品类别：通用产品/非维保服务产品 / 维保服务产品 */
+    productKind?: '通用产品/非维保服务产品' | '维保服务产品';
     onlineDelivery?: string;
     productClass?: string;
     productClassification?: string;
@@ -198,13 +229,29 @@ export interface Product {
     linkedServices?: LinkedService[];
     salesScope?: SalesScopeRow[];
     subUnitLicenseAllowed?: boolean;
+    /** 公有云权益关联（每种权益类型最多一个产品） */
+    publicCloudBenefits?: PublicCloudBenefit[];
+    /** 私有云权益关联（每种权益类型可关联多个产品） */
+    privateCloudBenefits?: PrivateCloudBenefit[];
+    /** 销售渠道：渠道端 / 商城 / 365后台直签 / 365后台兑换码 / 365后台自流量 */
+    salesChannels?: string[];
+    /** 可销售客户清单（客户类型多选） */
+    sellableCustomerTypes?: string[];
+    /** 可销售的渠道级别（仅当勾选"渠道端"时启用） */
+    sellableChannelLevels?: string[];
 }
 
 export interface SalesScopeRow {
     salesOrg: string;
+    /** 商务发货产品名称，默认带出产品名称，允许编辑 */
+    businessShipProductName?: string;
     materialType: string;
     authMaterialName: string;
     mediaMaterialName: string;
+    /** 授权物料编号（从物料清单选取） */
+    authMaterialCode?: string;
+    /** 介质物料编号（从物料清单选取） */
+    mediaMaterialCode?: string;
     supplyOrg: string;
     status: 'listed' | 'unlisted';
     billingStatus: 'maintained' | 'unmaintained';
@@ -214,6 +261,53 @@ export interface SalesScopeRow {
     billingModelSpec?: string;
     billingProductCode?: string;
     billingUnit?: string;
+}
+
+/** 公有云权益类型 */
+export type PublicCloudBenefitType = '套餐' | '权益包' | '三方产品' | '三方产品-政企';
+/** 私有云权益类型 */
+export type PrivateCloudBenefitType = '云办公（私有云）' | '文档中台';
+
+/** 外部权益系统中的产品 */
+export interface BenefitProduct {
+    /** 外部产品编号 */
+    code: string;
+    /** 外部产品名称 */
+    name: string;
+    /** 权益类型，用于回显 */
+    benefitType: PublicCloudBenefitType | PrivateCloudBenefitType;
+    /** 备注/简介 */
+    description?: string;
+}
+
+/** 公有云权益关联（单选） */
+export interface PublicCloudBenefit {
+    type: PublicCloudBenefitType;
+    productCode: string;
+    productName: string;
+}
+
+/** 私有云权益关联（多选，按类型分组） */
+export interface PrivateCloudBenefit {
+    type: PrivateCloudBenefitType;
+    productCode: string;
+    productName: string;
+}
+
+/** 物料清单条目（销售范围-物料选择器使用） */
+export interface MaterialListItem {
+    /** 物料编号 */
+    code: string;
+    /** 物料名称 */
+    name: string;
+    /** 物料类型：授权 / 介质 */
+    kind: '授权' | '介质';
+    /** 对应的供货组织 */
+    supplyOrg: string;
+    /** 关联销售组织（若有，过滤用） */
+    salesOrg?: string;
+    /** 启用状态：true=启用 / false=停用 */
+    enabled: boolean;
 }
 
 export interface LinkedService {

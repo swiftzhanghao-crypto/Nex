@@ -13,6 +13,7 @@ import OrganizationManager from './components/system/OrganizationManager';
 import ChannelManager from './components/channel/ChannelManager';
 import OpportunityManager from './components/crm/OpportunityManager';
 import ProductDetails from './components/product/ProductDetails';
+import ProductCreateWizard from './components/product/ProductCreateWizard';
 import OrderDetails from './components/order/OrderDetails';
 import CustomerDetails from './components/crm/CustomerDetails';
 import ReportsManager from './components/crm/ReportsManager';
@@ -67,6 +68,7 @@ function AppRoutes() {
         <Route path="/product-policy" element={<ProductPolicyManager />} />
         <Route path="/catalog/:id/preview" element={<ProductPreview />} />
         <Route path="/products" element={<ProductManager />} />
+        <Route path="/products/create" element={<ProductCreateWizard />} />
         <Route path="/products/:id" element={<ProductDetails />} />
         <Route path="/merchandises/:id" element={<MerchandiseDetails />} />
 
