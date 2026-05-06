@@ -25,6 +25,13 @@ data/*.db-shm
 # Environment
 .env
 
+# Deploy
+.deploy.env
+.deploy-last-commit
+__deploy_*
+__src_*
+dist-upload*.zip
+
 # Playwright MCP screenshots
 .playwright-mcp/
 

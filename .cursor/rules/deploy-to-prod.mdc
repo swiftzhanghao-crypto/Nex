@@ -1,0 +1,70 @@
+---
+description: 推送代码到 git 后自动部署到生产服务器（10.99.128.225 / NexSrv 任务 / 端口 4567）
+alwaysApply: true
+---
+
+# 部署到生产服务器
+
+当用户说「**发布**」「**部署**」「**deploy**」「**push 后部署**」「**同步到服务端**」等意图时，
+**完成 git push 后**应主动询问"是否同步部署到 10.99.128.225"，得到肯定后执行：
+
+```powershell
+.\scripts\deploy-prod.ps1
+```
+
+脚本会自动完成：增量上传源文件 → 本地 `npm run build` → 上传 dist → 停止 NexSrv → 强杀监听
+4567 的 PID → 启动 NexSrv → 健康检查 → 记录已部署 commit。
+
+## 触发时机
+
+- ✅ 用户刚执行 `git push` 完成后，主动询问是否部署
+- ✅ 用户明确说"发布到服务端"、"重新部署"
+- ❌ 仅修改本地配置/文档时不主动部署
+- ❌ 未推送到 git 的本地变更先确认是否要 push
+
+## 关键事实（不要重新探查）
+
+| 项目 | 值 |
+|---|---|
+| 服务器 | `10.99.128.225` (Windows) |
+| 部署目录 | `C:\Users\mac\Desktop\nex` |
+| 计划任务 | `NexSrv`（SYSTEM, 开机自启） |
+| 端口 | `4567` |
+| 健康端点 | `http://10.99.128.225:4567/api/health` |
+| 静态目录 | `<deploy>\dist`（vite build 产物） |
+| 服务命令 | `tsx server/production.ts >> server.log 2>&1` |
+| 日志 | `<deploy>\server.log` |
+| SSH 主机指纹 | `SHA256:eds5eVJTexFv8ozfXcxeIcBOd8L4/yiV18AWKmtHLp4` |
+| 凭据来源 | 仓库根目录 `.deploy.env`（已 gitignore） |
+
+## 常用命令
+
+```powershell
+# 增量部署（默认；与 .deploy-last-commit 比 diff）
+.\scripts\deploy-prod.ps1
+
+# 全量同步源文件（首次部署或服务端基线不确定时）
+.\scripts\deploy-prod.ps1 -FullSync
+
+# 仅同步源代码并重启（纯 server/*.ts 改动，不涉及前端）
+.\scripts\deploy-prod.ps1 -SkipBuild
+
+# 仅重新构建前端 + 重启（前端样式/组件改动）
+.\scripts\deploy-prod.ps1 -SkipUpload
+```
+
+## 已知陷阱（脚本已规避，不要踩）
+
+1. **pscp 路径解析**：远端路径以 `C:` 开头时常被错误地当成 host:path 分隔，文件会落到用户 home 而不是预期目录。脚本统一上传到 home 后用 plink `move` 转移。
+2. **`schtasks /End` 不杀子进程**：服务由计划任务的子进程 `node.exe` 监听端口，必须 `netstat -ano | findstr :4567` 拿 PID 后 `taskkill /PID xxx /T /F` 才能真正释放端口。脚本已实现。
+3. **服务器无 `vite`**：生产环境只装了运行时依赖，前端必须**本地构建**再上传 dist；不要尝试在服务器跑 `npm run build`。
+4. **PowerShell 中嵌套引号**：复杂命令通过"生成临时 .bat → pscp 上传 → plink 执行 → 删除"的方式避免 cmd/powershell 多层引号转义灾难。
+5. **首次连接 host key**：脚本通过 `-hostkey` 参数显式指定指纹，跳过交互确认。
+6. **PowerShell 保留变量**：`$pid` 是 PowerShell 自动变量，脚本里用的是 `$procPid`。
+
+## 失败排查
+
+- 健康检查超时：SSH 到服务器查看 `C:\Users\mac\Desktop\nex\server.log` 末尾。
+- 端口仍被占用：`netstat -ano | findstr :4567`，手动 `taskkill /PID <pid> /F`。
+- pscp/plink 报 hostkey 错误：服务器重装系统后指纹变化，更新 `.deploy.env` 的 `DEPLOY_HOSTKEY`。
+- 工具缺失：`winget install --id PuTTY.PuTTY -e --accept-package-agreements --accept-source-agreements`。
