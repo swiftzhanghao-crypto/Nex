@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { Order, OrderStatus, OrderItem, ActivationMethod, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, DeliveryMethod, OrderDraft, ConversionOrder, CustomerContact, PurchaseNature, SubUnitAuthMode, OnlineDeliveryEntry, Subscription, SubscriptionLineProductSnapshot } from '../../types';
 import { initialConversionOrders, ALL_INSTALL_PKG_ROWS } from '../../data/staticData';
-import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Network, Globe, Radio, RefreshCcw, Wallet, Zap, Box, Settings, MapPin, Briefcase, XCircle, Search, Save, ScrollText, Phone, Mail, Users, Banknote, Calendar, Check, ChevronRight, ChevronDown, Pencil, Key, Building2, Sparkles, Upload, Download, Wrench, Tag } from 'lucide-react';
+import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Network, Globe, Radio, RefreshCcw, Wallet, Zap, Box, Settings, MapPin, Briefcase, XCircle, Search, Save, ScrollText, Phone, Mail, Users, Banknote, Calendar, Check, ChevronRight, ChevronDown, Pencil, Key, Building2, Sparkles, Upload, Download, Wrench, Tag, Package } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import Pagination from '../common/Pagination';
 import { useAppContext, useEnsureData } from '../../contexts/AppContext';
@@ -28,6 +28,18 @@ import { useTempSubUnits } from './wizard/useTempSubUnits';
 import { useProductCascade } from './wizard/useProductCascade';
 import { useConversion } from './wizard/useConversion';
 import Step1OrderType from './wizard/Step1OrderType';
+import {
+  validateStep1,
+  validateStep2,
+  validateStep3,
+  validateStep4,
+  validateAll,
+  getFieldError,
+  type ValidationError,
+  type WizardFormState,
+} from './wizard/wizardValidation';
+import { FieldError, ValidationToast, StepValidationBanner } from './wizard/ValidationFeedback';
+import OrderConfirmModal from './wizard/OrderConfirmModal';
 
 interface OrderCreateWizardProps {
   isOpen: boolean;
@@ -98,11 +110,12 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     isCategoryPickerOpen, setIsCategoryPickerOpen,
     categoryPickerRef,
     tempProductId, setTempProductId,
-    tempSkuId, setTempSkuId, setTempSkuIdFromOption,
+    tempSkuId, setTempSkuId, setTempSkuIdFromOption, setTempProductWithSku,
     tempPricingOptionId, setTempPricingOptionId,
     tempQuantity, setTempQuantity,
     tempActivationMethod, setTempActivationMethod,
     tempMediaCount, setTempMediaCount,
+    tempSiteLicensePcCount, setTempSiteLicensePcCount,
     tempLicensePeriod, setTempLicensePeriod,
     tempLicensePeriodNum, setTempLicensePeriodNum,
     tempLicensePeriodUnit, setTempLicensePeriodUnit,
@@ -199,10 +212,11 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       condition: string;
       expectedDate: string;
       percentage: number;
+      content?: string;
   };
   const [productAcceptanceRows, setProductAcceptanceRows] = useState<ProductAcceptanceRow[]>([]);
 
-  const [settlementMethod, setSettlementMethod] = useState<'cash' | 'credit' | ''>('');
+  const [settlementMethod, setSettlementMethod] = useState<'cash' | 'credit' | ''>('cash');
   const [settlementType, setSettlementType] = useState<'once' | 'installment'>('once');
   const [expectedPaymentDate, setExpectedPaymentDate] = useState('');
   const [installmentPlans, setInstallmentPlans] = useState<{amount: number; expectedDate: string; actualDate: string; paidAmount: number}[]>([]);
@@ -210,6 +224,27 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const [reuseSerialNumber, setReuseSerialNumber] = useState('');
 
   const [expandedSubUnitIdx, setExpandedSubUnitIdx] = useState<number | null>(null);
+
+  // --- Realtime Validation State ---
+  const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+  const [showValidationToast, setShowValidationToast] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+
+  const markFieldTouched = useCallback((field: string) => {
+    setTouchedFields(prev => {
+      const next = new Set(prev);
+      next.add(field);
+      return next;
+    });
+  }, []);
+
+  const getVisibleFieldError = useCallback((field: string): string | undefined => {
+    if (!touchedFields.has(field) && !hasAttemptedSubmit) return undefined;
+    return getFieldError(validationErrors, field);
+  }, [validationErrors, touchedFields, hasAttemptedSubmit]);
 
   const {
     updateItemSubUnitMode,
@@ -382,10 +417,16 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setSelectedConversionIds([]);
       setSellerName('');
       setSellerContact('');
-      setSettlementMethod('');
+      setSettlementMethod('cash');
       setSettlementType('once');
       setExpectedPaymentDate('');
       setInstallmentPlans([]);
+      setValidationErrors([]);
+      setTouchedFields(new Set());
+      setShowValidationToast(false);
+      setShowConfirmModal(false);
+      setIsSubmitting(false);
+      setHasAttemptedSubmit(false);
   };
 
   const handleClose = () => { onClose(); resetCreateForm(); };
@@ -516,14 +557,17 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     setNewContactForm({ name: '', phone: '', email: '', position: '' });
   };
 
-  const handleAddItem = () => {
-    if (!selectedProduct || !selectedSku || tempQuantity <= 0) return;
+  const canAddItem = useMemo(() => {
+    if (!selectedProduct || !selectedSku || tempQuantity <= 0) return false;
+    if (selectedSku.pricingOptions && selectedSku.pricingOptions.length > 0 && !tempPricingOptionId) return false;
+    const pkgRows = ALL_INSTALL_PKG_ROWS.filter(r => r.productId === selectedProduct.id && r.enabled);
+    if (pkgRows.length > 0 && !tempPkgType) return false;
+    if ((buyerType === 'Customer' || buyerType === 'Channel') && !tempEnterpriseId) return false;
+    return true;
+  }, [selectedProduct, selectedSku, tempQuantity, tempPricingOptionId, tempPkgType, buyerType, tempEnterpriseId, orderEnterpriseId]);
 
-    
-    if (selectedSku.pricingOptions && selectedSku.pricingOptions.length > 0 && !selectedOption) {
-        alert("请选择授权类型 (Pricing Option)");
-        return;
-    }
+  const handleAddItem = () => {
+    if (!canAddItem || !selectedProduct || !selectedSku) return;
 
     const capabilitiesSnapshot = selectedProduct.composition?.map(c => c.name) || [];
 
@@ -575,6 +619,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         licensePeriod: isPermanent ? '永久' : (needsManualPeriod && tempLicensePeriodNum ? `${tempLicensePeriodNum}${tempLicensePeriodUnit}` : undefined),
         activationMethod: tempActivationMethod,
         mediaCount: typeof tempMediaCount === 'number' ? tempMediaCount : undefined,
+        siteLicensePcCount: typeof tempSiteLicensePcCount === 'number' ? tempSiteLicensePcCount : undefined,
         purchaseNature: tempPurchaseNature,
         purchaseNature365: tempPurchaseNature365,
         licensee: tempLicensee || undefined,
@@ -698,6 +743,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setTempQuantity(item.quantity);
       setTempActivationMethod(item.activationMethod || 'Account');
       setTempMediaCount(item.mediaCount ?? 1);
+      setTempSiteLicensePcCount(item.siteLicensePcCount ?? '');
       setNegotiatedPrice(item.priceAtPurchase);
       setTempEnterpriseId(item.enterpriseId || '');
       setTempLicensee(item.licensee || '');
@@ -727,6 +773,40 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   };
 
   const calculateNewOrderTotal = () => newOrderItems.reduce((acc, item) => acc + (item.priceAtPurchase * item.quantity), 0);
+
+  // --- Realtime Validation Effect ---
+  useEffect(() => {
+    const formState: WizardFormState = {
+      buyerType,
+      orderSource,
+      hasOpportunity,
+      linkedOpportunityId,
+      newOrderCustomer,
+      orderEnterpriseId,
+      selectedChannelId,
+      purchasingContacts,
+      selectedPurchasingContactId,
+      itContacts,
+      selectedItContactId,
+      isAgentOrder,
+      agentCode,
+      newOrderItems,
+      serialNumberRequirement,
+      reuseSerialNumber,
+      settlementMethod,
+      settlementType,
+      installmentPlans,
+      productAcceptanceRows,
+      orderTotal: newOrderItems.reduce((acc, item) => acc + (item.priceAtPurchase * item.quantity), 0),
+    };
+    setValidationErrors(validateAll(formState));
+  }, [
+    buyerType, orderSource, hasOpportunity, linkedOpportunityId, newOrderCustomer,
+    orderEnterpriseId, selectedChannelId, purchasingContacts, selectedPurchasingContactId,
+    itContacts, selectedItContactId, isAgentOrder, agentCode, newOrderItems,
+    serialNumberRequirement, reuseSerialNumber, settlementMethod, settlementType,
+    installmentPlans, productAcceptanceRows,
+  ]);
 
   const orderLinesNatureSourceKey = useMemo(
     () =>
@@ -789,7 +869,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
               if (existing && existing.length > 0) {
                   next.push(...existing);
               } else {
-                  next.push({ productIdx: idx, method: '一次性验收', condition: '视同验收', expectedDate: '', percentage: 100 });
+                  next.push({ productIdx: idx, method: '一次性验收', condition: '视同验收', expectedDate: '', percentage: 100, content: '' });
               }
           });
           return next;
@@ -904,7 +984,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     setCurrentDraftId(d.id);
     setSelectedPurchasingContactId(d.purchasingContactId || '');
     setSelectedItContactId(d.itContactId || '');
-    setSettlementMethod(d.settlementMethod || '');
+    setSettlementMethod(d.settlementMethod || 'cash');
     setExpectedPaymentDate(d.expectedPaymentDate || '');
     setSerialNumberRequirement(d.serialNumberRequirement || '生成新序列号');
     setReuseSerialNumber(d.reuseSerialNumber || '');
@@ -920,54 +1000,19 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     requestAnimationFrame(() => { isRestoringDraftRef.current = false; });
   }, [initialDraft]);
 
-  const handleCreateOrder = async () => {
-    const selfDealMissingEnterprise = buyerType === 'SelfDeal' && !orderEnterpriseId;
-    const otherMissingCustomer = buyerType !== 'SelfDeal' && !newOrderCustomer;
-    if (selfDealMissingEnterprise || otherMissingCustomer || newOrderItems.length === 0 || !buyerType) {
-        alert(selfDealMissingEnterprise ? '请选择企业 ID。' : '请完善订单信息：客户、产品或订单类型未填写。');
-        return;
+  const handleCreateOrder = () => {
+    setHasAttemptedSubmit(true);
+    const currentErrors = validationErrors;
+    if (currentErrors.length > 0) {
+      setShowValidationToast(true);
+      return;
+
     }
-    const invalidItem = newOrderItems.find(it => !it.quantity || it.quantity <= 0 || it.priceAtPurchase < 0);
-    if (invalidItem) {
-        alert(`产品"${invalidItem.productName}"的数量或价格无效，请检查后再提交。`);
-        return;
-    }
-    if (!skipDeliveryStep) {
-        if (serialNumberRequirement !== '生成新序列号' && reuseSerialNumber.length !== 20) {
-            alert(`选择"${serialNumberRequirement}"时需要填写 20 位序列号（当前 ${reuseSerialNumber.length} 位），请补全后再提交。`);
-            return;
-        }
-        if (settlementMethod === 'credit' && settlementType === 'installment' && installmentPlans.length < 2) {
-            alert('分期付款至少需要 2 期，请添加更多分期计划。');
-            return;
-        }
-        for (let pi = 0; pi < newOrderItems.length; pi++) {
-            const rows = productAcceptanceRows.filter(r => r.productIdx === pi);
-            if (rows.some(r => r.method === '分期验收')) {
-                const totalPct = rows.reduce((s, r) => s + r.percentage, 0);
-                if (Math.abs(totalPct - 100) > 0.01) {
-                    alert(`产品"${newOrderItems[pi].productName}"的分期验收比例合计为 ${totalPct}%，必须等于 100%，请调整后再提交。`);
-                    return;
-                }
-            }
-        }
-    }
-    for (let pi = 0; pi < newOrderItems.length; pi++) {
-        const item = newOrderItems[pi];
-        if (item.subUnitAuthMode && item.subUnitAuthMode !== 'none' && item.subUnits && item.subUnits.length > 0) {
-            const subs = item.subUnits as SubUnitLocal[];
-            const subTotal = subs.reduce((s, u) => s + (parseInt(u.authCount) || 0), 0);
-            if (subTotal !== item.quantity) {
-                alert(`产品"${item.productName}"的下级单位授权数量合计 (${subTotal}) 与该明细数量 (${item.quantity}) 不一致，请调整后再提交。`);
-                return;
-            }
-            const emptyUnit = subs.find(u => !u.unitName || !u.enterpriseId || !u.authCount || !u.itContact || !u.phone);
-            if (emptyUnit) {
-                alert(`产品"${item.productName}"中下级单位"${emptyUnit.unitName || '(未命名)'}"存在未填写的必填字段，请补充完整。`);
-                return;
-            }
-        }
-    }
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmSubmit = async () => {
+    setIsSubmitting(true);
     const customer = customers.find(c => c.id === newOrderCustomer);
     const salesUser = users.find(u => u.id === salesRepId);
     const businessUser = users.find(u => u.id === businessManagerId);
@@ -1000,6 +1045,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                 percentage: row.percentage,
                 amount,
                 status: 'Pending',
+                content: row.content || undefined,
             });
         }
     }
@@ -1032,7 +1078,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         approvalRecords: [], salesRepId: salesRepId, salesRepName: salesUser?.name, 
         businessManagerId: businessManagerId, businessManagerName: businessUser?.name,
         creatorId: creatorUser.id, creatorName: creatorUser.name.replace(/\s*\(.*?\)/g, ''), creatorPhone: creatorUser.phone,
-        buyerType,
+        buyerType: buyerType as BuyerType,
         buyerId: buyerType === 'Channel' ? selectedChannelId : (buyerType === 'Customer' ? newOrderCustomer : undefined),
         buyerName: selectedBuyerNameId
             ? (buyerType === 'Channel' ? channels.find(c => c.id === selectedBuyerNameId)?.name : customers.find(c => c.id === selectedBuyerNameId)?.companyName)
@@ -1066,8 +1112,13 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
             const created = await orderApi.create(newOrder);
             if (currentDraftId) setOrderDrafts(prev => prev.filter(d => d.id !== currentDraftId));
             await refreshOrders();
+            setShowConfirmModal(false);
             onClose(); resetCreateForm(); navigate(`/orders/${created.id}`);
-        } catch (e: any) { alert(e.message || '创建订单失败'); return; }
+        } catch (e: any) {
+            setIsSubmitting(false);
+            alert(e.message || '创建订单失败');
+            return;
+        }
     } else {
         if (currentDraftId) {
             setOrders(prev => prev.map(o => o.id === currentDraftId ? newOrder : o));
@@ -1075,6 +1126,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         } else {
             setOrders([newOrder, ...orders]);
         }
+        setShowConfirmModal(false);
         onClose(); resetCreateForm(); navigate(`/orders/${newOrder.id}`);
     }
   };
@@ -1231,6 +1283,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
             </div>
 
             <div className="p-5 overflow-y-auto flex-1 custom-scrollbar bg-gray-50/30 dark:bg-black/20">
+                {/* 步骤级校验错误 Banner */}
+                {hasAttemptedSubmit && <StepValidationBanner errors={validationErrors} currentStep={currentStep} />}
+
                 {/* Step 1: Order Type & Source */}
                 {currentStep === 1 && (
                     <Step1OrderType
@@ -1256,7 +1311,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                         <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-3">
                             <div className="flex items-center justify-between">
                                 <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                    <Briefcase className="w-4 h-4 text-purple-500"/> 关联商机
+                                    <Briefcase className="w-4 h-4 text-purple-500"/> 关联商机 <span className="text-red-500 text-sm">*</span>
                                 </h4>
                                 <div className="flex gap-2">
                                     <button onClick={() => setHasOpportunity('yes')} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${hasOpportunity === 'yes' ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 shadow-sm' : 'border-gray-200 dark:border-white/10 text-gray-400 hover:border-gray-300 dark:hover:border-white/20'}`}>
@@ -1438,10 +1493,11 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 <>
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">选择客户 <span className="text-red-500">*</span></label>
-                                    <select className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={newOrderCustomer} onChange={e => handleCustomerChange(e.target.value)}>
+                                    <select className={`w-full p-3 bg-white dark:bg-[#1C1C1E] border rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm ${getVisibleFieldError('newOrderCustomer') ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`} value={newOrderCustomer} onChange={e => handleCustomerChange(e.target.value)} onBlur={() => markFieldTouched('newOrderCustomer')}>
                                         <option value="">-- 请选择客户 --</option>
                                         {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
                                     </select>
+                                    <FieldError error={getVisibleFieldError('newOrderCustomer')} />
                                     {linkedOpportunityId && (
                                         <div className="flex items-center gap-2 text-xs text-blue-500 dark:text-blue-400 mt-1">
                                             <Briefcase className="w-3 h-3 shrink-0" />
@@ -1457,10 +1513,11 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     {subscriptionLock && (
                                         <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-1">来自订阅续费/增购，客户不可更换。</p>
                                     )}
-                                    <select disabled={!!subscriptionLock} className={`w-full p-3 border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm disabled:opacity-60 disabled:cursor-not-allowed ${subscriptionLock ? 'bg-gray-100 dark:bg-white/5' : 'bg-white dark:bg-[#1C1C1E]'}`} value={newOrderCustomer} onChange={e => handleCustomerChange(e.target.value)}>
+                                    <select disabled={!!subscriptionLock} className={`w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm disabled:opacity-60 disabled:cursor-not-allowed ${subscriptionLock ? 'bg-gray-100 dark:bg-white/5' : 'bg-white dark:bg-[#1C1C1E]'} ${getVisibleFieldError('newOrderCustomer') ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`} value={newOrderCustomer} onChange={e => handleCustomerChange(e.target.value)} onBlur={() => markFieldTouched('newOrderCustomer')}>
                                         <option value="">-- 请选择客户 --</option>
                                         {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
                                     </select>
+                                    <FieldError error={getVisibleFieldError('newOrderCustomer')} />
                                 </div>
                                 </>
                                 )}
@@ -1483,10 +1540,11 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     <>
                                     <div className="space-y-2">
                                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300">买方名称（代理商） <span className="text-red-500">*</span></label>
-                                        <select className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={selectedChannelId} onChange={e => setSelectedChannelId(e.target.value)}>
+                                        <select className={`w-full p-3 bg-white dark:bg-[#1C1C1E] border rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm ${getVisibleFieldError('selectedChannelId') ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`} value={selectedChannelId} onChange={e => setSelectedChannelId(e.target.value)} onBlur={() => markFieldTouched('selectedChannelId')}>
                                             <option value="">-- 选择渠道商 --</option>
                                             {channels.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                         </select>
+                                        <FieldError error={getVisibleFieldError('selectedChannelId')} />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300">直接下级渠道</label>
@@ -1555,7 +1613,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         <select
                                             value={selectedPurchasingContactId}
                                             onChange={e => setSelectedPurchasingContactId(e.target.value)}
-                                            className="flex-1 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-[#2C2C2E] text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 outline-none transition"
+                                            onBlur={() => markFieldTouched('selectedPurchasingContactId')}
+                                            className={`flex-1 px-3 py-2 border rounded-xl text-sm bg-white dark:bg-[#2C2C2E] text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 outline-none transition ${getVisibleFieldError('selectedPurchasingContactId') ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}
                                         >
                                             <option value="">{buyerType === 'SelfDeal' || buyerType === 'RedeemCode' ? '请选择联系人' : '请选择采购联系人'}</option>
                                             {purchasingContacts.map(c => (
@@ -1569,6 +1628,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             <Plus className="w-3.5 h-3.5"/>新建
                                         </button>
                                     </div>
+                                    <FieldError error={getVisibleFieldError('selectedPurchasingContactId')} />
                                     {selectedPurchasingContactId && (() => {
                                         const c = purchasingContacts.find(x => x.id === selectedPurchasingContactId);
                                         if (!c) return null;
@@ -1590,7 +1650,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         <select
                                             value={selectedItContactId}
                                             onChange={e => setSelectedItContactId(e.target.value)}
-                                            className="flex-1 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-[#2C2C2E] text-gray-800 dark:text-white focus:ring-2 focus:ring-purple-500/30 focus:border-purple-400 outline-none transition"
+                                            onBlur={() => markFieldTouched('selectedItContactId')}
+                                            className={`flex-1 px-3 py-2 border rounded-xl text-sm bg-white dark:bg-[#2C2C2E] text-gray-800 dark:text-white focus:ring-2 focus:ring-purple-500/30 focus:border-purple-400 outline-none transition ${getVisibleFieldError('selectedItContactId') ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}
                                         >
                                             <option value="">请选择 IT 联系人</option>
                                             {itContacts.map(c => (
@@ -1604,6 +1665,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             <Plus className="w-3.5 h-3.5"/>新建
                                         </button>
                                     </div>
+                                    <FieldError error={getVisibleFieldError('selectedItContactId')} />
                                     {selectedItContactId && (() => {
                                         const c = itContacts.find(x => x.id === selectedItContactId);
                                         if (!c) return null;
@@ -1889,7 +1951,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 </div>
                                 <div className="grid grid-cols-4 gap-4">
                                 <div className="space-y-2 relative" ref={categoryPickerRef}>
-                                    <label className="text-xs font-bold text-gray-500 uppercase">产品分类</label>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">产品分类 <span className="text-red-500">*</span></label>
                                     <button
                                         type="button"
                                         onClick={() => { setIsCategoryPickerOpen(!isCategoryPickerOpen); if (!isCategoryPickerOpen && !tempHoverCategory && categoryTree.length > 0) setTempHoverCategory(categoryTree[0].label); }}
@@ -1936,27 +1998,57 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     )}
                                 </div>
 
-                                <div className="space-y-2 col-span-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">选择产品</label>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase">选择产品 <span className="text-red-500">*</span></label>
                                     <select 
                                         className={`w-full p-3 border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50 disabled:cursor-not-allowed ${!tempCategory ? 'bg-gray-100 dark:bg-white/5' : 'bg-white dark:bg-[#1C1C1E]'}`}
-                                        value={tempProductId} 
-                                        onChange={e => setTempProductId(e.target.value)}
+                                        value={tempProductId && tempSkuId ? `${tempProductId}||${tempSkuId}` : tempProductId ? `${tempProductId}||` : ''}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            if (!val) { setTempProductId(''); return; }
+                                            const [pId, sId] = val.split('||');
+                                            if (sId) {
+                                                setTempProductWithSku(pId, sId);
+                                            } else {
+                                                setTempProductId(pId);
+                                            }
+                                        }}
                                         disabled={!tempCategory}
                                     >
                                         <option value="">-- {tempCategory ? '请选择产品' : '请先选择分类'} --</option>
                                         {products.filter(p => p.status === 'OnShelf' && p.subCategory === tempCategory).map(p => {
                                             const activeSkus = p.skus.filter(s => s.status === 'Active');
-                                            const specName = activeSkus.length > 0 ? activeSkus[0].name : '';
+                                            const uniqueSpecs = Array.from(new Map(activeSkus.map(s => [s.name, s])).values());
+                                            if (uniqueSpecs.length <= 1) {
+                                                return <option key={p.id} value={`${p.id}||${uniqueSpecs[0]?.id || ''}`}>{p.name}{uniqueSpecs[0] ? ` / ${uniqueSpecs[0].name}` : ''}</option>;
+                                            }
                                             return (
-                                                <option key={p.id} value={p.id}>{p.name}{specName ? ` / ${specName}` : ''}</option>
+                                                <optgroup key={p.id} label={p.name}>
+                                                    {uniqueSpecs.map(s => (
+                                                        <option key={`${p.id}-${s.id}`} value={`${p.id}||${s.id}`}>{p.name} / {s.name}</option>
+                                                    ))}
+                                                </optgroup>
                                             );
                                         })}
                                     </select>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">授权类型</label>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">产品规格</label>
+                                    <div className={`w-full p-3 border border-gray-200 dark:border-white/10 rounded-xl text-sm min-h-[46px] flex items-center ${selectedProduct ? 'bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white' : 'bg-gray-100 dark:bg-white/5 text-gray-400'}`}>
+                                        {(() => {
+                                            if (!selectedProduct) return '选择产品后自动带出';
+                                            const activeSkus = selectedProduct.skus.filter(s => s.status === 'Active');
+                                            const uniqueNames = Array.from(new Set(activeSkus.map(s => s.name)));
+                                            if (uniqueNames.length === 0) return <span className="text-gray-400">无规格</span>;
+                                            if (selectedSku) return <span className="font-medium">{selectedSku.name}</span>;
+                                            return <span className="font-medium">{uniqueNames.join(' / ')}</span>;
+                                        })()}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase">授权类型 <span className="text-red-500">*</span></label>
                                     {(() => {
                                         const activeSkus = selectedProduct?.skus.filter(s => s.status === 'Active') || [];
                                         const allOptions = activeSkus.flatMap(s => (s.pricingOptions || []).map(opt => ({ ...opt, skuId: s.id, skuCode: s.code })));
@@ -1989,7 +2081,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">数量</label>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">数量 <span className="text-red-500">*</span></label>
                                     <input type="number" className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm" min="1" value={tempQuantity} onChange={e => setTempQuantity(Number(e.target.value))} />
                                 </div>
 
@@ -2023,7 +2115,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-xs font-bold text-orange-500 uppercase flex items-center gap-1"><ArrowUpRight className="w-3 h-3"/> 单价</label>
+                                    <label className="text-xs font-bold text-orange-500 uppercase flex items-center gap-1"><ArrowUpRight className="w-3 h-3"/> 单价 <span className="text-red-500">*</span></label>
                                     <div className="relative">
                                         <input 
                                             type="number" 
@@ -2230,6 +2322,19 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             placeholder="请输入介质数量"
                                         />
                                     </div>
+
+                                    {/* 端年场地授权覆盖的PC数量 */}
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">端年场地授权覆盖的PC数量</label>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            value={tempSiteLicensePcCount}
+                                            onChange={e => setTempSiteLicensePcCount(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                                            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 outline-none transition"
+                                            placeholder="请输入PC数量"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
@@ -2261,6 +2366,11 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
                                 return (
                                     <div className="space-y-3">
+
+                                        <div className="flex items-center gap-2 pb-1">
+                                            <Package className="w-4 h-4 text-indigo-500"/>
+                                            <span className="text-sm font-bold text-gray-900 dark:text-white">安装包信息 <span className="text-red-500">*</span></span>
+                                        </div>
 
                                         {/* 通用 / 定制 切换 */}
                                         <div className="flex gap-3">
@@ -2415,13 +2525,13 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
                                     {(buyerType === 'Customer' || buyerType === 'Channel') && newOrderCustomer && selectedCustomerObj?.enterprises && selectedCustomerObj.enterprises.length > 0 && (
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-indigo-500 uppercase flex items-center gap-1"><Briefcase className="w-3 h-3"/> 关联企业 ID</label>
+                                        <label className="text-xs font-bold text-indigo-500 uppercase flex items-center gap-1"><Briefcase className="w-3 h-3"/> 关联企业 ID <span className="text-red-500">*</span></label>
                                         <select
                                             className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-indigo-200 dark:border-indigo-900/30 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200 transition text-sm text-indigo-700 dark:text-indigo-400"
                                             value={tempEnterpriseId}
                                             onChange={e => setTempEnterpriseId(e.target.value)}
                                         >
-                                            <option value="">-- 不关联企业 --</option>
+                                            <option value="">-- 请选择关联企业 --</option>
                                             {selectedCustomerObj.enterprises.map(ent => (
                                                 <option key={ent.id} value={ent.id}>{ent.name} (ID: {ent.id})</option>
                                             ))}
@@ -2672,7 +2782,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 <button onClick={() => { setShowAddProductModal(false); setEditingItemIndex(null); }} className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition">取消</button>
                                 <button
                                     onClick={handleAddItem}
-                                    disabled={!tempProductId || !tempSkuId || !tempPricingOptionId}
+                                    disabled={!canAddItem}
                                     className="px-8 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-xl text-sm font-bold flex items-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-apple"
                                 >
                                     {editingItemIndex !== null ? <><Check className="w-4 h-4"/> 保存修改</> : <><Plus className="w-4 h-4"/> 加入清单</>}
@@ -2735,13 +2845,17 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             </span>
                                             <span className="text-gray-400">仅支持字母和数字</span>
                                         </div>
+                                        <FieldError error={getVisibleFieldError('reuseSerialNumber')} />
                                     </div>
                                 )}
                             </div>
 
                             {/* 结算方式 */}
-                            <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-4">
-                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><Banknote className="w-4 h-4 text-emerald-500"/> 结算方式</h4>
+                            <div className={`bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border shadow-apple space-y-4 ${getVisibleFieldError('settlementMethod') ? 'border-red-300 dark:border-red-800' : 'border-gray-100 dark:border-white/5'}`}>
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><Banknote className="w-4 h-4 text-emerald-500"/> 结算方式 <span className="text-red-500 text-sm">*</span></h4>
+                                    {getVisibleFieldError('settlementMethod') && <span className="text-xs text-red-500 font-medium">{getVisibleFieldError('settlementMethod')}</span>}
+                                </div>
 
                                 {/* 第一层：现结销售 vs 信用额度 */}
                                 <div className="grid grid-cols-2 gap-3">
@@ -2876,6 +2990,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                         订单总额：<span className="font-bold font-mono text-gray-700 dark:text-gray-300">¥{calculateNewOrderTotal().toLocaleString()}</span>
                                                     </div>
                                                 </div>
+                                                <FieldError error={getVisibleFieldError('installmentPlans') || getVisibleFieldError('installmentPlansTotal')} />
                                             </div>
                                         )}
                                     </div>
@@ -3049,6 +3164,41 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                     <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple overflow-hidden">
                         <div className="px-5 pt-4 pb-2 flex items-center justify-between">
                             <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><ClipboardCheck className="w-4 h-4 text-green-500"/> 验收计划</h4>
+                            {newOrderItems.length > 0 && (
+                                <div className="relative group/add-accept">
+                                    <button className="flex items-center gap-1.5 text-xs font-bold text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 px-3 py-1.5 rounded-lg border border-green-200 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-900/20 transition">
+                                        <Plus className="w-3.5 h-3.5"/> 添加验收条目
+                                    </button>
+                                    <div className="absolute right-0 top-full mt-1 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg py-1 z-20 min-w-[200px] opacity-0 invisible group-hover/add-accept:opacity-100 group-hover/add-accept:visible transition-all">
+                                        {newOrderItems.map((item, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => {
+                                                    const existingRows = productAcceptanceRows.filter(r => r.productIdx === idx);
+                                                    const totalPct = existingRows.reduce((s, r) => s + r.percentage, 0);
+                                                    setProductAcceptanceRows(prev => [...prev, {
+                                                        productIdx: idx,
+                                                        method: '分期验收' as const,
+                                                        condition: '视同验收',
+                                                        expectedDate: '',
+                                                        percentage: Math.max(0, 100 - totalPct),
+                                                        content: '',
+                                                    }]);
+                                                    if (existingRows.length === 1 && existingRows[0].method === '一次性验收') {
+                                                        setProductAcceptanceRows(prev => prev.map(r =>
+                                                            r.productIdx === idx ? { ...r, method: '分期验收' as const } : r
+                                                        ));
+                                                    }
+                                                }}
+                                                className="w-full text-left px-4 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition flex items-center gap-2"
+                                            >
+                                                <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-green-50 dark:bg-green-900/20 text-[10px] font-bold text-green-600 dark:text-green-400">{idx + 1}</span>
+                                                <span className="truncate">{item.productName}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         {newOrderItems.length > 0 ? (
                             <div className="overflow-x-auto">
@@ -3057,7 +3207,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         <tr>
                                             <th className="px-4 py-3 pl-5 text-center w-16">明细编号</th>
                                             <th className="px-4 py-3">产品名称</th>
+                                            <th className="px-4 py-3 text-center w-16">验收期数</th>
                                             <th className="px-4 py-3">验收方式</th>
+                                            <th className="px-4 py-3">验收内容</th>
                                             <th className="px-4 py-3">验收条件</th>
                                             <th className="px-4 py-3">预计验收时间</th>
                                             <th className="px-4 py-3 text-center">验收比例</th>
@@ -3086,6 +3238,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                                 {item.skuName && <div className="text-xs text-gray-500 mt-0.5">{item.skuName}</div>}
                                                             </td>
                                                         )}
+                                                        <td className="px-4 py-3 text-center">
+                                                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gray-100 dark:bg-white/10 text-xs font-bold font-mono text-gray-600 dark:text-gray-300">{rowIdx + 1}</span>
+                                                        </td>
                                                         <td className="px-4 py-3">
                                                             <select value={row.method} onChange={e => {
                                                                 const next = [...productAcceptanceRows];
@@ -3102,6 +3257,13 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                                 <option value="一次性验收">一次性验收</option>
                                                                 <option value="分期验收">分期验收</option>
                                                             </select>
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <input type="text" value={row.content || ''} onChange={e => {
+                                                                const next = [...productAcceptanceRows];
+                                                                next[globalIdx] = { ...next[globalIdx], content: e.target.value };
+                                                                setProductAcceptanceRows(next);
+                                                            }} placeholder="请输入验收内容" className="text-xs border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1.5 bg-white dark:bg-black/30 dark:text-white outline-none focus:border-[#0071E3] transition w-full min-w-[120px]"/>
                                                         </td>
                                                         <td className="px-4 py-3">
                                                             <select value={row.condition} onChange={e => {
@@ -3133,9 +3295,18 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                                         </td>
                                                         <td className="px-4 py-3 text-right font-mono font-bold text-gray-900 dark:text-white text-xs">¥{rowAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                                                         <td className="px-4 py-3 text-center">
-                                                            {row.method === '分期验收' && rows.length > 1 && (
-                                                                <button onClick={() => setProductAcceptanceRows(prev => prev.filter((_, i) => i !== globalIdx))} className="text-gray-400 hover:text-red-500 p-0.5 transition"><X className="w-3.5 h-3.5"/></button>
-                                                            )}
+                                                            {rows.length > 1 ? (
+                                                                <button onClick={() => {
+                                                                    setProductAcceptanceRows(prev => {
+                                                                        const next = prev.filter((_, i) => i !== globalIdx);
+                                                                        const remaining = next.filter(r => r.productIdx === itemIdx);
+                                                                        if (remaining.length === 1) {
+                                                                            return next.map(r => r.productIdx === itemIdx ? { ...r, method: '一次性验收' as const, percentage: 100 } : r);
+                                                                        }
+                                                                        return next;
+                                                                    });
+                                                                }} className="text-gray-400 hover:text-red-500 p-0.5 transition" title="删除此验收条目"><X className="w-3.5 h-3.5"/></button>
+                                                            ) : null}
                                                         </td>
                                                     </tr>
                                                 );
@@ -3143,20 +3314,23 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         })}
                                     </tbody>
                                 </table>
-                                {newOrderItems.some((_, idx) => productAcceptanceRows.some(r => r.productIdx === idx && r.method === '分期验收')) && (
-                                    <div className="px-5 py-3 border-t border-gray-100 dark:border-white/5 flex flex-wrap gap-2">
-                                        {newOrderItems.map((item, idx) => {
-                                            const rows = productAcceptanceRows.filter(r => r.productIdx === idx);
-                                            if (!rows.some(r => r.method === '分期验收')) return null;
-                                            const totalPct = rows.reduce((s, r) => s + r.percentage, 0);
-                                            return (
-                                                <button key={idx} onClick={() => setProductAcceptanceRows(prev => [...prev, { productIdx: idx, method: '分期验收', condition: '视同验收', expectedDate: '', percentage: Math.max(0, 100 - totalPct) }])} className="flex items-center gap-1 text-xs font-bold text-blue-500 hover:text-blue-700 px-3 py-1.5 rounded-lg border border-dashed border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition">
-                                                    <Plus className="w-3 h-3"/> {item.productName} 添加分期
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
+                                <div className="px-5 py-3 border-t border-gray-100 dark:border-white/5 flex flex-wrap items-center gap-2">
+                                    <span className="text-xs text-gray-400 dark:text-gray-500 mr-1">快速添加：</span>
+                                    {newOrderItems.map((item, idx) => {
+                                        const rows = productAcceptanceRows.filter(r => r.productIdx === idx);
+                                        const totalPct = rows.reduce((s, r) => s + r.percentage, 0);
+                                        return (
+                                            <button key={idx} onClick={() => {
+                                                setProductAcceptanceRows(prev => {
+                                                    const next = [...prev, { productIdx: idx, method: '分期验收' as const, condition: '视同验收', expectedDate: '', percentage: Math.max(0, 100 - totalPct), content: '' }];
+                                                    return next.map(r => r.productIdx === idx ? { ...r, method: '分期验收' as const } : r);
+                                                });
+                                            }} className="flex items-center gap-1 text-xs font-bold text-blue-500 hover:text-blue-700 px-3 py-1.5 rounded-lg border border-dashed border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition">
+                                                <Plus className="w-3 h-3"/> {item.productName}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         ) : (
                             <div className="px-5 pb-4 pt-1">
@@ -3169,6 +3343,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                     </div>
                     </div>
                 )}
+
             </div>
 
             {/* Footer Actions */}
@@ -3191,26 +3366,14 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                 <div className="flex gap-3">
                     {currentStep < lastStep ? (
                         <button 
-                            disabled={
-                                (currentStep === 1 && !buyerType) ||
-                                (currentStep === 2 && (
-                                    buyerType === 'SelfDeal' ? !orderEnterpriseId
-                                    : buyerType === 'Customer' ? (!linkedOpportunityId || !newOrderCustomer)
-                                    : !hasOpportunity || (hasOpportunity === 'yes' ? (!linkedOpportunityId || !newOrderCustomer) : !newOrderCustomer)
-                                       || (buyerType === 'Channel' && !selectedChannelId)
-                                )) ||
-                                (currentStep === 3 && newOrderItems.length === 0)
-                            }
+                            disabled={validationErrors.some(e => e.step === currentStep)}
                             onClick={() => {
-                                if (currentStep === 2) {
-                                    const hideItContact = buyerType === 'SelfDeal' || buyerType === 'RedeemCode';
-                                    const purchasingLabel = hideItContact ? '联系人' : '采购联系人';
-                                    const missingPurchasing = purchasingContacts.length > 0 && !selectedPurchasingContactId;
-                                    const missingIT = !hideItContact && itContacts.length > 0 && !selectedItContactId;
-                                    if (missingPurchasing || missingIT) {
-                                        alert(`请选择${missingPurchasing ? purchasingLabel : ''}${missingPurchasing && missingIT ? '和' : ''}${missingIT ? 'IT 联系人' : ''}`);
-                                        return;
-                                    }
+                                const stepErrors = validationErrors.filter(e => e.step === currentStep);
+                                if (stepErrors.length > 0) {
+                                    setHasAttemptedSubmit(true);
+                                    setShowValidationToast(true);
+                                    return;
+
                                 }
                                 setCurrentStep(currentStep + 1);
                             }}
@@ -3219,8 +3382,13 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             下一步
                         </button>
                     ) : (
-                        <button onClick={handleCreateOrder} className="unified-button-primary bg-[#0071E3] dark:bg-[#FF2D55] shadow-xl dark:hover:bg-[#FF2D55]/90 hover:scale-105 hover:shadow-blue-500/30">
+                        <button onClick={handleCreateOrder} className="unified-button-primary bg-[#0071E3] dark:bg-[#FF2D55] shadow-xl dark:hover:bg-[#FF2D55]/90 hover:scale-105 hover:shadow-blue-500/30 relative">
                             提交订单
+                            {validationErrors.length > 0 && (
+                                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg">
+                                    {validationErrors.length}
+                                </span>
+                            )}
                         </button>
                     )}
                 </div>
@@ -3228,6 +3396,55 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         </div>
         </ModalPortal>
 
+        {/* 校验错误 Toast 通知 */}
+        {showValidationToast && validationErrors.length > 0 && (
+            <ModalPortal>
+                <ValidationToast
+                    errors={validationErrors}
+                    onClose={() => setShowValidationToast(false)}
+                    onNavigateStep={(step) => { setCurrentStep(step); setShowValidationToast(false); }}
+                />
+            </ModalPortal>
+        )}
+
+        {/* 订单确认弹窗 */}
+        <OrderConfirmModal
+            open={showConfirmModal}
+            onClose={() => { setShowConfirmModal(false); setIsSubmitting(false); }}
+            onConfirm={handleConfirmSubmit}
+            isSubmitting={isSubmitting}
+            validationErrors={validationErrors}
+            buyerType={buyerType}
+            orderSource={orderSource}
+            customerName={customers.find(c => c.id === newOrderCustomer)?.companyName || (buyerType === 'SelfDeal' ? allEnterprises.find(e => e.entId === orderEnterpriseId)?.entName || '' : '')}
+            channelName={buyerType === 'Channel' ? channels.find(c => c.id === selectedChannelId)?.name : undefined}
+            opportunityName={opportunities.find(o => o.id === linkedOpportunityId)?.name}
+            salesRepName={users.find(u => u.id === salesRepId)?.name}
+            businessManagerName={users.find(u => u.id === businessManagerId)?.name}
+            sellerName={sellerName}
+            creatorName={(users.find(u => u.id === creatorId) || currentUser)?.name}
+            orderRemark={orderRemark}
+            purchasingContactName={purchasingContacts.find(c => c.id === selectedPurchasingContactId)?.name}
+            purchasingContactPhone={purchasingContacts.find(c => c.id === selectedPurchasingContactId)?.phone}
+            itContactName={itContacts.find(c => c.id === selectedItContactId)?.name}
+            itContactPhone={itContacts.find(c => c.id === selectedItContactId)?.phone}
+            linkedContractNames={linkedContractIds.length > 0 ? linkedContractIds.map(id => contracts.find(c => c.id === id)?.name || id) : undefined}
+            items={newOrderItems}
+            totalAmount={calculateNewOrderTotal()}
+            deliveryMethod={deliveryMethod}
+            shippingAddress={shippingAddress}
+            shippingPhone={shippingPhone}
+            shippingEmail={shippingEmail}
+            onlineDeliveries={onlineDeliveries}
+            acceptanceForm={acceptanceForm}
+            productAcceptanceRows={productAcceptanceRows}
+            settlementMethod={settlementMethod}
+            settlementType={settlementType}
+            expectedPaymentDate={expectedPaymentDate}
+            installmentPlans={installmentPlans}
+            serialNumberRequirement={serialNumberRequirement}
+            reuseSerialNumber={reuseSerialNumber}
+        />
 
         {/* 折算单选择弹窗 */}
         {isConversionPickerOpen && (

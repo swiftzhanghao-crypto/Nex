@@ -164,6 +164,8 @@ router.post('/', checkPermission('order', 'create'), validateBody(orderCreateSch
     industryLine: o.industryLine, province: o.province, city: o.city, district: o.district,
     settlementMethod: o.settlementMethod, settlementType: o.settlementType,
     expectedPaymentDate: o.expectedPaymentDate, installmentPlans: o.installmentPlans,
+    purchasingContactId: o.purchasingContactId, itContactId: o.itContactId,
+    linkedContractIds: o.linkedContractIds, linkedContractNames: o.linkedContractNames,
   });
 
   const nextStatus = normalizeOrderStatus(o.status || 'PENDING_APPROVAL');
@@ -204,6 +206,7 @@ router.put('/:id', checkPermission('order', 'update'), validateBody(orderUpdateS
   const db = getDb();
   const o = req.body;
   const id = req.params.id;
+
 
   const existing = db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as any;
   if (!existing) { res.status(404).json({ error: '订单不存在' }); return; }
@@ -272,6 +275,8 @@ router.put('/:id', checkPermission('order', 'update'), validateBody(orderUpdateS
     shippedDate: merged.shippedDate, carrier: merged.carrier, trackingNumber: merged.trackingNumber,
     settlementMethod: merged.settlementMethod, settlementType: merged.settlementType,
     expectedPaymentDate: merged.expectedPaymentDate, installmentPlans: merged.installmentPlans,
+    purchasingContactId: merged.purchasingContactId, itContactId: merged.itContactId,
+    linkedContractIds: merged.linkedContractIds, linkedContractNames: merged.linkedContractNames,
   });
 
   const updateOrder = db.prepare(`

@@ -170,6 +170,7 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
                                           const fields = [
                                               { label: '产品名称', value: selectedItemForDetails.productName || '-', isAmount: false },
                                               { label: '产品规格', value: [selectedItemForDetails.skuName, selectedItemForDetails.skuCode].filter(Boolean).join('  ·  ') || '-', isAmount: false },
+                                              ...(selectedItemForDetails.ecoProductName ? [{ label: '生态产品名称', value: selectedItemForDetails.ecoProductName, isAmount: false }] : []),
                                               { label: '授权类型', value: selectedItemForDetails.pricingOptionName || selectedItemForDetails.licenseType || '-', isAmount: false },
                                               { label: '产品类型', value: selectedItemForDetails.productType || '-', isAmount: false },
                                               { label: '数量', value: String(selectedItemForDetails.quantity), isAmount: false },
@@ -177,6 +178,7 @@ const OrderItemDetailsDrawer: React.FC<Props> = ({ item, itemIndex, isClosing, o
                                               { label: '计价数量', value: String(selectedItemForDetails.quantity), isAmount: false },
                                               { label: '计价单价', value: selectedItemForDetails.pricingUnitPrice != null ? fmt(selectedItemForDetails.pricingUnitPrice) : '-', isAmount: true },
                                               { label: '产品金额', value: fmt(itemAmount), isAmount: true },
+                                              { label: '端年场地授权覆盖的PC数量', value: selectedItemForDetails.siteLicensePcCount != null ? String(selectedItemForDetails.siteLicensePcCount) : '-', isAmount: false },
                                           ];
                                           return (
                                               <div className="grid grid-cols-2 gap-x-6">

@@ -7,6 +7,7 @@ import type { SubUnitLocal } from './subUnitCsv';
  * 将 Step 3 弹窗中的 "新增产品" 级联选择逻辑抽离。
  */
 export function useProductCascade(products: Product[]) {
+  const pendingSkuIdRef = useRef<string | null>(null);
   const [tempCategory, setTempCategory] = useState('');
   const [tempHoverCategory, setTempHoverCategory] = useState('');
   const [isCategoryPickerOpen, setIsCategoryPickerOpen] = useState(false);
@@ -17,6 +18,7 @@ export function useProductCascade(products: Product[]) {
   const [tempQuantity, setTempQuantity] = useState(1);
   const [tempActivationMethod, setTempActivationMethod] = useState<ActivationMethod>('Account');
   const [tempMediaCount, setTempMediaCount] = useState<number | ''>(1);
+  const [tempSiteLicensePcCount, setTempSiteLicensePcCount] = useState<number | ''>('')
 
   const [tempLicensePeriod, setTempLicensePeriod] = useState('');
   const [tempLicensePeriodNum, setTempLicensePeriodNum] = useState<number | ''>('');
@@ -89,7 +91,6 @@ export function useProductCascade(products: Product[]) {
   }, [isCategoryPickerOpen]);
 
   useEffect(() => {
-    setTempSkuId('');
     setTempPricingOptionId('');
     setNegotiatedPrice(null);
     setTempPkgType('');
@@ -97,16 +98,21 @@ export function useProductCascade(products: Product[]) {
     setTempPkgOs('');
     setTempPkgLink('');
     setTempEcoProductName('');
-    if (tempProductId) {
-      const prod = products.find(p => p.id === tempProductId);
-      const activeSkus = prod?.skus.filter(s => s.status === 'Active') || [];
-      const uniqueNames = Array.from(new Set(activeSkus.map(s => s.name)));
-      if (activeSkus.length === 1) {
-        setTempSkuId(activeSkus[0].id);
-      } else if (uniqueNames.length > 1 && activeSkus.length > 0) {
-        // Multiple distinct spec names — user picks spec first
+    if (pendingSkuIdRef.current) {
+      setTempSkuId(pendingSkuIdRef.current);
+      pendingSkuIdRef.current = null;
+    } else {
+      setTempSkuId('');
+      if (tempProductId) {
+        const prod = products.find(p => p.id === tempProductId);
+        const activeSkus = prod?.skus.filter(s => s.status === 'Active') || [];
+        const uniqueNames = Array.from(new Set(activeSkus.map(s => s.name)));
+        if (activeSkus.length === 1) {
+          setTempSkuId(activeSkus[0].id);
+        } else if (uniqueNames.length > 1 && activeSkus.length > 0) {
+          // Multiple distinct spec names — user picks spec first
+        }
       }
-      // When all SKUs share same name, SKU will be determined by authorization type selection
     }
   }, [tempProductId, products]);
 
@@ -134,6 +140,11 @@ export function useProductCascade(products: Product[]) {
     setTempSkuId(skuId);
   }, []);
 
+  const setTempProductWithSku = useCallback((productId: string, skuId: string) => {
+    pendingSkuIdRef.current = skuId || null;
+    setTempProductId(productId);
+  }, []);
+
   useEffect(() => {
     if (selectedOption) {
       setNegotiatedPrice(selectedOption.price);
@@ -155,6 +166,7 @@ export function useProductCascade(products: Product[]) {
     tempSkuId,
     setTempSkuId,
     setTempSkuIdFromOption,
+    setTempProductWithSku,
     tempPricingOptionId,
     setTempPricingOptionId,
     tempQuantity,
@@ -163,6 +175,8 @@ export function useProductCascade(products: Product[]) {
     setTempActivationMethod,
     tempMediaCount,
     setTempMediaCount,
+    tempSiteLicensePcCount,
+    setTempSiteLicensePcCount,
     tempLicensePeriod,
     setTempLicensePeriod,
     tempLicensePeriodNum,

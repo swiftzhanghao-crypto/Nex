@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Moon, Sun, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ExternalLink, Minus, Trash2, ClipboardCheck, Radar, Search, List, ArrowLeft, Smartphone, RefreshCcw, Sparkles, Bot, Pin } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ClipboardCheck, Radar, Search, List, ArrowLeft, Smartphone, RefreshCcw, Sparkles, Bot } from 'lucide-react';
 import manualContent from '../../docs/产品说明文档.md?raw';
 import designSpecContent from '../../docs/设计规范.md?raw';
 import operationManualContent from '../../docs/WPS365业务平台操作手册.md?raw';
@@ -20,12 +20,6 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-interface PageTab {
-  id: string;
-  title: string;
-  path: string;
-  pinned?: boolean;
-}
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { currentUser, users, setCurrentUser, roles, apiMode, filteredCustomers: customers, filteredProducts: products } = useAppContext();
@@ -35,13 +29,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [activeTopNav, setActiveTopNav] = useState<'DASHBOARD' | 'ORDER_CENTER' | 'PRODUCT_CENTER' | 'PERFORMANCE_CENTER' | 'CHANNEL_CENTER' | 'LEADS_CENTER' | 'OPERATIONS_CENTER' | 'SAB_CUSTOMER_INSIGHT' | 'SYSTEM_CONFIG'>('DASHBOARD');
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('theme');
-        return saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    }
-    return false;
-  });
+  
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isManualOpen, setIsManualOpen] = useState(false);
   const [isMobilePreviewOpen, setIsMobilePreviewOpen] = useState(false);
@@ -51,8 +39,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const toggleSection = (id: string) => setCollapsedSections(prev => ({ ...prev, [id]: !prev[id] }));
 
-  const [isTabMaximized, setIsTabMaximized] = useState(false);
-
   // ── ⌘K shortcut ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -60,164 +46,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         e.preventDefault();
         setIsGlobalSearchOpen(prev => !prev);
       }
-      if (e.key === 'Escape' && isTabMaximized) {
-        setIsTabMaximized(false);
-      }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [isTabMaximized]);
+  }, []);
 
-  // ── Tab Bar ────────────────────────────────────────────────
-  const [tabs, setTabs] = useState<PageTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string>('');
-
-  const getTabTitle = (pathname: string): string => {
-    const staticMap: Record<string, string> = {
-      '/': '数据看板',
-      '/orders': '订单管理',
-      '/renewals': '续费管理',
-      '/customers': '客户信息',
-      '/opportunities': '商机信息',
-      '/contracts': '合同信息',
-      '/remittances': '汇款管理',
-      '/invoices': '发票管理',
-      '/authorizations': '授权信息',
-      '/delivery-info': '交付信息',
-      '/acceptances': '验收管理',
-      '/products': '产品列表',
-      '/product-center': '产品目录',
-      '/product-policy': '产品政策',
-      '/product-manage/component-pool': '组件池',
-      '/product-manage/packages': '安装包管理',
-      '/product-manage/license-templates': '产品授权模板',
-      '/product-manage/attr-config': '属性配置',
-      '/performance': '业绩管理',
-      '/channels': '渠道管理',
-      '/leads': '线索中台',
-      '/wps-ops': '运营中心',
-      '/ops/dashboard': '指标看板',
-      '/ops/enterprise': '企业管理',
-      '/organization': '组织架构',
-      '/users': '用户管理',
-      '/roles': '角色管理',
-      '/merchandises': '商品管理',
-      '/product-pricing/msrp': '建议售价',
-      '/product-pricing/channel': '渠道价格',
-      '/system/license-types': '授权类型管理',
-      '/system/delivery-methods': '产品发货方式配置',
-      '/system/sales-org': '销售组织配置',
-      '/sab-insight': '智能查客户',
-      '/sab-insight/customer-list': '客户列表',
-      '/reports': '周报日报',
-    };
-    if (staticMap[pathname]) return staticMap[pathname];
-
-    const orderId = pathname.match(/^\/orders\/(.+)$/);
-    if (orderId) return `订单 ${orderId[1]}`;
-
-    const customerId = pathname.match(/^\/customers\/(.+)$/);
-    if (customerId) {
-      const cust = customers.find(c => c.id === customerId[1]);
-      return cust ? `客户 ${cust.companyName}` : `客户 ${customerId[1]}`;
-    }
-
-    const productId = pathname.match(/^\/products\/(.+)$/);
-    if (productId) {
-      const prod = products.find(p => p.id === productId[1]);
-      return prod ? `产品 ${prod.name}` : `产品 ${productId[1]}`;
-    }
-
-    const channelId = pathname.match(/^\/channels\/(.+)$/);
-    if (channelId) return `渠道 ${channelId[1]}`;
-
-    const sabCustomerId = pathname.match(/^\/sab-insight\/customer\/(.+)$/);
-    if (sabCustomerId) {
-      const cust = customers.find(c => c.id === sabCustomerId[1]);
-      return cust ? `客户洞察 ${cust.companyName}` : `客户洞察 ${sabCustomerId[1]}`;
-    }
-
-    const reportUserId = pathname.match(/^\/reports\/(.+)$/);
-    if (reportUserId) {
-      const u = users.find(usr => usr.id === reportUserId[1]);
-      return u ? `${u.name} 的报告` : `报告详情`;
-    }
-
-    return pathname.split('/').filter(Boolean).pop() || '页面';
-  };
-
-  useEffect(() => {
-    const path = location.pathname;
-    const title = getTabTitle(path);
-    setTabs(prev => {
-      const existing = prev.find(t => t.id === path);
-      if (existing) {
-        if (existing.title !== title) {
-          return prev.map(t => t.id === path ? { ...t, title } : t);
-        }
-        return prev;
-      }
-      return [...prev, { id: path, title, path }];
-    });
-    setActiveTabId(path);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, customers, products, users]);
-
-  const closeTab = (e: React.MouseEvent, tabId: string) => {
-    e.stopPropagation();
-    const tab = tabs.find(t => t.id === tabId);
-    if (tab?.pinned) return;
-    const idx = tabs.findIndex(t => t.id === tabId);
-    const newTabs = tabs.filter(t => t.id !== tabId);
-    setTabs(newTabs);
-    if (tabId === activeTabId) {
-      if (newTabs.length > 0) {
-        const next = newTabs[Math.max(0, idx - 1)];
-        navigate(next.path);
-      } else {
-        navigate('/');
-      }
-    }
-  };
-  const closeOtherTabs = (tabId: string) => {
-    const keep = tabs.filter(t => t.id === tabId || t.pinned);
-    setTabs(keep);
-    if (activeTabId !== tabId && keep.length > 0) {
-      navigate(keep.find(t => t.id === tabId)?.path || keep[0].path);
-    }
-  };
-
-  const closeAllTabs = () => {
-    const pinned = tabs.filter(t => t.pinned);
-    setTabs(pinned);
-    if (pinned.length > 0) {
-      navigate(pinned[0].path);
-    } else {
-      navigate('/');
-    }
-  };
-
-  const togglePinTab = (tabId: string) => {
-    setTabs(prev => {
-      const updated = prev.map(t => t.id === tabId ? { ...t, pinned: !t.pinned } : t);
-      const pinned = updated.filter(t => t.pinned);
-      const unpinned = updated.filter(t => !t.pinned);
-      return [...pinned, ...unpinned];
-    });
-  };
-
-  const toggleMaximizeTab = () => {
-    setIsTabMaximized(prev => !prev);
-  };
-
-  const [ctxMenu, setCtxMenu] = useState<{x: number; y: number; tabId: string} | null>(null);
-  useEffect(() => {
-    if (!ctxMenu) return;
-    const close = () => setCtxMenu(null);
-    document.addEventListener('click', close);
-    document.addEventListener('contextmenu', close);
-    return () => { document.removeEventListener('click', close); document.removeEventListener('contextmenu', close); };
-  }, [ctxMenu]);
 
   // ── End Tab Bar ────────────────────────────────────────────
 
@@ -250,14 +83,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   useEffect(() => {
     const root = window.document.documentElement;
-    if (isDarkMode) {
-      root.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      root.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [isDarkMode]);
+    root.classList.remove('dark');
+    localStorage.removeItem('theme');
+  }, []);
 
   useEffect(() => {
     if (location.pathname === '/' || location.pathname.startsWith('/dashboard')) {
@@ -294,7 +122,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     return () => document.removeEventListener('fullscreenchange', handleFullScreenChange);
   }, []);
 
-  const toggleTheme = () => setIsDarkMode(!isDarkMode);
+
 
   const currentUserRoleDefs = useMemo(
     () => roles.filter(r => currentUser.roles?.includes(r.id)),
@@ -382,7 +210,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="h-screen flex flex-col font-sans overflow-hidden bg-[#F5F5F7] dark:bg-black transition-colors duration-300 selection:bg-blue-500/30">
       
       {/* Top Header */}
-      <header className={`h-16 flex-shrink-0 flex items-center justify-between px-6 z-30 sticky top-0 bg-white border-b border-gray-200/50 dark:bg-[#1C1C1E] dark:border-white/10 transition-all ${isTabMaximized ? 'hidden' : ''}`}>
+      <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 z-30 sticky top-0 bg-white border-b border-gray-200/50 dark:bg-[#1C1C1E] dark:border-white/10 transition-all">
           <div className="flex items-center gap-6">
               {/* Logo Area */}
               <div className="flex items-center gap-3">
@@ -424,13 +252,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <kbd className="ml-auto hidden lg:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-white dark:bg-white/10 border border-gray-200/80 dark:border-white/10 text-[10px] text-gray-400 font-mono shrink-0">⌘K</kbd>
             </div>
 
-            <button
-              onClick={() => { setAiInitialQuery(''); setIsAIDrawerOpen(true); }}
-              className="p-2 text-gray-400 hover:text-[#0071E3] dark:text-gray-400 dark:hover:text-[#0A84FF] transition rounded-full hover:bg-[#0071E3]/10 dark:hover:bg-[#0A84FF]/10"
-              title="AI 业务助手"
-            >
-              <Bot className="w-4.5 h-4.5" />
-            </button>
 
              <button
                 onClick={toggleFullScreen}
@@ -440,12 +261,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 {isFullScreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
             </button>
 
-             <button 
-                onClick={toggleTheme}
-                className="p-2 text-gray-400 hover:text-amber-500 dark:text-gray-400 dark:hover:text-yellow-400 transition rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
-            >
-                {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
 
             <button
               onClick={() => setIsManualOpen(true)}
@@ -538,7 +353,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           )}
 
           {/* Sidebar */}
-          {!hideSidebar && !isTabMaximized && (
+          {!hideSidebar && (
             <aside className={`absolute inset-y-0 left-4 top-4 bottom-4 z-40 transform transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] lg:relative lg:translate-x-0 lg:top-0 lg:bottom-0 lg:left-0 lg:pt-2 lg:pb-2 lg:pl-2 lg:pr-3
               ${isSidebarOpen ? 'translate-x-0 w-[240px]' : '-translate-x-[110%] lg:translate-x-0'}
               ${isCollapsed ? 'lg:w-[88px]' : 'lg:w-[240px]'}
@@ -756,77 +571,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           {/* Content Area */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Tab Bar */}
-            {tabs.length > 0 && (
-              <div className="shrink-0 flex items-end bg-[#F0F0F2] dark:bg-[#111] border-b border-gray-200 dark:border-white/10 px-2 overflow-x-auto no-scrollbar relative" style={{ height: isTabMaximized ? 40 : 36 }}>
-                {tabs.map(tab => {
-                  const isActive = activeTabId === tab.id;
-                  return (
-                    <div
-                      key={tab.id}
-                      onClick={() => navigate(tab.path)}
-                      onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, tabId: tab.id }); }}
-                      className={`group relative flex items-center gap-1.5 px-3 cursor-pointer shrink-0 select-none transition-colors duration-150 rounded-t-lg mr-0.5 ${
-                        isActive
-                          ? 'bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white shadow-[0_-1px_0_0_#e5e7eb] dark:shadow-[0_-1px_0_0_rgba(255,255,255,0.1)]'
-                          : 'bg-transparent text-gray-500 dark:text-gray-400 hover:bg-white/70 dark:hover:bg-white/8 hover:text-gray-800 dark:hover:text-gray-200'
-                      }`}
-                      style={{ height: 34, maxWidth: 160 }}
-                      title={tab.title}
-                    >
-                      {tab.pinned && <Pin className="w-3 h-3 shrink-0 text-blue-500 dark:text-blue-400 -rotate-45" />}
-                      <span className="text-xs font-medium truncate max-w-[110px] whitespace-nowrap">{tab.title}</span>
-                      {!tab.pinned && (
-                        <button
-                          onClick={(e) => closeTab(e, tab.id)}
-                          className={`shrink-0 w-4 h-4 rounded-full flex items-center justify-center transition-all hover:bg-gray-200 dark:hover:bg-white/20 ${
-                            isActive ? 'opacity-60 hover:opacity-100' : 'opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100'
-                          }`}
-                        >
-                          <X className="w-2.5 h-2.5" />
-                        </button>
-                      )}
-                      {isActive && (
-                        <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#0071E3] dark:bg-[#0A84FF] rounded-t-full" />
-                      )}
-                    </div>
-                  );
-                })}
-
-                {/* Maximize restore button */}
-                {isTabMaximized && (
-                  <button
-                    onClick={toggleMaximizeTab}
-                    className="shrink-0 ml-auto flex items-center gap-1.5 px-2.5 self-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/70 dark:hover:bg-white/10 rounded-md transition-all"
-                    style={{ height: 28 }}
-                    title="还原"
-                  >
-                    <Minimize className="w-3.5 h-3.5" />
-                    <span className="text-[11px] font-medium">还原</span>
-                  </button>
-                )}
-
-                {/* Tab context menu */}
-                {ctxMenu && (() => {
-                  const ctxTab = tabs.find(t => t.id === ctxMenu.tabId);
-                  const isPinned = ctxTab?.pinned;
-                  const newWindowUrl = ctxTab ? `${window.location.origin}${window.location.pathname}#${ctxTab.path}` : '';
-                  return (
-                  <div className="tab-ctx-menu fixed bg-white dark:bg-[#2C2C2E] rounded-lg shadow-2xl border border-gray-200 dark:border-white/10 py-1 z-[999] min-w-[160px]" style={{ left: ctxMenu.x, top: ctxMenu.y }}>
-                    <button onClick={() => { togglePinTab(ctxMenu.tabId); setCtxMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2"><Pin className={`w-3 h-3 opacity-50 ${isPinned ? '-rotate-45' : ''}`}/>{isPinned ? '取消固定' : '固定标签页'}</button>
-                    <button onClick={() => { toggleMaximizeTab(); setCtxMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2">{isTabMaximized ? <Minimize className="w-3 h-3 opacity-50"/> : <Maximize className="w-3 h-3 opacity-50"/>}{isTabMaximized ? '还原' : '最大化'}</button>
-                    <div className="h-px bg-gray-100 dark:bg-white/10 my-1"></div>
-                    <button onClick={() => { if (newWindowUrl) window.open(newWindowUrl, '_blank', 'noopener'); setCtxMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2"><ExternalLink className="w-3 h-3 opacity-50"/>在新窗口打开</button>
-                    <div className="h-px bg-gray-100 dark:bg-white/10 my-1"></div>
-                    {!isPinned && <button onClick={(e) => { e.stopPropagation(); closeTab(e as any, ctxMenu.tabId); setCtxMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2"><X className="w-3 h-3 opacity-50"/>关闭标签页</button>}
-                    <button onClick={() => { closeOtherTabs(ctxMenu.tabId); setCtxMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex items-center gap-2"><Minus className="w-3 h-3 opacity-50"/>关闭其他标签页</button>
-                    <div className="h-px bg-gray-100 dark:bg-white/10 my-1"></div>
-                    <button onClick={() => { closeAllTabs(); setCtxMenu(null); }} className="w-full text-left px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center gap-2"><Trash2 className="w-3 h-3 opacity-50"/>关闭所有标签页</button>
-                  </div>
-                  );
-                })()}
-              </div>
-            )}
             <main className="flex-1 overflow-auto scroll-smooth relative custom-scrollbar p-0 lg:p-0">
                 {children}
             </main>

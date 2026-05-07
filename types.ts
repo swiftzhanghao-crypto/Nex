@@ -97,6 +97,9 @@ export interface OrderItem extends MerchandiseItem {
     // After-sale info
     afterSaleWarrantyPeriod?: string;
 
+    // 端年场地授权覆盖的PC数量
+    siteLicensePcCount?: number;
+
     // Sub-unit authorization (per item level)
     subUnitAuthMode?: SubUnitAuthMode;
     subUnits?: SubUnit[];
@@ -708,6 +711,7 @@ export interface AcceptancePhase {
     amount: number;
     status: 'Pending' | 'Accepted';
     acceptedDate?: string;
+    content?: string;
 }
 
 export interface AcceptanceConfig {

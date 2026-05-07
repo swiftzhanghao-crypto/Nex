@@ -240,6 +240,8 @@ function ensureSubscriptionChainOrders(db: any) {
         orderType: o.orderType, creatorId: o.creatorId, creatorName: o.creatorName,
         settlementMethod: (o as any).settlementMethod, settlementType: (o as any).settlementType,
         expectedPaymentDate: (o as any).expectedPaymentDate, installmentPlans: (o as any).installmentPlans,
+        purchasingContactId: (o as any).purchasingContactId, itContactId: (o as any).itContactId,
+        linkedContractIds: (o as any).linkedContractIds, linkedContractNames: (o as any).linkedContractNames,
       });
       ins.run(
         o.id, o.customerId, o.customerName, o.customerType ?? null,
@@ -387,6 +389,8 @@ export function seedDatabase() {
       shippedDate: o.shippedDate, carrier: o.carrier, trackingNumber: o.trackingNumber,
       settlementMethod: (o as any).settlementMethod, settlementType: (o as any).settlementType,
       expectedPaymentDate: (o as any).expectedPaymentDate, installmentPlans: (o as any).installmentPlans,
+      purchasingContactId: (o as any).purchasingContactId, itContactId: (o as any).itContactId,
+      linkedContractIds: (o as any).linkedContractIds, linkedContractNames: (o as any).linkedContractNames,
     });
     insertOrder.run(o.id, o.customerId, o.customerName, o.customerType ?? null,
       o.customerLevel ?? null, o.customerIndustry ?? null, o.customerRegion ?? null,

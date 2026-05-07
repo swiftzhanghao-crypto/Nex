@@ -31,7 +31,7 @@ const Step1OrderType: React.FC<Step1OrderTypeProps> = ({
     <div className="space-y-6 animate-fade-in">
       <div>
         <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-          <Target className="w-5 h-5 text-purple-500" /> 订单类型
+          <Target className="w-5 h-5 text-purple-500" /> 订单类型 <span className="text-red-500 text-sm">*</span>
         </h4>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[

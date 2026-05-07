@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Order, OrderStatus, OrderItem, User, ApprovalRecord, OrderSource, OrderDraft, Subscription, SubscriptionLineProductSnapshot } from '../../types';
 import { subscriptionMostUrgentProductSnapshot } from '../../utils/subscriptionLineProduct';
-import { Search, Plus, Trash2, Disc, CheckCircle, FileText, CreditCard, Truck, X, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, FileCheck, CheckSquare, Package, Settings, Filter, ChevronDown, Calendar, Shield, RotateCcw, Save, ChevronRight, Copy, Check, Building2 } from 'lucide-react';
+import { Search, Plus, Trash2, Disc, CheckCircle, FileText, CreditCard, Truck, X, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, FileCheck, CheckSquare, Package, Settings, Filter, ChevronDown, Calendar, Shield, RotateCcw, Save, ChevronRight, Copy, Check } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import OrderCreateWizard from './OrderCreateWizard';
 import StatusFilterCard from './StatusFilterCard';
@@ -466,7 +466,6 @@ const OrderManager: React.FC = () => {
     if (filterStatus === 'STOCK_PKG') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && !!order.isAuthConfirmed && !order.isPackageConfirmed;
     if (filterStatus === 'STOCK_SHIP') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && !!order.isPackageConfirmed && !order.isShippingConfirmed;
     if (filterStatus === 'STOCK_CD') matchesStatus = order.status === OrderStatus.PROCESSING_PROD && !!order.isShippingConfirmed && !order.isCDBurned;
-    if (filterStatus === 'HAS_SUBUNIT') matchesStatus = (order.items || []).some(it => it.subUnits && it.subUnits.length > 0);
 
     const searchLower = searchTerm.toLowerCase();
     const safeItems = order.items || [];
@@ -985,7 +984,6 @@ const OrderManager: React.FC = () => {
             {exceptionStatuses.filter(step => hasPermission(step.permission)).map((step) => (
                 <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} variant={step.id === OrderStatus.CANCELLED ? 'muted' : 'danger'} onClick={() => setFilterStatus(step.id)} />
             ))}
-            <StatusFilterCard id="HAS_SUBUNIT" label="含下级单位" icon={Building2} count={orders.filter(o => (o.items || []).some(it => it.subUnits && it.subUnits.length > 0)).length} isActive={filterStatus === 'HAS_SUBUNIT'} onClick={() => setFilterStatus('HAS_SUBUNIT')} />
         </div>
 
         <div className="unified-card overflow-hidden">
@@ -1329,14 +1327,15 @@ const OrderManager: React.FC = () => {
                               {order.opportunityName || '-'}
                           </td>
                         );
-                      case 'action':
+                      case 'action': {
+                        const actionContent = getAction(order);
+                        const hasAction = actionContent !== null;
                         return (
-                          <td key={colId} className={`px-3 py-2.5 text-right whitespace-nowrap sticky right-[52px] z-20 ${stickyBg} shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors overflow-visible`}>
-                              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                {getAction(order)}
-                              </div>
+                          <td key={colId} className={`px-3 py-2.5 text-right whitespace-nowrap sticky right-[52px] z-20 transition-colors overflow-visible ${hasAction ? `${stickyBg} shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.25)]` : ''}`}>
+                              {actionContent}
                           </td>
                         );
+                      }
                       default:
                         return <td key={colId} className="px-3 py-2.5 text-gray-400">-</td>;
                     }
