@@ -134,11 +134,11 @@ const ChannelDetails: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="p-4 lg:p-6 space-y-4">
+      <div className="p-3 lg:p-4 space-y-2.5">
 
         {/* Tab: 基本信息 */}
         {activeTab === 'basic' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
           {/* 基本信息 (2/3) */}
           <div className="md:col-span-2 unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
             <div className="px-5 py-3.5 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">

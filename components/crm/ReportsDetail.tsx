@@ -210,7 +210,7 @@ const ReportsDetail: React.FC = () => {
   const dept = departments.find(d => d.id === user.departmentId);
 
   return (
-    <div className="p-4 lg:p-6 max-w-[2400px] mx-auto space-y-4 animate-page-enter">
+    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto space-y-2.5 animate-page-enter">
       {/* Breadcrumb */}
       <button onClick={() => navigate('/reports')} className="text-sm text-gray-500 hover:text-[#0071E3] flex items-center gap-1.5 transition">
         <ArrowLeft className="w-4 h-4" /> 返回周报日报列表

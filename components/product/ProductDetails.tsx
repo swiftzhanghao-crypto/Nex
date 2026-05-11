@@ -214,7 +214,7 @@ const ProductDetails: React.FC = () => {
 
   // --- RENDER ---
   return (
-    <div className="flex flex-col min-h-screen bg-[#F5F5F7] dark:bg-black">
+    <div className="flex flex-col min-h-screen bg-[#F5F2EC] dark:bg-black">
       {/* Sticky Header — modeled after OrderDetails */}
       <div className="sticky top-0 z-20 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-white/10 px-4 md:px-6 pt-4 flex flex-col">
           <div className="flex items-center gap-4 pb-3">
@@ -270,7 +270,7 @@ const ProductDetails: React.FC = () => {
               </div>
       </div>
 
-      <div className="p-4 lg:p-6 max-w-[2400px] mx-auto w-full space-y-4 animate-page-enter pb-20">
+      <div className="p-3 lg:p-4 max-w-[2400px] mx-auto w-full space-y-2.5 animate-page-enter pb-20">
               {detailTab === 'info' && (<>
               {/* Basic Info - Full Width */}
               <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">

@@ -244,8 +244,8 @@ const ProductManager: React.FC = () => {
   }
 
   return (
-    <div className="p-4 lg:p-6 max-w-[2400px] mx-auto space-y-4 animate-page-enter pb-2 relative">
-      <div className="flex items-center justify-between">
+    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto h-full flex flex-col gap-2.5 animate-page-enter relative">
+      <div className="flex items-center justify-between shrink-0">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">产品管理</h1>
         {activeTab === 'SPU' && (
             <button onClick={() => navigate('/products/create')} className="unified-button-primary">
@@ -254,9 +254,9 @@ const ProductManager: React.FC = () => {
         )}
       </div>
 
-      <div className="unified-card overflow-hidden">
+      <div className="unified-card overflow-hidden flex-1 min-h-0 flex flex-col">
           {/* Tabs + Toolbar — fused into the card header */}
-          <div className="border-b border-gray-200/60 dark:border-white/10">
+          <div className="border-b border-gray-200/60 dark:border-white/10 shrink-0">
               <div className="flex items-center justify-between px-4 lg:px-5">
                   <div className="flex items-center gap-0 -mb-px">
                       {visibleTabs.map((tab) => (
@@ -390,7 +390,7 @@ const ProductManager: React.FC = () => {
           {/* SPU (Product) List */}
           {activeTab === 'SPU' && (
               <>
-                <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] custom-scrollbar">
+                <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 custom-scrollbar">
                 <table className="w-full text-left border-separate border-spacing-0 min-w-[1100px]" style={{ tableLayout: 'fixed' }}>
                     <colgroup>
                         <col style={{ width: 44 }} />
@@ -477,7 +477,7 @@ const ProductManager: React.FC = () => {
           {/* SKU List */}
           {activeTab === 'SKU' && (
               <>
-                  <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] custom-scrollbar">
+                  <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 custom-scrollbar">
                   <table className="w-full text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed' }}>
                       <colgroup>
                           <col style={{ width: 180 }} />
@@ -516,7 +516,7 @@ const ProductManager: React.FC = () => {
           {/* Sales Scope List */}
           {activeTab === 'SALES' && (
               <>
-                  <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] custom-scrollbar">
+                  <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 custom-scrollbar">
                   <table className="w-full text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed' }}>
                       <colgroup>
                           <col style={{ width: 180 }} />
@@ -553,7 +553,7 @@ const ProductManager: React.FC = () => {
           )}
 
           {/* Shared Pagination */}
-          <div className="flex justify-between items-center px-5 py-3 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5">
+          <div className="flex justify-between items-center px-5 py-3 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5 shrink-0">
               {activeTab === 'SPU' ? (
                   <button
                       onClick={handleCopyTable}

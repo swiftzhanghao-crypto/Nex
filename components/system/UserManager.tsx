@@ -668,7 +668,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   };
 
   return (
-    <div className="p-4 lg:p-6 max-w-[2400px] mx-auto space-y-4 animate-page-enter relative h-[calc(100vh-64px)] flex flex-col">
+    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto gap-2.5 animate-page-enter relative h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center shrink-0 gap-4">
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight">
@@ -814,8 +814,8 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
 
       {/* --- USERS TAB --- */}
       {activeTab === 'USERS' && (
-          <div className="unified-card dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 flex flex-col animate-fade-in flex-1">
-              <div className="flex-1 overflow-auto">
+          <div className="unified-card dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 flex flex-col animate-fade-in flex-1 min-h-0">
+              <div className="flex-1 min-h-0 overflow-auto">
                   <table className="w-full text-left">
                       <thead className="unified-table-header dark: sticky top-0 backdrop-blur">
                           <tr>

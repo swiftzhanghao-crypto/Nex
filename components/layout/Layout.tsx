@@ -207,7 +207,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="h-screen flex flex-col font-sans overflow-hidden bg-[#F5F5F7] dark:bg-black transition-colors duration-300 selection:bg-blue-500/30">
+    <div className="h-screen flex flex-col font-sans overflow-hidden bg-[#F5F2EC] dark:bg-black transition-colors duration-300 selection:bg-blue-500/30">
       
       {/* Top Header */}
       <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 z-30 sticky top-0 bg-white border-b border-gray-200/50 dark:bg-[#1C1C1E] dark:border-white/10 transition-all">
@@ -570,8 +570,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           )}
 
           {/* Content Area */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <main className="flex-1 overflow-auto scroll-smooth relative custom-scrollbar p-0 lg:p-0">
+          <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+            <main className="flex-1 min-w-0 flex flex-col overflow-y-auto relative p-0 lg:p-0">
                 {children}
             </main>
           </div>

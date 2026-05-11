@@ -1961,7 +1961,7 @@ const ProductCreateWizard: React.FC = () => {
 
   // ===================== MAIN RENDER =====================
   return (
-    <div className="flex flex-col min-h-screen bg-[#F5F5F7] dark:bg-black">
+    <div className="flex flex-col min-h-screen bg-[#F5F2EC] dark:bg-black">
       {/* Sticky Header */}
       <div className="sticky top-0 z-20 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-white/10 px-4 md:px-6">
         <div className="flex items-center gap-4 py-3">
@@ -2015,7 +2015,7 @@ const ProductCreateWizard: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-4 lg:p-6 max-w-[1400px] mx-auto w-full animate-page-enter pb-28">
+      <div className="flex-1 p-3 lg:p-4 max-w-[1400px] mx-auto w-full animate-page-enter pb-28">
         {renderStepContent()}
       </div>
 

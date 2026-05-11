@@ -277,14 +277,12 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
   const enableSubUnitAuth = newOrderItems.some(it => it.subUnitAuthMode && it.subUnitAuthMode !== 'none');
 
-  const skipDeliveryStep = buyerType === 'SelfDeal' || buyerType === 'RedeemCode';
   const wizardSteps = [
       { id: 1, label: '订单类型', desc: '来源与模式', icon: Layers },
       { id: 2, label: '客户信息', desc: '客户/商机', icon: UserIcon },
       { id: 3, label: '产品配置', desc: '规格/价格', icon: ShoppingBag },
-      ...(!skipDeliveryStep ? [{ id: 4, label: '交付信息', desc: '备注/验收', icon: ClipboardCheck }] : []),
+      { id: 4, label: '交付信息', desc: '备注/验收', icon: ClipboardCheck },
   ];
-  const lastStep = skipDeliveryStep ? 3 : 4;
 
   const selectedCustomerObj = customers.find(c => c.id === newOrderCustomer);
 
@@ -943,9 +941,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     if (!initialDraft) return;
     isRestoringDraftRef.current = true;
     const d = initialDraft;
+    setCurrentStep(d.currentStep);
     setBuyerType(d.buyerType);
-    const draftMaxStep = (d.buyerType === 'SelfDeal' || d.buyerType === 'RedeemCode') ? 3 : 4;
-    setCurrentStep(Math.min(d.currentStep, draftMaxStep));
     setOrderSource(d.orderSource);
     setOrderRemark(d.orderRemark || '');
     setLinkedContractIds(d.linkedContractIds || []);
@@ -1006,7 +1003,6 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     if (currentErrors.length > 0) {
       setShowValidationToast(true);
       return;
-
     }
     setShowConfirmModal(true);
   };
@@ -1096,7 +1092,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
         itContactId: selectedItContactId || undefined,
         linkedContractIds: buyerType !== 'SelfDeal' && linkedContractIds.length > 0 ? linkedContractIds : undefined,
         linkedContractNames: buyerType !== 'SelfDeal' && linkedContractIds.length > 0 ? linkedContractIds.map(id => contracts.find(c => c.id === id)?.name || id) : undefined,
-        settlementMethod: skipDeliveryStep ? 'cash' : (settlementMethod || undefined),
+        settlementMethod: settlementMethod || undefined,
         settlementType: settlementMethod === 'credit' ? settlementType : undefined,
         expectedPaymentDate: settlementMethod === 'credit' && settlementType === 'once' && expectedPaymentDate ? expectedPaymentDate : undefined,
         installmentPlans: settlementMethod === 'credit' && settlementType === 'installment' && installmentPlans.length > 0 ? installmentPlans : undefined,
@@ -1304,7 +1300,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
                 {/* Step 2: Basic Info */}
                 {currentStep === 2 && (
-                    <div className="space-y-4 animate-fade-in">
+                    <div className="space-y-2.5 animate-fade-in">
 
                         {/* 关联商机 */}
                         {buyerType !== 'SelfDeal' && (
@@ -1605,10 +1601,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                             <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-2">
                                 <Users className="w-4 h-4 text-teal-500"/> 订单联系人
                             </h4>
-                            <div className={`grid grid-cols-1 ${buyerType !== 'SelfDeal' && buyerType !== 'RedeemCode' ? 'md:grid-cols-2' : ''} gap-4`}>
-                                {/* 采购联系人 / 自成交时显示为"联系人" */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                                {/* 采购联系人 */}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">{buyerType === 'SelfDeal' || buyerType === 'RedeemCode' ? '联系人' : '采购联系人'} <span className="text-red-500">*</span></label>
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">采购联系人 <span className="text-red-500">*</span></label>
                                     <div className="flex items-center gap-2">
                                         <select
                                             value={selectedPurchasingContactId}
@@ -1616,7 +1612,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                             onBlur={() => markFieldTouched('selectedPurchasingContactId')}
                                             className={`flex-1 px-3 py-2 border rounded-xl text-sm bg-white dark:bg-[#2C2C2E] text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 outline-none transition ${getVisibleFieldError('selectedPurchasingContactId') ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}
                                         >
-                                            <option value="">{buyerType === 'SelfDeal' || buyerType === 'RedeemCode' ? '请选择联系人' : '请选择采购联系人'}</option>
+                                            <option value="">请选择采购联系人</option>
                                             {purchasingContacts.map(c => (
                                                 <option key={c.id} value={c.id}>{c.name}{c.isPrimary ? '（主要）' : ''}{c.position ? ` · ${c.position}` : ''}</option>
                                             ))}
@@ -1642,8 +1638,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     })()}
                                 </div>
 
-                                {/* IT 联系人（自成交/兑换码订单不显示） */}
-                                {buyerType !== 'SelfDeal' && buyerType !== 'RedeemCode' && (
+                                {/* IT 联系人 */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">IT 联系人 <span className="text-red-500">*</span></label>
                                     <div className="flex items-center gap-2">
@@ -1678,7 +1673,6 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         );
                                     })()}
                                 </div>
-                                )}
                             </div>
                         </div>
                         )}
@@ -1740,7 +1734,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
                 {/* Step 3: Merchandise Selection */}
                 {currentStep === 3 && (
-                    <div className="space-y-4 animate-fade-in">
+                    <div className="space-y-2.5 animate-fade-in">
                         {orderSource === 'Renewal' && originalOrderId && (
                             <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 p-4 rounded-2xl text-sm text-indigo-700 dark:text-indigo-300 flex items-center gap-3">
                                 <RefreshCcw className="w-5 h-5"/>
@@ -2798,8 +2792,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
                 {/* Step 4: Commerce & Delivery */}
                 {currentStep === 4 && (
-                    <div className="space-y-4 animate-fade-in">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2.5 animate-fade-in">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                         <div className="space-y-4">
                             <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-4">
                                 <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><Key className="w-4 h-4 text-amber-500"/> 序列号需求</h4>
@@ -3364,7 +3358,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                     )}
                 </div>
                 <div className="flex gap-3">
-                    {currentStep < lastStep ? (
+                    {currentStep < 4 ? (
                         <button 
                             disabled={validationErrors.some(e => e.step === currentStep)}
                             onClick={() => {
@@ -3373,7 +3367,6 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     setHasAttemptedSubmit(true);
                                     setShowValidationToast(true);
                                     return;
-
                                 }
                                 setCurrentStep(currentStep + 1);
                             }}

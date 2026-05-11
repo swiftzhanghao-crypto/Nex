@@ -1,61 +1,65 @@
 import React from 'react';
 
+type Variant = 'primary' | 'shipping' | 'warning' | 'success' | 'danger' | 'muted';
+
 interface StatusFilterCardProps {
   id: string;
   label: string;
   icon: React.ElementType;
   count: number;
   isActive: boolean;
-  variant?: 'primary' | 'danger' | 'muted';
+  variant?: Variant;
   onClick: () => void;
 }
 
-const StatusFilterCard: React.FC<StatusFilterCardProps> = ({ id, label, icon: Icon, count, isActive, variant = 'primary', onClick }) => {
-  const activeClass = variant === 'danger'
-    ? 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-500/20'
-    : variant === 'muted'
-      ? 'bg-gray-500 border-gray-500 text-white shadow-lg shadow-gray-400/20'
-      : 'bg-[#0071E3] border-[#0071E3] text-white shadow-lg shadow-blue-500/20';
+const styles: Record<Variant, { active: string; inactive: string; badge: string }> = {
+  primary: {
+    active: 'bg-[#0071E3] border-[#0071E3] text-white shadow-sm shadow-blue-500/20',
+    inactive: 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-blue-300 dark:hover:border-blue-800 hover:text-[#0071E3] dark:hover:text-blue-400',
+    badge: 'bg-blue-50 text-[#0071E3] dark:bg-blue-900/30 dark:text-blue-400',
+  },
+  shipping: {
+    active: 'bg-violet-600 border-violet-600 text-white shadow-sm shadow-violet-500/20',
+    inactive: 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-violet-300 dark:hover:border-violet-800 hover:text-violet-600 dark:hover:text-violet-400',
+    badge: 'bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400',
+  },
+  warning: {
+    active: 'bg-amber-500 border-amber-500 text-white shadow-sm shadow-amber-500/20',
+    inactive: 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-amber-300 dark:hover:border-amber-800 hover:text-amber-600 dark:hover:text-amber-400',
+    badge: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
+  },
+  success: {
+    active: 'bg-emerald-600 border-emerald-600 text-white shadow-sm shadow-emerald-500/20',
+    inactive: 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-emerald-300 dark:hover:border-emerald-800 hover:text-emerald-600 dark:hover:text-emerald-400',
+    badge: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
+  },
+  danger: {
+    active: 'bg-red-600 border-red-600 text-white shadow-sm shadow-red-500/20',
+    inactive: 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-red-300 dark:hover:border-red-800 hover:text-red-600 dark:hover:text-red-400',
+    badge: 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+  },
+  muted: {
+    active: 'bg-gray-500 border-gray-500 text-white shadow-sm shadow-gray-400/20',
+    inactive: 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-600',
+    badge: 'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400',
+  },
+};
 
-  const inactiveClass = variant === 'danger'
-    ? 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-red-300 dark:hover:border-red-900'
-    : variant === 'muted'
-      ? 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-gray-400 dark:hover:border-gray-600'
-      : 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 text-gray-500 hover:border-[#0071E3]/40 dark:hover:border-blue-900';
-
-  const iconBgActive = 'bg-white/20';
-  const iconBgInactive = variant === 'danger'
-    ? 'bg-red-50 dark:bg-red-900/20 text-red-600'
-    : variant === 'muted'
-      ? 'bg-gray-100 dark:bg-white/10 text-gray-500'
-      : 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3]';
-
-  const badgeActive = variant === 'danger' || variant === 'muted'
-    ? `bg-white ${variant === 'danger' ? 'text-red-600' : 'text-gray-600'}`
-    : 'bg-white text-[#0071E3]';
-  const badgeInactive = variant === 'danger'
-    ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
-    : variant === 'muted'
-      ? 'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400'
-      : 'bg-blue-100 text-[#0071E3] dark:bg-blue-900/40 dark:text-blue-400';
+const StatusFilterCard: React.FC<StatusFilterCardProps> = ({ label, icon: Icon, count, isActive, variant = 'primary', onClick }) => {
+  const base = 'inline-flex items-center gap-1.5 px-2.5 h-7 rounded-lg border text-xs font-semibold transition-all duration-200 whitespace-nowrap shrink-0 cursor-pointer select-none';
+  const s = styles[variant];
 
   return (
-    <button
-      onClick={onClick}
-      className={`relative p-2 rounded-xl border transition-all duration-300 text-left group min-w-[100px] flex-shrink-0 snap-start ${isActive ? activeClass : inactiveClass}`}
-    >
-      <div className="flex items-center justify-between mb-1.5">
-        <div className={`p-1 rounded-lg ${isActive ? iconBgActive : iconBgInactive}`}>
-          <Icon className="w-3.5 h-3.5" />
-        </div>
-        {count > 0 && (
-          <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isActive ? badgeActive : badgeInactive}`}>
-            {count}
-          </span>
-        )}
-      </div>
-      <div className={`text-[11px] font-bold ${isActive ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{label}</div>
-      {isActive && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-1 bg-white rounded-full" />}
+    <button onClick={onClick} className={`${base} ${isActive ? s.active : s.inactive}`}>
+      <Icon className="w-3 h-3" />
+      <span>{label}</span>
+      {count > 0 && (
+        <span className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold leading-none px-1 ${
+          isActive ? 'bg-white/25 text-inherit' : s.badge
+        }`}>
+          {count}
+        </span>
+      )}
     </button>
   );
 };

@@ -66,9 +66,9 @@ const ProductPolicyManager: React.FC = () => {
   };
 
   return (
-    <div className="p-4 lg:p-6 max-w-[2400px] mx-auto space-y-4 animate-page-enter pb-2">
+    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto h-full flex flex-col gap-2.5 animate-page-enter">
       {/* ── Header ── */}
-      <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
+      <div className="flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0">
         <div className="flex items-center gap-4 w-full lg:w-auto">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">产品政策</h1>
           <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">年度产品政策，点击链接可直接访问</span>
@@ -81,8 +81,8 @@ const ProductPolicyManager: React.FC = () => {
       </div>
 
       {/* ── Table ── */}
-      <div className="unified-card overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="unified-card overflow-hidden flex-1 min-h-0 flex flex-col">
+        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-left border-separate border-spacing-0">
             <colgroup>
               <col style={{ width: 60 }} />
@@ -154,7 +154,7 @@ const ProductPolicyManager: React.FC = () => {
           </table>
         </div>
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-gray-100 dark:border-white/10 flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
+        <div className="px-6 py-3 border-t border-gray-100 dark:border-white/10 flex items-center justify-between text-xs text-gray-400 dark:text-gray-500 shrink-0">
           <span>共 {policies.length} 条</span>
         </div>
       </div>

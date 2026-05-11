@@ -76,10 +76,10 @@ const InvoiceManager: React.FC = () => {
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-4 animate-page-enter">
+    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto h-full flex flex-col gap-2.5 animate-page-enter">
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">发票管理</h1>
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">共 {filtered.length} 条申请记录</p>
@@ -87,7 +87,7 @@ const InvoiceManager: React.FC = () => {
       </div>
 
       {/* Search & Filter Bar */}
-      <div className="unified-card p-3 flex flex-wrap items-center gap-3">
+      <div className="unified-card p-3 flex flex-wrap items-center gap-3 shrink-0">
         {/* Keyword */}
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">关键字</span>
@@ -195,7 +195,7 @@ const InvoiceManager: React.FC = () => {
 
       {/* Active Filter Tags */}
       {activeFilterCount > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 shrink-0">
           {filterStatus.map(s => (
             <span key={s} className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-xs font-medium border border-blue-100 dark:border-blue-800/30">
               {statusConfig[s]?.label}
@@ -212,8 +212,8 @@ const InvoiceManager: React.FC = () => {
       )}
 
       {/* Table */}
-      <div className="unified-card overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="unified-card overflow-hidden flex-1 min-h-0 flex flex-col">
+        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
             <thead>
               <tr className="unified-table-header">

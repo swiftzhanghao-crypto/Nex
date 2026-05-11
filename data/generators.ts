@@ -418,6 +418,7 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
   const sources: OrderSource[] = ['Sales', 'ChannelPortal', 'OnlineStore', 'APISync'];
   const SUBUNIT_ORDER_TARGET = 35;
   let subUnitOrderCreated = 0;
+  let processingProdIdx = 0;
 
   for (let i = 1; i <= 100; i++) {
     const customer = customers[i % customers.length];
@@ -430,7 +431,8 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
     const dateStr = date.toISOString();
 
     let status = statuses[i % statuses.length];
-    if (i < 10) status = OrderStatus.PENDING_APPROVAL;
+    if (i <= 5) status = OrderStatus.PENDING_APPROVAL;
+    else if (i >= 6 && i <= 15) status = OrderStatus.PROCESSING_PROD;
 
     const isSelfDeal = Math.random() > 0.8;
 
@@ -463,7 +465,8 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
       buyerId = customer.id;
     }
 
-    if (isSelfDeal) {
+    const forcedProcessing = i >= 6 && i <= 15;
+    if (isSelfDeal && !forcedProcessing) {
       if (Math.random() > 0.5) status = OrderStatus.PENDING_PAYMENT;
       else status = OrderStatus.DELIVERED;
     }
@@ -650,7 +653,8 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
     let isCDBurned = isCompleted;
 
     if (status === OrderStatus.PROCESSING_PROD) {
-      const progress = Math.floor(Math.random() * 5);
+      const progress = processingProdIdx % 5;
+      processingProdIdx++;
       if (progress >= 1) isAuthConfirmed = true;
       if (progress >= 2) isPackageConfirmed = true;
       if (progress >= 3) isShippingConfirmed = true;

@@ -94,7 +94,7 @@ export const CustomerInsight: React.FC = () => {
   );
 
   return (
-    <div className="min-h-full bg-[#F5F5F7] dark:bg-black text-[#1D1D1F] dark:text-white/95 pb-16">
+    <div className="min-h-full bg-[#F5F2EC] dark:bg-black text-[#1D1D1F] dark:text-white/95 pb-16">
       <div className="mx-auto max-w-4xl px-5 pt-14 sm:pt-20">
         <div className="text-center space-y-3 mb-10">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/80 dark:bg-white/5 px-3 py-1 text-xs font-medium text-[#86868B] border border-black/5 dark:border-white/10 shadow-sm">

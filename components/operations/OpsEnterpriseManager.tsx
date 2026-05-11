@@ -60,7 +60,7 @@ const OpsEnterpriseManager: React.FC = () => {
     const handleSearch = (v: string) => { setSearchTerm(v); setCurrentPage(1); };
 
     return (
-        <div className="p-4 lg:p-6 max-w-[2400px] mx-auto animate-page-enter pb-2 h-full flex flex-col">
+        <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto animate-page-enter h-full flex flex-col gap-4">
             {/* 顶部标题 + 搜索 + 筛选 */}
             <div className="flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">企业管理</h1>
@@ -133,8 +133,8 @@ const OpsEnterpriseManager: React.FC = () => {
             </div>
 
             {/* 表格卡片 */}
-            <div className="unified-card overflow-hidden mt-4 flex-1 flex flex-col min-h-0">
-                <div className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar">
+            <div className="unified-card overflow-hidden flex-1 flex flex-col min-h-0">
+                <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 custom-scrollbar">
                     <table className="w-full text-left border-separate border-spacing-0">
                         <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E] sticky top-0 z-10">
                             <tr>

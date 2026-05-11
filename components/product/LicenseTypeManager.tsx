@@ -344,7 +344,7 @@ const LicenseTypeManager: React.FC = () => {
   /* ===== Detail View ===== */
   if (detailAt) {
     return (
-      <div className="p-4 lg:p-6 max-w-[2400px] mx-auto animate-page-enter">
+      <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto animate-page-enter">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <button onClick={() => setDetailId(null)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 transition"><ChevronLeft className="w-5 h-5" /></button>
@@ -577,7 +577,7 @@ const LicenseTypeManager: React.FC = () => {
 
   /* ===== List View ===== */
   return (
-    <div className="p-4 lg:p-6 max-w-[2400px] mx-auto animate-page-enter">
+    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto animate-page-enter">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">下单页面字段展示配置</h1>

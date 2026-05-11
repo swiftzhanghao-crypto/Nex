@@ -88,7 +88,7 @@ const ReportsManager: React.FC = () => {
   }, [enrichedUsers]);
 
   return (
-    <div className="p-4 lg:p-6 max-w-[2400px] mx-auto space-y-4 animate-page-enter relative h-[calc(100vh-64px)] flex flex-col">
+    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto gap-2.5 animate-page-enter relative h-full flex flex-col">
       {/* Header */}
       <div className="flex justify-between items-center shrink-0">
         <div>
@@ -126,9 +126,9 @@ const ReportsManager: React.FC = () => {
       </div>
 
       {/* List Card */}
-      <div className="unified-card dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 flex flex-col animate-fade-in flex-1">
+      <div className="unified-card dark:bg-[#1C1C1E] border-gray-100 dark:border-white/10 flex flex-col animate-fade-in flex-1 min-h-0">
         {/* Filters */}
-        <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-3 flex-wrap">
+        <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-3 flex-wrap shrink-0">
           <div className="relative flex-1 min-w-[240px] max-w-sm">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -169,7 +169,7 @@ const ReportsManager: React.FC = () => {
         </div>
 
         {/* Table */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 min-h-0 overflow-auto">
           <table className="w-full text-left">
             <thead className="unified-table-header sticky top-0 backdrop-blur">
               <tr>

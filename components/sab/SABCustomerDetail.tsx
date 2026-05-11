@@ -10,7 +10,7 @@ export const SABCustomerDetail: React.FC = () => {
   const iframeSrc = `${base}customer-detail.html`;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-0px)] min-h-[480px] bg-[#F5F5F7] dark:bg-black">
+    <div className="flex flex-col h-[calc(100vh-0px)] min-h-[480px] bg-[#F5F2EC] dark:bg-black">
       <header className="shrink-0 flex items-center gap-3 px-4 sm:px-6 py-3 border-b border-black/[0.06] dark:border-white/10 bg-white/90 dark:bg-[#1C1C1E]/95 backdrop-blur-md">
         <button
           type="button"

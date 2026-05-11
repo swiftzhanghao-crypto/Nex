@@ -6,7 +6,7 @@ import {
     ArrowLeft, Box, Printer, Award, X, Lock, CheckCircle, Truck, ClipboardCheck, 
     UploadCloud, AlertOctagon, RefreshCcw, Key, Package, Disc, Receipt, FileText, 
     Briefcase, History, Eye, CheckSquare, CreditCard, ShieldCheck, User as UserIcon, Building,
-    AlertCircle, Clock, MapPin, Target, Users, Paperclip, Scroll, Camera, ScrollText, Copy, Check, Phone, Mail, Download, Banknote, Edit3, Wallet, ChevronDown, Hash,
+    AlertCircle, Clock, MapPin, Target, Users, Paperclip, Scroll, Camera, ScrollText, Copy, Check, Phone, Mail, Download, Banknote, Edit3, Wallet, Hash,
     Inbox, AlertTriangle, Plus, Search
 } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
@@ -75,7 +75,7 @@ const SkeletonBlock: React.FC<{ className?: string }> = ({ className = '' }) => 
 );
 
 const OrderDetailSkeleton: React.FC = () => (
-    <div className="flex flex-col min-h-screen bg-[#F5F5F7] dark:bg-black">
+    <div className="flex flex-col min-h-screen bg-[#F5F2EC] dark:bg-black">
         {/* Header skeleton */}
         <div className="sticky top-0 z-20 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-white/10 px-4 md:px-6 pt-4 pb-3">
             <div className="flex items-center gap-4">
@@ -102,7 +102,7 @@ const OrderDetailSkeleton: React.FC = () => (
             </div>
         </div>
         {/* Content skeleton */}
-        <div className="p-4 lg:p-6 max-w-[2400px] mx-auto w-full space-y-4">
+        <div className="p-3 lg:p-4 max-w-[2400px] mx-auto w-full space-y-2.5">
             {/* Stepper skeleton */}
             <div className="unified-card dark:bg-[#1C1C1E] px-6 py-5 border-gray-100/50 dark:border-white/10">
                 <div className="flex justify-between items-center">
@@ -132,7 +132,7 @@ const OrderDetailSkeleton: React.FC = () => (
                 </div>
             </div>
             {/* Info cards skeleton */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
                 {[1, 2, 3].map(i => (
                     <div key={i} className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 p-5 space-y-4">
                         <div className="flex items-center gap-2">
@@ -241,9 +241,6 @@ const OrderDetails: React.FC = () => {
   const [tempLinkedContractIds, setTempLinkedContractIds] = useState<string[]>([]);
   const [selectedDeliveryNo, setSelectedDeliveryNo] = useState<string | null>(null);
 
-  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
-  const toggleSection = (key: string) => setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
-  const isSectionCollapsed = (key: string) => !!collapsedSections[key];
 
   // Step specific forms
   const [shippingCarrier, setShippingCarrier] = useState('');
@@ -276,7 +273,7 @@ const OrderDetails: React.FC = () => {
 
   if (!selectedOrder) {
       return (
-          <div className="flex flex-col items-center justify-center h-screen bg-[#F5F5F7] dark:bg-black">
+          <div className="flex flex-col items-center justify-center h-screen bg-[#F5F2EC] dark:bg-black">
               <EmptyState
                   icon={<FileText className="w-7 h-7 text-gray-300 dark:text-gray-600" />}
                   title="订单不存在"
@@ -343,72 +340,50 @@ const OrderDetails: React.FC = () => {
       COMPLETED: 'order_workflow_payment',
   };
 
-  // Updated Workflow
-  let steps = [
-      { 
-          id: 'PAYMENT', 
-          label: '支付', 
-          icon: CreditCard, 
-          status: selectedOrder.isPaid ? 'Completed' : (![OrderStatus.CANCELLED, OrderStatus.REFUNDED].includes(selectedOrder.status) ? 'Current' : 'Locked'),
-          completedAt: getStepTime('PAYMENT')
-      },
-      { 
-          id: 'APPROVAL', 
-          label: '审批', 
-          icon: FileText, 
-          status: !selectedOrder.isPaid ? 'Locked' : (selectedOrder.status === OrderStatus.PENDING_APPROVAL ? 'Current' : (['PENDING_CONFIRM', 'PROCESSING_PROD', 'SHIPPED', 'DELIVERED'].includes(selectedOrder.status) ? 'Completed' : 'Locked')), 
-          completedAt: getStepTime('APPROVAL')
-      },
-      { 
-          id: 'CONFIRM', 
-          label: '确认', 
-          icon: CheckSquare, 
-          status: selectedOrder.status === OrderStatus.PENDING_CONFIRM ? 'Current' : (['PROCESSING_PROD', 'SHIPPED', 'DELIVERED'].includes(selectedOrder.status) ? 'Completed' : 'Locked'), 
-          completedAt: getStepTime('CONFIRM')
-      },
-      { 
-          id: 'STOCK_PREP', 
-          label: '备货', 
-          icon: Package, 
-          status: (selectedOrder.status === OrderStatus.PROCESSING_PROD && isStockReady) ? 'Completed' : (selectedOrder.status === OrderStatus.PROCESSING_PROD ? 'Current' : (['SHIPPED', 'DELIVERED'].includes(selectedOrder.status) ? 'Completed' : 'Locked')), 
-          completedAt: getStepTime('STOCK_PREP')
-      },
-      { 
-          id: 'SHIPPING', 
-          label: '发货', 
-          icon: Truck, 
-          status: selectedOrder.status === OrderStatus.SHIPPED || selectedOrder.status === OrderStatus.DELIVERED ? 'Completed' : (selectedOrder.status === OrderStatus.PROCESSING_PROD && isStockReady ? 'Current' : 'Locked'), 
-          completedAt: getStepTime('SHIPPING')
-      },
-      { 
-          id: 'ACCEPTANCE', 
-          label: '验收', 
-          icon: ClipboardCheck, 
-          status: selectedOrder.status === OrderStatus.DELIVERED ? 'Completed' : (selectedOrder.status === OrderStatus.SHIPPED ? 'Current' : 'Locked'), 
-          completedAt: getStepTime('ACCEPTANCE')
-      },
-  ].map(s => ({ ...s, disabled: s.status === 'Locked' }));
+  // Updated Workflow — 自成交订单无工作流，其他类型订单不含支付步骤（支付按钮已移至右上角）
+  let steps: { id: string; label: string; icon: any; status: string; completedAt?: string; disabled?: boolean }[] = [];
 
-  if (selectedOrder.buyerType === 'SelfDeal') {
+  if (selectedOrder.buyerType !== 'SelfDeal') {
       steps = [
           { 
-              id: 'PAYMENT', 
-              label: '支付', 
-              icon: CreditCard, 
-              status: selectedOrder.isPaid ? 'Completed' : 'Current',
-              completedAt: getStepTime('PAYMENT')
+              id: 'APPROVAL', 
+              label: '审批', 
+              icon: FileText, 
+              status: !selectedOrder.isPaid ? 'Locked' : (selectedOrder.status === OrderStatus.PENDING_APPROVAL ? 'Current' : (['PENDING_CONFIRM', 'PROCESSING_PROD', 'SHIPPED', 'DELIVERED'].includes(selectedOrder.status) ? 'Completed' : 'Locked')), 
+              completedAt: getStepTime('APPROVAL')
           },
-          {
-              id: 'COMPLETED',
-              label: '交易完成',
-              icon: CheckCircle,
-              status: selectedOrder.status === OrderStatus.DELIVERED ? 'Completed' : 'Locked',
-              completedAt: selectedOrder.status === OrderStatus.DELIVERED ? selectedOrder.date : undefined
-          }
+          { 
+              id: 'CONFIRM', 
+              label: '确认', 
+              icon: CheckSquare, 
+              status: selectedOrder.status === OrderStatus.PENDING_CONFIRM ? 'Current' : (['PROCESSING_PROD', 'SHIPPED', 'DELIVERED'].includes(selectedOrder.status) ? 'Completed' : 'Locked'), 
+              completedAt: getStepTime('CONFIRM')
+          },
+          { 
+              id: 'STOCK_PREP', 
+              label: '备货', 
+              icon: Package, 
+              status: (selectedOrder.status === OrderStatus.PROCESSING_PROD && isStockReady) ? 'Completed' : (selectedOrder.status === OrderStatus.PROCESSING_PROD ? 'Current' : (['SHIPPED', 'DELIVERED'].includes(selectedOrder.status) ? 'Completed' : 'Locked')), 
+              completedAt: getStepTime('STOCK_PREP')
+          },
+          { 
+              id: 'SHIPPING', 
+              label: '发货', 
+              icon: Truck, 
+              status: selectedOrder.status === OrderStatus.SHIPPED || selectedOrder.status === OrderStatus.DELIVERED ? 'Completed' : (selectedOrder.status === OrderStatus.PROCESSING_PROD && isStockReady ? 'Current' : 'Locked'), 
+              completedAt: getStepTime('SHIPPING')
+          },
+          { 
+              id: 'ACCEPTANCE', 
+              label: '验收', 
+              icon: ClipboardCheck, 
+              status: selectedOrder.status === OrderStatus.DELIVERED ? 'Completed' : (selectedOrder.status === OrderStatus.SHIPPED ? 'Current' : 'Locked'), 
+              completedAt: getStepTime('ACCEPTANCE')
+          },
       ].map(s => ({ ...s, disabled: s.status === 'Locked' }));
-  }
 
-  steps = steps.filter(s => hasPermission(stepPermissionMap[s.id] || ''));
+      steps = steps.filter(s => hasPermission(stepPermissionMap[s.id] || ''));
+  }
 
   // ... (Handlers same as before, simplified for brevity in this response but kept in full file content) ...
   // [Full handlers code from previous OrderDetails.tsx is preserved]
@@ -674,7 +649,7 @@ const OrderDetails: React.FC = () => {
 
   return (
     <>
-      <div className="flex flex-col min-h-screen bg-[#F5F5F7] dark:bg-black">
+      <div className="flex flex-col min-h-screen bg-[#F5F2EC] dark:bg-black">
       {/* Header */}
       <div className="sticky top-0 z-20 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-white/10 px-4 md:px-6 pt-4 flex flex-col">
           <div className="flex items-center gap-4 pb-3">
@@ -797,6 +772,14 @@ const OrderDetails: React.FC = () => {
 
                {/* Group 4: 操作按钮 */}
                <div className="flex items-center gap-2 shrink-0">
+                   {![OrderStatus.CANCELLED, OrderStatus.REFUNDED, OrderStatus.DRAFT].includes(selectedOrder.status) && (
+                   <button 
+                       onClick={() => setActiveStepModal('PAYMENT')}
+                       className={`whitespace-nowrap shrink-0 ${selectedOrder.isPaid ? 'unified-button-secondary !text-green-600 !border-green-200 dark:!border-green-900/30' : 'unified-button-primary !bg-green-600 hover:!bg-green-700'}`}
+                   >
+                       <CreditCard className="w-3.5 h-3.5"/> {selectedOrder.isPaid ? '支付详情' : '支付'}
+                   </button>
+                   )}
                    {selectedOrder.status === OrderStatus.DRAFT && (
                    <button 
                        onClick={() => navigate('/orders', { state: { editDraftId: selectedOrder.id } })}
@@ -854,57 +837,58 @@ const OrderDetails: React.FC = () => {
           </div>
       </div>
 
-      <div className="p-4 lg:p-6 max-w-[2400px] mx-auto w-full space-y-4 animate-page-enter pb-20">
+      {/* Workflow Stepper — visually extends header */}
+      {activeTab === 'MANAGEMENT' && hasPermission('order_workflow_view') && steps.length > 0 && (
+          <div className="shrink-0 border-b border-gray-200/80 dark:border-white/10 px-4 md:px-6 overflow-x-auto" style={{background: 'linear-gradient(to bottom, #FDFBF7, #F5F2EC)'}}>
+              <div className="max-w-[2400px] mx-auto w-full py-5">
+                  <div className="flex justify-between items-start relative min-w-[700px]">
+                      <div className="absolute top-5 h-0.5 bg-gray-300 dark:bg-white/10 -z-0 rounded-full overflow-hidden" style={{ left: `calc(100% / ${steps.length} / 2)`, right: `calc(100% / ${steps.length} / 2)` }}>
+                      </div>
+                      {steps.map((step, idx) => (
+                          <div 
+                              key={step.id} 
+                              onClick={() => !step.disabled && setActiveStepModal(step.id)} 
+                              className={`flex flex-col items-center gap-1.5 relative z-10 flex-1 transition-all group ${
+                                  step.disabled 
+                                  ? 'cursor-not-allowed' 
+                                  : 'cursor-pointer hover:scale-105'
+                              }`}
+                          >
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                                  step.status === 'Completed' ? 'bg-green-500 text-white ring-4 ring-green-100 dark:ring-green-900/20 shadow-apple' : 
+                                  step.status === 'Current' ? 'bg-[#0071E3] dark:bg-[#0A84FF] text-white ring-4 ring-blue-100 dark:ring-blue-900/30 shadow-xl scale-110' : 
+                                  'bg-white dark:bg-[#2C2C2E] border-2 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500 shadow-sm'
+                              }`}>
+                                  {step.status === 'Completed' ? <CheckCircle className="w-5 h-5" /> : step.status === 'Locked' ? <Lock className="w-3.5 h-3.5" /> : <step.icon className="w-5 h-5" />}
+                              </div>
+                              <div className="text-center">
+                                  <div className={`text-sm font-semibold ${step.status === 'Completed' ? 'text-green-600 dark:text-green-400' : step.status === 'Current' ? 'text-[#0071E3] dark:text-[#0A84FF]' : 'text-gray-500 dark:text-gray-500'}`}>{step.label}</div>
+                                  {step.completedAt && (
+                                      <div className="text-[9px] text-gray-400 font-mono mt-0.5 whitespace-nowrap">
+                                          {new Date(step.completedAt).toLocaleDateString()} {new Date(step.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      </div>
+                                  )}
+                                  {step.status === 'Current' && <div className="text-[9px] font-bold text-[#0071E3] dark:text-[#0A84FF] bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-full mt-1 border border-blue-100 dark:border-blue-800/40">待处理</div>}
+                                  {step.status === 'Completed' && <div className="text-[9px] text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full font-bold mt-0.5 flex items-center gap-0.5"><CheckCircle className="w-2.5 h-2.5" />已完成</div>}
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      <div className="p-3 lg:p-4 max-w-[2400px] mx-auto w-full space-y-2.5 animate-page-enter pb-20">
           {activeTab === 'MANAGEMENT' && (
             <>
-              {/* Stepper */}
-              {hasPermission('order_workflow_view') && steps.length > 0 && (
-              <div className="unified-card dark:bg-[#1C1C1E] px-6 py-4 border-gray-100/50 dark:border-white/10 overflow-x-auto">
-             <div className="flex justify-between items-start relative min-w-[700px]">
-                 <div className="absolute top-5 h-1 bg-gray-100 dark:bg-white/10 -z-0 rounded-full overflow-hidden" style={{ left: `calc(100% / ${steps.length} / 2)`, right: `calc(100% / ${steps.length} / 2)` }}>
-                 </div>
-                 {steps.map((step, idx) => (
-                    <div 
-                        key={step.id} 
-                        onClick={() => !step.disabled && setActiveStepModal(step.id)} 
-                        className={`flex flex-col items-center gap-1.5 relative z-10 flex-1 transition-all group ${
-                            step.disabled 
-                            ? 'cursor-not-allowed' 
-                            : 'cursor-pointer hover:scale-105'
-                        }`}
-                    >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                            step.status === 'Completed' ? 'bg-green-500 text-white ring-4 ring-green-100 dark:ring-green-900/20 shadow-apple' : 
-                            step.status === 'Current' ? 'bg-[#0071E3] dark:bg-[#0A84FF] text-white ring-4 ring-blue-100 dark:ring-blue-900/30 shadow-xl scale-110' : 
-                            'bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-600 text-gray-300 dark:text-gray-500'
-                        }`}>
-                            {step.status === 'Completed' ? <CheckCircle className="w-5 h-5" /> : step.status === 'Locked' ? <Lock className="w-3.5 h-3.5" /> : <step.icon className="w-5 h-5" />}
-                        </div>
-                        <div className="text-center">
-                            <div className={`text-sm font-bold ${step.status === 'Completed' ? 'text-green-600 dark:text-green-400' : step.status === 'Current' ? 'text-[#0071E3] dark:text-[#0A84FF]' : 'text-gray-300 dark:text-gray-500'}`}>{step.label}</div>
-                            {step.completedAt && (
-                                <div className="text-[9px] text-gray-400 font-mono mt-0.5 whitespace-nowrap">
-                                    {new Date(step.completedAt).toLocaleDateString()} {new Date(step.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </div>
-                            )}
-                            {step.status === 'Current' && <div className="text-[9px] font-bold text-[#0071E3] dark:text-[#0A84FF] bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-full mt-1 border border-blue-100 dark:border-blue-800/40">待处理</div>}
-                            {step.status === 'Completed' && <div className="text-[9px] text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full font-bold mt-0.5 flex items-center gap-0.5"><CheckCircle className="w-2.5 h-2.5" />已完成</div>}
-                        </div>
-                    </div>
-                 ))}
-             </div>
-          </div>
-              )}
-
           {/* Order Items Table + Summary Side-by-Side */}
           {hasPermission('order_detail_product') && (
           <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
-              <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 cursor-pointer select-none" onClick={() => toggleSection('product')}>
+              <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                   <Package className="w-5 h-5 text-orange-500" />
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white flex-1">订单产品明细</h3>
-                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('product') ? '-rotate-90' : ''}`} />
               </div>
-              {!isSectionCollapsed('product') && (
+              {(
               <div className="flex items-stretch">
                   <div className="flex-1 min-w-0 overflow-x-auto border-r border-gray-100 dark:border-white/10">
                       <table className="w-full text-left min-w-[520px]">
@@ -1073,12 +1057,11 @@ const OrderDetails: React.FC = () => {
               const stageClass = opp.stage === '赢单' ? 'unified-tag-green !rounded-full' : opp.stage === '输单' ? 'unified-tag-gray !rounded-full' : opp.stage === '需求判断' ? 'unified-tag-blue !rounded-full' : opp.stage === '确认商机' ? 'unified-tag-indigo !rounded-full' : opp.stage === '确认渠道' ? 'unified-tag-purple !rounded-full' : 'unified-tag-yellow !rounded-full';
               return (
                   <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
-                      <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 cursor-pointer select-none" onClick={() => toggleSection('opportunity')}>
+                      <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                           <Target className="w-5 h-5 text-orange-500" />
                           <h3 className="text-base font-semibold text-gray-900 dark:text-white flex-1">商机信息</h3>
-                          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('opportunity') ? '-rotate-90' : ''}`} />
                       </div>
-                      {!isSectionCollapsed('opportunity') && <div className="p-5">
+                      <div className="p-5">
                           <div className="grid grid-cols-3 gap-x-6">
                               {[
                                   { label: '商机名称', value: opp.name },
@@ -1123,21 +1106,20 @@ const OrderDetails: React.FC = () => {
                                   </div>
                               </div>
                           )}
-                      </div>}
+                      </div>
                   </div>
               );
           })()}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
               {/* 客户信息 (1/3 卡片，含订单联系人) */}
               {hasPermission('order_detail_customer') && (
               <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col">
-                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 shrink-0 cursor-pointer select-none" onClick={() => toggleSection('customer')}>
+                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 shrink-0">
                       <Building className="w-5 h-5 text-[#0071E3]" />
                       <h3 className="text-base font-semibold text-gray-900 dark:text-white flex-1">客户信息</h3>
-                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('customer') ? '-rotate-90' : ''}`} />
                   </div>
-                  {!isSectionCollapsed('customer') && <div className="p-5 flex-1">
+                  <div className="p-5 flex-1">
                       <div className="divide-y divide-gray-50 dark:divide-white/5">
                           {[
                               { label: '客户名称', value: selectedOrder.customerName, link: `/customers/${selectedOrder.customerId}` },
@@ -1192,25 +1174,24 @@ const OrderDetails: React.FC = () => {
                               <div className="mt-3 pt-3 border-t border-gray-100 dark:border-white/10">
                                   <div className="text-[14px] font-bold text-gray-400 dark:text-gray-500 tracking-wider mb-2">订单联系人</div>
                                   <div className="space-y-2">
-                                      {renderContact(pct, selectedOrder.buyerType === 'SelfDeal' || selectedOrder.buyerType === 'RedeemCode' ? '联系人' : '采购联系人', { bg: 'bg-blue-50/60 dark:bg-blue-900/10', ring: 'border-blue-100/80 dark:border-blue-800/30', badge: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' })}
-                                      {selectedOrder.buyerType !== 'SelfDeal' && selectedOrder.buyerType !== 'RedeemCode' && renderContact(ict, 'IT联系人', { bg: 'bg-purple-50/60 dark:bg-purple-900/10', ring: 'border-purple-100/80 dark:border-purple-800/30', badge: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' })}
+                                      {renderContact(pct, '采购联系人', { bg: 'bg-blue-50/60 dark:bg-blue-900/10', ring: 'border-blue-100/80 dark:border-blue-800/30', badge: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' })}
+                                      {renderContact(ict, 'IT联系人', { bg: 'bg-purple-50/60 dark:bg-purple-900/10', ring: 'border-purple-100/80 dark:border-purple-800/30', badge: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' })}
                                   </div>
                               </div>
                           );
                       })()}
-                  </div>}
+                  </div>
               </div>
               )}
 
               {/* 交易双方信息 (1/3 卡片) */}
               {hasPermission('order_detail_trader') && (
               <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col">
-                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 shrink-0 cursor-pointer select-none" onClick={() => toggleSection('trader')}>
+                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 shrink-0">
                       <Users className="w-5 h-5 text-indigo-500" />
                       <h3 className="text-base font-semibold text-gray-900 dark:text-white flex-1">交易双方信息</h3>
-                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('trader') ? '-rotate-90' : ''}`} />
                   </div>
-                  {!isSectionCollapsed('trader') && <div className="p-5 flex-1">
+                  <div className="p-5 flex-1">
                       <div className="divide-y divide-gray-50 dark:divide-white/5">
                           {[
                               { label: '买方名称', value: selectedOrder.buyerName },
@@ -1225,38 +1206,36 @@ const OrderDetails: React.FC = () => {
                               </div>
                           ))}
                       </div>
-                  </div>}
+                  </div>
               </div>
               )}
 
               {/* 订单备注 (1/3 卡片) */}
               {hasPermission('order_detail_remark') && <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden flex flex-col">
-                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 shrink-0 cursor-pointer select-none" onClick={() => toggleSection('remark')}>
+                  <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 shrink-0">
                       <FileText className="w-4 h-4 text-amber-500" />
                       <h3 className="text-base font-semibold text-gray-900 dark:text-white flex-1">订单备注</h3>
-                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('remark') ? '-rotate-90' : ''}`} />
                   </div>
-                  {!isSectionCollapsed('remark') && <div className="px-4 py-3 flex-1 overflow-y-auto">
+                  <div className="px-4 py-3 flex-1 overflow-y-auto">
                       {selectedOrder.orderRemark ? (
                           <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap break-words">{selectedOrder.orderRemark}</p>
                       ) : (
                           <EmptyState icon={<FileText className="w-6 h-6 text-gray-300 dark:text-gray-600" />} title="暂无备注" className="py-6" />
                       )}
-                  </div>}
+                  </div>
               </div>}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
               {/* 合同信息 (moved before original order) */}
               <div className="unified-card md:col-span-2 dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
                   <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
-                      <div className="flex items-center gap-2 flex-1 cursor-pointer select-none" onClick={() => toggleSection('contract')}>
+                      <div className="flex items-center gap-2 flex-1">
                           <Scroll className="w-5 h-5 text-blue-500" />
                           <h3 className="text-base font-semibold text-gray-900 dark:text-white flex-1">合同信息</h3>
                           {(selectedOrder.linkedContractIds?.length ?? 0) > 0 && (
                               <span className="text-xs text-gray-400 font-mono">({selectedOrder.linkedContractIds!.length})</span>
                           )}
-                          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('contract') ? '-rotate-90' : ''}`} />
                       </div>
                       <button
                           onClick={(e) => { e.stopPropagation(); setTempLinkedContractIds([...(selectedOrder.linkedContractIds || [])]); setContractPickerSearch(''); setShowContractPicker(true); }}
@@ -1265,7 +1244,7 @@ const OrderDetails: React.FC = () => {
                           <Plus className="w-3.5 h-3.5"/> 添加合同
                       </button>
                   </div>
-                  {!isSectionCollapsed('contract') && (() => {
+                  {(() => {
                       const ids = selectedOrder.linkedContractIds;
                       if (!ids || ids.length === 0) return (
                           <EmptyState icon={<Scroll className="w-6 h-6 text-gray-300 dark:text-gray-600" />} title="暂未关联合同" className="py-8" />
@@ -1317,11 +1296,10 @@ const OrderDetails: React.FC = () => {
               {/* Original Order Numbers (small card) */}
               {hasPermission('order_detail_original') && (
               <div className="unified-card md:col-span-1 dark:bg-[#1C1C1E] p-4 border-gray-100/50 dark:border-white/10 space-y-3">
-                  <div className="border-b border-gray-100 dark:border-white/10 pb-2.5 cursor-pointer select-none flex items-center" onClick={() => toggleSection('originalOrder')}>
+                  <div className="border-b border-gray-100 dark:border-white/10 pb-2.5 flex items-center">
                       <h4 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2 flex-1"><History className="w-5 h-5 text-purple-500"/> 原订单编号</h4>
-                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('originalOrder') ? '-rotate-90' : ''}`} />
                   </div>
-                  {!isSectionCollapsed('originalOrder') && <div className="divide-y divide-gray-50 dark:divide-white/5">
+                  <div className="divide-y divide-gray-50 dark:divide-white/5">
                       {[
                           { label: 'SMS订单编号', value: selectedOrder.smsOriginalOrderId || 'S00713162' },
                           { label: 'SaaS订单编号', value: selectedOrder.saasOriginalOrderId || 'P20260303195755000001' },
@@ -1331,7 +1309,7 @@ const OrderDetails: React.FC = () => {
                               <span className="text-sm font-medium font-mono text-gray-900 dark:text-white flex-1 break-all">{item.value}</span>
                           </div>
                       ))}
-                  </div>}
+                  </div>
               </div>
               )}
             </div>
@@ -1339,12 +1317,11 @@ const OrderDetails: React.FC = () => {
             {/* Settlement Method */}
             {hasPermission('order_detail_settlement') && (
             <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
-                <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2 cursor-pointer select-none" onClick={() => toggleSection('settlement')}>
+                <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                     <Banknote className="w-5 h-5 text-emerald-500" />
                     <h3 className="text-base font-semibold text-gray-900 dark:text-white flex-1">结算方式</h3>
-                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isSectionCollapsed('settlement') ? '-rotate-90' : ''}`} />
                 </div>
-                {!isSectionCollapsed('settlement') && <div className="px-5 py-4 space-y-4">
+                <div className="px-5 py-4 space-y-4">
                     {selectedOrder.settlementMethod ? (<>
                     <div className="flex items-center gap-3 flex-wrap">
                         <div className="flex items-center gap-2">
@@ -1413,14 +1390,14 @@ const OrderDetails: React.FC = () => {
                     </>) : (
                         <EmptyState icon={<Banknote className="w-6 h-6 text-gray-300 dark:text-gray-600" />} title="未设置结算方式" className="py-6" />
                     )}
-                </div>}
+                </div>
             </div>
             )}
 
             {/* Acceptance Information Table */}
             {hasPermission('order_detail_acceptance') && (
             <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
-                    <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between cursor-pointer select-none" onClick={() => toggleSection('acceptance')}>
+                    <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <ClipboardCheck className="w-5 h-5 text-green-500" />
                             <h3 className="text-base font-semibold text-gray-900 dark:text-white">验收信息</h3>
@@ -1438,9 +1415,8 @@ const OrderDetails: React.FC = () => {
                                 {selectedOrder.acceptanceConfig.status === 'Completed' ? '已完成' : selectedOrder.acceptanceConfig.status === 'In Progress' ? '进行中' : '待验收'}
                             </span>
                         )}
-                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ml-2 ${isSectionCollapsed('acceptance') ? '-rotate-90' : ''}`} />
                     </div>
-                    {!isSectionCollapsed('acceptance') && <><div className="overflow-x-auto">
+                    <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
                             <thead className="unified-table-header">
                                 <tr>
@@ -1523,7 +1499,6 @@ const OrderDetails: React.FC = () => {
                             </span>
                         </div>
                     )}
-                </>}
                 </div>
             )}
 
@@ -1531,7 +1506,7 @@ const OrderDetails: React.FC = () => {
         )}
 
           {activeTab === 'FULFILLMENT' && hasPermission('order_detail_delivery') && (
-          <div className="space-y-6">
+          <div className="space-y-2.5">
           {/* 订单交付列表 */}
           <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
               <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
@@ -2141,6 +2116,33 @@ const OrderDetails: React.FC = () => {
 
                       {/* Payment, Shipping, Acceptance, Refund Steps... */}
                       {activeStepModal === 'PAYMENT' && (
+                          selectedOrder.isPaid ? (
+                          <div className="space-y-5">
+                              <div className="p-5 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl text-white shadow-lg text-center">
+                                  <div className="text-xs font-bold uppercase mb-1 opacity-80">已收款项</div>
+                                  <div className="text-3xl font-bold font-mono">¥{selectedOrder.total.toLocaleString()}</div>
+                                  <div className="flex items-center justify-center gap-1.5 mt-2 text-green-100">
+                                      <CheckCircle className="w-4 h-4"/>
+                                      <span className="text-xs font-bold">支付完成</span>
+                                  </div>
+                              </div>
+                              <div className="space-y-3">
+                                  {[
+                                      { label: '支付方式', value: selectedOrder.paymentRecord?.paymentMethod || (selectedOrder.paymentMethod === 'WechatPay' ? '微信支付' : selectedOrder.paymentMethod === 'Alipay' ? '支付宝' : selectedOrder.paymentMethod === 'Transfer' ? '银行转账' : selectedOrder.paymentMethod || '-') },
+                                      { label: '支付时间', value: selectedOrder.paymentDate ? new Date(selectedOrder.paymentDate).toLocaleString('zh-CN') : '-' },
+                                      { label: '交易流水号', value: selectedOrder.paymentRecord?.transactionId || '-', mono: true },
+                                      ...(selectedOrder.paymentRecord?.bankName ? [{ label: '收款银行', value: selectedOrder.paymentRecord.bankName }] : []),
+                                      { label: '付款方', value: selectedOrder.paymentRecord?.payerName || selectedOrder.customerName || '-' },
+                                      { label: '收款金额', value: `¥${(selectedOrder.paymentRecord?.amount || selectedOrder.total).toLocaleString()}`, mono: true },
+                                  ].map((item, idx) => (
+                                      <div key={idx} className="flex items-center justify-between py-2.5 px-4 bg-gray-50/80 dark:bg-white/5 rounded-xl">
+                                          <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">{item.label}</span>
+                                          <span className={`text-sm font-medium text-gray-900 dark:text-white ${(item as any).mono ? 'font-mono' : ''}`}>{item.value}</span>
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+                          ) : (
                           <div className="space-y-5">
                               <div className="p-5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl text-white shadow-lg text-center">
                                   <div className="text-xs font-bold uppercase mb-1 opacity-80">应收账款</div>
@@ -2186,6 +2188,7 @@ const OrderDetails: React.FC = () => {
 
                               <button onClick={() => requestConfirm({ title: '确认收款到账', description: `即将确认收到 ¥${selectedOrder.total.toLocaleString()} 款项，此操作不可撤销，确认继续？`, confirmLabel: '确认到账', onConfirm: handleConfirmPayment })} className="w-full py-4 bg-green-500 text-white rounded-2xl font-bold shadow-lg hover:bg-green-600 transition">确认到账</button>
                           </div>
+                          )
                       )}
                       
                       {activeStepModal === 'SHIPPING' && (

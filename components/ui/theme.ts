@@ -14,9 +14,9 @@ export const colors = {
   accent:       '#FF2D55',
   accentHover:  '#FF2D55CC',
 
-  canvas:       '#F5F5F7',
+  canvas:       '#F5F2EC',
   canvasDark:   '#000000',
-  surface:      '#FFFFFF',
+  surface:      '#FDFBF7',
   surfaceDark:  '#1C1C1E',
   surfaceDark2: '#2C2C2E',
 
@@ -58,8 +58,8 @@ export const cls = {
   overlay: 'fixed inset-0 bg-black/40 backdrop-blur-sm z-[500] flex items-center justify-center p-4 animate-fade-in',
   drawerOverlay: 'fixed inset-0 z-[500] flex justify-end',
 
-  modalContent: 'bg-white dark:bg-[#2C2C2E] rounded-2xl shadow-2xl animate-modal-enter',
-  drawerContent: 'bg-white dark:bg-[#1C1C1E] border-l border-gray-200 dark:border-white/10 shadow-2xl animate-drawer-enter',
+  modalContent: 'bg-[#FDFBF7] dark:bg-[#2C2C2E] rounded-2xl shadow-2xl animate-modal-enter',
+  drawerContent: 'bg-[#FDFBF7] dark:bg-[#1C1C1E] border-l border-gray-200 dark:border-white/10 shadow-2xl animate-drawer-enter',
 
   emptyState: 'py-16 text-center text-sm text-gray-400 dark:text-gray-500',
 } as const;

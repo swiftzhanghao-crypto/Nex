@@ -322,11 +322,11 @@ const CustomerDetails: React.FC = () => {
           </div>
       </div>
 
-      <div className="p-4 lg:p-6 space-y-4">
+      <div className="p-3 lg:p-4 space-y-2.5">
 
       {/* ── Tab: 客户信息 ── */}
       {activeTab === 'info' && (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
           {/* 基本信息 (span 2) */}
           <div className="md:col-span-2 unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
               <div className="px-5 py-3.5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
@@ -411,7 +411,7 @@ const CustomerDetails: React.FC = () => {
                   </button>
               </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
               {(customer.enterprises || []).length === 0 ? (
                   <div className="md:col-span-3 unified-card dark:bg-[#1C1C1E] p-10 text-center text-sm text-gray-400">暂无关联企业，点击右上角添加。</div>
               ) : (
@@ -539,7 +539,7 @@ const CustomerDetails: React.FC = () => {
                   <Plus className="w-3.5 h-3.5" /> 添加联系人
               </button>
           </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
           {customer.contacts.length === 0 ? (
               <div className="md:col-span-3 unified-card dark:bg-[#1C1C1E] p-10 text-center text-sm text-gray-400">暂无联系人信息，点击右上角"添加联系人"。</div>
           ) : (
@@ -770,7 +770,7 @@ const CustomerDetails: React.FC = () => {
                   <Plus className="w-3.5 h-3.5" /> 添加发票信息
               </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
               {!customer.billingInfo?.taxId ? (
                   <div className="md:col-span-3 unified-card dark:bg-[#1C1C1E] p-10 text-center text-sm text-gray-400">暂无发票信息，点击右上角"添加发票信息"。</div>
               ) : (
@@ -822,7 +822,7 @@ const CustomerDetails: React.FC = () => {
           {bankAccounts.length === 0 ? (
               <div className="unified-card dark:bg-[#1C1C1E] p-10 text-center text-sm text-gray-400 dark:text-gray-500">暂无银行账号，点击右上角"添加银行账号"。</div>
           ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
               {bankAccounts.map(b => (
               <div key={b.id} className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden self-start">
                   <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">

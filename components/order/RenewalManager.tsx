@@ -304,9 +304,9 @@ const RenewalManager: React.FC = () => {
   const activeFilters = (regionFilter !== '全部' ? 1 : 0) + (hideExpired ? 1 : 0);
 
   return (
-    <div className="p-4 lg:p-6 max-w-[2400px] mx-auto space-y-4 animate-page-enter pb-2">
+    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto h-full flex flex-col gap-2.5 animate-page-enter">
       {/* ── 页头 ── */}
-      <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
+      <div className="flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0">
         <div className="flex items-center gap-4 w-full lg:w-auto">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">续费管理</h1>
           <span className="text-sm text-gray-400 dark:text-gray-500">管理所有客户的订阅与续费</span>
@@ -376,7 +376,7 @@ const RenewalManager: React.FC = () => {
 
       {/* ── 筛选面板 ── */}
       {isFilterOpen && (
-        <div className="unified-card dark:bg-[#1C1C1E] p-4 animate-fade-in">
+        <div className="unified-card dark:bg-[#1C1C1E] p-4 animate-fade-in shrink-0">
           <div className="flex items-center gap-6 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">区域</span>
@@ -430,7 +430,7 @@ const RenewalManager: React.FC = () => {
       )}
 
       {/* ── 产品线 Tab（固定选项） ── */}
-      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-1">
+      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-1 shrink-0">
         <button
           onClick={() => { setProductLineTab(PRODUCT_LINE_TAB_ALL); setStatusFilter('All'); setCurrentPage(1); setSelectedIds(new Set()); setExpandedIds(new Set()); }}
           className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 whitespace-nowrap border ${
@@ -467,7 +467,7 @@ const RenewalManager: React.FC = () => {
       </div>
 
       {/* ── 统计卡片 ── */}
-      <div className="flex overflow-x-auto gap-2 pb-2 custom-scrollbar no-scrollbar scroll-smooth snap-x snap-mandatory">
+      <div className="flex overflow-x-auto gap-2 pb-2 custom-scrollbar no-scrollbar scroll-smooth snap-x snap-mandatory shrink-0">
         <StatusFilterCard id="All" label="全部" icon={Layers} count={stats.all} isActive={statusFilter === 'All'} onClick={() => { setStatusFilter('All'); setCurrentPage(1); }} />
         <StatusFilterCard id="Active" label="活跃" icon={CheckCircle} count={stats.active} isActive={statusFilter === 'Active'} onClick={() => { setStatusFilter('Active'); setCurrentPage(1); }} />
         <StatusFilterCard id="Expire7" label="7天内到期" icon={Timer} count={stats.expire7} isActive={statusFilter === 'Expire7'} variant="danger" onClick={() => { setStatusFilter('Expire7'); setCurrentPage(1); }} />
@@ -478,7 +478,7 @@ const RenewalManager: React.FC = () => {
       </div>
 
       {/* ── 客户分段 Tab（活跃 / 待跟进 / 已到期） + 批量操作 ── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-1 bg-gray-100 dark:bg-white/5 rounded-xl p-1 flex-wrap">
           {CUSTOMER_SEGMENT_TABS.map(tab => (
             <button
@@ -520,11 +520,11 @@ const RenewalManager: React.FC = () => {
       </div>
 
       {/* ── 表格 ── */}
-      <div className="unified-card overflow-hidden">
+      <div className="unified-card overflow-hidden flex-1 min-h-0 flex flex-col">
         {/* 固定表头 */}
         <div
           ref={headerScrollRef}
-          className="overflow-x-auto no-scrollbar"
+          className="overflow-x-auto no-scrollbar shrink-0"
           onScroll={e => { if (bodyScrollRef.current) bodyScrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
         >
           <table className="w-full text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed', minWidth: 1620 }}>
@@ -551,7 +551,7 @@ const RenewalManager: React.FC = () => {
         {/* 可滚动 body */}
         <div
           ref={bodyScrollRef}
-          className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-380px)] custom-scrollbar"
+          className="overflow-x-auto overflow-y-auto flex-1 min-h-0 custom-scrollbar"
           onScroll={e => { if (headerScrollRef.current) headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
         >
           <table className="w-full text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed', minWidth: 1620 }}>

@@ -82,17 +82,17 @@ const RemittanceManager: React.FC = () => {
   const totalAmount = filtered.reduce((s, r) => s + r.amount, 0);
 
   return (
-    <div className="p-4 lg:p-6 space-y-4 animate-page-enter">
+    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto h-full flex flex-col gap-2.5 animate-page-enter">
 
       {/* Page Title */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">汇款明细</h1>
         </div>
       </div>
 
       {/* Search & Filter Bar */}
-      <div className="unified-card p-3 flex flex-wrap items-center gap-3">
+      <div className="unified-card p-3 flex flex-wrap items-center gap-3 shrink-0">
         {/* Keyword Search */}
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">关键字</span>
@@ -211,7 +211,7 @@ const RemittanceManager: React.FC = () => {
 
       {/* Active Filter Tags */}
       {(filterType.length > 0 || filterMethod.length > 0) && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 shrink-0">
           {filterType.map(t => (
             <span key={t} className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-xs font-medium border border-blue-100 dark:border-blue-800/30">
               类型：{t}
@@ -228,8 +228,8 @@ const RemittanceManager: React.FC = () => {
       )}
 
       {/* Table */}
-      <div className="unified-card overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="unified-card overflow-hidden flex-1 min-h-0 flex flex-col">
+        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm min-w-[1100px]">
             <thead>
               <tr className="unified-table-header">
@@ -337,7 +337,7 @@ const RemittanceManager: React.FC = () => {
         </div>
 
         {/* Footer: count + pagination */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5">
+        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5 shrink-0">
           {filtered.length > 0 ? (
             <span className="text-xs text-gray-400">合计：<span className="text-orange-500 dark:text-orange-400 font-semibold">{formatAmount(totalAmount)}</span></span>
           ) : <span />}
@@ -348,7 +348,7 @@ const RemittanceManager: React.FC = () => {
             onPageChange={setCurrentPage}
             onSizeChange={s => { setPageSize(s); setCurrentPage(1); }}
             sizeOptions={PAGE_SIZE_OPTIONS}
-            className="flex items-center gap-3"
+            className="flex items-center gap-3 shrink-0"
           />
         </div>
       </div>

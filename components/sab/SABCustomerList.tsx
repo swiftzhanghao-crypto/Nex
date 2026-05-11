@@ -325,7 +325,7 @@ export const SABCustomerList: React.FC = () => {
         }
       `}</style>
 
-      <div className="min-h-full bg-[#F5F5F7] dark:bg-black pb-10">
+      <div className="min-h-full bg-[#F5F2EC] dark:bg-black pb-10">
         <div className="mx-auto max-w-[2400px] px-4 sm:px-6 pt-6">
           <div className="mb-6">
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#1D1D1F] dark:text-white">客户列表</h1>
@@ -503,7 +503,7 @@ export const SABCustomerList: React.FC = () => {
                     <select
                       value={adv.customerType}
                       onChange={(e) => setAdv((s) => ({ ...s, customerType: e.target.value }))}
-                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F5F7] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30 dark:focus:ring-[#0A84FF]/30"
+                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F2EC] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30 dark:focus:ring-[#0A84FF]/30"
                     >
                       <option value="">全部</option>
                       <option value="战略">战略客户</option>
@@ -516,7 +516,7 @@ export const SABCustomerList: React.FC = () => {
                     <select
                       value={adv.level}
                       onChange={(e) => setAdv((s) => ({ ...s, level: e.target.value }))}
-                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F5F7] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
+                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F2EC] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
                     >
                       <option value="">全部</option>
                       <option value="S0">S0</option>
@@ -530,7 +530,7 @@ export const SABCustomerList: React.FC = () => {
                     <input
                       value={adv.reportTag}
                       onChange={(e) => setAdv((s) => ({ ...s, reportTag: e.target.value }))}
-                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F5F7] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
+                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F2EC] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
                       placeholder="如 KA、GA"
                     />
                   </label>
@@ -539,7 +539,7 @@ export const SABCustomerList: React.FC = () => {
                     <input
                       value={adv.customerTag}
                       onChange={(e) => setAdv((s) => ({ ...s, customerTag: e.target.value }))}
-                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F5F7] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
+                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F2EC] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
                       placeholder="关键词"
                     />
                   </label>
@@ -553,7 +553,7 @@ export const SABCustomerList: React.FC = () => {
                   <input
                     value={adv.groupInput}
                     onChange={(e) => setAdv((s) => ({ ...s, groupInput: e.target.value }))}
-                    className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F5F7] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
+                    className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F2EC] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
                     placeholder="搜索集团名称"
                   />
                 </label>
@@ -567,7 +567,7 @@ export const SABCustomerList: React.FC = () => {
                       className={`py-2 rounded-xl text-xs font-medium border transition ${
                         adv.province === p
                           ? 'border-[#0071E3] bg-[#0071E3]/10 text-[#0071E3] dark:border-[#0A84FF] dark:bg-[#0A84FF]/15 dark:text-[#0A84FF]'
-                          : 'border-black/[0.08] dark:border-white/10 bg-[#F5F5F7] dark:bg-black/40 text-[#1D1D1F] dark:text-white/80'
+                          : 'border-black/[0.08] dark:border-white/10 bg-[#F5F2EC] dark:bg-black/40 text-[#1D1D1F] dark:text-white/80'
                       }`}
                     >
                       {p}
@@ -584,7 +584,7 @@ export const SABCustomerList: React.FC = () => {
                     <select
                       value={adv.dealStatus}
                       onChange={(e) => setAdv((s) => ({ ...s, dealStatus: e.target.value }))}
-                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F5F7] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
+                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F2EC] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
                     >
                       <option value="">全部</option>
                       <option value="成交客户">成交客户</option>
@@ -597,7 +597,7 @@ export const SABCustomerList: React.FC = () => {
                     <select
                       value={adv.authStatus}
                       onChange={(e) => setAdv((s) => ({ ...s, authStatus: e.target.value }))}
-                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F5F7] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
+                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F2EC] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
                     >
                       <option value="">全部</option>
                       <option value="已覆盖">已覆盖</option>
@@ -624,7 +624,7 @@ export const SABCustomerList: React.FC = () => {
                     <input
                       value={adv.orderMin}
                       onChange={(e) => setAdv((s) => ({ ...s, orderMin: e.target.value }))}
-                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F5F7] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
+                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F2EC] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
                       inputMode="decimal"
                     />
                   </label>
@@ -633,7 +633,7 @@ export const SABCustomerList: React.FC = () => {
                     <input
                       value={adv.orderMax}
                       onChange={(e) => setAdv((s) => ({ ...s, orderMax: e.target.value }))}
-                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F5F7] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
+                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F2EC] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
                       inputMode="decimal"
                     />
                   </label>
@@ -642,7 +642,7 @@ export const SABCustomerList: React.FC = () => {
                     <input
                       value={adv.opptyMin}
                       onChange={(e) => setAdv((s) => ({ ...s, opptyMin: e.target.value }))}
-                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F5F7] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
+                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F2EC] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
                       inputMode="decimal"
                     />
                   </label>
@@ -651,7 +651,7 @@ export const SABCustomerList: React.FC = () => {
                     <input
                       value={adv.opptyMax}
                       onChange={(e) => setAdv((s) => ({ ...s, opptyMax: e.target.value }))}
-                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F5F7] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
+                      className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F2EC] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
                       inputMode="decimal"
                     />
                   </label>
@@ -661,7 +661,7 @@ export const SABCustomerList: React.FC = () => {
                   <select
                     value={adv.mauActive}
                     onChange={(e) => setAdv((s) => ({ ...s, mauActive: e.target.value }))}
-                    className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F5F7] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
+                    className="mt-1 w-full rounded-xl border border-black/[0.08] dark:border-white/10 bg-[#F5F2EC] dark:bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#0071E3]/30"
                   >
                     <option value="">不限</option>
                     <option value="yes">高活跃（≥1万）</option>

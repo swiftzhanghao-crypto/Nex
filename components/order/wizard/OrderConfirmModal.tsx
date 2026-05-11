@@ -109,7 +109,7 @@ const OrderConfirmModal: React.FC<OrderConfirmModalProps> = ({
   return (
     <ModalPortal>
       <div className="fixed inset-0 z-[600] bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
-      <div className="fixed inset-4 md:inset-8 z-[601] flex flex-col bg-[#F5F5F7] dark:bg-black rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-white/10 animate-modal-enter">
+      <div className="fixed inset-4 md:inset-8 z-[601] flex flex-col bg-[#F5F2EC] dark:bg-black rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-white/10 animate-modal-enter">
         {/* Header */}
         <div className="px-6 py-4 bg-white dark:bg-[#1C1C1E] border-b border-gray-200 dark:border-white/10 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -211,7 +211,7 @@ const OrderConfirmModal: React.FC<OrderConfirmModalProps> = ({
             </div>
           </SectionCard>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
             {/* 基本信息 */}
             <SectionCard icon={<Layers className="w-5 h-5 text-purple-500" />} title="订单基本信息">
               <div className="divide-y divide-gray-50 dark:divide-white/5">

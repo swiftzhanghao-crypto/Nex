@@ -54,7 +54,7 @@ const Pagination: React.FC<PaginationProps> = ({
     onPageChange(p);
   };
 
-  const wrapperCls = className ?? 'flex justify-between items-center px-5 py-3.5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5';
+  const wrapperCls = className ?? 'flex justify-between items-center px-5 py-3.5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5 shrink-0';
 
   return (
     <div className={wrapperCls}>

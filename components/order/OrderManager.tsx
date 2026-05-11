@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Order, OrderStatus, OrderItem, User, ApprovalRecord, OrderSource, OrderDraft, Subscription, SubscriptionLineProductSnapshot } from '../../types';
 import { subscriptionMostUrgentProductSnapshot } from '../../utils/subscriptionLineProduct';
-import { Search, Plus, Trash2, Disc, CheckCircle, FileText, CreditCard, Truck, X, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, FileCheck, CheckSquare, Package, Settings, Filter, ChevronDown, Calendar, Shield, RotateCcw, Save, ChevronRight, Copy, Check } from 'lucide-react';
+import { Search, Plus, Trash2, Disc, CheckCircle, FileText, CreditCard, Truck, X, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, FileCheck, CheckSquare, Package, Settings, Filter, ChevronDown, Calendar, Shield, RotateCcw, Save, ChevronRight, Copy, Check, Eye, Pencil } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import OrderCreateWizard from './OrderCreateWizard';
 import StatusFilterCard from './StatusFilterCard';
@@ -16,6 +16,43 @@ import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 import Pagination from '../common/Pagination';
 
 type FilterMode = '单选' | '多选' | '时间段' | '时间点' | '金额范围';
+
+interface OrderViewFilters {
+  filterStatus: string;
+  advancedFilters: FilterCondition[];
+}
+
+interface OrderView {
+  id: string;
+  name: string;
+  columns: string[];
+  isDefault?: boolean;
+  filters?: OrderViewFilters;
+}
+
+const VIEWS_STORAGE_KEY = 'order_list_views';
+const ACTIVE_VIEW_STORAGE_KEY = 'order_list_active_view';
+
+function loadViews(defaultColumns: string[]): OrderView[] {
+  try {
+    const raw = localStorage.getItem(VIEWS_STORAGE_KEY);
+    if (raw) {
+      const views = JSON.parse(raw) as OrderView[];
+      if (Array.isArray(views) && views.length > 0) {
+        return views.map(v => v.isDefault && v.name === '默认视图' ? { ...v, name: '全部订单' } : v);
+      }
+    }
+  } catch {}
+  return [{ id: 'default', name: '全部订单', columns: defaultColumns, isDefault: true }];
+}
+function saveViews(views: OrderView[]) {
+  localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify(views));
+}
+function loadActiveViewId(): string {
+  return localStorage.getItem(ACTIVE_VIEW_STORAGE_KEY) || 'default';
+}
+
+const DEFAULT_COLS = ['id', 'customer', 'buyer', 'products', 'sales', 'businessManager', 'department', 'source', 'buyerType', 'date', 'status', 'paymentStatus', 'stockStatus', 'total', 'action'];
 
 interface FilterCondition {
     id: string;
@@ -47,10 +84,10 @@ const orderSourceLabelMap: Record<string, string> = {
 
 const statusMap: Record<string, string> = {
     [OrderStatus.DRAFT]: '草稿',
-    [OrderStatus.PENDING_APPROVAL]: '待审批',
-    [OrderStatus.PENDING_CONFIRM]: '待确认',
+    [OrderStatus.PENDING_APPROVAL]: '订单审批',
+    [OrderStatus.PENDING_CONFIRM]: '订单确认',
     [OrderStatus.PROCESSING_PROD]: '备货中',
-    [OrderStatus.PENDING_PAYMENT]: '待支付',
+    [OrderStatus.PENDING_PAYMENT]: '订单支付',
     [OrderStatus.SHIPPED]: '已发货',
     [OrderStatus.DELIVERED]: '已完成',
     [OrderStatus.CANCELLED]: '已取消',
@@ -91,13 +128,13 @@ const OrderManager: React.FC = () => {
   // Pipeline Status Definitions
   const pipelineStatuses = [
       { id: OrderStatus.DRAFT, label: '草稿', desc: '已暂存、待继续提交', icon: Save, permission: 'order_create' },
-      { id: OrderStatus.PENDING_APPROVAL, label: '待审批', desc: '等待经理或财务审批', icon: FileCheck, permission: 'order_view_pending_approval' },
-      { id: OrderStatus.PENDING_CONFIRM, label: '待确认', desc: '等待商务确认订单', icon: CheckSquare, permission: 'order_view_pending_confirm' },
+      { id: OrderStatus.PENDING_APPROVAL, label: '订单审批', desc: '等待经理或财务审批', icon: FileCheck, permission: 'order_view_pending_approval' },
+      { id: OrderStatus.PENDING_CONFIRM, label: '订单确认', desc: '等待商务确认订单', icon: CheckSquare, permission: 'order_view_pending_confirm' },
       { id: 'STOCK_AUTH', label: '授权确认', desc: '生成并确认产品授权码', icon: CheckCircle, permission: 'order_view_auth_confirm' },
       { id: 'STOCK_PKG', label: '安装包核验', desc: '核对安装包版本及完整性', icon: FileText, permission: 'order_view_stock_pkg' },
       { id: 'STOCK_SHIP', label: '快递单填写', desc: '填写快递单及物流信息', icon: Truck, permission: 'order_view_stock_ship' },
       { id: 'STOCK_CD', label: '光盘刻录', desc: '刻录物理光盘介质', icon: Disc, permission: 'order_view_stock_cd' },
-      { id: OrderStatus.PENDING_PAYMENT, label: '待支付', desc: '等待客户完成支付', icon: CreditCard, permission: 'order_view_payment' }, 
+      { id: OrderStatus.PENDING_PAYMENT, label: '订单支付', desc: '等待客户完成支付', icon: CreditCard, permission: 'order_view_payment' }, 
       { id: OrderStatus.SHIPPED, label: '已发货', desc: '产品已发出，运输中', icon: Truck, permission: 'order_view_shipped' },
       { id: OrderStatus.DELIVERED, label: '已完成', desc: '客户已签收，流程结束', icon: CheckCircle, permission: 'order_view_completed' },
   ];
@@ -109,7 +146,12 @@ const OrderManager: React.FC = () => {
       { id: OrderStatus.CANCELLED, label: '已取消', desc: '订单已作废', icon: X, permission: 'order_view_cancelled' },
   ];
 
+  const _initViews = useMemo(() => loadViews(DEFAULT_COLS), []);
+  const _initActiveId = useMemo(() => loadActiveViewId(), []);
+  const _initActiveView = useMemo(() => _initViews.find(v => v.id === _initActiveId) || _initViews[0], [_initViews, _initActiveId]);
+
   const [filterStatus, setFilterStatus] = useState<string>(() => {
+    if (_initActiveView.filters?.filterStatus) return _initActiveView.filters.filterStatus;
     if (hasPermission('order_view_all')) return 'All';
     const firstAllowed = pipelineStatuses.find(step => hasPermission(step.permission));
     if (firstAllowed) return firstAllowed.id;
@@ -121,15 +163,14 @@ const OrderManager: React.FC = () => {
   const [isSearchFieldOpen, setIsSearchFieldOpen] = useState(false);
   
   // Advanced Filter State
-  const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
+  const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(() => (_initActiveView.filters?.advancedFilters?.length ?? 0) > 0);
   const [isFilterClosing, setIsFilterClosing] = useState(false);
   const closeFilterDrawer = () => {
       setIsFilterClosing(true);
       setTimeout(() => { setIsAdvancedFilterOpen(false); setIsFilterClosing(false); }, 280);
   };
-  const [advancedFilters, setAdvancedFilters] = useState<FilterCondition[]>([]);
-  // appliedFilters 是已点击「查询」后真正生效的筛选条件
-  const [appliedFilters, setAppliedFilters] = useState<FilterCondition[]>([]);
+  const [advancedFilters, setAdvancedFilters] = useState<FilterCondition[]>(() => _initActiveView.filters?.advancedFilters || []);
+  const [appliedFilters, setAppliedFilters] = useState<FilterCondition[]>(() => _initActiveView.filters?.advancedFilters || []);
 
   const multiCheckboxFields = ['orderSource', 'orderType', 'orderStatus', 'paymentStatus', 'stockStatus', 'subUnitAuth'];
   const personPickerFields = ['businessManager'];
@@ -239,9 +280,68 @@ const OrderManager: React.FC = () => {
 
   // Column Configuration State
   const [isColumnConfigOpen, setIsColumnConfigOpen] = useState(false);
-  const [visibleColumns, setVisibleColumns] = useState<string[]>([
-      'id', 'customer', 'buyer', 'products', 'sales', 'businessManager', 'department', 'source', 'buyerType', 'date', 'status', 'paymentStatus', 'stockStatus', 'total', 'action'
-  ]);
+  const [views, setViews] = useState<OrderView[]>(_initViews);
+  const [activeViewId, setActiveViewId] = useState<string>(_initActiveId);
+  const activeView = useMemo(() => views.find(v => v.id === activeViewId) || views[0], [views, activeViewId]);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(activeView.columns);
+
+  useEffect(() => { saveViews(views); }, [views]);
+  useEffect(() => { localStorage.setItem(ACTIVE_VIEW_STORAGE_KEY, activeViewId); }, [activeViewId]);
+
+  const switchView = useCallback((viewId: string) => {
+    const view = views.find(v => v.id === viewId);
+    if (view) {
+      setActiveViewId(viewId);
+      setVisibleColumns(view.columns);
+      const f = view.filters;
+      setFilterStatus(f?.filterStatus || 'All');
+      const restored = f?.advancedFilters || [];
+      setAdvancedFilters(restored);
+      setAppliedFilters(restored);
+      setIsAdvancedFilterOpen(restored.length > 0);
+    }
+  }, [views]);
+
+  const [editingViewId, setEditingViewId] = useState<string | null>(null);
+  const [editingViewName, setEditingViewName] = useState('');
+  const [viewMenuOpenId, setViewMenuOpenId] = useState<string | null>(null);
+  const viewMenuRef = useRef<HTMLDivElement>(null);
+
+  const addViewFromColumns = useCallback((columns: string[], name: string) => {
+    const id = 'view_' + Date.now();
+    const newView: OrderView = {
+      id, name, columns: [...columns],
+      filters: { filterStatus, advancedFilters: [...appliedFilters] },
+    };
+    setViews(prev => [...prev, newView]);
+    setActiveViewId(id);
+    setVisibleColumns(columns);
+  }, [filterStatus, appliedFilters]);
+
+  const deleteView = useCallback((viewId: string) => {
+    setViews(prev => {
+      const next = prev.filter(v => v.id !== viewId);
+      if (next.length === 0) {
+        const def: OrderView = { id: 'default', name: '全部订单', columns: DEFAULT_COLS, isDefault: true };
+        return [def];
+      }
+      return next;
+    });
+    if (activeViewId === viewId) {
+      const remaining = views.filter(v => v.id !== viewId);
+      const fallback = remaining[0] || { id: 'default', columns: DEFAULT_COLS };
+      setActiveViewId(fallback.id);
+      setVisibleColumns(fallback.columns);
+    }
+    setViewMenuOpenId(null);
+  }, [activeViewId, views]);
+
+  const renameView = useCallback((viewId: string, newName: string) => {
+    if (!newName.trim()) return;
+    setViews(prev => prev.map(v => v.id === viewId ? { ...v, name: newName.trim() } : v));
+    setEditingViewId(null);
+  }, []);
+
 
   const allColumns = [
       { id: 'id', label: '订单编号' },
@@ -758,8 +858,13 @@ const OrderManager: React.FC = () => {
   const openColumnConfig = () => setIsColumnConfigOpen(true);
   const handleColumnConfigConfirm = useCallback((cols: string[]) => {
     setVisibleColumns(cols);
+    setViews(prev => prev.map(v => v.id === activeViewId ? {
+      ...v,
+      columns: [...cols],
+      filters: { filterStatus, advancedFilters: [...appliedFilters] },
+    } : v));
     setIsColumnConfigOpen(false);
-  }, []);
+  }, [activeViewId, filterStatus, appliedFilters]);
 
   const searchFieldOptions: { value: 'id' | 'customerName' | 'buyerName' | 'productName' | 'licensee'; label: string; placeholder: string }[] = [
     { value: 'id',           label: '订单编号', placeholder: '搜索订单编号…' },
@@ -791,6 +896,7 @@ const OrderManager: React.FC = () => {
           <col style={{ width: 52 }} />
       </colgroup>
   );
+  const tableWidth = 52 + orderedVisibleColumns.reduce((s, col) => s + (colWidthMap[col.id] || 120), 0) + 52;
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -806,17 +912,80 @@ const OrderManager: React.FC = () => {
   }, [orders]);
 
   return (
-    <div className="p-4 lg:p-6 max-w-[2400px] mx-auto space-y-4 animate-page-enter pb-2">
-      <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
-        {/* Left: title */}
-        <div className="flex items-center gap-4 w-full lg:w-auto">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">订单管理</h1>
-            <a href="https://365.kdocs.cn/latest" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline shrink-0"><FileText className="w-3.5 h-3.5" />使用说明</a>
+    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto animate-page-enter pb-2 h-full flex flex-col gap-2.5 min-w-0 overflow-hidden">
+      <div className="flex items-center gap-3 flex-wrap shrink-0">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">订单管理</h1>
+        {/* View Dropdown */}
+        <div className="relative" ref={viewMenuRef}>
+          <button
+            onClick={() => setViewMenuOpenId(viewMenuOpenId ? null : '__dropdown__')}
+            className="h-8 px-3 pr-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-sm font-medium text-gray-700 dark:text-gray-300 hover:border-blue-300 dark:hover:border-blue-500/40 transition shadow-apple flex items-center gap-1.5"
+          >
+            <Eye className="w-3.5 h-3.5 text-[#0071E3] dark:text-[#0A84FF]" />
+            {activeView.name}
+            <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${viewMenuOpenId === '__dropdown__' ? 'rotate-180' : ''}`} />
+          </button>
+          {viewMenuOpenId === '__dropdown__' && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => { setViewMenuOpenId(null); setEditingViewId(null); }} />
+              <div className="absolute left-0 top-full mt-1.5 w-56 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl z-50 py-1 animate-fade-in">
+                {views.map(view => (
+                  <div key={view.id} className="group flex items-center">
+                    {editingViewId === view.id ? (
+                      <input
+                        autoFocus
+                        value={editingViewName}
+                        onChange={e => setEditingViewName(e.target.value)}
+                        onBlur={() => renameView(view.id, editingViewName)}
+                        onKeyDown={e => { if (e.key === 'Enter') renameView(view.id, editingViewName); if (e.key === 'Escape') setEditingViewId(null); }}
+                        onClick={e => e.stopPropagation()}
+                        className="flex-1 h-9 mx-1 px-3 text-sm border border-blue-400 rounded-lg bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white outline-none"
+                      />
+                    ) : (
+                      <button
+                        onClick={() => { switchView(view.id); setViewMenuOpenId(null); }}
+                        className={`flex-1 text-left px-3 py-2 text-sm font-medium flex items-center gap-2 transition ${
+                          activeViewId === view.id
+                            ? 'text-[#0071E3] dark:text-[#0A84FF] bg-blue-50 dark:bg-blue-900/20'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        <Eye className="w-3.5 h-3.5 shrink-0" />
+                        <span className="flex-1 truncate">{view.name}</span>
+                        {activeViewId === view.id && <Check className="w-3.5 h-3.5 shrink-0" />}
+                      </button>
+                    )}
+                    {!editingViewId && (
+                      <div className="flex items-center gap-0.5 pr-1.5 opacity-0 group-hover:opacity-100 transition shrink-0">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditingViewId(view.id); setEditingViewName(view.name); }}
+                          className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 transition"
+                          title="重命名"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        {!view.isDefault && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); deleteView(view.id); }}
+                            className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+                            title="删除"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
+            <div className="flex-1" />
+
             {/* Search bar */}
-            <div className="flex items-stretch h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] w-full sm:w-[320px] focus-within:border-blue-400 dark:focus-within:border-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)] transition shadow-apple">
+            <div className="flex items-stretch h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] w-[280px] lg:w-[320px] shrink-0 focus-within:border-blue-400 dark:focus-within:border-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)] transition shadow-apple">
                 {/* Field selector */}
                 <div className="relative flex-shrink-0">
                     <button
@@ -910,8 +1079,6 @@ const OrderManager: React.FC = () => {
             </button>
             )}
 
-            <div className="w-px h-6 bg-gray-200 dark:bg-white/10 mx-1 hidden sm:block"></div>
-
             {hasPermission('order_create') && (
                 <div className="flex items-center gap-2">
                     {orderDrafts.length > 0 && (
@@ -969,31 +1136,49 @@ const OrderManager: React.FC = () => {
                     </button>
                 </div>
             )}
-        </div>
       </div>
 
-      <div className="space-y-6">
-        {/* Status Cards Grid */}
-        <div className="flex overflow-x-auto gap-2 pb-2 custom-scrollbar no-scrollbar scroll-smooth snap-x snap-mandatory">
-            {hasPermission('order_view_all') && (
-                <StatusFilterCard id="All" label="全部订单" icon={Layers} count={orders.length} isActive={filterStatus === 'All'} onClick={() => setFilterStatus('All')} />
-            )}
-            {pipelineStatuses.filter(step => hasPermission(step.permission)).map((step) => (
-                <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} onClick={() => setFilterStatus(step.id)} />
-            ))}
-            {exceptionStatuses.filter(step => hasPermission(step.permission)).map((step) => (
-                <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} variant={step.id === OrderStatus.CANCELLED ? 'muted' : 'danger'} onClick={() => setFilterStatus(step.id)} />
-            ))}
-        </div>
+      <div className="flex-1 min-h-0 flex flex-col gap-2.5">
+        {/* Status Filter Tabs */}
+        {(() => {
+          const shippingIds = new Set(['STOCK_AUTH', 'STOCK_PKG', 'STOCK_SHIP', 'STOCK_CD']);
+          const successIds = new Set([OrderStatus.SHIPPED, OrderStatus.DELIVERED]);
+          const warningIds = new Set([OrderStatus.PENDING_PAYMENT]);
+          const getVariant = (id: string): 'primary' | 'shipping' | 'warning' | 'success' | 'danger' | 'muted' => {
+            if (shippingIds.has(id)) return 'shipping';
+            if (successIds.has(id)) return 'success';
+            if (warningIds.has(id)) return 'warning';
+            return 'primary';
+          };
+          const approvalGroup = pipelineStatuses.filter(s => !shippingIds.has(s.id) && !successIds.has(s.id) && !warningIds.has(s.id)).filter(s => hasPermission(s.permission));
+          const shippingGroup = pipelineStatuses.filter(s => shippingIds.has(s.id)).filter(s => hasPermission(s.permission));
+          const paymentGroup = pipelineStatuses.filter(s => warningIds.has(s.id)).filter(s => hasPermission(s.permission));
+          const sep = <div className="w-px h-5 bg-gray-200 dark:bg-white/10 mx-0.5 self-center shrink-0" />;
+          return (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {approvalGroup.map(step => (
+                <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} variant={getVariant(step.id)} onClick={() => setFilterStatus(step.id)} />
+              ))}
+              {shippingGroup.length > 0 && sep}
+              {shippingGroup.map(step => (
+                <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} variant="shipping" onClick={() => setFilterStatus(step.id)} />
+              ))}
+              {paymentGroup.length > 0 && sep}
+              {paymentGroup.map(step => (
+                <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} variant="warning" onClick={() => setFilterStatus(step.id)} />
+              ))}
+            </div>
+          );
+        })()}
 
-        <div className="unified-card overflow-hidden">
+        <div className="unified-card overflow-hidden flex-1 min-h-0 min-w-0 flex flex-col">
             {/* ── 固定表头（不在滚动容器内，滚动条不延伸至此） ── */}
             <div
                 ref={headerScrollRef}
                 className="overflow-x-auto no-scrollbar"
                 onScroll={(e) => { if (bodyScrollRef.current) bodyScrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
             >
-              <table className="w-full text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed' }}>
+              <table className="text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed', width: tableWidth }}>
                 {tableColGroup}
                 <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E]">
                   <tr>
@@ -1022,10 +1207,10 @@ const OrderManager: React.FC = () => {
             {/* ── 可滚动表体（滚动条只在此区域） ── */}
             <div
                 ref={bodyScrollRef}
-                className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-370px)] custom-scrollbar"
+                className="overflow-x-auto overflow-y-auto flex-1 min-h-0 custom-scrollbar"
                 onScroll={(e) => { if (headerScrollRef.current) headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
             >
-          <table className="w-full text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed' }}>
+          <table className="text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed', width: tableWidth }}>
             {tableColGroup}
             <tbody className="divide-y divide-gray-100 dark:divide-white/5 text-sm">
               {currentOrders.map(order => {
@@ -1349,7 +1534,7 @@ const OrderManager: React.FC = () => {
           </table>
         </div>
         
-        <div className="flex items-center px-5 py-3.5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5">
+        <div className="flex items-center px-5 py-3.5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5 shrink-0">
             <span className="text-xs text-gray-500 dark:text-gray-400">
               共 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF]">{filteredOrders.length}</span> 条
             </span>
@@ -1772,6 +1957,7 @@ const OrderManager: React.FC = () => {
           fixedColumns={FIXED_COLUMNS}
           onClose={() => setIsColumnConfigOpen(false)}
           onConfirm={handleColumnConfigConfirm}
+          onSaveAsView={addViewFromColumns}
         />
       )}
 

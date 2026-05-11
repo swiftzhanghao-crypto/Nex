@@ -117,7 +117,7 @@ const ProductPreview: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden bg-[#F5F5F7] dark:bg-black">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden bg-[#F5F2EC] dark:bg-black">
 
       {/* ── Header + Tabs（整体 sticky 顶栏，与订单详情一致） ── */}
       <div className="shrink-0 z-20 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-white/10 px-4 md:px-6 pt-4 flex flex-col">

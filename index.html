@@ -20,9 +20,9 @@
               'primary-dark': '#0A84FF',
               secondary: '#86868B',
               dark: '#1D1D1F',
-              canvas: '#F5F5F7',
+              canvas: '#F5F2EC',
               'canvas-dark': '#000000',
-              surface: '#FFFFFF',
+              surface: '#FDFBF7',
               'surface-dark': '#1C1C1E',
             },
             boxShadow: {
@@ -246,6 +246,24 @@
         background: linear-gradient(to left, rgba(0,0,0,0.15), transparent);
       }
 
+      /* Warm surface override for light mode */
+      html:not(.dark) .bg-white { background-color: #FDFBF7; }
+      html:not(.dark) .bg-white\/90 { background-color: rgba(253, 251, 247, 0.9); }
+      html:not(.dark) .bg-white\/80 { background-color: rgba(253, 251, 247, 0.8); }
+      html:not(.dark) .bg-white\/60 { background-color: rgba(253, 251, 247, 0.6); }
+      html:not(.dark) .bg-white\/50 { background-color: rgba(253, 251, 247, 0.5); }
+      html:not(.dark) .bg-white\/30 { background-color: rgba(253, 251, 247, 0.3); }
+
+      /* Hide number input spinners */
+      input[type="number"]::-webkit-outer-spin-button,
+      input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      input[type="number"] {
+        -moz-appearance: textfield;
+      }
+
       /* Tab context menu */
       .tab-ctx-menu {
         animation: ctxPop 0.12s ease-out;
@@ -258,7 +276,7 @@
     <style type="text/tailwindcss">
       @layer components {
         .unified-card {
-          @apply bg-white dark:bg-[#1C1C1E] rounded-[24px] shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden transition-all duration-300;
+          @apply bg-[#FDFBF7] dark:bg-[#1C1C1E] rounded-[24px] shadow-apple border border-gray-100/50 dark:border-white/10 overflow-hidden transition-all duration-300;
         }
         .unified-table-header {
           @apply bg-gray-50/80 dark:bg-white/5 text-gray-500 dark:text-gray-400 text-sm uppercase font-bold tracking-wider border-b border-gray-100 dark:border-white/10;
@@ -270,7 +288,7 @@
           @apply unified-button bg-[#0071E3] dark:bg-[#FF2D55] text-white hover:bg-blue-600 dark:hover:bg-[#FF2D55]/80 shadow-lg shadow-blue-500/20 dark:shadow-red-500/20;
         }
         .unified-button-secondary {
-          @apply unified-button bg-white dark:bg-[#1C1C1E] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 shadow-sm;
+          @apply unified-button bg-[#FDFBF7] dark:bg-[#1C1C1E] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 hover:bg-[#F5F2EC] dark:hover:bg-white/5 shadow-sm;
         }
         .unified-button-ghost {
           @apply unified-button bg-transparent text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10;
@@ -338,7 +356,7 @@
 }
 </script>
 </head>
-  <body class="antialiased bg-[#F5F5F7] dark:bg-black text-[#1D1D1F] dark:text-[#F5F5F7]">
+  <body class="antialiased bg-[#F5F2EC] dark:bg-black text-[#1D1D1F] dark:text-[#F5F5F7]">
     <div id="root"></div>
     <div id="modal-root"></div>
     <script type="module" src="/index.tsx"></script>

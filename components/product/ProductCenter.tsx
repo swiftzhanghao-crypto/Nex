@@ -124,7 +124,6 @@ const ProductCenter: React.FC = () => {
         {/* Title */}
         <div className="flex items-center gap-4 shrink-0">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">产品目录</h1>
-          <a href="https://365.kdocs.cn/latest" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline shrink-0"><FileText className="w-3.5 h-3.5" />使用说明</a>
         </div>
 
         {/* Right controls */}

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X } from 'lucide-react';
+import { X, Eye } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 
 export interface ColumnDef {
@@ -14,11 +14,14 @@ interface ColumnConfigModalProps {
   fixedColumns: Set<string>;
   onClose: () => void;
   onConfirm: (columns: string[]) => void;
+  onSaveAsView?: (columns: string[], name: string) => void;
 }
 
 const ColumnConfigModal: React.FC<ColumnConfigModalProps> = ({
-  allColumns, initialVisible, defaultVisible, fixedColumns, onClose, onConfirm,
+  allColumns, initialVisible, defaultVisible, fixedColumns, onClose, onConfirm, onSaveAsView,
 }) => {
+  const [showSaveView, setShowSaveView] = useState(false);
+  const [viewName, setViewName] = useState('');
   const [tempVisible, setTempVisible] = useState<string[]>(initialVisible);
   const [leftSearch, setLeftSearch] = useState('');
   const [rightSearch, setRightSearch] = useState('');
@@ -182,7 +185,52 @@ const ColumnConfigModal: React.FC<ColumnConfigModalProps> = ({
             </div>
           </div>
 
-          <div className="px-6 py-4 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
+          <div className="px-6 py-4 border-t border-gray-100 dark:border-white/10 flex items-center gap-3">
+            {onSaveAsView && (
+              showSaveView ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <Eye className="w-4 h-4 text-[#0071E3] shrink-0" />
+                  <input
+                    autoFocus
+                    value={viewName}
+                    onChange={e => setViewName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && viewName.trim()) {
+                        onSaveAsView(tempVisible, viewName.trim());
+                        onClose();
+                      }
+                      if (e.key === 'Escape') setShowSaveView(false);
+                    }}
+                    placeholder="输入视图名称…"
+                    className="flex-1 h-8 px-3 text-sm border border-gray-200 dark:border-white/10 rounded-lg bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white outline-none focus:border-blue-400 placeholder:text-gray-400"
+                  />
+                  <button
+                    onClick={() => {
+                      if (viewName.trim()) {
+                        onSaveAsView(tempVisible, viewName.trim());
+                        onClose();
+                      }
+                    }}
+                    disabled={!viewName.trim()}
+                    className="px-4 py-1.5 rounded-lg text-sm font-bold text-white bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    保存
+                  </button>
+                  <button onClick={() => setShowSaveView(false)} className="px-3 py-1.5 rounded-lg text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition">
+                    取消
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setShowSaveView(true); setViewName(''); }}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  保存为视图
+                </button>
+              )
+            )}
+            <div className="flex-1" />
             <button onClick={onClose} className="px-5 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/10 transition">取 消</button>
             <button onClick={() => onConfirm(tempVisible)} className="px-5 py-2 rounded-xl text-sm font-bold text-white bg-[#0071E3] hover:bg-[#0060C0] dark:bg-[#0A84FF] dark:hover:bg-[#007AEB] transition">确 定</button>
           </div>
