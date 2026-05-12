@@ -668,16 +668,16 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   };
 
   return (
-    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto gap-2.5 animate-page-enter relative h-full flex flex-col">
+    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto gap-2.5 animate-page-enter relative h-full flex flex-col min-w-0">
       {/* Header */}
-      <div className="flex items-center shrink-0 gap-4">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight">
+      <div className="flex items-center shrink-0 gap-4 flex-wrap min-w-0">
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight shrink-0">
             {activeTab === 'USERS' ? '用户管理' : '角色管理'}
         </h1>
 
         {/* 用户 Tab: 搜索 + 新增 放在标题同行 */}
         {activeTab === 'USERS' && (
-          <div className="flex items-center gap-3 ml-auto">
+          <div className="flex items-center gap-3 ml-auto min-w-0">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -694,7 +694,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
         )}
 
         {activeTab === 'ROLES' && (
-          <div className="flex items-center gap-1 ml-2">
+          <div className="flex items-center gap-1 ml-2 min-w-0 overflow-x-auto no-scrollbar">
             {[
               { id: MAIN_SPACE_ID, label: '平台角色', icon: Globe },
               ...spaces.map(s => ({ id: s.id, label: s.name, icon: Box, isApp: true })),

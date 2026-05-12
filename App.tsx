@@ -5,6 +5,8 @@ import { AppProvider, useAppContext } from './contexts/AppContext';
 import Layout from './components/layout/Layout';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import LoginModal from './components/auth/LoginModal';
+import SSOCallback from './components/auth/SSOCallback';
+import CrmXsyCallback from './components/auth/CrmXsyCallback';
 import ProductManager from './components/product/ProductManager';
 import OrderManager from './components/order/OrderManager';
 import CustomerManager from './components/crm/CustomerManager';
@@ -62,6 +64,8 @@ function AppRoutes() {
   return (
     <Layout>
       <Routes>
+        <Route path="/sso-callback" element={<SSOCallback />} />
+        <Route path="/crm-callback" element={<CrmXsyCallback />} />
         <Route path="/" element={<Dashboard />} />
 
         <Route path="/product-center" element={<ProductCenter />} />

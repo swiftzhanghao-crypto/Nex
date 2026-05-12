@@ -282,7 +282,7 @@ const CustomerDetails: React.FC = () => {
   const getTypeDisplay = (t: string) => typeLabel[t] || t;
 
   return (
-    <div className="max-w-[2400px] mx-auto w-full animate-page-enter pb-20">
+    <div className="max-w-[2400px] mx-auto w-full animate-page-enter pb-20 min-w-0">
 
       {/* ── Sticky Header + Tabs ── */}
       <div className="sticky top-0 z-20 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-white/10 px-4 md:px-6 pt-4 flex flex-col">
@@ -326,14 +326,14 @@ const CustomerDetails: React.FC = () => {
 
       {/* ── Tab: 客户信息 ── */}
       {activeTab === 'info' && (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5">
           {/* 基本信息 (span 2) */}
-          <div className="md:col-span-2 unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
+          <div className="lg:col-span-2 unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
               <div className="px-5 py-3.5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                   <FileText className="w-4.5 h-4.5 text-[#0071E3]" />
                   <h4 className="text-base font-bold text-gray-800 dark:text-white">基本信息</h4>
               </div>
-              <div className="grid grid-cols-3 gap-0">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-0">
                   {[
                       { label: '客户编号', value: customer.id, mono: true },
                       { label: '客户名称', value: customer.companyName },
@@ -363,7 +363,7 @@ const CustomerDetails: React.FC = () => {
           </div>
 
           {/* 归属信息 (span 1) */}
-          <div className="md:col-span-1 unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden self-start">
+          <div className="lg:col-span-1 unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden self-start">
               <div className="px-5 py-3.5 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
                   <UserCircle className="w-4.5 h-4.5 text-indigo-500" />
                   <h4 className="text-base font-bold text-gray-800 dark:text-white">归属信息</h4>

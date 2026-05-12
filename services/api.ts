@@ -19,7 +19,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   };
   if (_token) headers['Authorization'] = `Bearer ${_token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers, credentials: 'include' });
 
   if (res.status === 401) {
     setToken(null);
@@ -72,6 +72,7 @@ export const authApi = {
       method: 'POST', body: JSON.stringify({ email, password }),
     }),
   me: () => request<User>('/auth/me'),
+  logout: () => request<{ code: number; msg: string }>('/auth/logout', { method: 'POST' }),
 };
 
 // ---- Users ----

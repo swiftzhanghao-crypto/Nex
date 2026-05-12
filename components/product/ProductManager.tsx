@@ -244,7 +244,7 @@ const ProductManager: React.FC = () => {
   }
 
   return (
-    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto h-full flex flex-col gap-2.5 animate-page-enter relative">
+    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto h-full flex flex-col gap-2.5 animate-page-enter relative min-w-0">
       <div className="flex items-center justify-between shrink-0">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">产品管理</h1>
         {activeTab === 'SPU' && (

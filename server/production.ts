@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { initSchema } from './db.ts';
 import { seedDatabase } from './seed.ts';
 import authRoutes from './routes/auth.ts';
+import wpsAuthRoutes from './routes/wps-auth.ts';
 import userRoutes from './routes/users.ts';
 import orderRoutes from './routes/orders.ts';
 import customerRoutes from './routes/customers.ts';
@@ -13,6 +14,7 @@ import financeRoutes from './routes/finance.ts';
 import channelRoutes from './routes/channels.ts';
 import opportunityRoutes from './routes/opportunities.ts';
 import spacesRoutes from './routes/spaces.ts';
+import crmXsyRoutes from './routes/crm-xiaoshouyi.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '4567');
@@ -46,6 +48,7 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
+app.use('/api/auth', wpsAuthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/orders', orderRoutes);
@@ -55,6 +58,7 @@ app.use('/api/finance', financeRoutes);
 app.use('/api/channels', channelRoutes);
 app.use('/api/opportunities', opportunityRoutes);
 app.use('/api/spaces', spacesRoutes);
+app.use('/api/crm/xsy', crmXsyRoutes);
 
 app.use(((err: any, _req: any, res: any, _next: any) => {
   console.error(`[error] ${err.message}`);

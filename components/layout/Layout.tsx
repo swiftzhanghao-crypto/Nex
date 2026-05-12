@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ClipboardCheck, Radar, Search, List, ArrowLeft, Smartphone, RefreshCcw, Sparkles, Bot } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ClipboardCheck, Radar, Search, List, ArrowLeft, Smartphone, RefreshCcw, Sparkles, Bot, LogOut } from 'lucide-react';
 import manualContent from '../../docs/产品说明文档.md?raw';
 import designSpecContent from '../../docs/设计规范.md?raw';
 import operationManualContent from '../../docs/WPS365业务平台操作手册.md?raw';
@@ -22,7 +22,7 @@ interface LayoutProps {
 
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { currentUser, users, setCurrentUser, roles, apiMode, filteredCustomers: customers, filteredProducts: products } = useAppContext();
+  const { currentUser, users, setCurrentUser, roles, apiMode, logout, filteredCustomers: customers, filteredProducts: products } = useAppContext();
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -211,9 +211,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       
       {/* Top Header */}
       <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 z-30 sticky top-0 bg-white border-b border-gray-200/50 dark:bg-[#1C1C1E] dark:border-white/10 transition-all">
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-6 min-w-0 flex-1">
               {/* Logo Area */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 shrink-0">
                 <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full p-2 transition">
                     <Menu className="w-5 h-5" />
                 </button>
@@ -223,13 +223,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </div>
               </div>
 
-              {/* Desktop Tabs */}
-              <nav className="hidden md:flex items-center gap-1 ml-6">
+              {/* Desktop Tabs — 超出时水平滚动，隐藏滚动条，保证始终单行 */}
+              <nav className="hidden md:flex items-center gap-1 ml-6 min-w-0 overflow-x-auto no-scrollbar">
                   {topNavItems.map((item) => (
                       <button 
                           key={item.id}
                           onClick={() => navigate(item.path)}
-                          className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                          className={`px-5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 shrink-0 ${
                               activeTopNav === item.id 
                               ? 'bg-[#0071E3] text-white shadow-apple shadow-blue-500/20' 
                               : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/10'
@@ -241,7 +241,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </nav>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             {/* AI Search Bar */}
             <div
               onClick={() => setIsGlobalSearchOpen(true)}
@@ -336,6 +336,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 </button>
                             ))}
                         </div>
+                        {apiMode && (
+                            <div className="border-t border-gray-100 dark:border-white/10 mt-1 pt-1">
+                                <button
+                                    onClick={() => { setIsUserMenuOpen(false); logout(); }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition text-left"
+                                >
+                                    <LogOut className="w-3.5 h-3.5" />
+                                    退出登录
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

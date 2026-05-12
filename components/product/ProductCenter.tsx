@@ -119,7 +119,7 @@ const ProductCenter: React.FC = () => {
     <div className="h-full flex flex-col bg-gray-50 dark:bg-black/20 overflow-hidden animate-page-enter">
 
       {/* ── Top Bar: title + controls (OrderManager style) ─────── */}
-      <div className="px-6 pt-6 pb-4 shrink-0 flex items-center justify-between gap-4">
+      <div className="px-6 pt-6 pb-4 shrink-0 flex items-center justify-between gap-4 flex-wrap">
 
         {/* Title */}
         <div className="flex items-center gap-4 shrink-0">
@@ -131,7 +131,7 @@ const ProductCenter: React.FC = () => {
 
           {/* Search - catalog only */}
           {mainView === 'catalog' && (
-          <div className="unified-card flex items-stretch h-9 border-gray-200 dark:border-white/10 dark:bg-[#1C1C1E] w-[280px] focus-within:border-blue-400 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]">
+          <div className="unified-card flex items-stretch h-9 border-gray-200 dark:border-white/10 dark:bg-[#1C1C1E] w-[220px] xl:w-[280px] focus-within:border-blue-400 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]">
             <div className="relative flex-1 flex items-center min-w-0">
               <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 pointer-events-none shrink-0" />
               <input
@@ -185,10 +185,10 @@ const ProductCenter: React.FC = () => {
         </div>
       )}
 
-      {mainView === 'catalog' && <div className="unified-card flex-1 flex mx-6 mb-6 border-gray-200/80 dark:border-white/10 dark:bg-[#1C1C1E]">
+      {mainView === 'catalog' && <div className="unified-card flex-1 min-w-0 flex mx-6 mb-6 border-gray-200/80 dark:border-white/10 dark:bg-[#1C1C1E]">
 
         {/* ── Left: Collapsible Tree Sidebar ─────────────────── */}
-        <div className="unified-card w-[312px] shrink-0 -r border-gray-200/80 dark:border-white/10 overflow-y-auto dark:bg-[#1C1C1E]">
+        <div className="unified-card w-[280px] xl:w-[312px] shrink-0 -r border-gray-200/80 dark:border-white/10 overflow-y-auto dark:bg-[#1C1C1E]">
           <div className="px-4 pt-4 pb-1">
             <div className="text-sm font-bold text-gray-300 dark:text-gray-600 px-1 mb-3">产品分类</div>
           </div>
@@ -247,7 +247,7 @@ const ProductCenter: React.FC = () => {
         </div>
 
         {/* ── Right: Product Table ────────────────────────────── */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
 
 
           {/* Card Grid */}

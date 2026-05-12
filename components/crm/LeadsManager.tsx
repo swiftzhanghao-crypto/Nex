@@ -107,7 +107,7 @@ const LeadsManager: React.FC = () => {
   };
 
   return (
-    <div className="p-3 lg:p-4 max-w-[1800px] mx-auto space-y-2.5 animate-fade-in h-[calc(100vh-64px)] flex flex-col">
+    <div className="p-3 lg:p-4 max-w-[1800px] mx-auto space-y-2.5 animate-fade-in h-[calc(100vh-64px)] flex flex-col min-w-0">
       {/* Title */}
       <h1 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">线索管理</h1>
 

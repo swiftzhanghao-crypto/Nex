@@ -85,7 +85,7 @@ const PerformanceManager: React.FC = () => {
   const fmt = (v: number) => `¥${v.toLocaleString()}`;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 p-3 lg:p-4 max-w-[2400px] w-full mx-auto min-w-0">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">业绩管理</h1>
         <span className="text-xs text-gray-400 dark:text-gray-500">共 {filtered.length} 条记录</span>
@@ -93,7 +93,7 @@ const PerformanceManager: React.FC = () => {
 
       {/* Search + Filter Bar */}
       <div className="flex items-center gap-3">
-        <div className="flex-1 flex items-center gap-0 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden shadow-sm">
+        <div className="flex-1 min-w-0 flex items-center gap-0 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden shadow-sm">
           <div className="relative">
             <button
               onClick={() => {

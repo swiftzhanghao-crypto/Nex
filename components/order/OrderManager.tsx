@@ -4,12 +4,11 @@ import ReactDOM from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Order, OrderStatus, OrderItem, User, ApprovalRecord, OrderSource, OrderDraft, Subscription, SubscriptionLineProductSnapshot } from '../../types';
 import { subscriptionMostUrgentProductSnapshot } from '../../utils/subscriptionLineProduct';
-import { Search, Plus, Trash2, Disc, CheckCircle, FileText, CreditCard, Truck, X, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, FileCheck, CheckSquare, Package, Settings, Filter, ChevronDown, Calendar, Shield, RotateCcw, Save, ChevronRight, Copy, Check, Eye, Pencil } from 'lucide-react';
+import { Search, Plus, Trash2, Disc, CheckCircle, FileText, CreditCard, Truck, X, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, FileCheck, CheckSquare, Package, Settings, Filter, ChevronDown, Calendar, Shield, RotateCcw, Save, ChevronRight, Copy, Check, Eye, Pencil, SlidersHorizontal, GripVertical, Columns3 } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import OrderCreateWizard from './OrderCreateWizard';
 import StatusFilterCard from './StatusFilterCard';
 import DeleteConfirmModal from './DeleteConfirmModal';
-import ColumnConfigModal from './ColumnConfigModal';
 import UserDetailPanel from '../common/UserDetailPanel';
 import EmployeeCardModal from '../common/EmployeeCardModal';
 import { useAppContext, useEnsureData } from '../../contexts/AppContext';
@@ -165,9 +164,10 @@ const OrderManager: React.FC = () => {
   // Advanced Filter State
   const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(() => (_initActiveView.filters?.advancedFilters?.length ?? 0) > 0);
   const [isFilterClosing, setIsFilterClosing] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<'filter' | 'columns'>('filter');
   const closeFilterDrawer = () => {
       setIsFilterClosing(true);
-      setTimeout(() => { setIsAdvancedFilterOpen(false); setIsFilterClosing(false); }, 280);
+      setTimeout(() => { setIsAdvancedFilterOpen(false); setIsFilterClosing(false); setDrawerTab('filter'); }, 280);
   };
   const [advancedFilters, setAdvancedFilters] = useState<FilterCondition[]>(() => _initActiveView.filters?.advancedFilters || []);
   const [appliedFilters, setAppliedFilters] = useState<FilterCondition[]>(() => _initActiveView.filters?.advancedFilters || []);
@@ -279,7 +279,6 @@ const OrderManager: React.FC = () => {
   const [filterSource, setFilterSource] = useState<OrderSource | 'All'>('All');
 
   // Column Configuration State
-  const [isColumnConfigOpen, setIsColumnConfigOpen] = useState(false);
   const [views, setViews] = useState<OrderView[]>(_initViews);
   const [activeViewId, setActiveViewId] = useState<string>(_initActiveId);
   const activeView = useMemo(() => views.find(v => v.id === activeViewId) || views[0], [views, activeViewId]);
@@ -855,7 +854,34 @@ const OrderManager: React.FC = () => {
 
   const DEFAULT_VISIBLE = ['id', 'customer', 'buyer', 'products', 'sales', 'businessManager', 'department', 'source', 'buyerType', 'date', 'status', 'paymentStatus', 'stockStatus', 'total', 'action'];
   const FIXED_COLUMNS = useMemo(() => new Set(['id', 'action']), []);
-  const openColumnConfig = () => setIsColumnConfigOpen(true);
+
+  // Drawer-embedded column config state
+  const [tempVisibleCols, setTempVisibleCols] = useState<string[]>(visibleColumns);
+  const [colSearch, setColSearch] = useState('');
+  const [colDragIdx, setColDragIdx] = useState<number | null>(null);
+  const [showSaveView, setShowSaveView] = useState(false);
+  const [saveViewName, setSaveViewName] = useState('');
+  useEffect(() => { if (isAdvancedFilterOpen) { setTempVisibleCols(visibleColumns); setShowSaveView(false); setSaveViewName(''); } }, [isAdvancedFilterOpen]);
+
+  const saveCurrentAsView = useCallback((name: string) => {
+    const cols = drawerTab === 'columns' ? tempVisibleCols : visibleColumns;
+    const filters = drawerTab === 'filter' ? advancedFilters : appliedFilters;
+    const id = 'view_' + Date.now();
+    const newView: OrderView = {
+      id, name, columns: [...cols],
+      filters: { filterStatus, advancedFilters: [...filters] },
+    };
+    setViews(prev => [...prev, newView]);
+    setActiveViewId(id);
+    setVisibleColumns(cols);
+    if (drawerTab === 'filter') {
+      setAppliedFilters([...advancedFilters]);
+    }
+    setShowSaveView(false);
+    setSaveViewName('');
+    closeFilterDrawer();
+  }, [drawerTab, tempVisibleCols, visibleColumns, advancedFilters, appliedFilters, filterStatus]);
+
   const handleColumnConfigConfirm = useCallback((cols: string[]) => {
     setVisibleColumns(cols);
     setViews(prev => prev.map(v => v.id === activeViewId ? {
@@ -863,7 +889,6 @@ const OrderManager: React.FC = () => {
       columns: [...cols],
       filters: { filterStatus, advancedFilters: [...appliedFilters] },
     } : v));
-    setIsColumnConfigOpen(false);
   }, [activeViewId, filterStatus, appliedFilters]);
 
   const searchFieldOptions: { value: 'id' | 'customerName' | 'buyerName' | 'productName' | 'licensee'; label: string; placeholder: string }[] = [
@@ -955,7 +980,7 @@ const OrderManager: React.FC = () => {
                         {activeViewId === view.id && <Check className="w-3.5 h-3.5 shrink-0" />}
                       </button>
                     )}
-                    {!editingViewId && (
+                    {!editingViewId && !view.isDefault && (
                       <div className="flex items-center gap-0.5 pr-1.5 opacity-0 group-hover:opacity-100 transition shrink-0">
                         <button
                           onClick={(e) => { e.stopPropagation(); setEditingViewId(view.id); setEditingViewName(view.name); }}
@@ -964,15 +989,13 @@ const OrderManager: React.FC = () => {
                         >
                           <Pencil className="w-3 h-3" />
                         </button>
-                        {!view.isDefault && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); deleteView(view.id); }}
-                            className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
-                            title="删除"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteView(view.id); }}
+                          className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+                          title="删除"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1030,7 +1053,7 @@ const OrderManager: React.FC = () => {
                 </div>
             </div>
 
-            {/* 筛选按钮（原设置字段位置） */}
+            {/* 筛选 & 列配置（合并入口） */}
             <button 
                 onClick={() => {
                     if (!isAdvancedFilterOpen && advancedFilters.length === 0) {
@@ -1042,12 +1065,16 @@ const OrderManager: React.FC = () => {
                         }));
                         setAdvancedFilters(defaults);
                     }
+                    setDrawerTab('filter');
                     setIsAdvancedFilterOpen(!isAdvancedFilterOpen);
                 }}
-                className={`p-2 rounded-lg border transition shadow-apple ${isAdvancedFilterOpen ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
-                title="高级筛选"
+                className={`relative p-2 rounded-lg border transition shadow-apple ${isAdvancedFilterOpen ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
+                title="筛选与列配置"
             >
-                <Filter className="w-4 h-4" />
+                <SlidersHorizontal className="w-4 h-4" />
+                {appliedFilters.length > 0 && !isAdvancedFilterOpen && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#0071E3] dark:bg-[#0A84FF]" />
+                )}
             </button>
 
             {/* 重置按钮 */}
@@ -1061,23 +1088,13 @@ const OrderManager: React.FC = () => {
                     setFilterAmountMax('');
                     setFilterSource('All');
                     setAdvancedFilters([]);
+                    setAppliedFilters([]);
                 }}
                 className="p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-500 dark:text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:border-red-800 dark:hover:text-red-400 transition shadow-apple"
                 title="重置所有筛选"
             >
                 <RotateCcw className="w-4 h-4" />
             </button>
-
-            {/* 设置字段按钮 */}
-            {hasPermission('order_column_config') && (
-            <button
-                onClick={openColumnConfig}
-                className={`p-2 rounded-lg border transition shadow-apple ${isColumnConfigOpen ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
-                title="配置列"
-            >
-                <Settings className="w-4 h-4" />
-            </button>
-            )}
 
             {hasPermission('order_create') && (
                 <div className="flex items-center gap-2">
@@ -1600,156 +1617,361 @@ const OrderManager: React.FC = () => {
           );
       })()}
 
-      {/* Advanced Filters Drawer */}
+      {/* Unified Filter & Column Config Drawer */}
       {isAdvancedFilterOpen && (
         <ModalPortal>
         <div className="fixed inset-0 z-[500]">
-          {/* Full-screen backdrop */}
           <div
             className={`absolute inset-0 pointer-events-auto ${isFilterClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'} bg-black/40 backdrop-blur-sm`}
             onClick={closeFilterDrawer}
           />
-          {/* Drawer panel */}
-          <div className={`absolute right-0 inset-y-0 w-full max-w-[480px] pointer-events-auto bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col border-l border-gray-200/50 dark:border-white/10 ${isFilterClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
-            <div className="p-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center shrink-0">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">设置筛选条件</h3>
-                <button onClick={closeFilterDrawer} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full text-gray-400 transition">
-                    <X className="w-5 h-5"/>
-                </button>
+          <div className={`absolute right-0 inset-y-0 w-full max-w-[560px] pointer-events-auto bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col border-l border-gray-200/50 dark:border-white/10 ${isFilterClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
+            {/* Header with Tabs */}
+            <div className="border-b border-gray-100 dark:border-white/10 shrink-0">
+                <div className="px-5 pt-4 pb-0 flex items-center justify-between">
+                    <div className="flex items-center gap-1 bg-gray-100 dark:bg-white/5 rounded-lg p-0.5">
+                        <button
+                            onClick={() => setDrawerTab('filter')}
+                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all ${drawerTab === 'filter' ? 'bg-white dark:bg-[#2C2C2E] text-[#0071E3] dark:text-[#0A84FF] shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+                        >
+                            <Filter className="w-3.5 h-3.5" />
+                            筛选条件
+                            {appliedFilters.length > 0 && <span className="min-w-[16px] h-4 flex items-center justify-center rounded-full bg-[#0071E3] dark:bg-[#0A84FF] text-white text-[10px] font-bold px-1">{appliedFilters.length}</span>}
+                        </button>
+                        <button
+                            onClick={() => setDrawerTab('columns')}
+                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all ${drawerTab === 'columns' ? 'bg-white dark:bg-[#2C2C2E] text-[#0071E3] dark:text-[#0A84FF] shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+                        >
+                            <Columns3 className="w-3.5 h-3.5" />
+                            显示列
+                        </button>
+                    </div>
+                    <button onClick={closeFilterDrawer} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full text-gray-400 transition">
+                        <X className="w-5 h-5"/>
+                    </button>
+                </div>
+                <div className="h-3" />
             </div>
 
-            <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
-                <div className="space-y-4 mb-8">
-                    {advancedFilters.length === 0 && (
-                        <div className="text-center py-12 border-2 border-dashed border-gray-100 dark:border-white/5 rounded-2xl">
-                            <p className="text-sm text-gray-400">暂无筛选条件，点击下方按钮添加</p>
-                        </div>
-                    )}
-                    {advancedFilters.map((filter) => {
-                        const isMultiCheckbox = multiCheckboxFields.includes(filter.fieldId);
-                        const isPersonPicker = personPickerFields.includes(filter.fieldId);
-                        const isDateFilter = dateFilterFields.includes(filter.fieldId);
-                        const isAmountFilter = amountFilterFields.includes(filter.fieldId);
-                        const selectedArr = Array.isArray(filter.value) ? filter.value as string[] : [];
-                        const amountVal = (filter.value && typeof filter.value === 'object' && 'min' in filter.value) ? filter.value as { min: string; max: string } : { min: '', max: '' };
-                        const checkboxOpts = getCheckboxOptions(filter.fieldId);
-                        const fieldLabel = availableFilterFields.find(f => f.id === filter.fieldId)?.label || '选择字段';
-                        const isFieldOpen = activeDropdown?.filterId === filter.id && activeDropdown.type === 'field';
-                        const isModeOpen = activeDropdown?.filterId === filter.id && activeDropdown.type === 'mode';
-                        const isValueOpen = activeDropdown?.filterId === filter.id && activeDropdown.type === 'value';
-                        const bmIds = isPersonPicker ? [...new Set(orders.filter(o => o.businessManagerId).map(o => o.businessManagerId as string))] : [];
-                        const bmUsers = isPersonPicker ? bmIds.map(id => users.find(u => u.id === id)).filter(Boolean) as typeof users : [];
-                        const selectedUser = isPersonPicker ? bmUsers.find(u => u.id === filter.value) : undefined;
-                        return (
-                        <div key={filter.id} className="flex items-start gap-2">
-                            {/* Field */}
-                            <div className="w-[120px] shrink-0">
-                                <button
-                                    onMouseDown={(e) => { e.stopPropagation(); toggleDropdown(e, filter.id, 'field'); }}
-                                    className={`w-full flex items-center justify-between px-3 py-2.5 text-xs bg-gray-50 dark:bg-black/30 border rounded-xl transition hover:border-[#0071E3]/50 ${isFieldOpen ? 'border-[#0071E3] ring-2 ring-[#0071E3]/20' : 'border-gray-200 dark:border-white/10'}`}
-                                >
-                                    <span className="text-gray-900 dark:text-white truncate">{fieldLabel}</span>
-                                    <ChevronDown className={`w-3.5 h-3.5 text-gray-400 shrink-0 ml-1 transition-transform ${isFieldOpen ? 'rotate-180' : ''}`} />
+            {/* Tab: Filter */}
+            {drawerTab === 'filter' && (
+              <>
+                <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+                    <div className="space-y-4 mb-8">
+                        {advancedFilters.length === 0 && (
+                            <div className="text-center py-12 border-2 border-dashed border-gray-100 dark:border-white/5 rounded-2xl">
+                                <p className="text-sm text-gray-400">暂无筛选条件，点击下方按钮添加</p>
+                            </div>
+                        )}
+                        {advancedFilters.map((filter) => {
+                            const isMultiCheckbox = multiCheckboxFields.includes(filter.fieldId);
+                            const isPersonPicker = personPickerFields.includes(filter.fieldId);
+                            const isDateFilter = dateFilterFields.includes(filter.fieldId);
+                            const isAmountFilter = amountFilterFields.includes(filter.fieldId);
+                            const selectedArr = Array.isArray(filter.value) ? filter.value as string[] : [];
+                            const amountVal = (filter.value && typeof filter.value === 'object' && 'min' in filter.value) ? filter.value as { min: string; max: string } : { min: '', max: '' };
+                            const checkboxOpts = getCheckboxOptions(filter.fieldId);
+                            const fieldLabel = availableFilterFields.find(f => f.id === filter.fieldId)?.label || '选择字段';
+                            const isFieldOpen = activeDropdown?.filterId === filter.id && activeDropdown.type === 'field';
+                            const isModeOpen = activeDropdown?.filterId === filter.id && activeDropdown.type === 'mode';
+                            const isValueOpen = activeDropdown?.filterId === filter.id && activeDropdown.type === 'value';
+                            const bmIds = isPersonPicker ? [...new Set(orders.filter(o => o.businessManagerId).map(o => o.businessManagerId as string))] : [];
+                            const bmUsers = isPersonPicker ? bmIds.map(id => users.find(u => u.id === id)).filter(Boolean) as typeof users : [];
+                            const selectedUser = isPersonPicker ? bmUsers.find(u => u.id === filter.value) : undefined;
+                            return (
+                            <div key={filter.id} className="flex items-start gap-2">
+                                <div className="w-[120px] shrink-0">
+                                    <button
+                                        onMouseDown={(e) => { e.stopPropagation(); toggleDropdown(e, filter.id, 'field'); }}
+                                        className={`w-full flex items-center justify-between px-3 py-2.5 text-xs bg-gray-50 dark:bg-black/30 border rounded-xl transition hover:border-[#0071E3]/50 ${isFieldOpen ? 'border-[#0071E3] ring-2 ring-[#0071E3]/20' : 'border-gray-200 dark:border-white/10'}`}
+                                    >
+                                        <span className="text-gray-900 dark:text-white truncate">{fieldLabel}</span>
+                                        <ChevronDown className={`w-3.5 h-3.5 text-gray-400 shrink-0 ml-1 transition-transform ${isFieldOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+                                </div>
+                                <div className="w-[64px] shrink-0">
+                                    {(isMultiCheckbox || isPersonPicker || isAmountFilter) ? (
+                                        <div className="px-2 py-2.5 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-400 text-center select-none">
+                                            {isMultiCheckbox ? '多选' : isPersonPicker ? '单选' : '范围'}
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onMouseDown={(e) => { e.stopPropagation(); toggleDropdown(e, filter.id, 'mode'); }}
+                                            className={`w-full flex items-center justify-between px-2 py-2.5 text-xs bg-gray-50 dark:bg-black/30 border rounded-xl transition hover:border-[#0071E3]/50 ${isModeOpen ? 'border-[#0071E3] ring-2 ring-[#0071E3]/20' : 'border-gray-200 dark:border-white/10'}`}
+                                        >
+                                            <span className="text-gray-900 dark:text-white truncate">{filter.mode}</span>
+                                            <ChevronDown className={`w-3 h-3 text-gray-400 shrink-0 ml-0.5 transition-transform ${isModeOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    {isAmountFilter ? (
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-xl">
+                                            <span className="text-xs text-gray-400 shrink-0">¥</span>
+                                            <input type="number" placeholder="最小" className="bg-transparent text-sm dark:text-white outline-none w-full min-w-0" value={amountVal.min} onChange={(e) => updateFilterCondition(filter.id, { value: { ...amountVal, min: e.target.value } })} />
+                                            <span className="text-gray-300 shrink-0">—</span>
+                                            <input type="number" placeholder="最大" className="bg-transparent text-sm dark:text-white outline-none w-full min-w-0" value={amountVal.max} onChange={(e) => updateFilterCondition(filter.id, { value: { ...amountVal, max: e.target.value } })} />
+                                        </div>
+                                    ) : isDateFilter && filter.mode === '时间段' ? (
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-xl">
+                                            <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                            <input type="date" className="bg-transparent text-xs dark:text-white outline-none flex-1 min-w-0" value={(filter.value as any)?.start || ''} onChange={(e) => updateFilterCondition(filter.id, { value: { ...(filter.value as any), start: e.target.value } })} />
+                                            <span className="text-gray-300 shrink-0">—</span>
+                                            <input type="date" className="bg-transparent text-xs dark:text-white outline-none flex-1 min-w-0" value={(filter.value as any)?.end || ''} onChange={(e) => updateFilterCondition(filter.id, { value: { ...(filter.value as any), end: e.target.value } })} />
+                                        </div>
+                                    ) : isDateFilter && filter.mode === '时间点' ? (
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-xl">
+                                            <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                            <input type="date" className="bg-transparent text-sm dark:text-white outline-none w-full" value={typeof filter.value === 'string' ? filter.value : ''} onChange={(e) => updateFilterCondition(filter.id, { value: e.target.value })} />
+                                        </div>
+                                    ) : (isMultiCheckbox || isPersonPicker) ? (
+                                        <button
+                                            onMouseDown={(e) => { e.stopPropagation(); toggleDropdown(e, filter.id, 'value'); }}
+                                            className={`w-full flex items-center justify-between px-3 py-2.5 text-sm bg-gray-50 dark:bg-black/30 border rounded-xl transition hover:border-[#0071E3]/50 ${isValueOpen ? 'border-[#0071E3] ring-2 ring-[#0071E3]/20' : 'border-gray-200 dark:border-white/10'}`}
+                                        >
+                                            {isPersonPicker ? (
+                                                selectedUser ? (
+                                                    <span className="flex items-center gap-2 truncate">
+                                                        <img src={selectedUser.avatar} className="w-5 h-5 rounded-full shrink-0" alt="" onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedUser.name)}&background=0071E3&color=fff&size=40`; }} />
+                                                        <span className="text-gray-700 dark:text-gray-200 truncate">{selectedUser.name}</span>
+                                                    </span>
+                                                ) : <span className="text-gray-400">点击选择…</span>
+                                            ) : (
+                                                <span className={`text-left truncate ${selectedArr.length === 0 ? 'text-gray-400' : 'text-gray-700 dark:text-gray-200'}`}>
+                                                    {selectedArr.length === 0 ? '点击选择…' : selectedArr.map(v => checkboxOpts.find(o => o.value === v)?.label || v).join('、')}
+                                                </span>
+                                            )}
+                                            <span className="flex items-center gap-1 shrink-0 ml-2">
+                                                {isMultiCheckbox && selectedArr.length > 0 && (
+                                                    <span className="unified-button-primary text-[10px] bg-[#0071E3] w-5 h-5">{selectedArr.length}</span>
+                                                )}
+                                                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isValueOpen ? 'rotate-180' : ''}`} />
+                                            </span>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onMouseDown={(e) => { e.stopPropagation(); toggleDropdown(e, filter.id, 'value'); }}
+                                            className={`w-full flex items-center justify-between px-3 py-2.5 text-sm bg-gray-50 dark:bg-black/30 border rounded-xl transition hover:border-[#0071E3]/50 ${isValueOpen ? 'border-[#0071E3] ring-2 ring-[#0071E3]/20' : 'border-gray-200 dark:border-white/10'}`}
+                                        >
+                                            <span className="text-gray-900 dark:text-white truncate">{filter.value as string || '全部'}</span>
+                                            <ChevronDown className={`w-3.5 h-3.5 text-gray-400 shrink-0 ml-2 transition-transform ${isValueOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+                                    )}
+                                </div>
+                                <button onClick={() => removeFilterCondition(filter.id)} className="p-2.5 text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition shrink-0">
+                                    <Trash2 className="w-4 h-4" />
                                 </button>
                             </div>
-                            {/* Mode */}
-                            <div className="w-[64px] shrink-0">
-                                {(isMultiCheckbox || isPersonPicker || isAmountFilter) ? (
-                                    <div className="px-2 py-2.5 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-400 text-center select-none">
-                                        {isMultiCheckbox ? '多选' : isPersonPicker ? '单选' : '范围'}
-                                    </div>
-                                ) : (
-                                    <button
-                                        onMouseDown={(e) => { e.stopPropagation(); toggleDropdown(e, filter.id, 'mode'); }}
-                                        className={`w-full flex items-center justify-between px-2 py-2.5 text-xs bg-gray-50 dark:bg-black/30 border rounded-xl transition hover:border-[#0071E3]/50 ${isModeOpen ? 'border-[#0071E3] ring-2 ring-[#0071E3]/20' : 'border-gray-200 dark:border-white/10'}`}
-                                    >
-                                        <span className="text-gray-900 dark:text-white truncate">{filter.mode}</span>
-                                        <ChevronDown className={`w-3 h-3 text-gray-400 shrink-0 ml-0.5 transition-transform ${isModeOpen ? 'rotate-180' : ''}`} />
-                                    </button>
+                            );
+                        })}
+                    </div>
+
+                    <button 
+                        onClick={addFilterCondition}
+                        className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-xl"
+                    >
+                        <Plus className="w-4 h-4" />
+                        添加筛选条件
+                    </button>
+                </div>
+
+                <div className="p-5 bg-gray-50/50 dark:bg-white/5 border-t border-gray-100 dark:border-white/10 shrink-0">
+                    {showSaveView && drawerTab === 'filter' ? (
+                      <div className="flex items-center gap-2 mb-3">
+                        <Eye className="w-4 h-4 text-emerald-500 shrink-0" />
+                        <input
+                          autoFocus
+                          value={saveViewName}
+                          onChange={e => setSaveViewName(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter' && saveViewName.trim()) saveCurrentAsView(saveViewName.trim()); if (e.key === 'Escape') setShowSaveView(false); }}
+                          placeholder="输入视图名称…"
+                          className="flex-1 h-8 px-3 text-sm border border-gray-200 dark:border-white/10 rounded-lg bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white outline-none focus:border-emerald-400 dark:focus:border-emerald-600 placeholder:text-gray-400 transition"
+                        />
+                        <button
+                          onClick={() => { if (saveViewName.trim()) saveCurrentAsView(saveViewName.trim()); }}
+                          disabled={!saveViewName.trim()}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                        >保存</button>
+                        <button onClick={() => setShowSaveView(false)} className="px-2 py-1.5 rounded-lg text-xs text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition">取消</button>
+                      </div>
+                    ) : null}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <button onClick={clearAdvancedFilters} className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-white dark:hover:bg-white/10 transition-all">重置</button>
+                        {!showSaveView && (
+                          <button
+                            onClick={() => { setShowSaveView(true); setSaveViewName(''); }}
+                            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            存为视图
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                          <button onClick={closeFilterDrawer} className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">取消</button>
+                          <button onClick={applyFilters} className="unified-button-primary bg-[#0071E3] shadow-blue-500/25">查询</button>
+                      </div>
+                    </div>
+                </div>
+              </>
+            )}
+
+            {/* Tab: Column Config */}
+            {drawerTab === 'columns' && (() => {
+              const colFilteredAll = allColumns.filter(c => c.id !== 'action' && (!colSearch || c.label.includes(colSearch)));
+              const selectedSet = new Set(tempVisibleCols);
+              const orderedSelected = tempVisibleCols.filter(id => id !== 'action').map(id => allColumns.find(c => c.id === id)!).filter(Boolean);
+              const unselected = colFilteredAll.filter(c => !selectedSet.has(c.id));
+              return (
+                <>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    <div className="px-5 pt-4 pb-3">
+                      <input
+                        type="text"
+                        value={colSearch}
+                        onChange={e => setColSearch(e.target.value)}
+                        placeholder="搜索列字段…"
+                        className="w-full text-sm px-3.5 py-2 border border-gray-200 dark:border-white/10 rounded-xl bg-gray-50 dark:bg-black/30 outline-none text-gray-700 dark:text-gray-200 placeholder:text-gray-400 focus:border-blue-300 dark:focus:border-blue-600 transition"
+                      />
+                    </div>
+
+                    {/* Selected columns with drag reorder */}
+                    {orderedSelected.length > 0 && (
+                      <div className="px-5 pb-2">
+                        <div className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">已选字段 · {orderedSelected.length}</div>
+                        <div className="space-y-0.5">
+                          {orderedSelected.filter(c => !colSearch || c.label.includes(colSearch)).map((col) => {
+                            const isFixed = FIXED_COLUMNS.has(col.id);
+                            const tIdx = tempVisibleCols.indexOf(col.id);
+                            return (
+                              <div
+                                key={col.id}
+                                draggable={!isFixed}
+                                onDragStart={() => setColDragIdx(tIdx)}
+                                onDragOver={e => {
+                                  e.preventDefault();
+                                  if (colDragIdx === null || colDragIdx === tIdx) return;
+                                  const arr = [...tempVisibleCols];
+                                  const [item] = arr.splice(colDragIdx, 1);
+                                  arr.splice(tIdx, 0, item);
+                                  setTempVisibleCols(arr);
+                                  setColDragIdx(tIdx);
+                                }}
+                                onDragEnd={() => setColDragIdx(null)}
+                                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition group ${colDragIdx === tIdx ? 'bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-200 dark:ring-blue-800' : 'hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                              >
+                                <GripVertical className={`w-3.5 h-3.5 shrink-0 ${isFixed ? 'text-transparent' : 'text-gray-300 dark:text-gray-600 cursor-grab'}`} />
+                                <input
+                                  type="checkbox"
+                                  checked
+                                  disabled={isFixed}
+                                  onChange={() => {
+                                    if (!isFixed) setTempVisibleCols(prev => prev.filter(id => id !== col.id));
+                                  }}
+                                  className="w-3.5 h-3.5 rounded border-gray-300 text-[#0071E3] shrink-0 disabled:opacity-40"
+                                />
+                                <span className="text-sm text-gray-800 dark:text-gray-200 flex-1">{col.label}</span>
+                                {isFixed && <span className="text-[10px] text-orange-500 font-medium shrink-0">固定</span>}
+                                {!isFixed && (
+                                  <button
+                                    onClick={() => setTempVisibleCols(prev => prev.filter(id => id !== col.id))}
+                                    className="text-gray-300 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition shrink-0"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
                                 )}
-                            </div>
-                            {/* Value */}
-                            <div className="flex-1 min-w-0">
-                                {isAmountFilter ? (
-                                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-xl">
-                                        <span className="text-xs text-gray-400 shrink-0">¥</span>
-                                        <input type="number" placeholder="最小" className="bg-transparent text-sm dark:text-white outline-none w-full min-w-0" value={amountVal.min} onChange={(e) => updateFilterCondition(filter.id, { value: { ...amountVal, min: e.target.value } })} />
-                                        <span className="text-gray-300 shrink-0">—</span>
-                                        <input type="number" placeholder="最大" className="bg-transparent text-sm dark:text-white outline-none w-full min-w-0" value={amountVal.max} onChange={(e) => updateFilterCondition(filter.id, { value: { ...amountVal, max: e.target.value } })} />
-                                    </div>
-                                ) : isDateFilter && filter.mode === '时间段' ? (
-                                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-xl">
-                                        <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                        <input type="date" className="bg-transparent text-xs dark:text-white outline-none flex-1 min-w-0" value={(filter.value as any)?.start || ''} onChange={(e) => updateFilterCondition(filter.id, { value: { ...(filter.value as any), start: e.target.value } })} />
-                                        <span className="text-gray-300 shrink-0">—</span>
-                                        <input type="date" className="bg-transparent text-xs dark:text-white outline-none flex-1 min-w-0" value={(filter.value as any)?.end || ''} onChange={(e) => updateFilterCondition(filter.id, { value: { ...(filter.value as any), end: e.target.value } })} />
-                                    </div>
-                                ) : isDateFilter && filter.mode === '时间点' ? (
-                                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-xl">
-                                        <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                        <input type="date" className="bg-transparent text-sm dark:text-white outline-none w-full" value={typeof filter.value === 'string' ? filter.value : ''} onChange={(e) => updateFilterCondition(filter.id, { value: e.target.value })} />
-                                    </div>
-                                ) : (isMultiCheckbox || isPersonPicker) ? (
-                                    <button
-                                        onMouseDown={(e) => { e.stopPropagation(); toggleDropdown(e, filter.id, 'value'); }}
-                                        className={`w-full flex items-center justify-between px-3 py-2.5 text-sm bg-gray-50 dark:bg-black/30 border rounded-xl transition hover:border-[#0071E3]/50 ${isValueOpen ? 'border-[#0071E3] ring-2 ring-[#0071E3]/20' : 'border-gray-200 dark:border-white/10'}`}
-                                    >
-                                        {isPersonPicker ? (
-                                            selectedUser ? (
-                                                <span className="flex items-center gap-2 truncate">
-                                                    <img src={selectedUser.avatar} className="w-5 h-5 rounded-full shrink-0" alt="" onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedUser.name)}&background=0071E3&color=fff&size=40`; }} />
-                                                    <span className="text-gray-700 dark:text-gray-200 truncate">{selectedUser.name}</span>
-                                                </span>
-                                            ) : <span className="text-gray-400">点击选择…</span>
-                                        ) : (
-                                            <span className={`text-left truncate ${selectedArr.length === 0 ? 'text-gray-400' : 'text-gray-700 dark:text-gray-200'}`}>
-                                                {selectedArr.length === 0 ? '点击选择…' : selectedArr.map(v => checkboxOpts.find(o => o.value === v)?.label || v).join('、')}
-                                            </span>
-                                        )}
-                                        <span className="flex items-center gap-1 shrink-0 ml-2">
-                                            {isMultiCheckbox && selectedArr.length > 0 && (
-                                                <span className="unified-button-primary text-[10px] bg-[#0071E3] w-5 h-5">{selectedArr.length}</span>
-                                            )}
-                                            <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isValueOpen ? 'rotate-180' : ''}`} />
-                                        </span>
-                                    </button>
-                                ) : (
-                                    <button
-                                        onMouseDown={(e) => { e.stopPropagation(); toggleDropdown(e, filter.id, 'value'); }}
-                                        className={`w-full flex items-center justify-between px-3 py-2.5 text-sm bg-gray-50 dark:bg-black/30 border rounded-xl transition hover:border-[#0071E3]/50 ${isValueOpen ? 'border-[#0071E3] ring-2 ring-[#0071E3]/20' : 'border-gray-200 dark:border-white/10'}`}
-                                    >
-                                        <span className="text-gray-900 dark:text-white truncate">{filter.value as string || '全部'}</span>
-                                        <ChevronDown className={`w-3.5 h-3.5 text-gray-400 shrink-0 ml-2 transition-transform ${isValueOpen ? 'rotate-180' : ''}`} />
-                                    </button>
-                                )}
-                            </div>
-                            {/* Delete */}
-                            <button onClick={() => removeFilterCondition(filter.id)} className="p-2.5 text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition shrink-0">
-                                <Trash2 className="w-4 h-4" />
-                            </button>
+                              </div>
+                            );
+                          })}
                         </div>
-                        );
-                    })}
-                </div>
+                      </div>
+                    )}
 
-                <button 
-                    onClick={addFilterCondition}
-                    className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-xl"
-                >
-                    <Plus className="w-4 h-4" />
-                    添加筛选条件
-                </button>
-            </div>
+                    {/* Unselected columns */}
+                    {unselected.length > 0 && (
+                      <div className="px-5 pb-4">
+                        <div className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2 mt-3">可选字段 · {unselected.length}</div>
+                        <div className="space-y-0.5">
+                          {unselected.map(col => (
+                            <label key={col.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer transition">
+                              <span className="w-3.5" />
+                              <input
+                                type="checkbox"
+                                checked={false}
+                                onChange={() => {
+                                  setTempVisibleCols(prev => {
+                                    const actionIdx = prev.indexOf('action');
+                                    if (actionIdx >= 0) {
+                                      const next = [...prev];
+                                      next.splice(actionIdx, 0, col.id);
+                                      return next;
+                                    }
+                                    return [...prev, col.id];
+                                  });
+                                }}
+                                className="w-3.5 h-3.5 rounded border-gray-300 text-[#0071E3] shrink-0"
+                              />
+                              <span className="text-sm text-gray-500 dark:text-gray-400">{col.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
-            <div className="p-5 bg-gray-50/50 dark:bg-white/5 border-t border-gray-100 dark:border-white/10 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-2">
-                    <button onClick={clearAdvancedFilters} className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-white dark:hover:bg-white/10 transition-all">重置</button>
-                </div>
-                <div className="flex items-center gap-2">
-                    <button onClick={closeFilterDrawer} className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">取消</button>
-                    <button onClick={applyFilters} className="unified-button-primary bg-[#0071E3] shadow-blue-500/25">查询</button>
-                </div>
-            </div>
+                  <div className="p-5 bg-gray-50/50 dark:bg-white/5 border-t border-gray-100 dark:border-white/10 shrink-0">
+                    {showSaveView && drawerTab === 'columns' ? (
+                      <div className="flex items-center gap-2 mb-3">
+                        <Eye className="w-4 h-4 text-emerald-500 shrink-0" />
+                        <input
+                          autoFocus
+                          value={saveViewName}
+                          onChange={e => setSaveViewName(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter' && saveViewName.trim()) saveCurrentAsView(saveViewName.trim()); if (e.key === 'Escape') setShowSaveView(false); }}
+                          placeholder="输入视图名称…"
+                          className="flex-1 h-8 px-3 text-sm border border-gray-200 dark:border-white/10 rounded-lg bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white outline-none focus:border-emerald-400 dark:focus:border-emerald-600 placeholder:text-gray-400 transition"
+                        />
+                        <button
+                          onClick={() => { if (saveViewName.trim()) saveCurrentAsView(saveViewName.trim()); }}
+                          disabled={!saveViewName.trim()}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                        >保存</button>
+                        <button onClick={() => setShowSaveView(false)} className="px-2 py-1.5 rounded-lg text-xs text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition">取消</button>
+                      </div>
+                    ) : null}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => { setTempVisibleCols([...DEFAULT_VISIBLE]); }}
+                          className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-white dark:hover:bg-white/10 transition-all"
+                        >
+                          恢复默认
+                        </button>
+                        {!showSaveView && (
+                          <button
+                            onClick={() => { setShowSaveView(true); setSaveViewName(''); }}
+                            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            存为视图
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={closeFilterDrawer} className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">取消</button>
+                        <button
+                          onClick={() => { handleColumnConfigConfirm(tempVisibleCols); closeFilterDrawer(); }}
+                          className="unified-button-primary bg-[#0071E3] shadow-blue-500/25"
+                        >
+                          确 定
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
         </ModalPortal>
@@ -1947,18 +2169,6 @@ const OrderManager: React.FC = () => {
       )}
       {isEmployeeCardOpen && detailsUser && (
         <EmployeeCardModal user={detailsUser} roles={roles} departments={departments} users={users} onClose={() => setIsEmployeeCardOpen(false)} />
-      )}
-
-      {isColumnConfigOpen && (
-        <ColumnConfigModal
-          allColumns={allColumns}
-          initialVisible={visibleColumns}
-          defaultVisible={DEFAULT_VISIBLE}
-          fixedColumns={FIXED_COLUMNS}
-          onClose={() => setIsColumnConfigOpen(false)}
-          onConfirm={handleColumnConfigConfirm}
-          onSaveAsView={addViewFromColumns}
-        />
       )}
 
       {confirmDeleteId && (

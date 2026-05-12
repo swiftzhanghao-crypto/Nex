@@ -33,6 +33,7 @@ import {
     setToken, getToken,
 } from '../services/api';
 
+
 // --- Mode detection: set VITE_API_MODE=true in .env to use backend ---
 const USE_API = import.meta.env.VITE_API_MODE === 'true';
 
@@ -146,6 +147,8 @@ interface AppContextType {
 
     needsLogin: boolean;
     login: (email: string, password: string) => Promise<void>;
+    /** SSO 回调兼容：写入 JWT 后拉取引导数据（旧 token-in-URL 模式 fallback） */
+    completeSsoLogin: (token: string) => Promise<void>;
     logout: () => void;
 }
 
@@ -194,7 +197,9 @@ export function useEnsureData(keys: LazyDataKey[]) {
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [loading, setLoading] = useState(USE_API);
     const [error, setError] = useState<string | null>(null);
-    const [needsLogin, setNeedsLogin] = useState<boolean>(USE_API && !getToken());
+    // 不再依赖 localStorage token 判断：SSO cookie 登录时 localStorage 无 token，
+    // 初始设为 false，由 loadBootstrap 探测后决定。
+    const [needsLogin, setNeedsLogin] = useState<boolean>(false);
 
     // --- Product domain ---
     const [products, setProducts] = useState(() => {
@@ -434,18 +439,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const loadBootstrap = useCallback(async () => {
         if (!USE_API) return;
-        if (!getToken()) {
-            clearApiData();
-            setLoading(false);
-            setError('未登录，请先登录');
-            setNeedsLogin(true);
-            return;
-        }
         setLoading(true);
         setError(null);
+
+        // 先探测登录态（支持 Bearer JWT 和 SSO session cookie 双模式）
+        // 如果有 localStorage token 就直接走 /me；否则靠 cookie 走 /me
+        let me: any;
         try {
-            const [me, userListRes, deptList, roleList, prodListRes, channelList, oppList, spaceList] = await Promise.all([
-                authApi.me(),
+            me = await authApi.me();
+        } catch {
+            // 探测失败 → 需要登录
+            clearApiData();
+            setNeedsLogin(true);
+            setLoading(false);
+            return;
+        }
+
+        try {
+            setCurrentUser(me);
+            const [userListRes, deptList, roleList, prodListRes, channelList, oppList, spaceList] = await Promise.all([
                 userApi.list({ size: 500 }),
                 userApi.departments(),
                 userApi.roles(),
@@ -454,7 +466,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 productApi.opportunities(),
                 spaceApi.list().catch(() => [] as any[]),
             ]);
-            setCurrentUser(me);
             setUsers(userListRes.data);
             setDepartments(deptList);
             setRoles(roleList);
@@ -464,7 +475,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setSpaces(spaceList as Space[]);
 
             setNeedsLogin(false);
-            console.log('[API] Bootstrap (metadata only) loaded');
+            console.log('[API] Bootstrap loaded (auth: %s)', getToken() ? 'JWT' : 'cookie');
         } catch (e: any) {
             console.error('[API] Initialization failed:', e);
             setError(e.message || '数据加载失败');
@@ -500,7 +511,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await loadBootstrap();
     }, [loadBootstrap]);
 
-    const logout = useCallback(() => {
+    const completeSsoLogin = useCallback(async (token: string) => {
+        setToken(token);
+        loadedOnceRef.current = {};
+        inFlightRef.current = {};
+        setNeedsLogin(false);
+        setError(null);
+        await loadBootstrap();
+    }, [loadBootstrap]);
+
+    const logout = useCallback(async () => {
+        try { await authApi.logout(); } catch { /* noop — 即使服务端清理失败也要清前端态 */ }
         setToken(null);
         clearApiData();
         setNeedsLogin(true);
@@ -586,6 +607,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         needsLogin,
         login,
+        completeSsoLogin,
         logout,
     };
 

@@ -23,7 +23,7 @@ const ChannelManager: React.FC = () => {
   React.useEffect(() => { setCurrentPage(1); }, [searchTerm]);
 
   return (
-    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto animate-page-enter h-full flex flex-col gap-4">
+    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto animate-page-enter h-full flex flex-col gap-4 min-w-0">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">渠道管理</h1>
         <div className="flex items-center gap-3 w-full md:w-auto justify-end">

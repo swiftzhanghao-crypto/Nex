@@ -1,6 +1,11 @@
 import { Router } from 'express';
 import { getDb } from '../db.ts';
-import { signToken, verifyPassword, hashPassword, authMiddleware, type AuthRequest } from '../auth.ts';
+import {
+  signToken, verifyPassword, hashPassword,
+  authMiddleware, parseCookies, SSO_COOKIE_NAME,
+  deleteSsoSession, deleteSsoSessionsByUser, clearSsoCookie,
+  type AuthRequest,
+} from '../auth.ts';
 import { parseRoles } from './users.ts';
 
 const router = Router();
@@ -51,6 +56,16 @@ router.get('/me', authMiddleware, (req: AuthRequest, res) => {
     avatar: user.avatar, departmentId: user.department_id,
     monthBadge: user.month_badge,
   });
+});
+
+router.post('/logout', (req: AuthRequest, res) => {
+  const cookies = parseCookies(req);
+  const sid = cookies[SSO_COOKIE_NAME];
+  if (sid) {
+    deleteSsoSession(sid);
+    clearSsoCookie(res);
+  }
+  res.json({ code: 0, msg: '已退出' });
 });
 
 export default router;

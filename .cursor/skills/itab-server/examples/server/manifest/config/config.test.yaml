@@ -1,0 +1,39 @@
+# 测试环境：MySQL + MinIO。敏感值通过部署平台环境变量注入，禁止提交真实密钥。
+# 必需环境变量：GF_ENV=test  DATABASE_DSN  STORAGE_ENDPOINT  STORAGE_ACCESS_KEY  STORAGE_SECRET_KEY
+server:
+  address: ":8080"
+  openapiPath: "/api.json"
+  swaggerPath: "/swagger"
+  pathPrefix: "${PATH_PREFIX}"
+
+logger:
+  level: "all"
+  stdout: true
+
+database:
+  default:
+    link: "${DATABASE_DSN}"
+    debug: true
+
+storage:
+  default:
+    driver: "s3"
+    endpoint: "${STORAGE_ENDPOINT}"
+    region: "us-east-1"
+    bucket: "it-ai-base-test"
+    accessKey: "${STORAGE_ACCESS_KEY}"
+    secretKey: "${STORAGE_SECRET_KEY}"
+    usePathStyle: true
+    presignTTL: "15m"
+    maxUploadBytes: 20971520
+    allowedMime:
+      - "image/*"
+      - "application/pdf"
+      - "application/vnd.ms-excel"
+      - "application/vnd.openxmlformats-officedocument.*"
+      - "text/csv"
+      - "text/plain"
+    allowedBizScopes:
+      - "customer_attach"
+      - "customer_photo"
+    publicBaseUrl: ""

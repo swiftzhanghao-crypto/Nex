@@ -33,6 +33,7 @@ export function initSchema() {
       avatar        TEXT,
       department_id TEXT,
       month_badge   TEXT,
+      wps_user_id   TEXT,
       created_at    TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -332,6 +333,39 @@ export function initSchema() {
       UNIQUE(space_id, user_id)
     );
 
+    CREATE TABLE IF NOT EXISTS crm_xsy_tokens (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id       TEXT NOT NULL,
+      access_token  TEXT NOT NULL,
+      token_type    TEXT NOT NULL DEFAULT 'Bearer',
+      expires_in    INTEGER NOT NULL DEFAULT 7200,
+      expires_at    TEXT NOT NULL,
+      scope         TEXT,
+      tenant_id     TEXT,
+      instance_uri  TEXT,
+      client_id     TEXT,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_crm_xsy_tokens_user ON crm_xsy_tokens(user_id);
+
+    CREATE TABLE IF NOT EXISTS sso_sessions (
+      sid                   TEXT PRIMARY KEY,
+      user_id               TEXT NOT NULL,
+      wps_user_id           TEXT,
+      wps_access_token      TEXT,
+      wps_refresh_token     TEXT,
+      wps_token_expires_at  TEXT,
+      created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at            TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sso_sessions_user    ON sso_sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_sso_sessions_expires ON sso_sessions(expires_at);
+
     CREATE INDEX IF NOT EXISTS idx_space_roles_space   ON space_roles(space_id);
     CREATE INDEX IF NOT EXISTS idx_space_members_space ON space_members(space_id);
     CREATE INDEX IF NOT EXISTS idx_space_members_user  ON space_members(user_id);
@@ -350,4 +384,10 @@ export function initSchema() {
 
   try { db.exec("ALTER TABLE users ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0"); }
   catch { /* column already exists */ }
+
+  try { db.exec('ALTER TABLE users ADD COLUMN wps_user_id TEXT'); }
+  catch { /* column already exists */ }
+  try {
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_wps_user_id ON users(wps_user_id) WHERE wps_user_id IS NOT NULL`);
+  } catch { /* index exists or unsupported */ }
 }

@@ -99,7 +99,7 @@ const OperationsManager: React.FC = () => {
   ];
 
   return (
-    <div className="p-6 lg:p-8 max-w-[1600px] mx-auto space-y-8 animate-fade-in">
+    <div className="p-3 lg:p-8 max-w-[1600px] mx-auto space-y-8 animate-fade-in min-w-0">
       {/* Overall Workflow Stepper */}
       <div className="unified-card dark:bg-[#1C1C1E] p-8 border-gray-100/50 dark:border-white/10 overflow-x-auto">
         <div className="flex justify-between items-start relative min-w-[700px]">
@@ -136,13 +136,13 @@ const OperationsManager: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        <div>
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 min-w-0">
+        <div className="shrink-0">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">备货处理</h1>
         </div>
         
-        <div className="flex items-center gap-3 w-full lg:w-auto">
-          <div className="relative flex-1 lg:w-64">
+        <div className="flex items-center gap-3 w-full lg:w-auto min-w-0">
+          <div className="relative flex-1 min-w-0 lg:w-64">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
               type="text" 

@@ -244,7 +244,7 @@ const ProductDetails: React.FC = () => {
                   </div>
               </div>
 
-              <div className="flex-1"></div>
+              <div className="flex-1 min-w-0"></div>
           </div>
 
               <div className="flex gap-1 overflow-x-auto no-scrollbar pt-2 border-b border-gray-200 dark:border-white/10">

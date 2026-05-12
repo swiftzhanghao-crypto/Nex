@@ -1,0 +1,39 @@
+# 本地开发（GF_ENV=dev 或未设置）；SQLite + 本地 S3 兼容层（bbolt-store-s3）；在 server/ 目录执行 go run .
+server:
+  address: ":8080"
+  openapiPath: "/api.json"
+  swaggerPath: "/swagger"
+  pathPrefix: "${PATH_PREFIX}"
+
+logger:
+  level: "all"
+  stdout: true
+
+database:
+  default:
+    link: "sqlite::@file(./data/sqlite/ledger.db)"
+    debug: true
+
+storage:
+  default:
+    driver: "s3"
+    endpoint: "http://127.0.0.1:9000"
+    region: "us-east-1"
+    bucket: "it-ai-base"
+    accessKey: "minioadmin"
+    secretKey: "minioadmin"
+    usePathStyle: true
+    presignTTL: "15m"
+    root: "./data/s3"
+    maxUploadBytes: 20971520
+    allowedMime:
+      - "image/*"
+      - "application/pdf"
+      - "application/vnd.ms-excel"
+      - "application/vnd.openxmlformats-officedocument.*"
+      - "text/csv"
+      - "text/plain"
+    allowedBizScopes:
+      - "customer_attach"
+      - "customer_photo"
+    publicBaseUrl: ""

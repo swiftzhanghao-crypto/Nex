@@ -721,7 +721,7 @@ const OrderDetails: React.FC = () => {
                    </div>
                </div>
 
-               <div className="flex-1"></div>
+               <div className="flex-1 min-w-0"></div>
 
                {/* Group 3: 人员 */}
                <div className="hidden lg:flex items-center gap-4 border-r border-gray-200 dark:border-white/10 pr-4 shrink-0">

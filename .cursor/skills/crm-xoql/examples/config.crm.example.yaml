@@ -1,0 +1,14 @@
+# 示例：可合并到 manifest/config/config.dev.yaml
+crm:
+  xiaoshouyi:
+    oauthBaseUrl: "https://login-sandbox.xiaoshouyi.com"
+    tokenPath: "/auc/oauth2/token"
+    apiBaseUrl: "https://api-sandbox.xiaoshouyi.com"
+    clientId: "your-client-id"
+    clientSecret: "your-client-secret"
+    username: "your-username"
+    password: "your-password-or-password-plus-otp"
+
+# 可选：管理口径开关可在业务接口层按请求参数控制
+# includeAdminCriteria:
+#   default: false

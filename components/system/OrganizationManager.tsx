@@ -227,7 +227,7 @@ const OrganizationManager: React.FC = () => {
               </div>
           </div>
 
-          <div className="unified-card flex-1 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 flex flex-col">
+          <div className="unified-card flex-1 min-w-0 dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 flex flex-col">
               {selectedDept ? (
                   <>
                     <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-start bg-gray-50/50 dark:bg-white/5 shrink-0">

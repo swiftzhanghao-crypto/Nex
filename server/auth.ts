@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
+import { getDb } from './db.ts';
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const JWT_SECRET = (() => {
@@ -10,14 +11,14 @@ const JWT_SECRET = (() => {
     console.error('[FATAL] 生产环境必须设置长度 ≥16 的 JWT_SECRET 环境变量');
     process.exit(1);
   }
-  // 开发环境：每次启动生成临时强随机密钥（这样旧 token 启动后即失效，更安全也更明显）
   const random = crypto.randomBytes(48).toString('hex');
   console.warn('[auth] JWT_SECRET 未配置，已生成本次进程临时密钥（仅开发可用，重启后旧 token 失效）');
   return random;
 })();
 
-// 默认 24h；可通过 JWT_EXPIRES_IN 覆盖。建议生产环境配 refresh token 后再缩短。
 const TOKEN_EXPIRY = (process.env.JWT_EXPIRES_IN as any) || '24h';
+
+// ── JWT ──────────────────────────────────────────────────────────────────────
 
 export interface JwtPayload {
   userId: string;
@@ -32,7 +33,8 @@ export function verifyToken(token: string): JwtPayload {
   return jwt.verify(token, JWT_SECRET) as JwtPayload;
 }
 
-// --- Password hashing (scrypt + salt, no external dependency) ---
+// ── Password hashing ─────────────────────────────────────────────────────────
+
 const SCRYPT_KEYLEN = 64;
 
 export function hashPassword(password: string): string {
@@ -60,22 +62,139 @@ export function verifyPassword(password: string, stored: string): boolean {
   }
 }
 
+// ── SSO Session (Cookie + sid) ───────────────────────────────────────────────
+
+export const SSO_COOKIE_NAME = process.env.COOKIE_NAME || 'itab-sid';
+const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
+const COOKIE_SECURE = process.env.COOKIE_SECURE === 'true';
+const COOKIE_SAMESITE: 'lax' | 'strict' | 'none' = (process.env.COOKIE_SAMESITE as any) || 'lax';
+
+export function parseCookies(req: Request): Record<string, string> {
+  const header = req.headers.cookie || '';
+  const result: Record<string, string> = {};
+  for (const pair of header.split(';')) {
+    const idx = pair.indexOf('=');
+    if (idx < 0) continue;
+    const key = pair.slice(0, idx).trim();
+    const val = pair.slice(idx + 1).trim();
+    if (key) result[key] = decodeURIComponent(val);
+  }
+  return result;
+}
+
+interface CreateSessionOpts {
+  wpsUserId?: string;
+  wpsAccessToken?: string;
+  wpsRefreshToken?: string;
+  wpsTokenExpiresAt?: string;
+}
+
+export function createSsoSession(userId: string, opts: CreateSessionOpts = {}): string {
+  const db = getDb();
+  const sid = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString();
+  db.prepare(
+    `INSERT INTO sso_sessions (sid, user_id, wps_user_id, wps_access_token, wps_refresh_token, wps_token_expires_at, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    sid, userId,
+    opts.wpsUserId ?? null,
+    opts.wpsAccessToken ?? null,
+    opts.wpsRefreshToken ?? null,
+    opts.wpsTokenExpiresAt ?? null,
+    expiresAt,
+  );
+  return sid;
+}
+
+export function getSsoSession(sid: string): { userId: string; wpsUserId?: string } | null {
+  const db = getDb();
+  const row = db.prepare(
+    `SELECT user_id, wps_user_id FROM sso_sessions WHERE sid = ? AND expires_at > datetime('now')`,
+  ).get(sid) as any;
+  if (!row) return null;
+  return { userId: row.user_id, wpsUserId: row.wps_user_id };
+}
+
+export function deleteSsoSession(sid: string): void {
+  getDb().prepare('DELETE FROM sso_sessions WHERE sid = ?').run(sid);
+}
+
+export function deleteSsoSessionsByUser(userId: string): void {
+  getDb().prepare('DELETE FROM sso_sessions WHERE user_id = ?').run(userId);
+}
+
+export function cleanupExpiredSessions(): void {
+  getDb().prepare("DELETE FROM sso_sessions WHERE expires_at <= datetime('now')").run();
+}
+
+export function setSsoCookie(res: Response, sid: string): void {
+  const parts = [
+    `${SSO_COOKIE_NAME}=${encodeURIComponent(sid)}`,
+    `Path=/`,
+    `HttpOnly`,
+    `Max-Age=${SESSION_TTL_SECONDS}`,
+    `SameSite=${COOKIE_SAMESITE}`,
+  ];
+  if (COOKIE_SECURE) parts.push('Secure');
+  res.setHeader('Set-Cookie', parts.join('; '));
+}
+
+export function clearSsoCookie(res: Response): void {
+  const parts = [
+    `${SSO_COOKIE_NAME}=`,
+    `Path=/`,
+    `HttpOnly`,
+    `Max-Age=0`,
+    `SameSite=${COOKIE_SAMESITE}`,
+  ];
+  if (COOKIE_SECURE) parts.push('Secure');
+  res.setHeader('Set-Cookie', parts.join('; '));
+}
+
+// ── Auth Middleware (dual-mode: JWT Bearer + SSO Cookie) ─────────────────────
+
 export interface AuthRequest extends Request {
   user?: JwtPayload;
 }
 
+function parseRolesField(raw: any): string[] {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : [raw]; }
+    catch { return raw.split(',').map((s: string) => s.trim()).filter(Boolean); }
+  }
+  return [];
+}
+
 export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
+  // 1) Try JWT Bearer token first
   const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
-    res.status(401).json({ error: '未提供认证令牌' });
-    return;
+  if (header?.startsWith('Bearer ')) {
+    try {
+      req.user = verifyToken(header.slice(7));
+      next();
+      return;
+    } catch { /* fall through to cookie */ }
   }
-  try {
-    req.user = verifyToken(header.slice(7));
-    next();
-  } catch {
-    res.status(401).json({ error: '令牌无效或已过期' });
+
+  // 2) Try SSO session cookie
+  const cookies = parseCookies(req);
+  const sid = cookies[SSO_COOKIE_NAME];
+  if (sid) {
+    const session = getSsoSession(sid);
+    if (session) {
+      const db = getDb();
+      const user = db.prepare('SELECT id, role FROM users WHERE id = ?').get(session.userId) as any;
+      if (user) {
+        req.user = { userId: user.id, roles: parseRolesField(user.role) };
+        next();
+        return;
+      }
+    }
   }
+
+  res.status(401).json({ error: '未提供认证令牌' });
 }
 
 export function requireRole(...roles: string[]) {
