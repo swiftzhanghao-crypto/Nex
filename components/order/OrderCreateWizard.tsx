@@ -164,7 +164,29 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
   const [originalOrderId, setOriginalOrderId] = useState<string | undefined>(undefined);
 
-  // Seller info (auto-populated from product's salesOrgName)
+  // Seller info: step 2 picks product category → derives available sales orgs
+  const [sellerProductCategory, setSellerProductCategory] = useState('');
+  const [isSellerCategoryPickerOpen, setIsSellerCategoryPickerOpen] = useState(false);
+  const [sellerHoverCategory, setSellerHoverCategory] = useState('');
+  const sellerCategoryPickerRef = useRef<HTMLDivElement>(null);
+  const sellerAvailableOrgs = useMemo(() => {
+    if (!sellerProductCategory) return [];
+    const matched = products.filter(p => p.status === 'OnShelf' && p.subCategory === sellerProductCategory);
+    const orgSet = new Set<string>();
+    matched.forEach(p => {
+      if (p.salesScope && p.salesScope.length > 0) {
+        p.salesScope.forEach(r => { if (r.salesOrg) orgSet.add(r.salesOrg); });
+      } else if (p.salesOrgName) {
+        orgSet.add(p.salesOrgName);
+      }
+    });
+    return Array.from(orgSet);
+  }, [sellerProductCategory, products]);
+  const sellerCategoryLabel = useMemo(() => {
+    if (!sellerProductCategory) return '';
+    const parent = categoryTree.find(c => c.subs.includes(sellerProductCategory));
+    return parent ? `${parent.label} / ${sellerProductCategory}` : sellerProductCategory;
+  }, [sellerProductCategory, categoryTree]);
   const [sellerName, setSellerName] = useState('');
   const [sellerContact, setSellerContact] = useState('');
 
@@ -355,6 +377,24 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     }
   }, [hasOpportunity]);
 
+  useEffect(() => {
+    if (isRestoringDraftRef.current) return;
+    if (!sellerProductCategory || sellerAvailableOrgs.length === 0) return;
+    if (!sellerName || !sellerAvailableOrgs.includes(sellerName)) {
+      setSellerName(sellerAvailableOrgs[0]);
+    }
+  }, [sellerProductCategory, sellerAvailableOrgs]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (sellerCategoryPickerRef.current && !sellerCategoryPickerRef.current.contains(e.target as Node)) {
+        setIsSellerCategoryPickerOpen(false);
+      }
+    };
+    if (isSellerCategoryPickerOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isSellerCategoryPickerOpen]);
+
   // Product cascade reset effects are now in useProductCascade
 
   const salesUsers = users.filter(u => u.roles?.includes('Sales') || u.roles?.includes('Admin'));
@@ -381,6 +421,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       setNewOrderItems([]);
       setPurchaseNatureManualByRow({});
       setSubscriptionLock(null);
+      setSellerProductCategory('');
       setTempCategory('');
       setTempProductId('');
       setTempSkuId('');
@@ -788,6 +829,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       selectedItContactId,
       isAgentOrder,
       agentCode,
+      sellerProductCategory,
+      sellerName,
       newOrderItems,
       serialNumberRequirement,
       reuseSerialNumber,
@@ -801,7 +844,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   }, [
     buyerType, orderSource, hasOpportunity, linkedOpportunityId, newOrderCustomer,
     orderEnterpriseId, selectedChannelId, purchasingContacts, selectedPurchasingContactId,
-    itContacts, selectedItContactId, isAgentOrder, agentCode, newOrderItems,
+    itContacts, selectedItContactId, isAgentOrder, agentCode, sellerProductCategory, sellerName, newOrderItems,
     serialNumberRequirement, reuseSerialNumber, settlementMethod, settlementType,
     installmentPlans, productAcceptanceRows,
   ]);
@@ -915,7 +958,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
       buyerType, orderSource, orderRemark, linkedContractIds, creatorId, originalOrderId,
       hasOpportunity, linkedOpportunityId, newOrderCustomer,
       orderEnterpriseId, isAgentOrder, agentCode, selectedChannelId, directChannel, terminalChannel, salesRepId, businessManagerId, buyerNameId: selectedBuyerNameId,
-      newOrderItems, tempCategory, enableConversion, selectedConversionIds, sellerName, sellerContact,
+      newOrderItems, tempCategory, sellerProductCategory, enableConversion, selectedConversionIds, sellerName, sellerContact,
       invoiceForm,
       deliveryMethod, receivingParty, receivingCompany, receivingMethod, shippingAddress, shippingPhone, shippingEmail, onlineDeliveries,
       acceptanceForm, acceptanceType, phaseDrafts,
@@ -964,6 +1007,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     setTempCategory(d.tempCategory);
     setEnableConversion(d.enableConversion || false);
     setSelectedConversionIds(d.selectedConversionIds || []);
+    setSellerProductCategory(d.sellerProductCategory || '');
     setSellerName(d.sellerName || '');
     setSellerContact(d.sellerContact || '');
     setInvoiceForm(d.invoiceForm);
@@ -1568,27 +1612,87 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         {users.filter(u => u.roles?.includes('Business') || u.roles?.includes('Admin')).map(u => <option key={u.id} value={u.id}>{u.name.replace(/\s*\(.*?\)/g, '')}</option>)}
                                     </select>
                                 </div>
+                                {linkedOpportunityId ? (
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">卖方名称</label>
-                                    {sellerName ? (
-                                        <div className="flex items-center gap-3 p-3 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800/30 rounded-xl">
-                                            <Briefcase className="w-4 h-4 text-teal-500 shrink-0"/>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{sellerName}</div>
-                                                {linkedOpportunityId && <div className="text-[10px] text-teal-600 dark:text-teal-400 mt-0.5">来自商机产品的销售组织</div>}
-                                            </div>
-                                            <button onClick={() => setSellerName('')} className="text-gray-400 hover:text-red-500 p-0.5 transition shrink-0"><X className="w-3.5 h-3.5"/></button>
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">卖方名称 <span className="text-red-500">*</span></label>
+                                    <div className={`flex items-center gap-3 p-3 border rounded-xl ${sellerName ? 'bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800/30' : getVisibleFieldError('sellerName') ? 'bg-red-50 dark:bg-red-900/10 border-red-300 dark:border-red-700' : 'bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800/30'}`}>
+                                        <Briefcase className="w-4 h-4 text-teal-500 shrink-0"/>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{sellerName || '—'}</div>
+                                            <div className="text-[10px] text-teal-600 dark:text-teal-400 mt-0.5">来自商机产品的销售组织</div>
                                         </div>
-                                    ) : (
-                                        <input
-                                            type="text"
-                                            value={sellerName}
-                                            onChange={e => setSellerName(e.target.value)}
-                                            placeholder="选择商机后自动带入，也可手动填写"
-                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm text-gray-800 dark:text-white placeholder:text-gray-400"
-                                        />
-                                    )}
+                                        <button onClick={() => setSellerName('')} className="text-gray-400 hover:text-red-500 p-0.5 transition shrink-0"><X className="w-3.5 h-3.5"/></button>
+                                    </div>
                                 </div>
+                                ) : (
+                                <>
+                                <div className="space-y-2 relative" ref={sellerCategoryPickerRef}>
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">产品类型 <span className="text-red-500">*</span></label>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setIsSellerCategoryPickerOpen(!isSellerCategoryPickerOpen); if (!isSellerCategoryPickerOpen && !sellerHoverCategory && categoryTree.length > 0) setSellerHoverCategory(categoryTree[0].label); }}
+                                        onBlur={() => markFieldTouched('sellerProductCategory')}
+                                        className={`w-full p-3 bg-white dark:bg-[#1C1C1E] border rounded-xl outline-none text-sm text-left flex items-center justify-between transition ${isSellerCategoryPickerOpen ? 'ring-2 ring-[#0071E3] border-[#0071E3]' : getVisibleFieldError('sellerProductCategory') ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}
+                                    >
+                                        <span className={sellerProductCategory ? 'text-gray-900 dark:text-white' : 'text-gray-400'}>{sellerCategoryLabel || '-- 请选择产品类型 --'}</span>
+                                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isSellerCategoryPickerOpen ? 'rotate-180' : ''}`}/>
+                                    </button>
+                                    {isSellerCategoryPickerOpen && (
+                                        <div className="absolute z-50 bottom-full left-0 mb-1 w-[480px] bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/15 rounded-2xl shadow-2xl overflow-hidden flex" style={{ maxHeight: 320 }}>
+                                            <div className="w-[180px] border-r border-gray-100 dark:border-white/10 overflow-y-auto py-1">
+                                                {categoryTree.map(cat => (
+                                                    <div
+                                                        key={cat.label}
+                                                        onMouseEnter={() => setSellerHoverCategory(cat.label)}
+                                                        className={`flex items-center justify-between px-4 py-2.5 cursor-pointer text-sm transition-colors ${
+                                                            sellerHoverCategory === cat.label
+                                                                ? 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-blue-400 font-bold'
+                                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
+                                                        }`}
+                                                    >
+                                                        <span className="truncate">{cat.label}</span>
+                                                        <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-50"/>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="flex-1 overflow-y-auto py-1">
+                                                {categoryTree.find(c => c.label === sellerHoverCategory)?.subs.map(sub => (
+                                                    <div
+                                                        key={sub}
+                                                        onClick={() => { if (sellerProductCategory !== sub) { setSellerProductCategory(sub); setSellerName(''); } setIsSellerCategoryPickerOpen(false); }}
+                                                        className={`flex items-center gap-2 px-4 py-2.5 cursor-pointer text-sm transition-colors ${
+                                                            sellerProductCategory === sub
+                                                                ? 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-blue-400 font-bold'
+                                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
+                                                        }`}
+                                                    >
+                                                        {sellerProductCategory === sub && <Check className="w-3.5 h-3.5 text-[#0071E3] dark:text-blue-400 shrink-0"/>}
+                                                        <span className="truncate">{sub}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    <FieldError error={getVisibleFieldError('sellerProductCategory')} />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">卖方名称（销售组织） <span className="text-red-500">*</span></label>
+                                    <select
+                                        className={`w-full p-3 bg-white dark:bg-[#1C1C1E] border rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm disabled:opacity-50 disabled:cursor-not-allowed ${getVisibleFieldError('sellerName') ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}
+                                        value={sellerName}
+                                        onChange={e => setSellerName(e.target.value)}
+                                        onBlur={() => markFieldTouched('sellerName')}
+                                        disabled={sellerAvailableOrgs.length === 0}
+                                    >
+                                        <option value="">{sellerAvailableOrgs.length === 0 ? (sellerProductCategory ? '该分类下暂无销售组织' : '请先选择产品类型') : '-- 请选择卖方名称 --'}</option>
+                                        {sellerAvailableOrgs.map(org => (
+                                            <option key={org} value={org}>{org}</option>
+                                        ))}
+                                    </select>
+                                    <FieldError error={getVisibleFieldError('sellerName')} />
+                                </div>
+                                </>
+                                )}
                                 </>
                                 )}
                             </div>
@@ -2534,14 +2638,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                     )}
 
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-teal-500 uppercase flex items-center gap-1"><Briefcase className="w-3 h-3"/> 供货组织</label>
-                                        <input
-                                            type="text"
-                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-teal-200 dark:border-teal-900/30 rounded-xl outline-none focus:ring-2 focus:ring-teal-200 transition text-sm text-teal-700 dark:text-teal-400"
-                                            placeholder="自动带出"
-                                            value={sellerName}
-                                            onChange={e => setSellerName(e.target.value)}
-                                        />
+                                        <label className="text-xs font-bold text-teal-500 uppercase flex items-center gap-1"><Briefcase className="w-3 h-3"/> 供货组织（卖方名称）</label>
+                                        <div className={`w-full p-3 border border-teal-200 dark:border-teal-900/30 rounded-xl text-sm min-h-[46px] flex items-center ${sellerName ? 'bg-teal-50 dark:bg-teal-900/10 text-teal-700 dark:text-teal-400 font-medium' : 'bg-gray-50 dark:bg-white/5 text-gray-400'}`}>
+                                            {sellerName || '请在第二步"产品类型"中选择'}
+                                        </div>
                                     </div>
                                 </div>
                             </div>

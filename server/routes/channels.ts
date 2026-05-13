@@ -3,6 +3,7 @@ import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
 import { safePagination, getUserName } from '../utils.ts';
+import { parseRoles } from './users.ts';
 
 const router = Router();
 router.use(authMiddleware);
@@ -81,6 +82,18 @@ router.put('/:id', checkPermission('channel', 'update'), (req: AuthRequest, res)
 
   const row = db.prepare('SELECT * FROM channels WHERE id = ?').get(id);
   res.json(toChannel(row));
+});
+
+router.get('/:id/users', checkPermission('channel', 'read'), (req, res) => {
+  const db = getDb();
+  const rows = db.prepare("SELECT * FROM users WHERE channel_id = ? ORDER BY sort_order ASC, rowid ASC").all(req.params.id) as any[];
+  res.json(rows.map(r => ({
+    id: r.id, accountId: r.account_id, name: r.name,
+    email: r.email, phone: r.phone, roles: parseRoles(r.role),
+    userType: r.user_type, status: r.status,
+    avatar: r.avatar, departmentId: r.department_id,
+    channelId: r.channel_id || undefined,
+  })));
 });
 
 router.delete('/:id', checkPermission('channel', 'delete'), (req: AuthRequest, res) => {

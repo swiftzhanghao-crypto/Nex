@@ -35,7 +35,7 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
   onSave,
   onEmployeeCard,
 }) => {
-  const { spaces, apiMode } = useAppContext();
+  const { spaces, apiMode, channels } = useAppContext();
   const [isEditing, setIsEditing] = useState(false);
   const [mainTab, setMainTab] = useState<MainTab>('ROLE_PERM');
   const [permTab, setPermTab] = useState<PermTab>('FUNCTIONAL');
@@ -51,6 +51,7 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
     departmentId: u.departmentId || '',
     userType: u.userType as UserType,
     status: u.status as 'Active' | 'Inactive',
+    channelId: u.channelId || '',
   }), []);
 
   const [form, setForm] = useState(() => buildFormFromUser(user));
@@ -165,7 +166,10 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
 
   const handleSave = () => {
     if (!form.name || !form.email) return;
-    onSave?.({ ...form });
+    if (form.userType === 'External' && !form.channelId) return;
+    const payload = { ...form };
+    if (payload.userType === 'Internal') payload.channelId = '';
+    onSave?.(payload);
     setIsEditing(false);
   };
 
@@ -272,6 +276,20 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
                           {getDeptPath(form.departmentId)}
                         </span>
                       </div>
+                      {form.userType === 'External' && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <Globe className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                          <select
+                            value={form.channelId || ''}
+                            onChange={e => setForm(p => ({ ...p, channelId: e.target.value }))}
+                            className={`text-[13px] bg-transparent border-b outline-none pb-0.5 transition ${!form.channelId ? 'border-red-300 text-red-500' : 'border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 focus:border-[#0071E3]'}`}
+                          >
+                            <option value="">-- 请选择渠道 --</option>
+                            {channels.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                          {!form.channelId && <span className="text-[11px] text-red-500">必填</span>}
+                        </div>
+                      )}
                     </>
                   ) : (
                     <>
@@ -299,6 +317,15 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
                           <Building2 className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                           {getDeptPath(user.departmentId)}
                         </span>
+                        {user.userType === 'External' && user.channelId && (
+                          <>
+                            <span className="text-gray-300 dark:text-gray-600">|</span>
+                            <span className="flex items-center gap-1.5 truncate">
+                              <Globe className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                              {channels.find(c => c.id === user.channelId)?.name || user.channelId}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </>
                   )}
@@ -334,7 +361,7 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
                       <button onClick={handleCancel} className="px-3 py-1.5 rounded-lg text-[13px] font-medium border border-gray-200 dark:border-white/15 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/10 transition flex items-center gap-1.5">
                         <RotateCcw className="w-3.5 h-3.5" /> 取消
                       </button>
-                      <button onClick={handleSave} disabled={!form.name || !form.email} className="px-3 py-1.5 rounded-lg text-[13px] font-semibold bg-[#0071E3] text-white hover:bg-[#0062CC] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1.5 shadow-sm">
+                      <button onClick={handleSave} disabled={!form.name || !form.email || (form.userType === 'External' && !form.channelId)} className="px-3 py-1.5 rounded-lg text-[13px] font-semibold bg-[#0071E3] text-white hover:bg-[#0062CC] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1.5 shadow-sm">
                         <Save className="w-3.5 h-3.5" /> 保存
                       </button>
                     </>

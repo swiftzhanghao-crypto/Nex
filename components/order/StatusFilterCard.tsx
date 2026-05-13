@@ -46,12 +46,12 @@ const styles: Record<Variant, { active: string; inactive: string; badge: string 
 };
 
 const StatusFilterCard: React.FC<StatusFilterCardProps> = ({ label, icon: Icon, count, isActive, variant = 'primary', onClick }) => {
-  const base = 'inline-flex items-center gap-1.5 px-2.5 h-7 rounded-lg border text-xs font-semibold transition-all duration-200 whitespace-nowrap shrink-0 cursor-pointer select-none';
+  const base = 'inline-flex items-center gap-1.5 px-3 h-8 rounded-lg border text-sm font-medium transition-all duration-200 whitespace-nowrap shrink-0 cursor-pointer select-none';
   const s = styles[variant];
 
   return (
     <button onClick={onClick} className={`${base} ${isActive ? s.active : s.inactive}`}>
-      <Icon className="w-3 h-3" />
+      <Icon className="w-3.5 h-3.5" />
       <span>{label}</span>
       {count > 0 && (
         <span className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold leading-none px-1 ${

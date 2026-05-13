@@ -31,12 +31,7 @@ const STEPS = [
 
 type StepKey = typeof STEPS[number]['key'];
 
-const SALES_ORG_OPTIONS = [
-  '珠海金山办公有限公司', '北京金山办公有限公司', '武汉金山办公有限公司',
-  '长沙金山办公软件有限公司', '上海金山办公软件有限公司', '西安金山办公软件有限公司',
-  '成都金山办公软件有限公司', '苏州金山办公软件有限公司', '贵州金山办公软件有限公司',
-  '北京数科网维技术有限责任公司', '广州数科网维技术有限公司', '深圳数科信创技术有限责任公司',
-];
+// SALES_ORG_OPTIONS now derived from AppContext salesOrganizations (see useMemo below)
 
 const BUSINESS_TAG_OPTIONS = ['生态', '数科', '金山志远', '公有云', '流版套件', '私有云', 'AI', 'IM'];
 
@@ -106,7 +101,7 @@ interface ProductDraft {
 
 const ProductCreateWizard: React.FC = () => {
   const navigate = useNavigate();
-  const { products, setProducts, authTypes, atomicCapabilities } = useAppContext();
+  const { products, setProducts, authTypes, atomicCapabilities, salesOrganizations } = useAppContext();
 
   const [currentStep, setCurrentStep] = useState(0);
   const [draftSavedTip, setDraftSavedTip] = useState(false);
@@ -350,8 +345,11 @@ const ProductCreateWizard: React.FC = () => {
   // --- Sales org candidates (matching search, includes already-added with badge) ---
   const salesOrgCandidates = useMemo(() => {
     const q = salesOrgPickerSearch.trim().toLowerCase();
-    return SALES_ORG_OPTIONS.filter(org => q ? org.toLowerCase().includes(q) : true);
-  }, [salesOrgPickerSearch]);
+    return salesOrganizations
+      .filter(o => o.status === '正常')
+      .filter(o => q ? o.name.toLowerCase().includes(q) || o.shortName.toLowerCase().includes(q) : true)
+      .map(o => o.name);
+  }, [salesOrgPickerSearch, salesOrganizations]);
 
   const addedSalesOrgs = useMemo(() => new Set((form.salesScope || []).map(r => r.salesOrg)), [form.salesScope]);
   const unaddedSalesOrgCandidates = useMemo(

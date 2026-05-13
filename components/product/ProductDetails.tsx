@@ -8,23 +8,12 @@ import Pagination from '../common/Pagination';
 import { useAppContext } from '../../contexts/AppContext';
 import { ALL_INSTALL_PKG_ROWS } from '../../data/staticData';
 
-const SALES_ORG_OPTIONS = [
-  '珠海金山办公有限公司', '北京金山办公有限公司', '武汉金山办公有限公司',
-  '长沙金山办公软件有限公司', '上海金山办公软件有限公司', '西安金山办公软件有限公司',
-  '成都金山办公软件有限公司', '苏州金山办公软件有限公司', '贵州金山办公软件有限公司',
-  '北京数科网维技术有限责任公司', '广州数科网维技术有限公司', '深圳数科信创技术有限责任公司',
-  '天津数科网维技术有限公司', '湖北数科网维技术有限公司', '江西数科网维信息技术服务有限公司',
-  '福建数科网维技术有限公司', '安徽数科网维技术有限公司', '四川数科网维技术有限公司',
-  '重庆数科网维技术有限公司', '辽宁数科网维技术有限公司', '浙江数科网维技术有限公司',
-  '陕西数科网维技术有限公司', '贵州数科网维技术有限公司', '山东数科信创技术有限责任公司',
-];
-
 const TAX_REFUND_OPTIONS = ['非退税', '退税', '即征即退', '先征后退'];
 
 const BUSINESS_TAG_OPTIONS = ['生态', '数科', '金山志远', '公有云', '流版套件', '私有云', 'AI', 'IM'];
 
 const ProductDetails: React.FC = () => {
-  const { products, setProducts, filteredProducts, authTypes, atomicCapabilities, apiMode } = useAppContext();
+  const { products, setProducts, filteredProducts, authTypes, atomicCapabilities, apiMode, salesOrganizations } = useAppContext();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const product = filteredProducts.find(p => p.id === id);
@@ -60,6 +49,49 @@ const ProductDetails: React.FC = () => {
   const [linkedServiceRequired, setLinkedServiceRequired] = useState(true);
   const [linkedServiceRemark, setLinkedServiceRemark] = useState('');
   const [expandedBillingRows, setExpandedBillingRows] = useState<Set<number>>(new Set());
+
+  const [showSalesOrgPicker, setShowSalesOrgPicker] = useState(false);
+  const [salesOrgPickerSearch, setSalesOrgPickerSearch] = useState('');
+  const [salesOrgPickerSelected, setSalesOrgPickerSelected] = useState<Set<string>>(new Set());
+
+  const openSalesOrgPicker = useCallback(() => {
+    const existing = new Set((productForm?.salesScope || []).map(r => r.salesOrg));
+    setSalesOrgPickerSearch('');
+    setSalesOrgPickerSelected(existing);
+    setShowSalesOrgPicker(true);
+  }, [productForm]);
+
+  const handleSalesOrgPickerSave = useCallback(() => {
+    if (!productForm) return;
+    const existing = productForm.salesScope || [];
+    const existingSet = new Set(existing.map(r => r.salesOrg));
+    const kept = existing.filter(r => salesOrgPickerSelected.has(r.salesOrg));
+    const added = Array.from(salesOrgPickerSelected)
+      .filter(org => !existingSet.has(org))
+      .map(org => ({
+        salesOrg: org,
+        businessShipProductName: productForm.name,
+        materialType: '',
+        authMaterialName: '',
+        mediaMaterialName: '',
+        supplyOrg: '',
+        status: 'unlisted' as const,
+        billingStatus: 'unmaintained' as const,
+      }));
+    const newScope = [...kept, ...added];
+    const updated = { ...productForm, salesScope: newScope, salesOrgName: newScope[0]?.salesOrg || '' };
+    setProductForm(updated);
+    persistProduct(updated);
+    setShowSalesOrgPicker(false);
+  }, [productForm, salesOrgPickerSelected, persistProduct]);
+
+  const handleRemoveSalesOrg = useCallback((idx: number) => {
+    if (!productForm) return;
+    const newScope = (productForm.salesScope || []).filter((_, i) => i !== idx);
+    const updated = { ...productForm, salesScope: newScope, salesOrgName: newScope[0]?.salesOrg || '' };
+    setProductForm(updated);
+    persistProduct(updated);
+  }, [productForm, persistProduct]);
 
   const linkedServiceCandidates = useMemo(() => {
     if (!productForm) return [];
@@ -120,39 +152,7 @@ const ProductDetails: React.FC = () => {
     const existingPkgs = product.installPackages || [];
     const mergedPkgs = existingPkgs.length > 0 ? existingPkgs : mappedPkgs;
 
-    const existingSalesScope = product.salesScope;
-    let salesScope = existingSalesScope;
-    if (!salesScope || salesScope.length === 0) {
-      const baseSpec = product.skus?.[0]?.name || '标准版';
-      const prodName = product.name;
-      const SALES_ORGS: { org: string; supply: string; listed: boolean; maintained: boolean }[] = [
-        { org: '华东销售中心', supply: '珠海总部', listed: true, maintained: true },
-        { org: '华南销售中心', supply: '珠海总部', listed: true, maintained: true },
-        { org: '华北销售中心', supply: '北京分部', listed: true, maintained: true },
-        { org: '全国直销中心', supply: '珠海总部', listed: true, maintained: true },
-        { org: '政务事业部', supply: '珠海总部', listed: false, maintained: false },
-      ];
-      const matType = product.productCategory === '服务' ? '服务产品' : '软件产品';
-      salesScope = SALES_ORGS.map(s => ({
-        salesOrg: s.org,
-        materialType: s.org === '政务事业部' ? `${matType}（政务）` : matType,
-        authMaterialName: s.org === '政务事业部' ? `${prodName} ${baseSpec}-政务授权` : `${prodName} ${baseSpec}-永久授权`,
-        mediaMaterialName: s.org === '政务事业部' ? `${prodName} ${baseSpec}-政务介质` : `${prodName} ${baseSpec}-电子介质`,
-        supplyOrg: s.supply,
-        status: s.listed ? 'listed' as const : 'unlisted' as const,
-        billingStatus: s.maintained ? 'maintained' as const : 'unmaintained' as const,
-        ...(s.maintained ? {
-          billingTaxRefundType: '即征即退',
-          billingInvoiceName: `${prodName} ${baseSpec}办公软件`,
-          billingTaxRate: '13%',
-          billingModelSpec: `${baseSpec}/5年/永久授权`,
-          billingProductCode: '1060201030000000000',
-          billingUnit: '套',
-        } : {}),
-      }));
-    }
-
-    setProductForm({ ...product, installPackages: mergedPkgs, salesScope });
+    setProductForm({ ...product, installPackages: mergedPkgs });
   }, [product]);
 
   const filteredPkgs = useMemo(() => {
@@ -848,15 +848,24 @@ const ProductDetails: React.FC = () => {
               )}
 
               {/* 销售范围 & 开票信息 */}
-              {detailTab === 'salesScope' && (
+              {detailTab === 'salesScope' && (<>
               <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
-                <div className="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-blue-500" />
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white">销售范围 & 开票信息</h3>
+                <div className="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-blue-500" />
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white">销售范围 & 开票信息</h3>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">({productForm.salesScope?.length || 0})</span>
+                  </div>
+                  <button
+                    onClick={openSalesOrgPicker}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+                  >
+                    <Plus className="w-3.5 h-3.5" />关联销售组织
+                  </button>
                 </div>
                 {(productForm.salesScope?.length || 0) > 0 ? (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left min-w-[1000px]">
+                    <table className="w-full text-left min-w-[1100px]">
                       <thead className="unified-table-header">
                         <tr>
                           <th className="px-5 py-3 w-10">#</th>
@@ -867,6 +876,7 @@ const ProductDetails: React.FC = () => {
                           <th className="px-5 py-3">供货组织</th>
                           <th className="px-5 py-3">状态</th>
                           <th className="px-5 py-3">开票信息</th>
+                          <th className="px-5 py-3 w-16 text-center">操作</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 dark:divide-white/5">
@@ -874,13 +884,13 @@ const ProductDetails: React.FC = () => {
                           const isExpanded = expandedBillingRows.has(idx);
                           return (
                           <React.Fragment key={idx}>
-                          <tr className="hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors">
+                          <tr className="hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors group">
                             <td className="px-6 py-3 text-xs text-gray-400 font-mono">{idx + 1}</td>
                             <td className="px-6 py-3 text-sm font-medium text-gray-900 dark:text-white">{row.salesOrg}</td>
-                            <td className="px-6 py-3 text-xs text-gray-600 dark:text-gray-400">{row.materialType}</td>
-                            <td className="px-6 py-3 text-xs text-gray-600 dark:text-gray-400">{row.authMaterialName}</td>
-                            <td className="px-6 py-3 text-xs text-gray-600 dark:text-gray-400">{row.mediaMaterialName}</td>
-                            <td className="px-6 py-3 text-xs text-gray-600 dark:text-gray-400">{row.supplyOrg}</td>
+                            <td className="px-6 py-3 text-xs text-gray-600 dark:text-gray-400">{row.materialType || '—'}</td>
+                            <td className="px-6 py-3 text-xs text-gray-600 dark:text-gray-400">{row.authMaterialName || '—'}</td>
+                            <td className="px-6 py-3 text-xs text-gray-600 dark:text-gray-400">{row.mediaMaterialName || '—'}</td>
+                            <td className="px-6 py-3 text-xs text-gray-600 dark:text-gray-400">{row.supplyOrg || '—'}</td>
                             <td className="px-6 py-3 text-xs">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                 row.status === 'listed'
@@ -911,10 +921,19 @@ const ProductDetails: React.FC = () => {
                                 )}
                               </button>
                             </td>
+                            <td className="px-6 py-3 text-center">
+                              <button
+                                onClick={() => handleRemoveSalesOrg(idx)}
+                                className="p-1 text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
+                                title="移除此销售组织"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
                           </tr>
                           {isExpanded && row.billingStatus === 'maintained' && (
                             <tr className="bg-gray-50/80 dark:bg-white/[0.03]">
-                              <td colSpan={8} className="px-6 py-0">
+                              <td colSpan={9} className="px-6 py-0">
                                 <div className="py-4 pl-8 border-l-2 border-blue-200 dark:border-blue-800 ml-2">
                                   <div className="flex items-center gap-2 mb-3">
                                     <FileText className="w-3.5 h-3.5 text-blue-500" />
@@ -959,13 +978,95 @@ const ProductDetails: React.FC = () => {
                 ) : (
                   <div className="p-12 text-center">
                     <Globe className="w-10 h-10 text-gray-200 dark:text-gray-700 mx-auto mb-3" />
-                    <div className="text-sm text-gray-400 dark:text-gray-500 mb-1">暂无销售范围数据</div>
-                    <div className="text-xs text-gray-400 dark:text-gray-500">配置产品的销售组织后，此处将自动展示销售范围信息</div>
+                    <div className="text-sm text-gray-400 dark:text-gray-500 mb-3">暂无销售范围数据</div>
+                    <button
+                      onClick={openSalesOrgPicker}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+                    >
+                      <Plus className="w-4 h-4" />关联销售组织
+                    </button>
                   </div>
                 )}
               </div>
-              )}
 
+              {/* Sales Org Picker Modal */}
+              {showSalesOrgPicker && (
+              <ModalPortal>
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 animate-fade-in" onClick={() => setShowSalesOrgPicker(false)}>
+                  <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl w-[560px] max-h-[80vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/10 shrink-0">
+                      <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-blue-500" />关联销售组织
+                      </h3>
+                      <button onClick={() => setShowSalesOrgPicker(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10 shrink-0">
+                      <div className="relative">
+                        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="搜索销售组织名称或简称..."
+                          className="w-full pl-9 pr-4 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-[#1C1C1E] text-gray-700 dark:text-gray-200 outline-none focus:ring-2 focus:ring-blue-500/20 transition"
+                          value={salesOrgPickerSearch}
+                          onChange={e => setSalesOrgPickerSearch(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
+                        <span>已选 <strong className="text-blue-600 dark:text-blue-400">{salesOrgPickerSelected.size}</strong> 个</span>
+                        <span>·</span>
+                        <button onClick={() => setSalesOrgPickerSelected(new Set(salesOrganizations.filter(o => o.status === '正常').map(o => o.name)))} className="text-blue-600 dark:text-blue-400 hover:underline">全选正常</button>
+                        <button onClick={() => setSalesOrgPickerSelected(new Set())} className="text-gray-500 hover:underline">清空</button>
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto px-2 py-2 min-h-0">
+                      {salesOrganizations
+                        .filter(o => {
+                          if (!salesOrgPickerSearch) return true;
+                          const q = salesOrgPickerSearch.toLowerCase();
+                          return o.name.toLowerCase().includes(q) || o.shortName.toLowerCase().includes(q);
+                        })
+                        .map(org => {
+                          const checked = salesOrgPickerSelected.has(org.name);
+                          return (
+                            <label key={org.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${checked ? 'bg-blue-50 dark:bg-blue-900/15' : 'hover:bg-gray-50 dark:hover:bg-white/5'}`}>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {
+                                  setSalesOrgPickerSelected(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(org.name)) next.delete(org.name); else next.add(org.name);
+                                    return next;
+                                  });
+                                }}
+                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500/20 shrink-0"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm text-gray-800 dark:text-gray-200 truncate">{org.name}</div>
+                                <div className="text-[11px] text-gray-400 flex items-center gap-2">
+                                  {org.shortName && <span>{org.shortName}</span>}
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${org.orgType === '金山' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : 'bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400'}`}>{org.orgType}</span>
+                                  {org.status === '待补充' && <span className="text-amber-500">待补充</span>}
+                                </div>
+                              </div>
+                            </label>
+                          );
+                        })
+                      }
+                    </div>
+                    <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-100 dark:border-white/10 shrink-0">
+                      <button onClick={() => setShowSalesOrgPicker(false)} className="px-4 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition">取消</button>
+                      <button onClick={handleSalesOrgPickerSave} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition font-medium">确定</button>
+                    </div>
+                  </div>
+                </div>
+              </ModalPortal>
+              )}
+              </>)}
+
+              {/* 权益信息 */}
               {detailTab === 'benefits' && (
               <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
                 <div className="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">

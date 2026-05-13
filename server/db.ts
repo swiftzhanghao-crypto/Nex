@@ -81,19 +81,32 @@ export function initSchema() {
     );
 
     CREATE TABLE IF NOT EXISTS products (
-      id            TEXT PRIMARY KEY,
-      name          TEXT NOT NULL,
-      category      TEXT NOT NULL,
-      sub_category  TEXT,
-      description   TEXT,
-      status        TEXT NOT NULL DEFAULT 'OnShelf',
-      tags          TEXT NOT NULL DEFAULT '[]',
-      skus          TEXT NOT NULL DEFAULT '[]',
-      composition   TEXT NOT NULL DEFAULT '[]',
-      install_pkgs  TEXT NOT NULL DEFAULT '[]',
-      package_id    TEXT,
-      rights        TEXT NOT NULL DEFAULT '[]',
-      license_tpl   TEXT
+      id                    TEXT PRIMARY KEY,
+      name                  TEXT NOT NULL,
+      category              TEXT NOT NULL,
+      sub_category          TEXT,
+      description           TEXT,
+      status                TEXT NOT NULL DEFAULT 'OnShelf',
+      tags                  TEXT NOT NULL DEFAULT '[]',
+      skus                  TEXT NOT NULL DEFAULT '[]',
+      composition           TEXT NOT NULL DEFAULT '[]',
+      install_pkgs          TEXT NOT NULL DEFAULT '[]',
+      package_id            TEXT,
+      rights                TEXT NOT NULL DEFAULT '[]',
+      license_tpl           TEXT,
+      product_type          TEXT,
+      online_delivery       TEXT,
+      product_class         TEXT,
+      product_classification TEXT,
+      product_series        TEXT,
+      product_line          TEXT,
+      product_category      TEXT,
+      product_class_finance TEXT,
+      product_line_finance  TEXT,
+      product_series_finance TEXT,
+      business_delivery_name TEXT,
+      sales_org_name        TEXT,
+      sales_scope           TEXT NOT NULL DEFAULT '[]'
     );
 
     CREATE TABLE IF NOT EXISTS channels (
@@ -390,4 +403,7 @@ export function initSchema() {
   try {
     db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_wps_user_id ON users(wps_user_id) WHERE wps_user_id IS NOT NULL`);
   } catch { /* index exists or unsupported */ }
+
+  try { db.exec('ALTER TABLE users ADD COLUMN channel_id TEXT'); }
+  catch { /* column already exists */ }
 }

@@ -271,6 +271,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
 
   const handleSaveUser = () => {
       if (!userForm.name || !userForm.email) return;
+      if (userForm.userType === 'External' && !userForm.channelId) return;
       if (editingId) {
           setUsers(prev => prev.map(u => u.id === editingId ? { ...u, ...userForm } as User : u));
       } else { 
@@ -824,6 +825,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                               <th className="p-4">账号ID</th>
                               <th className="p-4">部门</th>
                               <th className="p-4">类型</th>
+                              <th className="p-4">关联渠道</th>
                               <th className="p-4">状态</th>
                           </tr>
                       </thead>
@@ -871,6 +873,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                                   <td className="p-4 font-mono text-gray-600 dark:text-gray-300">{user.accountId}</td>
                                   <td className="p-4 text-gray-600 dark:text-gray-300">{getDepartmentName(user.departmentId)}</td>
                                   <td className="p-4"><span className={`px-2 py-0.5 rounded-md text-xs font-bold border ${user.userType === 'Internal' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800' : 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800'}`}>{user.userType === 'Internal' ? '内部员工' : '外部协作'}</span></td>
+                                  <td className="p-4 text-xs text-gray-600 dark:text-gray-300">{user.channelId ? (channels.find(c => c.id === user.channelId)?.name || user.channelId) : <span className="text-gray-300 dark:text-gray-600">-</span>}</td>
                                   <td className="p-4"><span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold ${user.status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400'}`}><div className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-green-500' : 'bg-gray-400'}`} />{user.status === 'Active' ? '已启用' : '已停用'}</span></td>
                               </tr>
                           ))}
@@ -2524,7 +2527,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                       <div className="grid grid-cols-2 gap-4">
                           <div>
                               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">人员类型</label>
-                              <select value={userForm.userType} onChange={e => setUserForm({...userForm, userType: e.target.value as UserType})} className="w-full p-3 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white">
+                              <select value={userForm.userType} onChange={e => { const ut = e.target.value as UserType; setUserForm({...userForm, userType: ut, channelId: ut === 'Internal' ? undefined : userForm.channelId}); }} className="w-full p-3 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white">
                                   <option value="Internal">内部员工</option>
                                   <option value="External">外部协作者</option>
                               </select>
@@ -2537,6 +2540,22 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
                               </select>
                           </div>
                       </div>
+                      {userForm.userType === 'External' && (
+                      <div>
+                          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase">
+                              关联渠道 <span className="text-red-500">*</span>
+                          </label>
+                          <select
+                              value={userForm.channelId || ''}
+                              onChange={e => setUserForm({...userForm, channelId: e.target.value || undefined})}
+                              className={`w-full p-3 bg-white dark:bg-black border rounded-xl text-sm outline-none dark:text-white ${!userForm.channelId ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}
+                          >
+                              <option value="">-- 请选择渠道 --</option>
+                              {channels.map(c => <option key={c.id} value={c.id}>{c.name} ({c.id})</option>)}
+                          </select>
+                          {!userForm.channelId && <p className="text-xs text-red-500 mt-1">外部人员必须关联一个渠道</p>}
+                      </div>
+                      )}
                   </div>
                   <div className="p-6 bg-gray-50 dark:bg-white/5 border-t border-gray-100 dark:border-white/10 flex justify-end gap-3">
                       <button onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition text-sm font-medium">取消</button>

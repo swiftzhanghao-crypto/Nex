@@ -17,6 +17,19 @@ function toProduct(row: any) {
     composition: safeJsonParse(row.composition, []),
     installPackages: safeJsonParse(row.install_pkgs, []),
     licenseTemplate: row.license_tpl ? safeJsonParse(row.license_tpl) : undefined,
+    productType: row.product_type ?? undefined,
+    onlineDelivery: row.online_delivery ?? undefined,
+    productClass: row.product_class ?? undefined,
+    productClassification: row.product_classification ?? undefined,
+    productSeries: row.product_series ?? undefined,
+    productLine: row.product_line ?? undefined,
+    productCategory: row.product_category ?? undefined,
+    productClassFinance: row.product_class_finance ?? undefined,
+    productLineFinance: row.product_line_finance ?? undefined,
+    productSeriesFinance: row.product_series_finance ?? undefined,
+    businessDeliveryName: row.business_delivery_name ?? undefined,
+    salesOrgName: row.sales_org_name ?? undefined,
+    salesScope: safeJsonParse(row.sales_scope, []),
   };
 }
 
@@ -88,12 +101,20 @@ router.post('/', checkPermission('product', 'create'), (req: AuthRequest, res) =
   const id = p.id || `PROD-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
   db.prepare(`
-    INSERT INTO products (id, name, category, sub_category, description, status, tags, skus, composition, install_pkgs, license_tpl)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO products (id, name, category, sub_category, description, status, tags, skus, composition, install_pkgs, license_tpl,
+      product_type, online_delivery, product_class, product_classification, product_series, product_line,
+      product_category, product_class_finance, product_line_finance, product_series_finance,
+      business_delivery_name, sales_org_name, sales_scope)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, p.name, p.category, p.subCategory ?? null, p.description ?? null,
     p.status || 'OnShelf', JSON.stringify(p.tags || []), JSON.stringify(p.skus || []),
     JSON.stringify(p.composition || []), JSON.stringify(p.installPackages || []),
-    p.licenseTemplate ? JSON.stringify(p.licenseTemplate) : null);
+    p.licenseTemplate ? JSON.stringify(p.licenseTemplate) : null,
+    p.productType ?? null, p.onlineDelivery ?? null, p.productClass ?? null,
+    p.productClassification ?? null, p.productSeries ?? null, p.productLine ?? null,
+    p.productCategory ?? null, p.productClassFinance ?? null, p.productLineFinance ?? null,
+    p.productSeriesFinance ?? null, p.businessDeliveryName ?? null, p.salesOrgName ?? null,
+    JSON.stringify(p.salesScope || []));
 
   const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
@@ -108,12 +129,21 @@ router.put('/:id', checkPermission('product', 'update'), (req: AuthRequest, res)
   const p = req.body;
   db.prepare(`
     UPDATE products SET name=?, category=?, sub_category=?, description=?, status=?,
-    tags=?, skus=?, composition=?, install_pkgs=?, license_tpl=?
+    tags=?, skus=?, composition=?, install_pkgs=?, license_tpl=?,
+    product_type=?, online_delivery=?, product_class=?, product_classification=?,
+    product_series=?, product_line=?, product_category=?, product_class_finance=?,
+    product_line_finance=?, product_series_finance=?, business_delivery_name=?,
+    sales_org_name=?, sales_scope=?
     WHERE id=?
   `).run(p.name, p.category, p.subCategory ?? null, p.description ?? null, p.status,
     JSON.stringify(p.tags || []), JSON.stringify(p.skus || []),
     JSON.stringify(p.composition || []), JSON.stringify(p.installPackages || []),
-    p.licenseTemplate ? JSON.stringify(p.licenseTemplate) : null, req.params.id);
+    p.licenseTemplate ? JSON.stringify(p.licenseTemplate) : null,
+    p.productType ?? null, p.onlineDelivery ?? null, p.productClass ?? null,
+    p.productClassification ?? null, p.productSeries ?? null, p.productLine ?? null,
+    p.productCategory ?? null, p.productClassFinance ?? null, p.productLineFinance ?? null,
+    p.productSeriesFinance ?? null, p.businessDeliveryName ?? null, p.salesOrgName ?? null,
+    JSON.stringify(p.salesScope || []), req.params.id);
 
   const userName = getUserName(db, req.user!.userId);
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)

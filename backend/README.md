@@ -11,6 +11,12 @@
 | x/crypto/scrypt | — | 密码哈希（兼容 Node.js） |
 | gin-contrib/cors | 1.7 | 跨域支持 |
 
+## 与 GoFrame v2 规范的关系
+
+本目录 **不是** GoFrame 项目；若需对照仓库内 GoFrame v2 Skill（`.cursor/skills/goframe-v2`）与当前实现的差异、严重度与演进建议，请参阅：
+
+**[docs/GOFRAME_V2_GAP_ANALYSIS.md](docs/GOFRAME_V2_GAP_ANALYSIS.md)**
+
 ## 目录结构
 
 ```
@@ -33,6 +39,8 @@ backend/
 │   └── seed/seed.go            # 种子数据（8 用户 + 5 部门 + 6 角色）
 ├── go.mod
 ├── go.sum
+├── docs/
+│   └── GOFRAME_V2_GAP_ANALYSIS.md  # 与 GoFrame v2 Skill 的差距分析
 └── README.md
 ```
 

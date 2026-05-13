@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Channel } from '../../types';
-import { ArrowLeft, FileText, UserCircle, Edit2, Save, X } from 'lucide-react';
+import { Channel, User } from '../../types';
+import { ArrowLeft, FileText, UserCircle, Edit2, Save, X, Mail, Phone, Shield } from 'lucide-react';
 import { useAppContext } from '../../contexts/AppContext';
+import { channelApi } from '../../services/api';
 
 type TabKey = 'basic' | 'bank' | 'invoice' | 'shipping' | 'accounts' | 'debt';
 
@@ -25,6 +26,23 @@ const ChannelDetails: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('basic');
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<Partial<Channel>>({});
+  const [channelUsers, setChannelUsers] = useState<User[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+
+  const { roles, apiMode, users: allUsers } = useAppContext();
+
+  useEffect(() => {
+    if (!id || activeTab !== 'accounts') return;
+    if (apiMode) {
+      setUsersLoading(true);
+      channelApi.users(id)
+        .then(setChannelUsers)
+        .catch(() => { setChannelUsers([]); })
+        .finally(() => setUsersLoading(false));
+    } else {
+      setChannelUsers(allUsers.filter(u => u.channelId === id));
+    }
+  }, [id, activeTab, apiMode, allUsers]);
 
   if (!channel) {
     return (
@@ -234,7 +252,79 @@ const ChannelDetails: React.FC = () => {
         {activeTab === 'bank' && emptyPlaceholder('🏦', '银行账号信息')}
         {activeTab === 'invoice' && emptyPlaceholder('🧾', '发票信息')}
         {activeTab === 'shipping' && emptyPlaceholder('📦', '收货地址')}
-        {activeTab === 'accounts' && emptyPlaceholder('👤', '用户账号')}
+        {activeTab === 'accounts' && (
+          <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10 overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <UserCircle className="w-4.5 h-4.5 text-[#0071E3]" />
+                <h4 className="text-base font-bold text-gray-800 dark:text-white">关联用户账号</h4>
+                <span className="text-xs text-gray-400 dark:text-gray-500">（外部协作者）</span>
+              </div>
+              <span className="text-xs font-mono text-gray-400">{channelUsers.length} 人</span>
+            </div>
+            {usersLoading ? (
+              <div className="flex items-center justify-center py-16 text-sm text-gray-400">加载中...</div>
+            ) : channelUsers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500">
+                <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center mb-3">
+                  <span className="text-xl">👤</span>
+                </div>
+                <p className="text-sm font-medium">暂无关联用户</p>
+                <p className="text-xs mt-1">可在「用户管理」中将外部人员关联到此渠道</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50/80 dark:bg-white/5 text-gray-500 dark:text-gray-400 text-xs uppercase">
+                      <th className="p-4 pl-5 text-left font-semibold">用户</th>
+                      <th className="p-4 text-left font-semibold">账号ID</th>
+                      <th className="p-4 text-left font-semibold">邮箱</th>
+                      <th className="p-4 text-left font-semibold">手机</th>
+                      <th className="p-4 text-left font-semibold">角色</th>
+                      <th className="p-4 text-left font-semibold">状态</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                    {channelUsers.map(u => (
+                      <tr key={u.id} className="hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors">
+                        <td className="p-4 pl-5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                              {u.avatar ? <img src={u.avatar} className="w-8 h-8 rounded-full object-cover" /> : u.name.slice(0, 1)}
+                            </div>
+                            <span className="font-medium text-gray-900 dark:text-white">{u.name}</span>
+                          </div>
+                        </td>
+                        <td className="p-4 font-mono text-gray-500 dark:text-gray-400 text-xs">{u.accountId}</td>
+                        <td className="p-4 text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
+                          <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />{u.email}
+                        </td>
+                        <td className="p-4 text-gray-600 dark:text-gray-300">
+                          {u.phone ? <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />{u.phone}</span> : <span className="text-gray-300 dark:text-gray-600">-</span>}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex flex-wrap gap-1">
+                            {(u.roles || []).map(rid => {
+                              const r = roles.find(rl => rl.id === rid);
+                              return <span key={rid} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800/40"><Shield className="w-2.5 h-2.5" />{r?.name || rid}</span>;
+                            })}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold ${u.status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400'}`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${u.status === 'Active' ? 'bg-green-500' : 'bg-gray-400'}`} />
+                            {u.status === 'Active' ? '已启用' : '已停用'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
         {activeTab === 'debt' && emptyPlaceholder('💰', '欠款结算')}
 
       </div>

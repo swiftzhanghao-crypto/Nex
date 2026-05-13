@@ -1,0 +1,43 @@
+server:
+  address: ":8080"
+  openapiPath: "/api.json"
+  swaggerPath: "/swagger"
+  pathPrefix: "${PATH_PREFIX}"
+
+logger:
+  level: "all"
+  stdout: true
+
+database:
+  default:
+    link: "${DATABASE_DSN}"
+    debug: true
+
+jwt:
+  secret: "${JWT_SECRET}"
+  expiresIn: "24h"
+
+cors:
+  origins: "${CORS_ORIGINS}"
+
+wps:
+  appId: "${WPS_APP_ID}"
+  appSecret: "${WPS_APP_SECRET}"
+  redirectUri: "${WPS_REDIRECT_URI}"
+  scopes: "kso.user_base.read"
+  openApiBase: "https://openapi.wps.cn"
+  frontendUrl: "${FRONTEND_URL}"
+  cookieName: "itab-sid"
+
+crm:
+  xiaoshouyi:
+    clientId: "${CRM_XSY_CLIENT_ID}"
+    clientSecret: "${CRM_XSY_CLIENT_SECRET}"
+    redirectUri: "${CRM_XSY_REDIRECT_URI}"
+    scope: "${CRM_XSY_SCOPE}"
+    oauthBase: "${CRM_XSY_OAUTH_BASE}"
+    apiBase: "${CRM_XSY_API_BASE}"
+
+ai:
+  geminiApiKey: "${GEMINI_API_KEY}"
+  defaultModel: "gemini-2.5-flash"

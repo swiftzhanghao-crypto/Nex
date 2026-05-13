@@ -1,0 +1,43 @@
+server:
+  address: ":8080"
+  openapiPath: "/api.json"
+  swaggerPath: "/swagger"
+  pathPrefix: "${PATH_PREFIX}"
+
+logger:
+  level: "all"
+  stdout: true
+
+database:
+  default:
+    link: "sqlite::@file(./data/sqlite/app.db)"
+    debug: true
+
+jwt:
+  secret: "wps365-dev-secret-change-in-production"
+  expiresIn: "24h"
+
+cors:
+  origins: "http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173"
+
+wps:
+  appId: "${WPS_APP_ID}"
+  appSecret: "${WPS_APP_SECRET}"
+  redirectUri: "${WPS_REDIRECT_URI}"
+  scopes: "kso.user_base.read"
+  openApiBase: "https://openapi.wps.cn"
+  frontendUrl: "http://localhost:5173"
+  cookieName: "itab-sid"
+
+crm:
+  xiaoshouyi:
+    clientId: "${CRM_XSY_CLIENT_ID}"
+    clientSecret: "${CRM_XSY_CLIENT_SECRET}"
+    redirectUri: "${CRM_XSY_REDIRECT_URI}"
+    scope: "all"
+    oauthBase: "https://login-sandbox.xiaoshouyi.com"
+    apiBase: "https://api-sandbox.xiaoshouyi.com"
+
+ai:
+  geminiApiKey: "${GEMINI_API_KEY}"
+  defaultModel: "gemini-2.5-flash"

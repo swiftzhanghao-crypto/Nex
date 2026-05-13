@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Order, OrderStatus, OrderItem, User, ApprovalRecord, OrderSource, OrderDraft, Subscription, SubscriptionLineProductSnapshot } from '../../types';
+import { Order, OrderStatus, OrderItem, User, ApprovalRecord, OrderSource, OrderDraft, Subscription, SubscriptionLineProductSnapshot, BuyerType } from '../../types';
 import { subscriptionMostUrgentProductSnapshot } from '../../utils/subscriptionLineProduct';
 import { Search, Plus, Trash2, Disc, CheckCircle, FileText, CreditCard, Truck, X, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, FileCheck, CheckSquare, Package, Settings, Filter, ChevronDown, Calendar, Shield, RotateCcw, Save, ChevronRight, Copy, Check, Eye, Pencil, SlidersHorizontal, GripVertical, Columns3 } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
@@ -52,6 +52,56 @@ function loadActiveViewId(): string {
 }
 
 const DEFAULT_COLS = ['id', 'customer', 'buyer', 'products', 'sales', 'businessManager', 'department', 'source', 'buyerType', 'date', 'status', 'paymentStatus', 'stockStatus', 'total', 'action'];
+
+function orderToDraft(order: Order): OrderDraft {
+  return {
+    id: order.id,
+    savedAt: order.date || new Date().toISOString(),
+    currentStep: 0,
+    buyerType: (order.buyerType as BuyerType) || '',
+    orderSource: order.source || 'Sales',
+    creatorId: order.creatorId || '',
+    originalOrderId: order.originalOrderId,
+    hasOpportunity: order.opportunityId ? 'yes' : '',
+    linkedOpportunityId: order.opportunityId || '',
+    newOrderCustomer: order.customerId || '',
+    orderEnterpriseId: '',
+    selectedChannelId: order.buyerType === 'Channel' ? (order.buyerId || '') : '',
+    directChannel: order.directChannel || '',
+    terminalChannel: order.terminalChannel || '',
+    salesRepId: order.salesRepId || '',
+    businessManagerId: order.businessManagerId || '',
+    newOrderItems: order.items || [],
+    tempCategory: '',
+    enableConversion: false,
+    selectedConversionIds: [],
+    sellerProductCategory: '',
+    sellerName: order.sellerName || '',
+    sellerContact: order.sellerContact || '',
+    invoiceForm: order.invoiceInfo || { type: 'VAT_Special', title: '', taxId: '', content: '' },
+    paymentMethod: order.paymentMethod,
+    paymentTerms: order.paymentTerms,
+    deliveryMethod: order.deliveryMethod || 'Online',
+    receivingParty: order.receivingParty || '',
+    receivingCompany: order.receivingCompany || '',
+    receivingMethod: order.receivingMethod || '',
+    shippingAddress: order.shippingAddress || '',
+    shippingPhone: order.shippingPhone || '',
+    shippingEmail: order.shippingEmail || '',
+    acceptanceForm: order.acceptanceInfo || { contactName: '', contactPhone: '', method: 'Remote' },
+    acceptanceType: order.acceptanceConfig?.type || 'OneTime',
+    phaseDrafts: [],
+    orderRemark: order.orderRemark || '',
+    linkedContractIds: order.linkedContractIds || [],
+    purchasingContactId: order.purchasingContactId || '',
+    itContactId: order.itContactId || '',
+    isAgentOrder: order.isAgentOrder,
+    agentCode: order.agentCode,
+    buyerNameId: order.buyerId,
+    settlementMethod: (order.settlementMethod as 'cash' | 'credit' | '') || '',
+    expectedPaymentDate: order.expectedPaymentDate || '',
+  };
+}
 
 interface FilterCondition {
     id: string;
@@ -507,10 +557,16 @@ const OrderManager: React.FC = () => {
           if (draft) {
               setResumeDraft(draft);
               setIsCreateOpen(true);
+          } else {
+              const order = orders.find(o => o.id === state.editDraftId);
+              if (order && order.status === OrderStatus.DRAFT) {
+                  setResumeDraft(orderToDraft(order));
+                  setIsCreateOpen(true);
+              }
           }
           window.history.replaceState({}, document.title);
       }
-  }, [location.state, orderDrafts]);
+  }, [location.state, orderDrafts, orders]);
 
   const getStatusBadge = useCallback((status: OrderStatus) => {
     const text = statusMap[status] || status;
@@ -798,7 +854,7 @@ const OrderManager: React.FC = () => {
           if (!prev) return prev;
           setOrderDrafts(drafts => drafts.filter(d => d.id !== prev));
           if (apiMode) {
-              import('../../services/api').then(({ orderApi }) => orderApi.delete(prev)).then(() => refreshOrders()).catch(() => {});
+              import('../../services/api').then(({ orderApi }) => orderApi.delete(prev)).then(() => refreshOrders()).catch(() => { /* error shown via global toast */ });
           }
           setOrders(ords => ords.filter(o => o.id !== prev));
           return null;
@@ -812,7 +868,7 @@ const OrderManager: React.FC = () => {
           return (
               <div className="flex items-center justify-end gap-1.5 mr-[-40px]">
                   <button
-                      onClick={(e) => { e.stopPropagation(); const draft = orderDrafts.find(d => d.id === order.id); if (draft) { setResumeDraft(draft); setIsCreateOpen(true); } }}
+                      onClick={(e) => { e.stopPropagation(); const draft = orderDrafts.find(d => d.id === order.id) || orderToDraft(order); setResumeDraft(draft); setIsCreateOpen(true); }}
                       className={btnCls}
                   >继续编辑</button>
                   <button
@@ -1170,7 +1226,7 @@ const OrderManager: React.FC = () => {
           const approvalGroup = pipelineStatuses.filter(s => !shippingIds.has(s.id) && !successIds.has(s.id) && !warningIds.has(s.id)).filter(s => hasPermission(s.permission));
           const shippingGroup = pipelineStatuses.filter(s => shippingIds.has(s.id)).filter(s => hasPermission(s.permission));
           const paymentGroup = pipelineStatuses.filter(s => warningIds.has(s.id)).filter(s => hasPermission(s.permission));
-          const sep = <div className="w-px h-5 bg-gray-200 dark:bg-white/10 mx-0.5 self-center shrink-0" />;
+          const sep = <div className="w-px h-6 bg-gray-200 dark:bg-white/10 mx-0.5 self-center shrink-0" />;
           return (
             <div className="flex flex-wrap items-center gap-1.5">
               {approvalGroup.map(step => (

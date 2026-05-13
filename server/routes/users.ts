@@ -16,6 +16,7 @@ function toUser(row: any) {
     email: row.email, phone: row.phone, roles: parseRoles(row.role),
     userType: row.user_type, status: row.status,
     avatar: row.avatar, departmentId: row.department_id,
+    channelId: row.channel_id || undefined,
     monthBadge: row.month_badge,
   };
 }
@@ -108,8 +109,7 @@ router.get('/:id', checkPermission('user', 'read'), (req, res) => {
 
 router.put('/:id', requireSelfOrRole('Admin'), (req: AuthRequest, res) => {
   const db = getDb();
-  const { name, email, phone, roles, role, userType, status, departmentId } = req.body;
-  // 兼容前端新旧版本：优先 roles（数组），其次 role（旧单值）
+  const { name, email, phone, roles, role, userType, status, departmentId, channelId } = req.body;
   const rolesVal = roles ? JSON.stringify(Array.isArray(roles) ? roles : [roles])
     : role ? JSON.stringify(Array.isArray(role) ? role : [role])
     : undefined;
@@ -125,10 +125,11 @@ router.put('/:id', requireSelfOrRole('Admin'), (req: AuthRequest, res) => {
     db.prepare(`UPDATE users SET name=?, phone=?, updated_at=datetime('now') WHERE id=?`)
       .run(name, phone ?? null, req.params.id);
   } else {
+    const resolvedChannelId = (userType === 'External' ? (channelId || null) : null);
     db.prepare(`
-      UPDATE users SET name=?, email=?, phone=?, role=?, user_type=?, status=?, department_id=?, updated_at=datetime('now')
+      UPDATE users SET name=?, email=?, phone=?, role=?, user_type=?, status=?, department_id=?, channel_id=?, updated_at=datetime('now')
       WHERE id=?
-    `).run(name, email, phone ?? null, rolesVal ?? '["Sales"]', userType ?? 'Internal', status ?? 'Active', departmentId ?? null, req.params.id);
+    `).run(name, email, phone ?? null, rolesVal ?? '["Sales"]', userType ?? 'Internal', status ?? 'Active', departmentId ?? null, resolvedChannelId, req.params.id);
   }
   const row = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
   if (!row) { res.status(404).json({ error: '用户不存在' }); return; }

@@ -79,13 +79,14 @@ router.get('/login', (req, res) => {
   stateStore.set(state, { redirect, userId: user.userId, exp: Date.now() + STATE_TTL_MS });
 
   const params = new URLSearchParams({
-    response_type: 'code',
     client_id: CRM_CLIENT_ID,
+    response_type: 'code',
     redirect_uri: CRM_REDIRECT_URI,
+    oauthType: 'standard',
     scope: CRM_SCOPE,
     state,
   });
-  res.redirect(302, `${CRM_OAUTH_BASE}/auc/oauth2/authorize?${params.toString()}`);
+  res.redirect(302, `${CRM_OAUTH_BASE}/auc/oauth2/auth?${params.toString()}`);
 });
 
 // ---------- callback: 用 code 换 token 并存库 ----------

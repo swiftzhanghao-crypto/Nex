@@ -3,7 +3,7 @@ import {
   initialProducts, initialMerchandises, initialAtomicCapabilities,
   initialAuthTypes,
   initialDepartments, initialRoles, initialUsers, initialChannels,
-  initialStandaloneEnterprises,
+  initialStandaloneEnterprises, productSalesOrgMap,
 } from '../data/staticData.ts';
 import { initialSpaces, initialSpaceRoles } from '../data/spaceSeedData.ts';
 import {
@@ -283,13 +283,13 @@ export function seedDatabase() {
 
   // --- Users ---
   const insertUser = db.prepare(`
-    INSERT INTO users (id, account_id, name, email, phone, password_hash, role, user_type, status, avatar, department_id, month_badge)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO users (id, account_id, name, email, phone, password_hash, role, user_type, status, avatar, department_id, month_badge, channel_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   for (const u of initialUsers) {
     const rolesJson = JSON.stringify(u.roles ?? []);
     insertUser.run(u.id, u.accountId, u.name, u.email, u.phone ?? null, defaultPassword,
-      rolesJson, u.userType, u.status, u.avatar ?? null, u.departmentId ?? null, u.monthBadge ?? null);
+      rolesJson, u.userType, u.status, u.avatar ?? null, u.departmentId ?? null, u.monthBadge ?? null, u.channelId ?? null);
   }
 
   // --- Departments ---
@@ -310,14 +310,38 @@ export function seedDatabase() {
 
   // --- Products ---
   const insertProduct = db.prepare(`
-    INSERT INTO products (id, name, category, sub_category, description, status, tags, skus, composition, install_pkgs, license_tpl)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO products (id, name, category, sub_category, description, status, tags, skus, composition, install_pkgs, license_tpl,
+      product_type, online_delivery, product_class, product_classification, product_series, product_line,
+      product_category, product_class_finance, product_line_finance, product_series_finance,
+      business_delivery_name, sales_org_name, sales_scope)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   for (const p of initialProducts) {
-    insertProduct.run(p.id, p.name, p.category, p.subCategory ?? null, p.description ?? null,
+    const scopeEntries = productSalesOrgMap[p.id] ?? [];
+    const salesScope = scopeEntries.map(e => ({
+      salesOrg: e.salesOrg,
+      businessShipProductName: e.businessShipProductName || p.name,
+      materialType: e.materialType,
+      authMaterialName: e.authMaterialName,
+      mediaMaterialName: e.mediaMaterialName,
+      supplyOrg: e.supplyOrg,
+      status: 'listed',
+      billingStatus: 'unmaintained',
+    }));
+    const salesOrgName = (p as any).salesOrgName ?? (scopeEntries.length > 0 ? scopeEntries[0].salesOrg : null);
+    insertProduct.run(
+      p.id, p.name, p.category, p.subCategory ?? null, p.description ?? null,
       p.status, JSON.stringify(p.tags ?? []), JSON.stringify(p.skus),
       JSON.stringify(p.composition ?? []), JSON.stringify(p.installPackages ?? []),
-      p.licenseTemplate ? JSON.stringify(p.licenseTemplate) : null);
+      p.licenseTemplate ? JSON.stringify(p.licenseTemplate) : null,
+      (p as any).productType ?? null, (p as any).onlineDelivery ?? null,
+      (p as any).productClass ?? null, (p as any).productClassification ?? null,
+      (p as any).productSeries ?? null, (p as any).productLine ?? null,
+      (p as any).productCategory ?? null, (p as any).productClassFinance ?? null,
+      (p as any).productLineFinance ?? null, (p as any).productSeriesFinance ?? null,
+      (p as any).businessDeliveryName ?? null, salesOrgName,
+      JSON.stringify(salesScope),
+    );
   }
 
   // --- Channels ---

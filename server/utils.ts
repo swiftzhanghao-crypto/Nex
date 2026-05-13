@@ -34,7 +34,7 @@ export function getUserName(db: Database.Database, userId: string): string {
 export function safePagination(
     page: string | undefined,
     size: string | undefined,
-    maxSize = 200,
+    maxSize = 5000,
 ): { limit: number; offset: number; pageNum: number } {
     const pageNum = Math.max(1, parseInt(page || '1', 10) || 1);
     const limit = Math.min(Math.max(1, parseInt(size || '50', 10) || 50), maxSize);

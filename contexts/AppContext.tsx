@@ -5,7 +5,7 @@ import type {
     AuthTypeData, Customer, Opportunity, Order,
     User, Department, RoleDefinition, Channel, Enterprise,
     Contract, Remittance, Invoice, Performance, Authorization, DeliveryInfo,
-    OrderDraft, Subscription, WorkReport, Space,
+    OrderDraft, Subscription, WorkReport, Space, SalesOrg,
 } from '../types';
 import { initialSpaces } from '../data/spaceSeedData';
 import {
@@ -18,7 +18,7 @@ import {
     initialProducts, initialMerchandises, initialAtomicCapabilities,
     initialAuthTypes,
     initialDepartments, initialRoles, initialUsers, initialChannels,
-    initialStandaloneEnterprises,
+    initialStandaloneEnterprises, initialSalesOrgs, productSalesOrgMap,
 } from '../data/staticData';
 
 import {
@@ -107,6 +107,9 @@ interface AppContextType {
     channels: Channel[];
     setChannels: React.Dispatch<React.SetStateAction<Channel[]>>;
     standaloneEnterprises: Enterprise[];
+
+    salesOrganizations: SalesOrg[];
+    setSalesOrganizations: React.Dispatch<React.SetStateAction<SalesOrg[]>>;
 
     contracts: Contract[];
     remittances: Remittance[];
@@ -203,8 +206,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // --- Product domain ---
     const [products, setProducts] = useState(() => {
-        const salesOrgs = ['珠海金山办公有限公司', '北京金山办公有限公司', '武汉金山办公有限公司'];
-        return initialProducts.map((p, i) => p.salesOrgName ? p : { ...p, salesOrgName: salesOrgs[i % salesOrgs.length] });
+        return initialProducts.map(p => {
+            const csvEntries = productSalesOrgMap[p.id];
+            if (csvEntries && csvEntries.length > 0) {
+                const salesScope = csvEntries.map(e => ({
+                    salesOrg: e.salesOrg,
+                    businessShipProductName: e.businessShipProductName || p.name,
+                    materialType: e.materialType,
+                    authMaterialName: e.authMaterialName,
+                    mediaMaterialName: e.mediaMaterialName,
+                    supplyOrg: e.supplyOrg,
+                    status: 'listed' as const,
+                    billingStatus: 'unmaintained' as const,
+                }));
+                return { ...p, salesScope, salesOrgName: csvEntries[0].salesOrg };
+            }
+            return p;
+        });
     });
     const [merchandises, setMerchandises] = useState(initialMerchandises);
     const [atomicCapabilities, setAtomicCapabilities] = useState(initialAtomicCapabilities);
@@ -227,6 +245,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // --- Channel domain ---
     const [channels, setChannels] = useState(initialChannels);
     const [standaloneEnterprises] = useState(initialStandaloneEnterprises);
+
+    // --- Sales organizations ---
+    const [salesOrganizations, setSalesOrganizations] = useState<SalesOrg[]>(initialSalesOrgs);
 
     // --- Space domain ---
     // Mock 模式下优先从 localStorage 恢复（含用户新建/修改过的应用），无则用 seed
@@ -461,7 +482,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 userApi.list({ size: 500 }),
                 userApi.departments(),
                 userApi.roles(),
-                productApi.list({ size: 500 }),
+                productApi.list({ size: 2000 }),
                 productApi.channels(),
                 productApi.opportunities(),
                 spaceApi.list().catch(() => [] as any[]),
@@ -570,6 +591,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         channels, setChannels,
         standaloneEnterprises,
+
+        salesOrganizations, setSalesOrganizations,
 
         contracts,
         remittances,

@@ -58,6 +58,20 @@ export function useProductCascade(products: Product[]) {
     return parent ? `${parent.label} / ${tempCategory}` : tempCategory;
   }, [tempCategory, categoryTree]);
 
+  const availableSalesOrgs = useMemo(() => {
+    if (!tempCategory) return [];
+    const matched = products.filter(p => p.status === 'OnShelf' && p.subCategory === tempCategory);
+    const orgSet = new Set<string>();
+    matched.forEach(p => {
+      if (p.salesScope && p.salesScope.length > 0) {
+        p.salesScope.forEach(r => { if (r.salesOrg) orgSet.add(r.salesOrg); });
+      } else if (p.salesOrgName) {
+        orgSet.add(p.salesOrgName);
+      }
+    });
+    return Array.from(orgSet);
+  }, [tempCategory, products]);
+
   const selectedProduct = products.find(p => p.id === tempProductId);
   const selectedSku = selectedProduct?.skus.find(s => s.id === tempSkuId);
   const selectedOption = selectedSku?.pricingOptions?.find(o => o.id === tempPricingOptionId);
@@ -207,6 +221,7 @@ export function useProductCascade(products: Product[]) {
     setTempEcoProductName,
     categoryTree,
     selectedCategoryLabel,
+    availableSalesOrgs,
     selectedProduct,
     selectedSku,
     selectedOption,

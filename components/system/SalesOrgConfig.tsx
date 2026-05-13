@@ -3,66 +3,13 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { Search, X, Building2, AlertCircle } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import Pagination from '../common/Pagination';
-
-interface SalesOrg {
-  id: string;
-  no: number;
-  name: string;
-  shortName: string;
-  financeCode: string;
-  orgType: '金山' | '数科';
-  status: '正常' | '待补充';
-}
-
-const initialData: SalesOrg[] = [
-  { id: 'so-43', no: 43, name: '苏州金山办公软件有限公司', shortName: '苏州金山', financeCode: '8795', orgType: '金山', status: '正常' },
-  { id: 'so-42', no: 42, name: '贵州金山办公软件有限公司', shortName: '贵州金山', financeCode: '8792', orgType: '金山', status: '正常' },
-  { id: 'so-37', no: 37, name: '陕西数科网维技术有限公司', shortName: '陕西数科', financeCode: '1014', orgType: '数科', status: '正常' },
-  { id: 'so-38', no: 38, name: '山西数科网维技术有限公司', shortName: '', financeCode: '', orgType: '数科', status: '待补充' },
-  { id: 'so-39', no: 39, name: '贵州数科网维技术有限公司', shortName: '贵州数科', financeCode: '8812', orgType: '数科', status: '正常' },
-  { id: 'so-40', no: 40, name: '泸州金山办公数科网维技术有限公司', shortName: '泸州数科', financeCode: '8806', orgType: '数科', status: '正常' },
-  { id: 'so-41', no: 41, name: '山东数科信创技术有限责任公司', shortName: '山东数科信创', financeCode: '2000', orgType: '数科', status: '正常' },
-  { id: 'so-23', no: 23, name: '北京数科网维技术有限责任公司', shortName: '北京数科', financeCode: '8800', orgType: '数科', status: '正常' },
-  { id: 'so-24', no: 24, name: '数科网维（上海）信息技术有限公司', shortName: '', financeCode: '', orgType: '数科', status: '待补充' },
-  { id: 'so-25', no: 25, name: '广州数科网维技术有限公司', shortName: '广州数科', financeCode: '8805', orgType: '数科', status: '正常' },
-  { id: 'so-26', no: 26, name: '深圳数科信创技术有限责任公司', shortName: '深圳数科', financeCode: '1003', orgType: '数科', status: '正常' },
-  { id: 'so-27', no: 27, name: '天津数科网维技术有限公司', shortName: '天津数科', financeCode: '1004', orgType: '数科', status: '正常' },
-  { id: 'so-28', no: 28, name: '湖南数科信创信息技术服务有限公司', shortName: '', financeCode: '', orgType: '数科', status: '待补充' },
-  { id: 'so-29', no: 29, name: '湖北数科网维技术有限公司', shortName: '湖北数科', financeCode: '8804', orgType: '数科', status: '正常' },
-  { id: 'so-30', no: 30, name: '河南数科网维科技有限公司', shortName: '', financeCode: '', orgType: '数科', status: '待补充' },
-  { id: 'so-31', no: 31, name: '江西数科网维信息技术服务有限公司', shortName: '江西数科', financeCode: '8803', orgType: '数科', status: '正常' },
-  { id: 'so-32', no: 32, name: '南昌数科网维技术有限公司', shortName: '南昌数科', financeCode: '8813', orgType: '数科', status: '正常' },
-  { id: 'so-33', no: 33, name: '珠海金山办公软件有限公司', shortName: '珠海金山', financeCode: '8001', orgType: '金山', status: '正常' },
-  { id: 'so-34', no: 34, name: '北京金山办公软件股份有限公司', shortName: '北京金山', financeCode: '8002', orgType: '金山', status: '正常' },
-  { id: 'so-35', no: 35, name: '成都金山办公软件有限公司', shortName: '成都金山', financeCode: '8790', orgType: '金山', status: '正常' },
-  { id: 'so-1', no: 1, name: '武汉金山办公软件有限公司', shortName: '武汉金山', financeCode: '8003', orgType: '金山', status: '正常' },
-  { id: 'so-2', no: 2, name: '长沙金山办公软件有限公司', shortName: '长沙金山', financeCode: '8004', orgType: '金山', status: '正常' },
-  { id: 'so-3', no: 3, name: '福建数科网维技术有限公司', shortName: '福建数科', financeCode: '8810', orgType: '数科', status: '正常' },
-  { id: 'so-4', no: 4, name: '安徽数科网维技术有限公司', shortName: '安徽数科', financeCode: '8811', orgType: '数科', status: '正常' },
-  { id: 'so-5', no: 5, name: '四川数科网维技术有限公司', shortName: '四川数科', financeCode: '8815', orgType: '数科', status: '正常' },
-  { id: 'so-6', no: 6, name: '重庆数科网维技术有限公司', shortName: '重庆数科', financeCode: '8816', orgType: '数科', status: '正常' },
-  { id: 'so-7', no: 7, name: '云南数科网维技术有限公司', shortName: '', financeCode: '', orgType: '数科', status: '待补充' },
-  { id: 'so-8', no: 8, name: '辽宁数科网维技术有限公司', shortName: '辽宁数科', financeCode: '8818', orgType: '数科', status: '正常' },
-  { id: 'so-9', no: 9, name: '吉林数科网维技术有限公司', shortName: '吉林数科', financeCode: '8819', orgType: '数科', status: '正常' },
-  { id: 'so-10', no: 10, name: '黑龙江数科网维技术有限公司', shortName: '黑龙江数科', financeCode: '8820', orgType: '数科', status: '正常' },
-  { id: 'so-11', no: 11, name: '甘肃数科网维技术有限公司', shortName: '', financeCode: '', orgType: '数科', status: '待补充' },
-  { id: 'so-12', no: 12, name: '海南数科网维技术有限公司', shortName: '海南数科', financeCode: '8822', orgType: '数科', status: '正常' },
-  { id: 'so-13', no: 13, name: '内蒙古数科网维技术有限公司', shortName: '内蒙古数科', financeCode: '8823', orgType: '数科', status: '正常' },
-  { id: 'so-14', no: 14, name: '浙江数科网维技术有限公司', shortName: '浙江数科', financeCode: '8824', orgType: '数科', status: '正常' },
-  { id: 'so-15', no: 15, name: '上海金山办公软件有限公司', shortName: '上海金山', financeCode: '8005', orgType: '金山', status: '正常' },
-  { id: 'so-16', no: 16, name: '西安金山办公软件有限公司', shortName: '西安金山', financeCode: '8006', orgType: '金山', status: '正常' },
-  { id: 'so-17', no: 17, name: '新疆数科网维技术有限公司', shortName: '', financeCode: '', orgType: '数科', status: '待补充' },
-  { id: 'so-18', no: 18, name: '广西数科网维技术有限公司', shortName: '广西数科', financeCode: '8826', orgType: '数科', status: '正常' },
-  { id: 'so-19', no: 19, name: '宁夏数科网维技术有限公司', shortName: '宁夏数科', financeCode: '8827', orgType: '数科', status: '正常' },
-  { id: 'so-20', no: 20, name: '青海数科网维技术有限公司', shortName: '青海数科', financeCode: '8828', orgType: '数科', status: '正常' },
-  { id: 'so-21', no: 21, name: '西藏数科网维技术有限公司', shortName: '', financeCode: '', orgType: '数科', status: '待补充' },
-  { id: 'so-22', no: 22, name: '河北数科网维技术有限公司', shortName: '河北数科', financeCode: '8830', orgType: '数科', status: '正常' },
-];
+import { useAppContext } from '../../contexts/AppContext';
+import type { SalesOrg } from '../../types';
 
 const ORG_TYPES: SalesOrg['orgType'][] = ['金山', '数科'];
 
 const SalesOrgConfig: React.FC = () => {
-  const [orgs, setOrgs] = useState<SalesOrg[]>(initialData);
+  const { salesOrganizations: orgs, setSalesOrganizations: setOrgs } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<string>('');

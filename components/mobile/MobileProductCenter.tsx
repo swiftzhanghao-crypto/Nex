@@ -8,13 +8,6 @@ interface CategoryGroup {
   children: string[];
 }
 
-const categoryTree: CategoryGroup[] = [
-  { group: '云服务产品', children: ['WPS365公有云', 'WPS365私有云', '混合云方案'] },
-  { group: '端侧软件',   children: ['Win端', 'Mac端', '移动端', '信创端'] },
-  { group: '单品授权',   children: ['私有云单品', 'Web Office', '文档中台', '协作版'] },
-  { group: '组件示例',   children: ['其他软件'] },
-];
-
 interface MobileProductCenterProps {
   onViewDetail?: (productId: string) => void;
 }
@@ -32,17 +25,21 @@ const MobileProductCenter: React.FC<MobileProductCenterProps> = ({ onViewDetail 
   const q = searchTerm.toLowerCase();
   const isSearching = searchTerm.trim().length > 0;
 
+  const productLineOptions = useMemo(() =>
+    [...new Set(products.map(p => p.productLine || p.category || '未分类'))].sort((a, b) => a.localeCompare(b, 'zh-Hans')),
+    [products]);
+
   const displayProducts = useMemo(() => {
     return products.filter(p =>
       isOnShelf(p) &&
       (isSearching
         ? p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)
-        : !selectedCategory || p.category === selectedCategory)
+        : !selectedCategory || (p.productLine || p.category) === selectedCategory)
     );
   }, [products, activeTab, searchTerm, selectedCategory]);
 
-  const getCategoryCount = (leaf: string) =>
-    products.filter(p => isOnShelf(p) && p.category === leaf).length;
+  const getCategoryCount = (line: string) =>
+    products.filter(p => isOnShelf(p) && (p.productLine || p.category) === line).length;
 
   const getTagColor = (tag: string) => {
     const t = tag.toUpperCase();
@@ -123,25 +120,23 @@ const MobileProductCenter: React.FC<MobileProductCenterProps> = ({ onViewDetail 
                 >
                   全部 <span className="ml-0.5 text-[11px] opacity-70">{products.filter(p => isOnShelf(p)).length}</span>
                 </button>
-                {categoryTree.map(({ group, children }) =>
-                  children.map(leaf => {
-                    const count = getCategoryCount(leaf);
+                {productLineOptions.map(line => {
+                    const count = getCategoryCount(line);
                     if (count === 0) return null;
                     return (
                       <button
-                        key={leaf}
-                        onClick={() => setSelectedCategory(leaf)}
+                        key={line}
+                        onClick={() => setSelectedCategory(line)}
                         className={`shrink-0 px-3 py-1.5 rounded-full text-[13px] font-medium transition-all ${
-                          selectedCategory === leaf
+                          selectedCategory === line
                             ? 'bg-[#007AFF] text-white shadow-sm'
                             : 'bg-white dark:bg-[#2C2C2E] text-gray-600 dark:text-gray-400'
                         }`}
                       >
-                        {leaf} <span className="ml-0.5 text-[11px] opacity-70">{count}</span>
+                        {line} <span className="ml-0.5 text-[11px] opacity-70">{count}</span>
                       </button>
                     );
-                  })
-                )}
+                })}
               </div>
             </div>
           </div>

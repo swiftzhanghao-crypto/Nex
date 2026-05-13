@@ -22,6 +22,8 @@ export interface WizardFormState {
   selectedItContactId: string;
   isAgentOrder: boolean;
   agentCode: string;
+  sellerProductCategory: string;
+  sellerName: string;
   // Step 3
   newOrderItems: OrderItem[];
   // Step 4
@@ -79,6 +81,14 @@ export function validateStep2(state: WizardFormState): ValidationError[] {
     if (buyerType === 'Channel' && !state.selectedChannelId) {
       errors.push({ field: 'selectedChannelId', message: '请选择渠道商', step: 2 });
     }
+  }
+
+  if (!state.linkedOpportunityId && !state.sellerProductCategory) {
+    errors.push({ field: 'sellerProductCategory', message: '请选择产品类型', step: 2 });
+  }
+
+  if (!state.sellerName) {
+    errors.push({ field: 'sellerName', message: '请选择卖方名称', step: 2 });
   }
 
   if (state.purchasingContacts.length > 0 && !state.selectedPurchasingContactId) {

@@ -10,13 +10,6 @@ interface CategoryGroup {
   children: string[];
 }
 
-const categoryTree: CategoryGroup[] = [
-  { group: '云服务产品', children: ['WPS365公有云', 'WPS365私有云', '混合云方案'] },
-  { group: '端侧软件',   children: ['Win端', 'Mac端', '移动端', '信创端'] },
-  { group: '单品授权',   children: ['私有云单品', 'Web Office', '文档中台', '协作版'] },
-  { group: '组件示例',   children: ['其他软件'] },
-];
-
 const ProductCenter: React.FC = () => {
   const { filteredProducts: products, currentUser, roles } = useAppContext();
   const navigate = useNavigate();
@@ -26,12 +19,32 @@ const ProductCenter: React.FC = () => {
   const [mainView, setMainView]       = useState<'catalog' | 'packages'>('catalog');
   const [searchTerm, setSearchTerm]   = useState('');
   const [activeTab, setActiveTab]     = useState<'ON_SHELF' | 'OFF_SHELF' | 'ALL'>('ON_SHELF');
-  const [selectedLeaf, setSelectedLeaf] = useState<string>(
-    categoryTree[0]?.children[0] ?? ''
-  );
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-    new Set([categoryTree[0]?.group ?? ''])
-  );
+
+  const categoryTree: CategoryGroup[] = React.useMemo(() => {
+    const lineMap = new Map<string, Set<string>>();
+    for (const p of products) {
+      const line = p.productLine || p.category || '未分类';
+      const type = p.productType || '未分类';
+      if (!lineMap.has(line)) lineMap.set(line, new Set());
+      lineMap.get(line)!.add(type);
+    }
+    return Array.from(lineMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b, 'zh-Hans'))
+      .map(([group, types]) => ({ group, children: Array.from(types).sort((a, b) => a.localeCompare(b, 'zh-Hans')) }));
+  }, [products]);
+
+  const [selectedLeaf, setSelectedLeaf] = useState<string>('');
+  const [selectedGroup, setSelectedGroup] = useState<string>('');
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  React.useEffect(() => {
+    if (categoryTree.length > 0 && !selectedGroup) {
+      const firstGroup = categoryTree[0];
+      setSelectedGroup(firstGroup.group);
+      setSelectedLeaf(firstGroup.children[0] ?? '');
+      setExpandedGroups(new Set([firstGroup.group]));
+    }
+  }, [categoryTree]);
 
   // 组件气泡
   const [compPopoverId, setCompPopoverId] = useState<string | null>(null);
@@ -66,31 +79,31 @@ const ProductCenter: React.FC = () => {
   const isSearching = searchTerm.trim().length > 0;
   const q = searchTerm.toLowerCase();
 
-  // 搜索状态下按关键词过滤，否则只按分类
+  const matchProductLine = (p: Product, group: string) => (p.productLine || p.category || '未分类') === group;
+  const matchProductType = (p: Product, leaf: string) => (p.productType || '未分类') === leaf;
+
   const displayProducts = products.filter(p =>
     isOnShelf(p) &&
     (isSearching
       ? p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)
-      : p.category === selectedLeaf)
+      : matchProductLine(p, selectedGroup) && matchProductType(p, selectedLeaf))
   );
 
-  // 计数始终基于搜索词（搜索时只计命中产品，非搜索时全量）
-  const getLeafCount = (leaf: string) =>
+  const getLeafCount = (group: string, leaf: string) =>
     products.filter(p =>
       isOnShelf(p) &&
-      p.category === leaf &&
+      matchProductLine(p, group) && matchProductType(p, leaf) &&
       (!isSearching || p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q))
     ).length;
 
-  const getGroupCount = (children: string[]) =>
-    children.reduce((sum, leaf) => sum + getLeafCount(leaf), 0);
+  const getGroupCount = (group: string, children: string[]) =>
+    children.reduce((sum, leaf) => sum + getLeafCount(group, leaf), 0);
 
-  // 搜索时过滤掉无结果的分类层级
   const visibleTree = isSearching
     ? categoryTree
         .map(({ group, children }) => ({
           group,
-          children: children.filter(leaf => getLeafCount(leaf) > 0),
+          children: children.filter(leaf => getLeafCount(group, leaf) > 0),
         }))
         .filter(({ children }) => children.length > 0)
     : categoryTree;
@@ -193,43 +206,42 @@ const ProductCenter: React.FC = () => {
             <div className="text-sm font-bold text-gray-300 dark:text-gray-600 px-1 mb-3">产品分类</div>
           </div>
           {visibleTree.map(({ group, children }) => {
-            // 搜索时强制展开所有可见分组
             const isExpanded = isSearching || expandedGroups.has(group);
             return (
               <div key={group}>
-                {/* 一级分类 */}
+                {/* 一级：产品条线 */}
                 <button
                   onClick={() => !isSearching && toggleGroup(group)}
-                  className="w-full flex items-center text-left pl-3 pr-3 py-2.5 text-base font-extrabold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                  className="w-full flex items-center text-left pl-3 pr-3 py-2.5 text-sm font-extrabold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                 >
                   {isExpanded
                     ? <ChevronDown className="w-4 h-4 shrink-0 mr-1.5" />
                     : <ChevronRight className="w-4 h-4 shrink-0 mr-1.5" />}
                   <span className="flex-1 truncate text-left">{group}</span>
                   <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 shrink-0 ml-1">
-                    共计<span className="font-mono ml-0.5">{getGroupCount(children)}</span>
+                    <span className="font-mono">{getGroupCount(group, children)}</span>
                   </span>
                 </button>
 
-                {/* 二级分类 */}
+                {/* 二级：产品类型 */}
                 {isExpanded && (
                   <div className="mb-1">
                     {children.map(leaf => {
-                      const count = getLeafCount(leaf);
-                      const isSelected = !isSearching && selectedLeaf === leaf;
+                      const count = getLeafCount(group, leaf);
+                      const isSelected = !isSearching && selectedGroup === group && selectedLeaf === leaf;
                       return (
                         <button
                           key={leaf}
-                          onClick={() => { setSelectedLeaf(leaf); setSearchTerm(''); }}
-                          className={`w-full flex items-center text-left pr-3 py-2 text-sm font-semibold transition-colors ${
+                          onClick={() => { setSelectedGroup(group); setSelectedLeaf(leaf); setSearchTerm(''); }}
+                          className={`w-full flex items-center text-left pr-3 py-1.5 text-xs transition-colors ${
                             isSelected
-                              ? 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-[#0A84FF]'
+                              ? 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-[#0A84FF] font-semibold'
                               : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5'
                           }`}
-                          style={{ paddingLeft: 'calc(0.75rem + 1rem + 0.375rem + 2em)' }}
+                          style={{ paddingLeft: 'calc(0.75rem + 1rem + 0.375rem + 1em)' }}
                         >
                           <span className="flex-1 truncate text-left">{leaf}</span>
-                          <span className={`text-[11px] px-2 py-0.5 rounded-full shrink-0 ml-1 font-mono font-bold ${
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded-full shrink-0 ml-1 font-mono font-bold ${
                             isSelected
                               ? 'bg-[#0071E3]/10 text-[#0071E3] dark:bg-[#0A84FF]/20 dark:text-[#0A84FF]'
                               : 'bg-gray-100 dark:bg-white/5 text-gray-400'

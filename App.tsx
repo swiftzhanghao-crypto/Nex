@@ -2,6 +2,7 @@
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useAppContext } from './contexts/AppContext';
+import { ToastProvider } from './contexts/ToastContext';
 import Layout from './components/layout/Layout';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import LoginModal from './components/auth/LoginModal';
@@ -150,12 +151,14 @@ function AppRoutes() {
 function App() {
   return (
     <AppProvider>
-      <Router>
-        <ErrorBoundary fallbackTitle="页面加载异常">
-          <AppRoutes />
-        </ErrorBoundary>
-        <LoginModal />
-      </Router>
+      <ToastProvider>
+        <Router>
+          <ErrorBoundary fallbackTitle="页面加载异常">
+            <AppRoutes />
+          </ErrorBoundary>
+          <LoginModal />
+        </Router>
+      </ToastProvider>
     </AppProvider>
   );
 }

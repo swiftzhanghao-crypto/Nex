@@ -577,6 +577,7 @@ export interface User {
     status: 'Active' | 'Inactive';
     avatar?: string;
     departmentId?: string;
+    channelId?: string;
     monthBadge?: string;
 }
 
@@ -1022,13 +1023,15 @@ export interface OrderDraft {
     terminalChannel?: string;
     salesRepId: string;
     businessManagerId: string;
+    // Step 2 → seller
+    sellerProductCategory?: string;
+    sellerName?: string;
+    sellerContact?: string;
     // Step 3
     newOrderItems: OrderItem[];
     tempCategory: string;
     enableConversion?: boolean;
     selectedConversionIds?: string[];
-    sellerName?: string;
-    sellerContact?: string;
     // Step 4
     invoiceForm: InvoiceInfo;
     paymentMethod?: PaymentMethod;
@@ -1131,4 +1134,14 @@ export interface WorkReport {
     sections: { heading: string; bullets: string[] }[];
     source: 'ai' | 'manual';
     createdAt: number;
+}
+
+export interface SalesOrg {
+    id: string;
+    no: number;
+    name: string;
+    shortName: string;
+    financeCode: string;
+    orgType: '金山' | '数科';
+    status: '正常' | '待补充';
 }

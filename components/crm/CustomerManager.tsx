@@ -1,11 +1,12 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Customer } from '../../types';
-import { Search, Plus, X, Filter, RotateCcw, ChevronDown, Trash2, CheckCircle } from 'lucide-react';
+import { Search, Plus, X, Filter, RotateCcw, ChevronDown, Trash2, CheckCircle, Cloud, Loader2 } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 import Pagination from '../common/Pagination';
+import { crmXsyApi, buildCrmXsyOAuthLoginUrl, getToken } from '../../services/api';
 
 // ── 筛选字段定义 ─────────────────────────────────────────────────
 const customerFilterFields: { id: string; label: string; mode: '单选' | '多选' }[] = [
@@ -24,9 +25,57 @@ interface CFilterCondition {
 }
 
 const CustomerManager: React.FC = () => {
-  const { customers, setCustomers, filteredCustomers: rowFilteredCustomers, users } = useAppContext();
+  const { customers, filteredCustomers: rowFilteredCustomers, users, apiMode, refreshCustomers } = useAppContext();
   useEnsureData(['customers']);
   const navigate = useNavigate();
+
+  const [crmStatus, setCrmStatus] = useState<{ enabled: boolean; bound: boolean } | null>(null);
+  const [crmSyncing, setCrmSyncing] = useState(false);
+  const [crmBanner, setCrmBanner] = useState<string | null>(null);
+
+  const loadCrmStatus = useCallback(() => {
+    if (!apiMode) {
+      setCrmStatus(null);
+      return;
+    }
+    crmXsyApi
+      .status()
+      .then(setCrmStatus)
+      .catch(() => setCrmStatus({ enabled: false, bound: false }));
+  }, [apiMode]);
+
+  useEffect(() => {
+    loadCrmStatus();
+    if (!apiMode) return;
+    const onVis = () => {
+      if (document.visibilityState === 'visible') loadCrmStatus();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [apiMode, loadCrmStatus]);
+
+  const handleCrmAuthorize = () => {
+    const url = buildCrmXsyOAuthLoginUrl('/customers');
+    if (!url) {
+      setCrmBanner('请先登录业务平台后再连接销售易');
+      return;
+    }
+    window.location.href = url;
+  };
+
+  const handleCrmSync = async () => {
+    setCrmSyncing(true);
+    setCrmBanner(null);
+    try {
+      const r = await crmXsyApi.syncCustomers();
+      await refreshCustomers();
+      setCrmBanner(`已从销售易同步 ${r.synced} 条客户（共拉取 ${r.total} 条）`);
+    } catch (e: any) {
+      setCrmBanner(e?.message || '同步失败');
+    } finally {
+      setCrmSyncing(false);
+    }
+  };
   const [searchTerm, setSearchTerm] = useState('');
   const [searchField, setSearchField] = useState<'crmId' | 'companyName' | 'enterpriseId'>('crmId');
   const [isSearchFieldOpen, setIsSearchFieldOpen] = useState(false);
@@ -216,8 +265,45 @@ const CustomerManager: React.FC = () => {
   return (
     <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto animate-page-enter h-full flex flex-col gap-4 min-w-0">
       <div className="flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0">
-        <div className="flex items-center gap-4 w-full lg:w-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:w-auto min-w-0">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">客户信息</h1>
+            {apiMode && (
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                {crmStatus?.enabled && crmStatus.bound ? (
+                  <>
+                    <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/25 px-2.5 py-1 rounded-lg border border-emerald-200/80 dark:border-emerald-800/50 font-medium">
+                      <CheckCircle className="w-3.5 h-3.5 shrink-0" /> 已连接销售易
+                    </span>
+                    <button
+                      type="button"
+                      disabled={crmSyncing}
+                      onClick={handleCrmSync}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-white bg-[#0071E3] hover:bg-[#0062CC] disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm"
+                    >
+                      {crmSyncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Cloud className="w-3.5 h-3.5" />}
+                      从销售易同步客户
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!crmStatus?.enabled) {
+                        setCrmBanner('销售易 CRM 集成尚未启用，请联系管理员配置 CRM_XSY_CLIENT_ID / CRM_XSY_CLIENT_SECRET / CRM_XSY_REDIRECT_URI 环境变量');
+                        return;
+                      }
+                      handleCrmAuthorize();
+                    }}
+                    disabled={!getToken()}
+                    title={!getToken() ? '请先登录' : !crmStatus?.enabled ? '管理员尚未配置销售易集成' : '跳转销售易完成授权'}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
+                  >
+                    <Cloud className="w-3.5 h-3.5" />
+                    连接销售易 CRM
+                  </button>
+                )}
+              </div>
+            )}
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
             <div className="flex items-stretch h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] w-full sm:w-[360px] focus-within:border-blue-400 dark:focus-within:border-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)] transition shadow-apple">
@@ -281,6 +367,18 @@ const CustomerManager: React.FC = () => {
             </button>
         </div>
       </div>
+
+      {crmBanner && (
+        <div
+          className={`text-sm px-4 py-2 rounded-xl border ${
+            crmBanner.includes('失败') || crmBanner.includes('请先')
+              ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/50'
+              : 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-900/25 dark:text-blue-200 dark:border-blue-800/40'
+          }`}
+        >
+          {crmBanner}
+        </div>
+      )}
 
       <div className="unified-card overflow-hidden flex-1 flex flex-col min-h-0">
         <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 custom-scrollbar">

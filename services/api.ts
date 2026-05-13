@@ -30,9 +30,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || `请求失败 (${res.status})`);
+    const msg = body.error || `请求失败 (${res.status})`;
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('api:error', { detail: msg }));
+    }
+    throw new Error(msg);
   }
-  // 204 / 空 body
   if (res.status === 204) return undefined as unknown as T;
   return res.json();
 }
@@ -166,6 +169,42 @@ export const productApi = {
   opportunities: () => request<any[]>('/products/meta/opportunities'),
 };
 
+// ---- Channels ----
+export const channelApi = {
+  users: (channelId: string) => request<User[]>(`/channels/${channelId}/users`),
+};
+
+// ---- 销售易 CRM（OAuth 由浏览器整页跳转 /api/crm/xsy/login，回调 #/crm-callback）----
+export interface CrmXsyStatus {
+  enabled: boolean;
+  bound: boolean;
+}
+
+export const crmXsyApi = {
+  status: () => request<CrmXsyStatus>('/crm/xsy/status'),
+  /** 将销售易 account 同步写入本地 customers 表（需已授权） */
+  syncCustomers: () =>
+    request<{ synced: number; total: number }>('/crm/xsy/sync-customers', { method: 'POST' }),
+};
+
+/**
+ * 构建销售易 OAuth 登录入口 URL（需已登录 JWT）。
+ * 与 `CRM_XSY_REDIRECT_URI` 对应的后端 `/api/crm/xsy/callback` 换票后，会 302 回前端 `/#/crm-callback`。
+ */
+export function buildCrmXsyOAuthLoginUrl(redirectPath = '/customers'): string {
+  const token = getToken();
+  if (!token) return '';
+  const apiBase = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+  const path = '/crm/xsy/login';
+  const safeRedirect = redirectPath.startsWith('/') && !redirectPath.startsWith('//') ? redirectPath : '/customers';
+  const qs = new URLSearchParams({ token, redirect: safeRedirect }).toString();
+  if (typeof window === 'undefined') return '';
+  if (apiBase.startsWith('http')) {
+    return `${apiBase}${path}?${qs}`;
+  }
+  return `${window.location.origin}${apiBase}${path}?${qs}`;
+}
+
 // ---- Opportunities ----
 export interface OpportunityListParams extends PaginationParams {
   customerId?: string;
@@ -191,21 +230,23 @@ export interface AuditLogListParams extends PaginationParams {
   action?: string;
 }
 
+export interface FinanceListParams extends PaginationParams {
+  [key: string]: string | number | boolean | null | undefined;
+}
+
+function financeList<T = any>(resource: string) {
+  return (params?: FinanceListParams) =>
+    request<PaginatedResult<T>>(`/finance/${resource}${buildQuery(params as Record<string, string | number | boolean | null | undefined>)}`);
+}
+
 export const financeApi = {
-  contracts: (params?: PaginationParams & Record<string, any>) =>
-    request<PaginatedResult<any>>(`/finance/contracts${buildQuery(params as any)}`),
-  remittances: (params?: PaginationParams & Record<string, any>) =>
-    request<PaginatedResult<any>>(`/finance/remittances${buildQuery(params as any)}`),
-  invoices: (params?: PaginationParams & Record<string, any>) =>
-    request<PaginatedResult<any>>(`/finance/invoices${buildQuery(params as any)}`),
-  performances: (params?: PaginationParams & Record<string, any>) =>
-    request<PaginatedResult<any>>(`/finance/performances${buildQuery(params as any)}`),
-  authorizations: (params?: PaginationParams & Record<string, any>) =>
-    request<PaginatedResult<any>>(`/finance/authorizations${buildQuery(params as any)}`),
-  deliveryInfos: (params?: PaginationParams & Record<string, any>) =>
-    request<PaginatedResult<any>>(`/finance/delivery-infos${buildQuery(params as any)}`),
-  auditLogs: (params?: AuditLogListParams) =>
-    request<PaginatedResult<any>>(`/finance/audit-logs${buildQuery(params as any)}`),
+  contracts: financeList('contracts'),
+  remittances: financeList('remittances'),
+  invoices: financeList('invoices'),
+  performances: financeList('performances'),
+  authorizations: financeList('authorizations'),
+  deliveryInfos: financeList('delivery-infos'),
+  auditLogs: financeList('audit-logs'),
 };
 
 // ---- Spaces ----
