@@ -102,7 +102,7 @@ const OrderDetailSkeleton: React.FC = () => (
             </div>
         </div>
         {/* Content skeleton */}
-        <div className="p-3 lg:p-4 max-w-[2400px] mx-auto w-full space-y-2.5">
+        <div className="page-container space-y-2.5">
             {/* Stepper skeleton */}
             <div className="unified-card dark:bg-[#1C1C1E] px-6 py-5 border-gray-100/50 dark:border-white/10">
                 <div className="flex justify-between items-center">
@@ -198,6 +198,7 @@ const OrderDetails: React.FC = () => {
   const [isCertPreviewMode, setIsCertPreviewMode] = useState(false);
   const [certView, setCertView] = useState<'paper' | 'structured'>('paper');
   const [selectedItemForDetails, setSelectedItemForDetails] = useState<OrderItem | null>(null);
+  const [serviceDetailModal, setServiceDetailModal] = useState<{ id: string; productType: string; productSpec: string; productName: string; serviceMethod: string; servicePeriod: string; quantity: number; unitPrice: number; subtotal: number } | null>(null);
   const [selectedItemIndex, setSelectedItemIndex] = useState<number>(0);
   const [itemDrawerInitialTab, setItemDrawerInitialTab] = useState<'INFO' | 'SUBUNIT'>('INFO');
   const [isItemDetailsClosing, setIsItemDetailsClosing] = useState(false);
@@ -408,7 +409,7 @@ const OrderDetails: React.FC = () => {
           accountNumber: '',
           transactionId: paymentForm.transactionId,
           payerName: selectedOrder.customerName,
-          paymentMethod: pmLabel,
+          paymentMethod: paymentForm.paymentMethod,
       };
       if (isSelfDeal) {
           const updatedItems = selectedOrder.items.map(item => ({
@@ -840,7 +841,7 @@ const OrderDetails: React.FC = () => {
       {/* Workflow Stepper — visually extends header */}
       {activeTab === 'MANAGEMENT' && hasPermission('order_workflow_view') && steps.length > 0 && (
           <div className="shrink-0 border-b border-gray-200/80 dark:border-white/10 px-4 md:px-6 overflow-x-auto" style={{background: 'linear-gradient(to bottom, #FDFBF7, #F5F2EC)'}}>
-              <div className="max-w-[2400px] mx-auto w-full py-5">
+              <div className="max-w-content mx-auto w-full py-5">
                   <div className="flex justify-between items-start relative min-w-[700px]">
                       <div className="absolute top-5 h-0.5 bg-gray-300 dark:bg-white/10 -z-0 rounded-full overflow-hidden" style={{ left: `calc(100% / ${steps.length} / 2)`, right: `calc(100% / ${steps.length} / 2)` }}>
                       </div>
@@ -878,7 +879,7 @@ const OrderDetails: React.FC = () => {
           </div>
       )}
 
-      <div className="p-3 lg:p-4 max-w-[2400px] mx-auto w-full space-y-2.5 animate-page-enter pb-20">
+      <div className="page-container space-y-2.5 animate-page-enter pb-20">
           {activeTab === 'MANAGEMENT' && (
             <>
           {/* Order Items Table + Summary Side-by-Side */}
@@ -1049,6 +1050,98 @@ const OrderDetails: React.FC = () => {
 
           </div>
           )}
+
+          {/* 服务明细 */}
+          {hasPermission('order_detail_product') && (() => {
+              const serviceItems: { id: string; productType: string; productSpec: string; productName: string; serviceMethod: string; servicePeriod: string; quantity: number; unitPrice: number; subtotal: number }[] = [];
+              selectedOrder.items.forEach((orderItem, idx) => {
+                  const product = products.find(p => p.id === orderItem.productId);
+                  if (!product) return;
+                  const linkedServices = (product as any).linkedServices || [];
+                  linkedServices.forEach((svc: any, sIdx: number) => {
+                      const svcProduct = products.find(p => p.id === svc.productId);
+                      if (!svcProduct) return;
+                      const svcSku = svc.skuId
+                          ? svcProduct.skus.find((s: any) => s.id === svc.skuId)
+                          : svcProduct.skus.find((s: any) => s.status === 'Active');
+                      const svcOption = svcSku?.pricingOptions?.[0];
+                      const unitPrice = svcOption?.price ?? svcSku?.price ?? 0;
+                      const period = svcOption
+                          ? (svcOption.license?.periodUnit === 'Forever' ? '永久' : `${svcOption.license?.periodNum || svcOption.license?.period || 1}${svcOption.license?.periodUnit === 'Year' ? '年' : '月'}`)
+                          : orderItem.licensePeriod || '1年';
+                      serviceItems.push({
+                          id: `svc_${idx}_${sIdx}`,
+                          productType: svcProduct.productType || (svcProduct as any).subCategory || '-',
+                          productSpec: svcSku?.name || '-',
+                          productName: svcProduct.name,
+                          serviceMethod: (svcProduct as any).activationMethods?.[0] || '在线服务',
+                          servicePeriod: period,
+                          quantity: orderItem.quantity,
+                          unitPrice,
+                          subtotal: unitPrice * orderItem.quantity,
+                      });
+                  });
+              });
+              if (serviceItems.length === 0) return null;
+              const isChannel = selectedOrder.buyerType === 'Channel';
+              return (
+                  <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">
+                      <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center gap-2">
+                          <Briefcase className="w-5 h-5 text-teal-500" />
+                          <h3 className="text-base font-semibold text-gray-900 dark:text-white flex-1">服务明细</h3>
+                          <span className="text-xs text-gray-400 dark:text-gray-500">共 {serviceItems.length} 项</span>
+                      </div>
+                      <div className="overflow-x-auto">
+                          <table className="w-full text-left text-sm min-w-[600px]">
+                              <thead className="unified-table-header">
+                                  <tr>
+                                      <th className="px-5 py-4 pl-6 text-center w-14">编号</th>
+                                      <th className="px-5 py-4">产品类型</th>
+                                      <th className="px-5 py-4">产品规格</th>
+                                      <th className="px-5 py-4">产品名称</th>
+                                      <th className="px-5 py-4">授权方式/服务方式</th>
+                                      <th className="px-5 py-4 text-center">授权或服务期限</th>
+                                      <th className="px-5 py-4 text-center">数量</th>
+                                      {!isChannel && <th className="px-5 py-4 text-right">服务成本预提单价</th>}
+                                      {!isChannel && <th className="px-5 py-4 text-right">服务成本预提金额小计(含税)</th>}
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                                  {serviceItems.map((svc, idx) => (
+                                      <tr key={svc.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                          <td className="px-5 py-4 pl-6 text-center">
+                                              <button
+                                                  type="button"
+                                                  onClick={() => setServiceDetailModal(svc)}
+                                                  className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800/40 text-xs font-bold font-mono text-teal-600 dark:text-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/40 hover:border-teal-200 dark:hover:border-teal-700 cursor-pointer transition"
+                                              >{idx + 1}</button>
+                                          </td>
+                                          <td className="px-5 py-4 text-gray-700 dark:text-gray-300">{svc.productType}</td>
+                                          <td className="px-5 py-4 text-gray-700 dark:text-gray-300">{svc.productSpec}</td>
+                                          <td className="px-5 py-4 font-medium text-gray-900 dark:text-white">{svc.productName}</td>
+                                          <td className="px-5 py-4 text-gray-700 dark:text-gray-300">{svc.serviceMethod}</td>
+                                          <td className="px-5 py-4 text-center">
+                                              <span className="inline-flex px-2.5 py-1 text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800 rounded-lg">{svc.servicePeriod}</span>
+                                          </td>
+                                          <td className="px-5 py-4 text-center font-medium dark:text-white">x {svc.quantity}</td>
+                                          {!isChannel && <td className="px-5 py-4 text-right font-mono text-gray-700 dark:text-gray-300">¥{svc.unitPrice.toLocaleString()}</td>}
+                                          {!isChannel && <td className="px-5 py-4 text-right font-bold font-mono text-gray-900 dark:text-white">¥{svc.subtotal.toLocaleString()}</td>}
+                                      </tr>
+                                  ))}
+                              </tbody>
+                              {!isChannel && (
+                                  <tfoot className="border-t border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/5">
+                                      <tr>
+                                          <td colSpan={7} className="px-5 py-3 text-right font-bold text-sm text-gray-700 dark:text-gray-300">合计</td>
+                                          <td colSpan={2} className="px-5 py-3 text-right font-bold font-mono text-red-600 dark:text-red-400">¥{serviceItems.reduce((sum, s) => sum + s.subtotal, 0).toLocaleString()}</td>
+                                      </tr>
+                                  </tfoot>
+                              )}
+                          </table>
+                      </div>
+                  </div>
+              );
+          })()}
 
           {/* Opportunity Information — table format consistent with order product details */}
           {hasPermission('order_detail_opportunity') && (() => {
@@ -2869,6 +2962,62 @@ const OrderDetails: React.FC = () => {
           onConfirm={() => { confirmDialog?.onConfirm(); setConfirmDialog(null); }}
           onCancel={() => setConfirmDialog(null)}
       />
+
+      {/* 服务明细详情弹窗 */}
+      {serviceDetailModal && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={() => setServiceDetailModal(null)}>
+              <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+                  <div className="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                      <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                          <Briefcase className="w-4 h-4 text-teal-500"/>
+                          服务明细详情
+                      </h3>
+                      <button onClick={() => setServiceDetailModal(null)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition">
+                          <X className="w-5 h-5 text-gray-400"/>
+                      </button>
+                  </div>
+                  <div className="px-6 py-5 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">产品类型</div>
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">{serviceDetailModal.productType}</div>
+                          </div>
+                          <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">产品规格</div>
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">{serviceDetailModal.productSpec}</div>
+                          </div>
+                          <div className="col-span-2">
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">产品名称</div>
+                              <div className="text-sm font-bold text-gray-900 dark:text-white">{serviceDetailModal.productName}</div>
+                          </div>
+                          <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">授权方式/服务方式</div>
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">{serviceDetailModal.serviceMethod}</div>
+                          </div>
+                          <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">授权或服务期限</div>
+                              <div className="text-sm font-medium text-teal-600 dark:text-teal-400">{serviceDetailModal.servicePeriod}</div>
+                          </div>
+                          <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">数量</div>
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">x {serviceDetailModal.quantity}</div>
+                          </div>
+                          <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">服务成本预提单价</div>
+                              <div className="text-sm font-bold font-mono text-gray-900 dark:text-white">¥{serviceDetailModal.unitPrice.toLocaleString()}</div>
+                          </div>
+                          <div className="col-span-2">
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">服务成本预提金额小计(含税)</div>
+                              <div className="text-lg font-bold font-mono text-red-600 dark:text-red-400">¥{serviceDetailModal.subtotal.toLocaleString()}</div>
+                          </div>
+                      </div>
+                  </div>
+                  <div className="px-6 py-3 border-t border-gray-100 dark:border-white/10 flex justify-end">
+                      <button onClick={() => setServiceDetailModal(null)} className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/15 transition">关闭</button>
+                  </div>
+              </div>
+          </div>
+      )}
     </>
   );
 };

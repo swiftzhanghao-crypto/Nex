@@ -82,7 +82,7 @@ const RemittanceManager: React.FC = () => {
   const totalAmount = filtered.reduce((s, r) => s + r.amount, 0);
 
   return (
-    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto h-full flex flex-col gap-2.5 animate-page-enter">
+    <div className="page-container h-full flex flex-col gap-2.5 animate-page-enter">
 
       {/* Page Title */}
       <div className="flex items-center justify-between shrink-0">

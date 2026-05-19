@@ -1,7 +1,7 @@
 import { getDb, initSchema } from './db.ts';
 import {
   initialProducts, initialMerchandises, initialAtomicCapabilities,
-  initialAuthTypes,
+  initialAuthTypes, initialSalesOrgs,
   initialDepartments, initialRoles, initialUsers, initialChannels,
   initialStandaloneEnterprises, productSalesOrgMap,
 } from '../data/staticData.ts';
@@ -261,6 +261,33 @@ function ensureSubscriptionChainOrders(db: any) {
   console.log(`[seed] Inserted ${subOrders.length} subscription chain order(s) for 续费管理.`);
 }
 
+function ensureAuthTypesSeed(db: any) {
+  const insertAuthType = db.prepare(`
+    INSERT OR IGNORE INTO auth_types
+      (id, name, period, ncc_biz, ncc_income, has_upgrade_warranty, purchase_unit, aux_purchase_unit, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  initialAuthTypes.forEach((a, idx) => {
+    insertAuthType.run(
+      a.id, a.name, a.period,
+      a.nccBiz ?? '', a.nccIncome ?? '',
+      a.hasUpgradeWarranty ? 1 : 0,
+      a.purchaseUnit ?? null, a.auxPurchaseUnit ?? null,
+      idx,
+    );
+  });
+}
+
+function ensureSalesOrgsSeed(db: any) {
+  const insertSalesOrg = db.prepare(`
+    INSERT OR IGNORE INTO sales_orgs (id, no, name, short_name, finance_code, org_type, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const s of initialSalesOrgs) {
+    insertSalesOrg.run(s.id, s.no, s.name, s.shortName ?? '', s.financeCode ?? '', s.orgType, s.status);
+  }
+}
+
 export function seedDatabase() {
   const db = getDb();
   initSchema();
@@ -268,6 +295,8 @@ export function seedDatabase() {
   const count = db.prepare('SELECT COUNT(*) as n FROM users').get() as { n: number };
   if (count.n > 0) {
     ensureSpaceSeedData(db);
+    ensureAuthTypesSeed(db);
+    ensureSalesOrgsSeed(db);
     migrateRolesToArray(db);
     migrateSpaceTextToApp(db);
     migrateSpaceAdminRoleName(db);
@@ -313,8 +342,8 @@ export function seedDatabase() {
     INSERT INTO products (id, name, category, sub_category, description, status, tags, skus, composition, install_pkgs, license_tpl,
       product_type, online_delivery, product_class, product_classification, product_series, product_line,
       product_category, product_class_finance, product_line_finance, product_series_finance,
-      business_delivery_name, sales_org_name, sales_scope)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      business_delivery_name, sales_org_name, sales_scope, linked_services)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   for (const p of initialProducts) {
     const scopeEntries = productSalesOrgMap[p.id] ?? [];
@@ -341,6 +370,7 @@ export function seedDatabase() {
       (p as any).productLineFinance ?? null, (p as any).productSeriesFinance ?? null,
       (p as any).businessDeliveryName ?? null, salesOrgName,
       JSON.stringify(salesScope),
+      JSON.stringify((p as any).linkedServices ?? []),
     );
   }
 
@@ -497,5 +527,11 @@ export function seedDatabase() {
   // --- Spaces ---
   ensureSpaceSeedData(db);
 
-  console.log(`[seed] Done. Users: ${initialUsers.length}, Customers: ${customers.length}, Orders: ${orders.length}, Products: ${initialProducts.length}, Performances: ${performances.length}, Authorizations: ${authorizations.length}, DeliveryInfos: ${deliveryInfos.length}, Spaces: ${initialSpaces.length}`);
+  // --- Auth Types ---
+  ensureAuthTypesSeed(db);
+
+  // --- Sales Orgs ---
+  ensureSalesOrgsSeed(db);
+
+  console.log(`[seed] Done. Users: ${initialUsers.length}, Customers: ${customers.length}, Orders: ${orders.length}, Products: ${initialProducts.length}, Performances: ${performances.length}, Authorizations: ${authorizations.length}, DeliveryInfos: ${deliveryInfos.length}, Spaces: ${initialSpaces.length}, AuthTypes: ${initialAuthTypes.length}, SalesOrgs: ${initialSalesOrgs.length}`);
 }

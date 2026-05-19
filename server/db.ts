@@ -106,7 +106,8 @@ export function initSchema() {
       product_series_finance TEXT,
       business_delivery_name TEXT,
       sales_org_name        TEXT,
-      sales_scope           TEXT NOT NULL DEFAULT '[]'
+      sales_scope           TEXT NOT NULL DEFAULT '[]',
+      linked_services       TEXT NOT NULL DEFAULT '[]'
     );
 
     CREATE TABLE IF NOT EXISTS channels (
@@ -363,6 +364,28 @@ export function initSchema() {
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_crm_xsy_tokens_user ON crm_xsy_tokens(user_id);
+
+    CREATE TABLE IF NOT EXISTS auth_types (
+      id                   TEXT PRIMARY KEY,
+      name                 TEXT NOT NULL,
+      period               TEXT NOT NULL,
+      ncc_biz              TEXT NOT NULL DEFAULT '',
+      ncc_income           TEXT NOT NULL DEFAULT '',
+      has_upgrade_warranty INTEGER NOT NULL DEFAULT 0,
+      purchase_unit        TEXT,
+      aux_purchase_unit    TEXT,
+      sort_order           INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS sales_orgs (
+      id           TEXT PRIMARY KEY,
+      no           INTEGER NOT NULL,
+      name         TEXT NOT NULL,
+      short_name   TEXT NOT NULL DEFAULT '',
+      finance_code TEXT NOT NULL DEFAULT '',
+      org_type     TEXT NOT NULL DEFAULT '金山',
+      status       TEXT NOT NULL DEFAULT '正常'
+    );
 
     CREATE TABLE IF NOT EXISTS sso_sessions (
       sid                   TEXT PRIMARY KEY,

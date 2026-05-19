@@ -5,6 +5,41 @@
  * 所有组件应从此处引用色值与样式常量，避免在业务代码中硬编码。
  */
 
+// ── 间距系统（引用 :root CSS 变量，可在 inline style 中使用）──
+
+export const spacing = {
+  page:      'var(--sp-page)',
+  pageLg:    'var(--sp-page-lg)',
+  card:      'var(--sp-card)',
+  cardLg:    'var(--sp-card-lg)',
+  section:   'var(--sp-section)',
+  sectionLg: 'var(--sp-section-lg)',
+  element:   'var(--sp-element)',
+  elementLg: 'var(--sp-element-lg)',
+  gutter:    'var(--sp-gutter)',
+  gutterLg:  'var(--sp-gutter-lg)',
+} as const;
+
+// ── 布局尺寸（引用 :root CSS 变量）──────────────────────
+
+export const layout = {
+  headerHeight:         'var(--layout-header-h)',
+  sidebarWidth:         'var(--layout-sidebar-w)',
+  sidebarCollapsedWidth:'var(--layout-sidebar-collapsed-w)',
+  contentMaxWidth:      'var(--layout-content-max-w)',
+  logoHeight:           'var(--layout-logo-h)',
+} as const;
+
+// ── 圆角（引用 :root CSS 变量）──────────────────────────
+
+export const radius = {
+  sm:   'var(--radius-sm)',
+  md:   'var(--radius-md)',
+  lg:   'var(--radius-lg)',
+  xl:   'var(--radius-xl)',
+  full: 'var(--radius-full)',
+} as const;
+
 // ── 色彩系统 ──────────────────────────────────────────────
 
 export const colors = {

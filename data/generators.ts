@@ -488,9 +488,10 @@ export function generateOrders(params: OrderGeneratorParams): Order[] {
 
     const licenseTypeFallbacks = ['数量授权', '用户订阅许可', '服务器授权', '年授权'] as const;
 
-    const deriveLicenseType = (option?: { license: { type: string; scope: string } }): string => {
+    const deriveLicenseType = (option?: { license?: { type?: string; scope?: string } }): string => {
       if (!option) return licenseTypeFallbacks[0];
-      const { type, scope } = option.license;
+      const type = option.license?.type ?? '';
+      const scope = option.license?.scope ?? '';
       if (type === 'FlatRate') return '服务器授权';
       if (type === 'Perpetual') return scope === 'Platform' ? '服务器授权' : '数量授权';
       if (type === 'Subscription') return scope === '1 User' ? '用户订阅许可' : '年授权';

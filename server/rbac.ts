@@ -92,6 +92,9 @@ const PERMISSION_MATRIX: Record<string, string[]> = {
   'opportunity:create':  ['Admin', 'Sales', 'Business'],
   'opportunity:update':  ['Admin', 'Sales', 'Business'],
   'opportunity:delete':  ['Admin', 'Sales', 'Business'],
+
+  // --- System Meta ---
+  'system:manage':       ['Admin'],
 };
 
 export function checkPermission(resource: string, action: string): (req: AuthRequest, res: Response, next: NextFunction) => void {

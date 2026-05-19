@@ -322,7 +322,7 @@ const OpsDashboard: React.FC = () => {
     };
 
     return (
-        <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto animate-page-enter h-full flex flex-col">
+        <div className="page-container animate-page-enter h-full flex flex-col">
             {/* 顶部 */}
             <div className="flex items-center gap-4 shrink-0 mb-6">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">指标看板</h1>

@@ -161,7 +161,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       { id: 'CHANNEL_CENTER', label: '渠道中心', path: '/channels', permissions: ['channel_view'] },
       { id: 'PERFORMANCE_CENTER', label: '业绩中心', path: '/performance', permissions: ['performance_view'] },
       { id: 'LEADS_CENTER', label: '线索中台', path: '/leads', permissions: ['leads_view'] },
-      { id: 'OPERATIONS_CENTER', label: '运营中心', path: '/wps-ops', permissions: ['wps_ops_view'] },
+      { id: 'OPERATIONS_CENTER', label: '运营中心', path: '/ops/dashboard', permissions: ['wps_ops_view'] },
       { id: 'SAB_CUSTOMER_INSIGHT', label: 'SAB 客户洞察', path: '/sab-insight', permissions: ['sab_insight_view', 'customer_view'] },
       { id: 'SYSTEM_CONFIG', label: '系统配置', path: '/organization', permissions: ['admin_view', 'user_manage', 'role_manage', 'org_manage', 'license_type_view'] }
   ].filter(item => item.permissions.some(p => hasPermission(p)));
@@ -210,7 +210,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="h-screen flex flex-col font-sans overflow-hidden bg-[#F5F2EC] dark:bg-black transition-colors duration-300 selection:bg-blue-500/30">
       
       {/* Top Header */}
-      <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 z-30 sticky top-0 bg-white border-b border-gray-200/50 dark:bg-[#1C1C1E] dark:border-white/10 transition-all">
+      <header className="h-header flex-shrink-0 flex items-center justify-between px-6 z-30 sticky top-0 bg-white border-b border-gray-200/50 dark:bg-[#1C1C1E] dark:border-white/10 transition-all">
           <div className="flex items-center gap-6 min-w-0 flex-1">
               {/* Logo Area */}
               <div className="flex items-center gap-3 shrink-0">
@@ -366,8 +366,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           {/* Sidebar */}
           {!hideSidebar && (
             <aside className={`absolute inset-y-0 left-4 top-4 bottom-4 z-40 transform transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] lg:relative lg:translate-x-0 lg:top-0 lg:bottom-0 lg:left-0 lg:pt-2 lg:pb-2 lg:pl-2 lg:pr-3
-              ${isSidebarOpen ? 'translate-x-0 w-[240px]' : '-translate-x-[110%] lg:translate-x-0'}
-              ${isCollapsed ? 'lg:w-[88px]' : 'lg:w-[240px]'}
+              ${isSidebarOpen ? 'translate-x-0 w-sidebar' : '-translate-x-[110%] lg:translate-x-0'}
+              ${isCollapsed ? 'lg:w-sidebar-collapsed' : 'lg:w-sidebar'}
               flex flex-col gap-1
             `}>
               {/* Sidebar visual container */}
@@ -471,6 +471,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             <NavItem to="/product-manage/component-pool" icon={ListTree} label="组件池" permission="product_component_pool_view" />
                             <NavItem to="/product-manage/packages" icon={HardDriveDownload} label="安装包管理" permission="product_package_view" />
                             <NavItem to="/product-manage/license-templates" icon={FileKey} label="产品授权模板" permission="product_license_template_view" />
+                            <NavItem to="/product-manage/service-config" icon={FileBadge} label="产品服务配置" permission="product_license_template_view" />
                             <NavItem to="/product-manage/attr-config" icon={SlidersHorizontal} label="属性配置" permission="product_attr_config_view" />
                           </>,
                           ['product_view', 'merchandise_view', 'product_component_pool_view', 'product_package_view', 'product_license_template_view', 'product_attr_config_view']

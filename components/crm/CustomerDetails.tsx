@@ -282,7 +282,7 @@ const CustomerDetails: React.FC = () => {
   const getTypeDisplay = (t: string) => typeLabel[t] || t;
 
   return (
-    <div className="max-w-[2400px] mx-auto w-full animate-page-enter pb-20 min-w-0">
+    <div className="max-w-content mx-auto w-full animate-page-enter pb-20 min-w-0">
 
       {/* ── Sticky Header + Tabs ── */}
       <div className="sticky top-0 z-20 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-white/10 px-4 md:px-6 pt-4 flex flex-col">

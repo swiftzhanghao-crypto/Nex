@@ -171,6 +171,12 @@ export const productApi = {
 
 // ---- Channels ----
 export const channelApi = {
+  list: (params?: { page?: number; size?: number; search?: string; type?: string; level?: string; status?: string }) =>
+    request<{ data: any[]; total: number }>(`/channels${buildQuery(params as any)}`),
+  get: (id: string) => request<any>(`/channels/${id}`),
+  create: (data: any) => request<any>('/channels', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: any) => request<any>(`/channels/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) => request<void>(`/channels/${id}`, { method: 'DELETE' }),
   users: (channelId: string) => request<User[]>(`/channels/${channelId}/users`),
 };
 
@@ -283,3 +289,37 @@ export const spaceApi = {
 
 // ---- Health check ----
 export const healthCheck = () => request<{ status: string; time: string }>('/health');
+
+// ============================================================
+// System: 授权类型 & 销售组织
+// ============================================================
+import type { AuthTypeData, SalesOrg } from '../types';
+
+export const systemApi = {
+  // 授权类型
+  listAuthTypes: () => request<AuthTypeData[]>('/system/auth-types'),
+  getAuthType: (id: string) => request<AuthTypeData>(`/system/auth-types/${id}`),
+  createAuthType: (data: AuthTypeData) =>
+    request<AuthTypeData>('/system/auth-types', { method: 'POST', body: JSON.stringify(data) }),
+  updateAuthType: (id: string, data: Partial<AuthTypeData>) =>
+    request<AuthTypeData>(`/system/auth-types/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteAuthType: (id: string) =>
+    request<{ ok: boolean }>(`/system/auth-types/${id}`, { method: 'DELETE' }),
+
+  // 销售组织
+  listSalesOrgs: (params?: { orgType?: string; status?: string; search?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.orgType) q.set('orgType', params.orgType);
+    if (params?.status) q.set('status', params.status);
+    if (params?.search) q.set('search', params.search);
+    const qs = q.toString();
+    return request<SalesOrg[]>(`/system/sales-orgs${qs ? `?${qs}` : ''}`);
+  },
+  getSalesOrg: (id: string) => request<SalesOrg>(`/system/sales-orgs/${id}`),
+  createSalesOrg: (data: SalesOrg) =>
+    request<SalesOrg>('/system/sales-orgs', { method: 'POST', body: JSON.stringify(data) }),
+  updateSalesOrg: (id: string, data: Partial<SalesOrg>) =>
+    request<SalesOrg>(`/system/sales-orgs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteSalesOrg: (id: string) =>
+    request<{ ok: boolean }>(`/system/sales-orgs/${id}`, { method: 'DELETE' }),
+};

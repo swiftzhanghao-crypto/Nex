@@ -30,6 +30,7 @@ function toProduct(row: any) {
     businessDeliveryName: row.business_delivery_name ?? undefined,
     salesOrgName: row.sales_org_name ?? undefined,
     salesScope: safeJsonParse(row.sales_scope, []),
+    linkedServices: safeJsonParse(row.linked_services, []),
   };
 }
 

@@ -2013,7 +2013,7 @@ const ProductCreateWizard: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-3 lg:p-4 max-w-[1400px] mx-auto w-full animate-page-enter pb-28">
+      <div className="flex-1 page-container max-w-[1400px] animate-page-enter pb-28">
         {renderStepContent()}
       </div>
 

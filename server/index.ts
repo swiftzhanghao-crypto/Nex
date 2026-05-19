@@ -14,6 +14,7 @@ import opportunityRoutes from './routes/opportunities.ts';
 import aiRoutes from './routes/ai.ts';
 import spacesRoutes from './routes/spaces.ts';
 import crmXsyRoutes from './routes/crm-xiaoshouyi.ts';
+import systemRoutes from './routes/system.ts';
 
 const PORT = parseInt(process.env.PORT || '3001');
 const app = express();
@@ -56,6 +57,7 @@ app.use('/api/opportunities', opportunityRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/spaces', spacesRoutes);
 app.use('/api/crm/xsy', crmXsyRoutes);
+app.use('/api/system', systemRoutes);
 
 app.use(((err: any, _req: any, res: any, _next: any) => {
   // 详细错误仅写入服务端日志，不外泄给客户端
@@ -99,6 +101,8 @@ app.listen(PORT, () => {
   console.log(`     GET    /api/finance/audit-logs`);
   console.log(`     POST   /api/ai/generate, /api/ai/category-suggest, /api/ai/generate-json`);
   console.log(`     GET    /api/crm/xsy/status | /login | /callback | /customers  POST /sync-customers`);
+  console.log(`     CRUD   /api/system/auth-types`);
+  console.log(`     CRUD   /api/system/sales-orgs`);
   if (process.env.NODE_ENV !== 'production') {
     console.log(`\n  [dev] Default login: any user email + password "123456"\n`);
   } else {

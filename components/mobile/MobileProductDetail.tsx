@@ -217,6 +217,10 @@ const MobileProductDetail: React.FC<MobileProductDetailProps> = ({ productId, on
                 <div className="space-y-3" style={{ animation: 'mobileSlideUp 0.25s ease-out' }}>
                   {pricingOptions.length > 0 ? pricingOptions.map(option => (
                     <div key={option.id} className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-sm border border-black/[0.04] dark:border-white/[0.06] p-4 space-y-3">
+                      {(() => {
+                        const scope = option.license.scope ?? '';
+                        return (
+                      <>
                       <div className="flex items-center justify-between">
                         <h4 className="text-[15px] font-bold text-[#007AFF]">{option.title}</h4>
                         <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-600">已启用</span>
@@ -224,8 +228,8 @@ const MobileProductDetail: React.FC<MobileProductDetailProps> = ({ productId, on
                       <div className="grid grid-cols-3 gap-2 bg-gray-50 dark:bg-white/5 rounded-xl p-3">
                         {[
                           { label: '定价周期', value: option.license.periodUnit === 'Year' || option.license.periodUnit === 'Month' ? '周期性' : '一次性' },
-                          { label: '购买单位', value: option.license.scope.includes('User') ? '用户' : option.license.scope.includes('Device') ? '设备' : '平台' },
-                          { label: '辅助单位', value: option.license.scope.includes('User') ? '用户' : '设备' },
+                          { label: '购买单位', value: scope.includes('User') ? '用户' : scope.includes('Device') ? '设备' : '平台' },
+                          { label: '辅助单位', value: scope.includes('User') ? '用户' : '设备' },
                         ].map(f => (
                           <div key={f.label}>
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{f.label}</p>
@@ -241,6 +245,9 @@ const MobileProductDetail: React.FC<MobileProductDetailProps> = ({ productId, on
                         </span>
                         <span className="text-[17px] font-bold text-[#007AFF] tabular-nums">¥{option.price.toLocaleString()}</span>
                       </div>
+                      </>
+                        );
+                      })()}
                     </div>
                   )) : (
                     <EmptyState text="暂无授权类型" />

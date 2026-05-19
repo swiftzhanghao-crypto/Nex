@@ -55,7 +55,7 @@ const SalesOrgConfig: React.FC = () => {
   };
 
   return (
-    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto animate-page-enter">
+    <div className="page-container animate-page-enter">
       {/* Header */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-5">
         <div>

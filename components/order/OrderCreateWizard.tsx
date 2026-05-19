@@ -813,6 +813,72 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
   const calculateNewOrderTotal = () => newOrderItems.reduce((acc, item) => acc + (item.priceAtPurchase * item.quantity), 0);
 
+  // ── 产品附带服务 ──
+  const [serviceProcurementMode, setServiceProcurementMode] = useState<'together' | 'separate'>('separate');
+  const prevProductIdsRef = useRef<string>('');
+
+  // 文档3.6: 切换产品类型/名称/授权方式时重置采购方式为默认「分开采购」
+  useEffect(() => {
+    const currentIds = newOrderItems.map(i => `${i.productId}_${i.skuId}_${i.activationMethod}`).join('|');
+    if (prevProductIdsRef.current && prevProductIdsRef.current !== currentIds) {
+      setServiceProcurementMode('separate');
+    }
+    prevProductIdsRef.current = currentIds;
+  }, [newOrderItems]);
+
+  // 判断是否有可用的服务配置（根据文档：匹配产品类型+规格+授权方式）
+  const hasServiceConfig = useMemo(() => {
+    return newOrderItems.some(item => {
+      const product = products.find(p => p.id === item.productId);
+      return product && (product as any).linkedServices && (product as any).linkedServices.length > 0;
+    });
+  }, [newOrderItems, products]);
+
+  // 服务明细表格出现的完整条件（文档3.2）：
+  // 1. 服务配置可用 2. 选择了一并采购 3. 已选订购性质 4. 已填单价 5. 已填数量
+  const showServiceDetailTable = useMemo(() => {
+    if (!hasServiceConfig) return false;
+    if (serviceProcurementMode !== 'together') return false;
+    return newOrderItems.some(item => item.purchaseNature && item.priceAtPurchase > 0 && item.quantity > 0);
+  }, [hasServiceConfig, serviceProcurementMode, newOrderItems]);
+
+  // 服务明细数据
+  const serviceDetailItems = useMemo(() => {
+    if (!showServiceDetailTable) return [];
+    const items: { id: string; productType: string; productSpec: string; productName: string; serviceMethod: string; servicePeriod: string; quantity: number; unitPrice: number; subtotal: number; sourceProductName: string; category: string }[] = [];
+    newOrderItems.forEach((orderItem, idx) => {
+      const product = products.find(p => p.id === orderItem.productId);
+      if (!product) return;
+      const linkedServices = (product as any).linkedServices || [];
+      linkedServices.forEach((svc: any, sIdx: number) => {
+        const svcProduct = products.find(p => p.id === svc.productId);
+        if (!svcProduct) return;
+        const svcSku = svc.skuId
+          ? svcProduct.skus.find(s => s.id === svc.skuId)
+          : svcProduct.skus.find(s => s.status === 'Active');
+        const svcOption = svcSku?.pricingOptions?.[0];
+        const unitPrice = svcOption?.price ?? svcSku?.price ?? 0;
+        const period = svcOption
+          ? (svcOption.license.periodUnit === 'Forever' ? '永久' : `${svcOption.license.periodNum || 1}${svcOption.license.periodUnit === 'Year' ? '年' : '月'}`)
+          : orderItem.licensePeriod || '1年';
+        items.push({
+          id: `svc_${idx}_${sIdx}`,
+          productType: (svcProduct as any).productType || svcProduct.subCategory || '-',
+          productSpec: svcSku?.name || '-',
+          productName: svcProduct.name,
+          serviceMethod: (svcProduct as any).activationMethods?.[0] || '在线服务',
+          servicePeriod: period,
+          quantity: orderItem.quantity,
+          unitPrice,
+          subtotal: unitPrice * orderItem.quantity,
+          sourceProductName: orderItem.productName,
+          category: svc.required ? '必选服务' : '基础服务',
+        });
+      });
+    });
+    return items;
+  }, [showServiceDetailTable, newOrderItems, products]);
+
   // --- Realtime Validation Effect ---
   useEffect(() => {
     const formState: WizardFormState = {
@@ -1638,7 +1704,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                         <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isSellerCategoryPickerOpen ? 'rotate-180' : ''}`}/>
                                     </button>
                                     {isSellerCategoryPickerOpen && (
-                                        <div className="absolute z-50 bottom-full left-0 mb-1 w-[480px] bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/15 rounded-2xl shadow-2xl overflow-hidden flex" style={{ maxHeight: 320 }}>
+                                        <div className="absolute z-50 bottom-full left-0 mb-1 w-[480px] bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/15 rounded-2xl shadow-2xl overflow-hidden flex" style={{ height: 320 }}>
                                             <div className="w-[180px] border-r border-gray-100 dark:border-white/10 overflow-y-auto py-1">
                                                 {categoryTree.map(cat => (
                                                     <div
@@ -1969,6 +2035,115 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                                 </div>
                             )}
                         </div>
+
+                        {/* 产品服务信息 */}
+                        {hasServiceConfig && newOrderItems.length > 0 && (
+                        <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple overflow-hidden">
+                            <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <Wrench className="w-4 h-4 text-teal-500"/> 产品服务信息
+                                </h4>
+                            </div>
+                            <div className="px-5 py-4 space-y-4">
+                                {/* 采购方式选择 */}
+                                <div className="flex items-center gap-4">
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300 shrink-0">产品和服务是否分开采购</label>
+                                    <div className="flex items-center gap-3">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="radio" name="serviceProcurement" checked={serviceProcurementMode === 'separate'} onChange={() => setServiceProcurementMode('separate')} className="w-4 h-4 text-blue-600" />
+                                            <span className="text-sm text-gray-700 dark:text-gray-300">产品和服务分开采购</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="radio" name="serviceProcurement" checked={serviceProcurementMode === 'together'} onChange={() => setServiceProcurementMode('together')} className="w-4 h-4 text-blue-600" />
+                                            <span className="text-sm text-gray-700 dark:text-gray-300">产品和服务一并采购</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {serviceProcurementMode === 'separate' && (
+                                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 rounded-lg px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
+                                        分开采购模式下，服务将作为独立的产品行添加到订单产品列表，通过产品明细编号与主产品关联。
+                                    </div>
+                                )}
+
+                                {/* 一并采购模式 - 服务明细表格 */}
+                                {showServiceDetailTable && serviceDetailItems.length > 0 && (
+                                    <div className="border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden">
+                                        <div className="px-4 py-2.5 bg-gray-50 dark:bg-[#1C1C1E] border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+                                            <span className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                                服务明细
+                                                <span className="text-xs font-mono bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded-full">{serviceDetailItems.length}</span>
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <button type="button" className="text-xs font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline flex items-center gap-1">
+                                                    <Plus className="w-3 h-3"/> 新增服务
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left text-sm min-w-[700px]">
+                                                <thead className="bg-gray-50/80 dark:bg-[#2C2C2E]">
+                                                    <tr>
+                                                        <th className="p-2.5 pl-4 text-center w-12 text-xs font-bold text-gray-500 dark:text-gray-400">编号</th>
+                                                        <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400">产品类型</th>
+                                                        <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400">产品规格</th>
+                                                        <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400">产品名称</th>
+                                                        <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400">授权方式/服务方式</th>
+                                                        <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400 text-center">授权或服务期限</th>
+                                                        <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400 text-center">数量</th>
+                                                        {buyerType !== 'Channel' && <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400 text-right">服务成本预提单价</th>}
+                                                        {buyerType !== 'Channel' && <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400 text-right">服务成本预提金额小计(含税)</th>}
+                                                        <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400 text-center">操作</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                                                    {serviceDetailItems.map((svc, idx) => (
+                                                        <tr key={svc.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                                            <td className="p-2.5 pl-4 text-center">
+                                                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-teal-50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800/40 text-[10px] font-bold font-mono text-teal-600 dark:text-teal-400">{idx + 1}</span>
+                                                            </td>
+                                                            <td className="p-2.5 text-xs text-gray-700 dark:text-gray-300">{svc.productType}</td>
+                                                            <td className="p-2.5 text-xs text-gray-700 dark:text-gray-300">{svc.productSpec}</td>
+                                                            <td className="p-2.5 text-xs font-medium text-gray-900 dark:text-white">{svc.productName}</td>
+                                                            <td className="p-2.5 text-xs text-gray-700 dark:text-gray-300">{svc.serviceMethod}</td>
+                                                            <td className="p-2.5 text-center">
+                                                                <span className="inline-flex px-1.5 py-0.5 text-[10px] font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800 rounded">{svc.servicePeriod}</span>
+                                                            </td>
+                                                            <td className="p-2.5 text-center text-xs font-medium text-gray-900 dark:text-white">{svc.quantity}</td>
+                                                            {buyerType !== 'Channel' && <td className="p-2.5 text-right text-xs font-mono text-gray-700 dark:text-gray-300">¥{svc.unitPrice.toLocaleString()}</td>}
+                                                            {buyerType !== 'Channel' && <td className="p-2.5 text-right text-xs font-bold font-mono text-gray-900 dark:text-white">¥{svc.subtotal.toLocaleString()}</td>}
+                                                            <td className="p-2.5 text-center">
+                                                                <div className="flex items-center justify-center gap-2">
+                                                                    <button type="button" className="text-[10px] font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline">编辑</button>
+                                                                    <button type="button" className="text-[10px] font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline">详情</button>
+                                                                    <button type="button" className="text-[10px] font-medium text-red-500 hover:underline">删除</button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                                {buyerType !== 'Channel' && (
+                                                    <tfoot className="border-t border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/5">
+                                                        <tr>
+                                                            <td colSpan={8} className="p-2.5 pl-4 text-right font-bold text-xs text-gray-700 dark:text-gray-300">合计</td>
+                                                            <td className="p-2.5 text-right font-bold text-xs font-mono text-red-600 dark:text-red-400">¥{serviceDetailItems.reduce((sum, s) => sum + s.subtotal, 0).toLocaleString()}</td>
+                                                            <td className="p-2.5"></td>
+                                                        </tr>
+                                                    </tfoot>
+                                                )}
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {serviceProcurementMode === 'together' && !showServiceDetailTable && (
+                                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-lg px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                                        请完善产品的订购性质、单价和数量后，系统将自动匹配并带出基础服务和必选服务。
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        )}
 
                         {/* 折算抵扣 - 仅自成交订单 */}
                         {buyerType === 'SelfDeal' && (

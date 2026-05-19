@@ -15,7 +15,7 @@ export function generateId(): string {
 export function subscriptionLicensePeriodLabel(
   start: string,
   end: string,
-  opt?: { license: { period: number; periodUnit: string } },
+  opt?: { license?: { period?: number; periodUnit?: string } },
 ): string {
   if (opt?.license?.periodUnit === 'Forever') return '永久';
   const s = new Date(start + 'T00:00:00');

@@ -44,7 +44,7 @@ const Dashboard: React.FC = () => {
   ];
 
   return (
-    <div className="p-3 lg:p-6 space-y-6 animate-in fade-in duration-500 max-w-[2400px] w-full mx-auto min-w-0">
+    <div className="page-container lg:p-6 space-y-6 animate-in fade-in duration-500 min-w-0">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

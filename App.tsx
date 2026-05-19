@@ -36,12 +36,12 @@ import AuthorizationManager from './components/order/AuthorizationManager';
 import DeliveryInfoManager from './components/order/DeliveryInfoManager';
 import AcceptanceManager from './components/order/AcceptanceManager';
 import RenewalManager from './components/order/RenewalManager';
-import OperationsManager from './components/operations/OperationsManager';
 import OpsEnterpriseManager from './components/operations/OpsEnterpriseManager';
 import OpsDashboard from './components/operations/OpsDashboard';
 import ProductComponentPoolManager from './components/product/ProductComponentPoolManager';
 import ProductPackageManager from './components/product/ProductPackageManager';
 import ProductLicenseTemplateManager from './components/product/ProductLicenseTemplateManager';
+import ProductServiceConfigManager from './components/product/ProductServiceConfigManager';
 import ProductAttrConfigManager from './components/product/ProductAttrConfigManager';
 import LicenseTypeManager from './components/product/LicenseTypeManager';
 import DeliveryMethodConfig from './components/system/DeliveryMethodConfig';
@@ -52,6 +52,16 @@ import ProductPolicyManager from './components/product/ProductPolicyManager';
 import CustomerInsight from './components/sab/CustomerInsight';
 import SABCustomerList from './components/sab/SABCustomerList';
 import SABCustomerDetail from './components/sab/SABCustomerDetail';
+
+const OpsPlaceholder: React.FC = () => (
+  <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 gap-4 animate-fade-in">
+    <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-white/5 flex items-center justify-center">
+      <svg className="w-8 h-8 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12H9.75m0 0l2.25-2.25M9.75 15l2.25 2.25M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" /></svg>
+    </div>
+    <p className="text-base font-medium">当前页面暂未开放</p>
+    <p className="text-sm text-gray-400 dark:text-gray-600">该功能尚在规划中，敬请期待</p>
+  </div>
+);
 
 const RequireAnyPermission: React.FC<{ permissions: string[]; children: React.ReactElement }> = ({ permissions, children }) => {
   const { currentUser, roles } = useAppContext();
@@ -114,6 +124,7 @@ function AppRoutes() {
         <Route path="/product-manage/component-pool" element={<ProductComponentPoolManager />} />
         <Route path="/product-manage/packages" element={<ProductPackageManager />} />
         <Route path="/product-manage/license-templates" element={<ProductLicenseTemplateManager />} />
+        <Route path="/product-manage/service-config" element={<ProductServiceConfigManager />} />
         <Route path="/product-manage/attr-config" element={<ProductAttrConfigManager />} />
 
         {/* 产品报价子路由 */}
@@ -121,10 +132,10 @@ function AppRoutes() {
         <Route path="/product-pricing/channel" element={<ProductChannelPriceManager />} />
 
         {/* 运营中心 */}
-        <Route path="/wps-ops" element={<OperationsManager />} />
+        <Route path="/wps-ops" element={<Navigate to="/ops/dashboard" replace />} />
         <Route path="/ops/dashboard" element={<OpsDashboard />} />
         <Route path="/ops/enterprise" element={<OpsEnterpriseManager />} />
-        <Route path="/ops/*" element={<OperationsManager />} />
+        <Route path="/ops/*" element={<OpsPlaceholder />} />
 
         <Route path="/sab-insight" element={
           <RequireAnyPermission permissions={['sab_insight_view', 'customer_view']}>

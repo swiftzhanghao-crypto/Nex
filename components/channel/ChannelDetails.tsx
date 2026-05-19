@@ -105,7 +105,7 @@ const ChannelDetails: React.FC = () => {
   );
 
   return (
-    <div className="max-w-[2400px] mx-auto w-full animate-page-enter pb-20">
+    <div className="max-w-content mx-auto w-full animate-page-enter pb-20">
 
       {/* Sticky Header + Tabs */}
       <div className="sticky top-0 z-20 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-xl border-b border-gray-200/60 dark:border-white/10 px-4 md:px-6 pt-4 flex flex-col">

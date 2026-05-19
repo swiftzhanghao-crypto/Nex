@@ -88,7 +88,7 @@ const ReportsManager: React.FC = () => {
   }, [enrichedUsers]);
 
   return (
-    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto gap-2.5 animate-page-enter relative h-full flex flex-col">
+    <div className="page-container gap-2.5 animate-page-enter relative h-full flex flex-col">
       {/* Header */}
       <div className="flex justify-between items-center shrink-0">
         <div>

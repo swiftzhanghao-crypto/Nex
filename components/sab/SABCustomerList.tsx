@@ -326,7 +326,7 @@ export const SABCustomerList: React.FC = () => {
       `}</style>
 
       <div className="min-h-full bg-[#F5F2EC] dark:bg-black pb-10">
-        <div className="mx-auto max-w-[2400px] px-4 sm:px-6 pt-6">
+        <div className="mx-auto max-w-content px-4 sm:px-6 pt-6">
           <div className="mb-6">
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#1D1D1F] dark:text-white">客户列表</h1>
             <p className="text-sm text-[#86868B] mt-1">管理与筛选 SAB 企业客户，支持列配置与高级筛选。</p>

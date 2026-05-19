@@ -135,7 +135,7 @@ const ProductComponentPoolManager: React.FC = () => {
   };
 
   return (
-    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto animate-page-enter">
+    <div className="page-container animate-page-enter">
       <div className="mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">组件池</h1>

@@ -993,7 +993,7 @@ const OrderManager: React.FC = () => {
   }, [orders]);
 
   return (
-    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto animate-page-enter pb-2 h-full flex flex-col gap-2.5 min-w-0 overflow-hidden">
+    <div className="page-container animate-page-enter pb-2 h-full flex flex-col gap-2.5 min-w-0 overflow-hidden">
       <div className="flex items-center gap-3 flex-wrap shrink-0">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">订单管理</h1>
         {/* View Dropdown */}
@@ -1215,8 +1215,8 @@ const OrderManager: React.FC = () => {
         {/* Status Filter Tabs */}
         {(() => {
           const shippingIds = new Set(['STOCK_AUTH', 'STOCK_PKG', 'STOCK_SHIP', 'STOCK_CD']);
-          const successIds = new Set([OrderStatus.SHIPPED, OrderStatus.DELIVERED]);
-          const warningIds = new Set([OrderStatus.PENDING_PAYMENT]);
+          const successIds = new Set<string>([OrderStatus.SHIPPED, OrderStatus.DELIVERED]);
+          const warningIds = new Set<string>([OrderStatus.PENDING_PAYMENT]);
           const getVariant = (id: string): 'primary' | 'shipping' | 'warning' | 'success' | 'danger' | 'muted' => {
             if (shippingIds.has(id)) return 'shipping';
             if (successIds.has(id)) return 'success';

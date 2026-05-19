@@ -29,7 +29,12 @@ const ProductCenter: React.FC = () => {
       lineMap.get(line)!.add(type);
     }
     return Array.from(lineMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b, 'zh-Hans'))
+      .sort(([a], [b]) => {
+        const aIsOther = a === '其他软件' ? 1 : 0;
+        const bIsOther = b === '其他软件' ? 1 : 0;
+        if (aIsOther !== bIsOther) return aIsOther - bIsOther;
+        return a.localeCompare(b, 'zh-Hans');
+      })
       .map(([group, types]) => ({ group, children: Array.from(types).sort((a, b) => a.localeCompare(b, 'zh-Hans')) }));
   }, [products]);
 
@@ -129,10 +134,10 @@ const ProductCenter: React.FC = () => {
 
   return (
     <>
-    <div className="h-full flex flex-col bg-gray-50 dark:bg-black/20 overflow-hidden animate-page-enter">
+    <div className="page-container h-full flex flex-col gap-2.5 min-w-0 overflow-hidden animate-page-enter">
 
-      {/* ── Top Bar: title + controls (OrderManager style) ─────── */}
-      <div className="px-6 pt-6 pb-4 shrink-0 flex items-center justify-between gap-4 flex-wrap">
+      {/* ── Top Bar: title + controls ─────── */}
+      <div className="shrink-0 flex items-center justify-between gap-4 flex-wrap">
 
         {/* Title */}
         <div className="flex items-center gap-4 shrink-0">
@@ -144,7 +149,7 @@ const ProductCenter: React.FC = () => {
 
           {/* Search - catalog only */}
           {mainView === 'catalog' && (
-          <div className="unified-card flex items-stretch h-9 border-gray-200 dark:border-white/10 dark:bg-[#1C1C1E] w-[220px] xl:w-[280px] focus-within:border-blue-400 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]">
+          <div className="flex items-stretch h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] w-[220px] xl:w-[280px] focus-within:border-blue-400 dark:focus-within:border-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)] transition shadow-apple">
             <div className="relative flex-1 flex items-center min-w-0">
               <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 pointer-events-none shrink-0" />
               <input
@@ -198,12 +203,12 @@ const ProductCenter: React.FC = () => {
         </div>
       )}
 
-      {mainView === 'catalog' && <div className="unified-card flex-1 min-w-0 flex mx-6 mb-6 border-gray-200/80 dark:border-white/10 dark:bg-[#1C1C1E]">
+      {mainView === 'catalog' && <div className="flex-1 min-w-0 flex rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] shadow-apple overflow-hidden">
 
         {/* ── Left: Collapsible Tree Sidebar ─────────────────── */}
-        <div className="unified-card w-[280px] xl:w-[312px] shrink-0 -r border-gray-200/80 dark:border-white/10 overflow-y-auto dark:bg-[#1C1C1E]">
-          <div className="px-4 pt-4 pb-1">
-            <div className="text-sm font-bold text-gray-300 dark:text-gray-600 px-1 mb-3">产品分类</div>
+        <div className="w-[260px] xl:w-[300px] shrink-0 border-r border-gray-200 dark:border-white/10 overflow-y-auto bg-white dark:bg-[#1C1C1E]">
+          <div className="px-4 pt-3 pb-1">
+            <div className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-1 mb-2">产品分类</div>
           </div>
           {visibleTree.map(({ group, children }) => {
             const isExpanded = isSearching || expandedGroups.has(group);
@@ -212,7 +217,7 @@ const ProductCenter: React.FC = () => {
                 {/* 一级：产品条线 */}
                 <button
                   onClick={() => !isSearching && toggleGroup(group)}
-                  className="w-full flex items-center text-left pl-3 pr-3 py-2.5 text-sm font-extrabold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                  className="w-full flex items-center text-left pl-3 pr-3 py-2 text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                 >
                   {isExpanded
                     ? <ChevronDown className="w-4 h-4 shrink-0 mr-1.5" />
@@ -263,22 +268,22 @@ const ProductCenter: React.FC = () => {
 
 
           {/* Card Grid */}
-          <div className="flex-1 overflow-y-auto p-5 bg-gray-50 dark:bg-black/20">
+          <div className="flex-1 overflow-y-auto p-4 bg-gray-50/50 dark:bg-black/10">
             {displayProducts.length > 0 ? (
               <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-4">
                 {displayProducts.map(product => (
                   <div
                     key={product.id}
-                    className="unified-card group dark:bg-[#1C1C1E] border-gray-200/80 dark:border-white/10 p-5 hover: hover:-blue-200 dark:hover:-blue-800/50 relative flex flex-col gap-3"
+                    className="group bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl p-4 hover:border-blue-200 dark:hover:border-blue-800/50 hover:shadow-md transition-all relative flex flex-col gap-3"
                   >
                     {/* Card Top: icon + name + status */}
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0">
-                        <Package className="w-5 h-5 text-[#0071E3] dark:text-[#0A84FF]" />
+                      <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0">
+                        <Package className="w-4.5 h-4.5 text-[#0071E3] dark:text-[#0A84FF]" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="font-semibold text-gray-900 dark:text-white text-base leading-snug truncate">
+                          <h3 className="font-semibold text-gray-900 dark:text-white text-sm leading-snug truncate">
                             {product.name}
                           </h3>
                           {product.status === 'OffShelf' ? (
@@ -376,7 +381,7 @@ const ProductCenter: React.FC = () => {
                       </div>
                       <button
                         onClick={() => navigate(`/catalog/${product.id}/preview`)}
-                        className="unified-button-primary shrink-0 ml-3 inline- .5 bg-[#0071E3] hover: active:bg-blue-700 shadow-apple"
+                        className="shrink-0 ml-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#0071E3] dark:bg-[#0A84FF] text-white hover:bg-blue-600 dark:hover:bg-blue-500 active:bg-blue-700 transition shadow-apple"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         查看详情
@@ -386,7 +391,7 @@ const ProductCenter: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full py-24 text-gray-400 dark:text-gray-600">
+              <div className="flex flex-col items-center justify-center h-full py-20 text-gray-400 dark:text-gray-600">
                 <Package className="w-12 h-12 mb-4 opacity-30" />
                 <div className="text-base font-medium mb-1">
                   暂无{activeTab === 'ON_SHELF' ? '在架' : activeTab === 'OFF_SHELF' ? '下架' : ''}产品

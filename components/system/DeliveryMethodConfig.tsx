@@ -218,7 +218,7 @@ const DeliveryMethodConfig: React.FC = () => {
   };
 
   return (
-    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto animate-page-enter">
+    <div className="page-container animate-page-enter">
       {/* Default Delivery Method */}
       <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl p-5 mb-6">
         <div className="flex items-center justify-between">

@@ -124,15 +124,17 @@ export interface AtomicCapability {
 }
 
 export interface ProductLicenseConfig {
-    type: LicenseType;
-    period: number;
+    type?: LicenseType;
+    period?: number;
+    periodNum?: number;
     periodUnit: LicenseUnit;
-    scope: string;
+    scope?: string;
 }
 
 export interface SkuPricingOption {
     id: string;
-    title: string;
+    title?: string;
+    name?: string;
     price: number;
     license: ProductLicenseConfig;
 }
@@ -230,6 +232,7 @@ export interface Product {
     businessDeliveryName?: string;
     taxRefundType?: string;
     linkedServices?: LinkedService[];
+    activationMethods?: string[];
     salesScope?: SalesScopeRow[];
     subUnitLicenseAllowed?: boolean;
     /** 公有云权益关联（每种权益类型最多一个产品） */
@@ -688,6 +691,7 @@ export interface InvoiceInfo {
 
 export interface PaymentRecord {
     amount: number;
+    paymentMethod?: PaymentMethod;
     paymentDate: string;
     bankName: string;
     accountNumber: string;

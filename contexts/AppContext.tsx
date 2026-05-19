@@ -30,6 +30,7 @@ import {
 
 import {
     authApi, userApi, orderApi, customerApi, productApi, opportunityApi, financeApi, spaceApi,
+    systemApi,
     setToken, getToken,
 } from '../services/api';
 
@@ -133,6 +134,7 @@ interface AppContextType {
 
     refreshOrders: () => Promise<void>;
     refreshCustomers: () => Promise<void>;
+    refreshChannels: () => Promise<void>;
 
     /** 按需懒加载：仅在需要全量数据的页面（看板/详情/AI/统计）调用 */
     loadAllOrders: () => Promise<void>;
@@ -424,6 +426,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await loadAllCustomers();
     }, [loadAllCustomers]);
 
+    const refreshChannels = useCallback(async () => {
+        try {
+            const channelList = await productApi.channels();
+            setChannels(channelList);
+        } catch (e) {
+            console.error('[API] refreshChannels failed:', e);
+        }
+    }, [setChannels]);
+
     const refreshSpaces = useCallback(async () => {
         if (!USE_API) {
             // Mock 模式：优先恢复 localStorage 中的最新列表，避免覆盖用户本地新建/修改的应用
@@ -478,7 +489,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         try {
             setCurrentUser(me);
-            const [userListRes, deptList, roleList, prodListRes, channelList, oppList, spaceList] = await Promise.all([
+            const [userListRes, deptList, roleList, prodListRes, channelList, oppList, spaceList, authTypeList, salesOrgList] = await Promise.all([
                 userApi.list({ size: 500 }),
                 userApi.departments(),
                 userApi.roles(),
@@ -486,6 +497,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 productApi.channels(),
                 productApi.opportunities(),
                 spaceApi.list().catch(() => [] as any[]),
+                systemApi.listAuthTypes().catch(() => [] as any[]),
+                systemApi.listSalesOrgs().catch(() => [] as any[]),
             ]);
             setUsers(userListRes.data);
             setDepartments(deptList);
@@ -494,6 +507,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setChannels(channelList);
             setOpportunities(oppList);
             setSpaces(spaceList as Space[]);
+            if (authTypeList.length) setAuthTypes(authTypeList);
+            if (salesOrgList.length) setSalesOrganizations(salesOrgList);
 
             setNeedsLogin(false);
             console.log('[API] Bootstrap loaded (auth: %s)', getToken() ? 'JWT' : 'cookie');
@@ -614,6 +629,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         refreshOrders,
         refreshCustomers,
+        refreshChannels,
 
         loadAllOrders,
         loadAllCustomers,

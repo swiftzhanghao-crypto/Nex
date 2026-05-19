@@ -85,7 +85,7 @@ const PerformanceManager: React.FC = () => {
   const fmt = (v: number) => `¥${v.toLocaleString()}`;
 
   return (
-    <div className="space-y-5 p-3 lg:p-4 max-w-[2400px] w-full mx-auto min-w-0">
+    <div className="space-y-5 page-container min-w-0">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">业绩管理</h1>
         <span className="text-xs text-gray-400 dark:text-gray-500">共 {filtered.length} 条记录</span>

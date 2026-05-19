@@ -669,7 +669,7 @@ const UserManager: React.FC<UserManagerProps> = ({ defaultTab = 'USERS' }) => {
   };
 
   return (
-    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto gap-2.5 animate-page-enter relative h-full flex flex-col min-w-0">
+    <div className="page-container gap-2.5 animate-page-enter relative h-full flex flex-col min-w-0">
       {/* Header */}
       <div className="flex items-center shrink-0 gap-4 flex-wrap min-w-0">
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight shrink-0">

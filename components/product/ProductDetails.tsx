@@ -270,7 +270,7 @@ const ProductDetails: React.FC = () => {
               </div>
       </div>
 
-      <div className="p-3 lg:p-4 max-w-[2400px] mx-auto w-full space-y-2.5 animate-page-enter pb-20">
+      <div className="page-container space-y-2.5 animate-page-enter pb-20">
               {detailTab === 'info' && (<>
               {/* Basic Info - Full Width */}
               <div className="unified-card dark:bg-[#1C1C1E] border-gray-100/50 dark:border-white/10">

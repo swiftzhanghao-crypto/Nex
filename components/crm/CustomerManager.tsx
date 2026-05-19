@@ -263,7 +263,7 @@ const CustomerManager: React.FC = () => {
   }, [searchTerm]);
 
   return (
-    <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto animate-page-enter h-full flex flex-col gap-4 min-w-0">
+    <div className="page-container animate-page-enter h-full flex flex-col gap-4 min-w-0">
       <div className="flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:w-auto min-w-0">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">客户信息</h1>

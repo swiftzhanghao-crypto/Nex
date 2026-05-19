@@ -251,8 +251,8 @@ const ProductPreview: React.FC = () => {
                         <div className="grid grid-cols-3 gap-3">
                           {[
                             { label: '定价周期', value: option.license.periodUnit === 'Year' || option.license.periodUnit === 'Month' ? '周期性' : '一次性' },
-                            { label: '购买单位', value: option.license.scope.includes('User') ? '用户' : option.license.scope.includes('Device') ? '设备' : '平台' },
-                            { label: '辅助单位', value: option.license.scope.includes('User') ? '用户' : option.license.scope.includes('Device') ? '设备' : '平台' },
+                            { label: '购买单位', value: (option.license.scope ?? '').includes('User') ? '用户' : (option.license.scope ?? '').includes('Device') ? '设备' : '平台' },
+                            { label: '辅助单位', value: (option.license.scope ?? '').includes('User') ? '用户' : (option.license.scope ?? '').includes('Device') ? '设备' : '平台' },
                           ].map(({ label, value }) => (
                             <div key={label} className="space-y-1">
                               <div className="text-xs uppercase text-gray-400 font-bold tracking-wider">{label}</div>

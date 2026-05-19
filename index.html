@@ -30,12 +30,105 @@
               'apple-hover': '0 12px 32px -4px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04)',
               'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
               'glow': '0 0 20px rgba(0, 113, 227, 0.3)',
-            }
+            },
+            spacing: {
+              'page': 'var(--sp-page)',
+              'page-lg': 'var(--sp-page-lg)',
+              'card': 'var(--sp-card)',
+              'card-lg': 'var(--sp-card-lg)',
+              'section': 'var(--sp-section)',
+              'section-lg': 'var(--sp-section-lg)',
+              'element': 'var(--sp-element)',
+              'element-lg': 'var(--sp-element-lg)',
+              'gutter': 'var(--sp-gutter)',
+              'gutter-lg': 'var(--sp-gutter-lg)',
+              'header': 'var(--layout-header-h)',
+            },
+            maxWidth: {
+              'content': 'var(--layout-content-max-w)',
+            },
+            width: {
+              'sidebar': 'var(--layout-sidebar-w)',
+              'sidebar-collapsed': 'var(--layout-sidebar-collapsed-w)',
+            },
+            borderRadius: {
+              'card': 'var(--radius-xl)',
+            },
+            gridTemplateColumns: {
+              '24': 'repeat(24, minmax(0, 1fr))',
+            },
+            gridColumn: {
+              'span-13': 'span 13 / span 13',
+              'span-14': 'span 14 / span 14',
+              'span-15': 'span 15 / span 15',
+              'span-16': 'span 16 / span 16',
+              'span-17': 'span 17 / span 17',
+              'span-18': 'span 18 / span 18',
+              'span-19': 'span 19 / span 19',
+              'span-20': 'span 20 / span 20',
+              'span-21': 'span 21 / span 21',
+              'span-22': 'span 22 / span 22',
+              'span-23': 'span 23 / span 23',
+              'span-24': 'span 24 / span 24',
+            },
           }
         }
       }
     </script>
     <style>
+      /* ══ 全局设计令牌 (Design Tokens) ══ */
+      :root {
+        /* ── 间距比例尺 (4px base unit) ── */
+        --sp-0: 0px;
+        --sp-0-5: 2px;
+        --sp-1: 4px;
+        --sp-1-5: 6px;
+        --sp-2: 8px;
+        --sp-2-5: 10px;
+        --sp-3: 12px;
+        --sp-4: 16px;
+        --sp-5: 20px;
+        --sp-6: 24px;
+        --sp-8: 32px;
+        --sp-10: 40px;
+        --sp-12: 48px;
+        --sp-16: 64px;
+        --sp-20: 80px;
+        --sp-24: 96px;
+
+        /* ── 语义间距令牌 ── */
+        --sp-page: var(--sp-3);           /* 页面外边距 (移动端) = 12px */
+        --sp-page-lg: var(--sp-4);        /* 页面外边距 (桌面端) = 16px */
+        --sp-card: var(--sp-4);           /* 卡片内边距 = 16px */
+        --sp-card-lg: var(--sp-6);        /* 卡片大内边距 = 24px */
+        --sp-section: var(--sp-2-5);      /* 区块间距 = 10px */
+        --sp-section-lg: var(--sp-4);     /* 区块间距 (桌面端) = 16px */
+        --sp-element: var(--sp-2);        /* 元素间距 = 8px */
+        --sp-element-lg: var(--sp-4);     /* 元素间距 (大) = 16px */
+        --sp-gutter: var(--sp-4);         /* 栅格列间距 = 16px */
+        --sp-gutter-lg: var(--sp-6);      /* 栅格列间距 (大) = 24px */
+        --sp-table-cell-x: var(--sp-3);   /* 表格单元格水平内边距 = 12px */
+        --sp-table-cell-y: var(--sp-2-5); /* 表格单元格垂直内边距 = 10px */
+
+        /* ── 布局尺寸 ── */
+        --layout-header-h: 64px;
+        --layout-sidebar-w: 240px;
+        --layout-sidebar-collapsed-w: 88px;
+        --layout-content-max-w: 2400px;
+        --layout-logo-h: 18px;
+
+        /* ── 24 栅格系统 ── */
+        --grid-columns: 24;
+        --grid-gutter: var(--sp-gutter);
+
+        /* ── 圆角 ── */
+        --radius-sm: 8px;
+        --radius-md: 12px;
+        --radius-lg: 16px;
+        --radius-xl: 24px;
+        --radius-full: 9999px;
+      }
+
       body {
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
@@ -271,6 +364,28 @@
       @keyframes ctxPop {
         from { opacity: 0; transform: scale(0.95); }
         to   { opacity: 1; transform: none; }
+      }
+
+      /* ══ 页面容器 ══ */
+      .page-container {
+        padding: var(--sp-page);
+        max-width: var(--layout-content-max-w);
+        width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      @media (min-width: 1024px) {
+        .page-container { padding: var(--sp-page-lg); }
+      }
+
+      /* ══ 24 栅格容器 ══ */
+      .grid-layout {
+        display: grid;
+        grid-template-columns: repeat(24, minmax(0, 1fr));
+        gap: var(--grid-gutter);
+      }
+      @media (min-width: 1024px) {
+        .grid-layout { gap: var(--sp-gutter-lg); }
       }
     </style>
     <style type="text/tailwindcss">

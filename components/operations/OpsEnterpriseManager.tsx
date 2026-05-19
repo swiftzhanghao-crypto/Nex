@@ -60,7 +60,7 @@ const OpsEnterpriseManager: React.FC = () => {
     const handleSearch = (v: string) => { setSearchTerm(v); setCurrentPage(1); };
 
     return (
-        <div className="p-3 lg:p-4 max-w-[2400px] w-full mx-auto animate-page-enter h-full flex flex-col gap-4">
+        <div className="page-container animate-page-enter h-full flex flex-col gap-4">
             {/* 顶部标题 + 搜索 + 筛选 */}
             <div className="flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">企业管理</h1>
