@@ -1,57 +1,71 @@
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useAppContext } from './contexts/AppContext';
 import { ToastProvider } from './contexts/ToastContext';
 import Layout from './components/layout/Layout';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import LoginModal from './components/auth/LoginModal';
-import SSOCallback from './components/auth/SSOCallback';
-import CrmXsyCallback from './components/auth/CrmXsyCallback';
-import ProductManager from './components/product/ProductManager';
-import OrderManager from './components/order/OrderManager';
-import CustomerManager from './components/crm/CustomerManager';
-import UserManager from './components/system/UserManager';
-import OrganizationManager from './components/system/OrganizationManager';
-import ChannelManager from './components/channel/ChannelManager';
-import OpportunityManager from './components/crm/OpportunityManager';
-import ProductDetails from './components/product/ProductDetails';
-import ProductCreateWizard from './components/product/ProductCreateWizard';
-import OrderDetails from './components/order/OrderDetails';
-import CustomerDetails from './components/crm/CustomerDetails';
-import ReportsManager from './components/crm/ReportsManager';
-import ReportsDetail from './components/crm/ReportsDetail';
-import MerchandiseDetails from './components/product/MerchandiseDetails';
-import ChannelDetails from './components/channel/ChannelDetails';
 
-import LeadsManager from './components/crm/LeadsManager';
-import Dashboard from './components/layout/Dashboard';
-import ProductPreview from './components/product/ProductPreview';
-import ProductCenter from './components/product/ProductCenter';
-import ContractManager from './components/order/ContractManager';
-import RemittanceManager from './components/order/RemittanceManager';
-import InvoiceManager from './components/order/InvoiceManager';
-import PerformanceManager from './components/performance/PerformanceManager';
-import AuthorizationManager from './components/order/AuthorizationManager';
-import DeliveryInfoManager from './components/order/DeliveryInfoManager';
-import AcceptanceManager from './components/order/AcceptanceManager';
-import RenewalManager from './components/order/RenewalManager';
-import OpsEnterpriseManager from './components/operations/OpsEnterpriseManager';
-import OpsDashboard from './components/operations/OpsDashboard';
-import ProductComponentPoolManager from './components/product/ProductComponentPoolManager';
-import ProductPackageManager from './components/product/ProductPackageManager';
-import ProductLicenseTemplateManager from './components/product/ProductLicenseTemplateManager';
-import ProductServiceConfigManager from './components/product/ProductServiceConfigManager';
-import ProductAttrConfigManager from './components/product/ProductAttrConfigManager';
-import LicenseTypeManager from './components/product/LicenseTypeManager';
-import DeliveryMethodConfig from './components/system/DeliveryMethodConfig';
-import SalesOrgConfig from './components/system/SalesOrgConfig';
-import ProductMsrpManager from './components/product/ProductMsrpManager';
-import ProductChannelPriceManager from './components/product/ProductChannelPriceManager';
-import ProductPolicyManager from './components/product/ProductPolicyManager';
-import CustomerInsight from './components/sab/CustomerInsight';
-import SABCustomerList from './components/sab/SABCustomerList';
-import SABCustomerDetail from './components/sab/SABCustomerDetail';
+const SSOCallback = React.lazy(() => import('./components/auth/SSOCallback'));
+const CrmXsyCallback = React.lazy(() => import('./components/auth/CrmXsyCallback'));
+
+const Dashboard = React.lazy(() => import('./components/layout/Dashboard'));
+const ProductCenter = React.lazy(() => import('./components/product/ProductCenter'));
+const ProductManager = React.lazy(() => import('./components/product/ProductManager'));
+const ProductCreateWizard = React.lazy(() => import('./components/product/ProductCreateWizard'));
+const ProductDetails = React.lazy(() => import('./components/product/ProductDetails'));
+const ProductPreview = React.lazy(() => import('./components/product/ProductPreview'));
+const MerchandiseDetails = React.lazy(() => import('./components/product/MerchandiseDetails'));
+const ProductPolicyManager = React.lazy(() => import('./components/product/ProductPolicyManager'));
+const ProductComponentPoolManager = React.lazy(() => import('./components/product/ProductComponentPoolManager'));
+const ProductPackageManager = React.lazy(() => import('./components/product/ProductPackageManager'));
+const ProductLicenseTemplateManager = React.lazy(() => import('./components/product/ProductLicenseTemplateManager'));
+const ProductServiceConfigManager = React.lazy(() => import('./components/product/ProductServiceConfigManager'));
+const ProductAttrConfigManager = React.lazy(() => import('./components/product/ProductAttrConfigManager'));
+const ProductMsrpManager = React.lazy(() => import('./components/product/ProductMsrpManager'));
+const ProductChannelPriceManager = React.lazy(() => import('./components/product/ProductChannelPriceManager'));
+
+const OrderManager = React.lazy(() => import('./components/order/OrderManager'));
+const OrderDetails = React.lazy(() => import('./components/order/OrderDetails'));
+const RenewalManager = React.lazy(() => import('./components/order/RenewalManager'));
+const ContractManager = React.lazy(() => import('./components/order/ContractManager'));
+const RemittanceManager = React.lazy(() => import('./components/order/RemittanceManager'));
+const InvoiceManager = React.lazy(() => import('./components/order/InvoiceManager'));
+const AcceptanceManager = React.lazy(() => import('./components/order/AcceptanceManager'));
+const AuthorizationManager = React.lazy(() => import('./components/order/AuthorizationManager'));
+const DeliveryInfoManager = React.lazy(() => import('./components/order/DeliveryInfoManager'));
+
+const CustomerManager = React.lazy(() => import('./components/crm/CustomerManager'));
+const CustomerDetails = React.lazy(() => import('./components/crm/CustomerDetails'));
+const OpportunityManager = React.lazy(() => import('./components/crm/OpportunityManager'));
+const LeadsManager = React.lazy(() => import('./components/crm/LeadsManager'));
+const ReportsManager = React.lazy(() => import('./components/crm/ReportsManager'));
+const ReportsDetail = React.lazy(() => import('./components/crm/ReportsDetail'));
+
+const UserManager = React.lazy(() => import('./components/system/UserManager'));
+const OrganizationManager = React.lazy(() => import('./components/system/OrganizationManager'));
+const LicenseTypeManager = React.lazy(() => import('./components/product/LicenseTypeManager'));
+const DeliveryMethodConfig = React.lazy(() => import('./components/system/DeliveryMethodConfig'));
+const SalesOrgConfig = React.lazy(() => import('./components/system/SalesOrgConfig'));
+
+const ChannelManager = React.lazy(() => import('./components/channel/ChannelManager'));
+const ChannelDetails = React.lazy(() => import('./components/channel/ChannelDetails'));
+
+const PerformanceManager = React.lazy(() => import('./components/performance/PerformanceManager'));
+
+const OpsEnterpriseManager = React.lazy(() => import('./components/operations/OpsEnterpriseManager'));
+const OpsDashboard = React.lazy(() => import('./components/operations/OpsDashboard'));
+
+const CustomerInsight = React.lazy(() => import('./components/sab/CustomerInsight'));
+const SABCustomerList = React.lazy(() => import('./components/sab/SABCustomerList'));
+const SABCustomerDetail = React.lazy(() => import('./components/sab/SABCustomerDetail'));
+
+const PageSpinner: React.FC = () => (
+  <div className="h-full flex items-center justify-center">
+    <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 
 const OpsPlaceholder: React.FC = () => (
   <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 gap-4 animate-fade-in">
@@ -74,87 +88,86 @@ const RequireAnyPermission: React.FC<{ permissions: string[]; children: React.Re
 function AppRoutes() {
   return (
     <Layout>
-      <Routes>
-        <Route path="/sso-callback" element={<SSOCallback />} />
-        <Route path="/crm-callback" element={<CrmXsyCallback />} />
-        <Route path="/" element={<Dashboard />} />
+      <Suspense fallback={<PageSpinner />}>
+        <Routes>
+          <Route path="/sso-callback" element={<SSOCallback />} />
+          <Route path="/crm-callback" element={<CrmXsyCallback />} />
+          <Route path="/" element={<Dashboard />} />
 
-        <Route path="/product-center" element={<ProductCenter />} />
-        <Route path="/product-policy" element={<ProductPolicyManager />} />
-        <Route path="/catalog/:id/preview" element={<ProductPreview />} />
-        <Route path="/products" element={<ProductManager />} />
-        <Route path="/products/create" element={<ProductCreateWizard />} />
-        <Route path="/products/:id" element={<ProductDetails />} />
-        <Route path="/merchandises/:id" element={<MerchandiseDetails />} />
+          <Route path="/product-center" element={<ProductCenter />} />
+          <Route path="/product-policy" element={<ProductPolicyManager />} />
+          <Route path="/catalog/:id/preview" element={<ProductPreview />} />
+          <Route path="/products" element={<ProductManager />} />
+          <Route path="/products/create" element={<ProductCreateWizard />} />
+          <Route path="/products/:id" element={<ProductDetails />} />
+          <Route path="/merchandises/:id" element={<MerchandiseDetails />} />
 
-        <Route path="/orders" element={<ErrorBoundary fallbackTitle="订单列表加载异常"><OrderManager /></ErrorBoundary>} />
-        <Route path="/orders/:id" element={<ErrorBoundary fallbackTitle="订单详情加载异常"><OrderDetails /></ErrorBoundary>} />
-        <Route path="/renewals" element={<RenewalManager />} />
+          <Route path="/orders" element={<ErrorBoundary fallbackTitle="订单列表加载异常"><OrderManager /></ErrorBoundary>} />
+          <Route path="/orders/:id" element={<ErrorBoundary fallbackTitle="订单详情加载异常"><OrderDetails /></ErrorBoundary>} />
+          <Route path="/renewals" element={<RenewalManager />} />
 
-        <Route path="/customers" element={<CustomerManager />} />
-        <Route path="/customers/:id" element={<CustomerDetails />} />
+          <Route path="/customers" element={<CustomerManager />} />
+          <Route path="/customers/:id" element={<CustomerDetails />} />
 
-        <Route path="/users" element={<UserManager defaultTab="USERS" />} />
-        <Route path="/roles" element={<UserManager defaultTab="ROLES" />} />
-        <Route path="/organization" element={<OrganizationManager />} />
-        <Route path="/system/license-types" element={<LicenseTypeManager />} />
-        <Route path="/system/delivery-methods" element={<DeliveryMethodConfig />} />
-        <Route path="/system/sales-org" element={<SalesOrgConfig />} />
+          <Route path="/users" element={<UserManager defaultTab="USERS" />} />
+          <Route path="/roles" element={<UserManager defaultTab="ROLES" />} />
+          <Route path="/organization" element={<OrganizationManager />} />
+          <Route path="/system/license-types" element={<LicenseTypeManager />} />
+          <Route path="/system/delivery-methods" element={<DeliveryMethodConfig />} />
+          <Route path="/system/sales-org" element={<SalesOrgConfig />} />
 
-        <Route path="/channels" element={<ChannelManager />} />
-        <Route path="/channels/:id" element={<ChannelDetails />} />
+          <Route path="/channels" element={<ChannelManager />} />
+          <Route path="/channels/:id" element={<ChannelDetails />} />
 
-        <Route path="/opportunities" element={<OpportunityManager />} />
+          <Route path="/opportunities" element={<OpportunityManager />} />
 
-        <Route path="/reports" element={<ReportsManager />} />
-        <Route path="/reports/:id" element={<ReportsDetail />} />
+          <Route path="/reports" element={<ReportsManager />} />
+          <Route path="/reports/:id" element={<ReportsDetail />} />
 
-        <Route path="/contracts" element={<ContractManager />} />
-        <Route path="/remittances" element={<RemittanceManager />} />
-        <Route path="/invoices" element={<InvoiceManager />} />
+          <Route path="/contracts" element={<ContractManager />} />
+          <Route path="/remittances" element={<RemittanceManager />} />
+          <Route path="/invoices" element={<InvoiceManager />} />
 
-        <Route path="/performance" element={<PerformanceManager />} />
-        <Route path="/authorizations" element={<AuthorizationManager />} />
-        <Route path="/delivery-info" element={<DeliveryInfoManager />} />
-        <Route path="/acceptances" element={<AcceptanceManager />} />
+          <Route path="/performance" element={<PerformanceManager />} />
+          <Route path="/authorizations" element={<AuthorizationManager />} />
+          <Route path="/delivery-info" element={<DeliveryInfoManager />} />
+          <Route path="/acceptances" element={<AcceptanceManager />} />
 
-        <Route path="/leads" element={<LeadsManager />} />
+          <Route path="/leads" element={<LeadsManager />} />
 
-        {/* 产品管理子路由 */}
-        <Route path="/product-manage/component-pool" element={<ProductComponentPoolManager />} />
-        <Route path="/product-manage/packages" element={<ProductPackageManager />} />
-        <Route path="/product-manage/license-templates" element={<ProductLicenseTemplateManager />} />
-        <Route path="/product-manage/service-config" element={<ProductServiceConfigManager />} />
-        <Route path="/product-manage/attr-config" element={<ProductAttrConfigManager />} />
+          <Route path="/product-manage/component-pool" element={<ProductComponentPoolManager />} />
+          <Route path="/product-manage/packages" element={<ProductPackageManager />} />
+          <Route path="/product-manage/license-templates" element={<ProductLicenseTemplateManager />} />
+          <Route path="/product-manage/service-config" element={<ProductServiceConfigManager />} />
+          <Route path="/product-manage/attr-config" element={<ProductAttrConfigManager />} />
 
-        {/* 产品报价子路由 */}
-        <Route path="/product-pricing/msrp" element={<ProductMsrpManager />} />
-        <Route path="/product-pricing/channel" element={<ProductChannelPriceManager />} />
+          <Route path="/product-pricing/msrp" element={<ProductMsrpManager />} />
+          <Route path="/product-pricing/channel" element={<ProductChannelPriceManager />} />
 
-        {/* 运营中心 */}
-        <Route path="/wps-ops" element={<Navigate to="/ops/dashboard" replace />} />
-        <Route path="/ops/dashboard" element={<OpsDashboard />} />
-        <Route path="/ops/enterprise" element={<OpsEnterpriseManager />} />
-        <Route path="/ops/*" element={<OpsPlaceholder />} />
+          <Route path="/wps-ops" element={<Navigate to="/ops/dashboard" replace />} />
+          <Route path="/ops/dashboard" element={<OpsDashboard />} />
+          <Route path="/ops/enterprise" element={<OpsEnterpriseManager />} />
+          <Route path="/ops/*" element={<OpsPlaceholder />} />
 
-        <Route path="/sab-insight" element={
-          <RequireAnyPermission permissions={['sab_insight_view', 'customer_view']}>
-            <CustomerInsight />
-          </RequireAnyPermission>
-        } />
-        <Route path="/sab-insight/customer-list" element={
-          <RequireAnyPermission permissions={['sab_insight_view', 'customer_view']}>
-            <SABCustomerList />
-          </RequireAnyPermission>
-        } />
-        <Route path="/sab-insight/customer/:id" element={
-          <RequireAnyPermission permissions={['sab_insight_view', 'customer_view']}>
-            <SABCustomerDetail />
-          </RequireAnyPermission>
-        } />
+          <Route path="/sab-insight" element={
+            <RequireAnyPermission permissions={['sab_insight_view', 'customer_view']}>
+              <CustomerInsight />
+            </RequireAnyPermission>
+          } />
+          <Route path="/sab-insight/customer-list" element={
+            <RequireAnyPermission permissions={['sab_insight_view', 'customer_view']}>
+              <SABCustomerList />
+            </RequireAnyPermission>
+          } />
+          <Route path="/sab-insight/customer/:id" element={
+            <RequireAnyPermission permissions={['sab_insight_view', 'customer_view']}>
+              <SABCustomerDetail />
+            </RequireAnyPermission>
+          } />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </Layout>
   );
 }

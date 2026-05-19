@@ -899,7 +899,6 @@ const OrderDetails: React.FC = () => {
                                   <th className="px-5 py-4">产品信息</th>
                                   <th className="px-5 py-4">下级单位授权</th>
                                   <th className="px-5 py-4 text-center">数量</th>
-                                  <th className="px-5 py-4 text-center whitespace-nowrap">场地授权PC数</th>
                                   <th className="px-5 py-4 text-center">授权/服务期限</th>
                                   <th className="px-5 py-4 text-right">单价</th>
                                   <th className="px-5 py-4 text-right">产品金额</th>
@@ -953,7 +952,6 @@ const OrderDetails: React.FC = () => {
                                           )}
                                       </td>
                                       <td className="px-5 py-5 text-center dark:text-white font-medium">x {item.quantity}</td>
-                                      <td className="px-5 py-5 text-center dark:text-white font-medium">{item.siteLicensePcCount != null ? item.siteLicensePcCount : <span className="text-gray-300 dark:text-gray-600">-</span>}</td>
                                       <td className="px-5 py-5 text-center">
                                           {item.licensePeriod && item.licensePeriod !== '永久'
                                               ? <span className="inline-flex px-2.5 py-1 text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800 rounded-lg">{item.licensePeriod}</span>
