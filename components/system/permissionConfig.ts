@@ -10,8 +10,6 @@ export const columnConfig = [
               { id: 'customerName', label: '客户名称' },
               { id: 'licensee', label: '被授权方' },
               { id: 'status', label: '订单状态' },
-              { id: 'paymentRecord', label: '收款记录' },
-              { id: 'approval', label: '审批记录' }
           ]
       },
       {

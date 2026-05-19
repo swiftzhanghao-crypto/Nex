@@ -3,6 +3,7 @@ import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
 import { safePagination, getUserName } from '../utils.ts';
+import { validateBody, channelCreateSchema, channelUpdateSchema } from '../validate.ts';
 import { parseRoles } from './users.ts';
 
 const router = Router();
@@ -45,7 +46,7 @@ router.get('/:id', checkPermission('channel', 'read'), (req, res) => {
   res.json(toChannel(row));
 });
 
-router.post('/', checkPermission('channel', 'create'), (req: AuthRequest, res) => {
+router.post('/', checkPermission('channel', 'create'), validateBody(channelCreateSchema), (req: AuthRequest, res) => {
   const db = getDb();
   const c = req.body;
   const id = c.id || `CH-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -63,7 +64,7 @@ router.post('/', checkPermission('channel', 'create'), (req: AuthRequest, res) =
   res.status(201).json(toChannel(row));
 });
 
-router.put('/:id', checkPermission('channel', 'update'), (req: AuthRequest, res) => {
+router.put('/:id', checkPermission('channel', 'update'), validateBody(channelUpdateSchema), (req: AuthRequest, res) => {
   const db = getDb();
   const c = req.body;
   const id = req.params.id;

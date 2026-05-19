@@ -4,6 +4,7 @@ import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
 import { buildRowPermissionWhere, checkRowPermissionForSingle } from '../rowPermissionFilter.ts';
 import { safeJsonParse, getUserName, safePagination } from '../utils.ts';
+import { validateBody, productCreateSchema, productUpdateSchema } from '../validate.ts';
 
 const router = Router();
 router.use(authMiddleware);
@@ -96,7 +97,7 @@ router.get('/:id', checkPermission('product', 'read'), (req: AuthRequest, res) =
   res.json(product);
 });
 
-router.post('/', checkPermission('product', 'create'), (req: AuthRequest, res) => {
+router.post('/', checkPermission('product', 'create'), validateBody(productCreateSchema), (req: AuthRequest, res) => {
   const db = getDb();
   const p = req.body;
   const id = p.id || `PROD-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -125,7 +126,7 @@ router.post('/', checkPermission('product', 'create'), (req: AuthRequest, res) =
   res.status(201).json(toProduct(row));
 });
 
-router.put('/:id', checkPermission('product', 'update'), (req: AuthRequest, res) => {
+router.put('/:id', checkPermission('product', 'update'), validateBody(productUpdateSchema), (req: AuthRequest, res) => {
   const db = getDb();
   const p = req.body;
   db.prepare(`

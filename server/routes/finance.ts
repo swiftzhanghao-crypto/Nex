@@ -3,6 +3,7 @@ import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
 import { safePagination, getUserName } from '../utils.ts';
+import { validateBody, contractCreateSchema, remittanceCreateSchema, invoiceCreateSchema } from '../validate.ts';
 
 const router = Router();
 router.use(authMiddleware);
@@ -44,7 +45,7 @@ router.get('/contracts/:id', checkPermission('contract', 'read'), (req, res) => 
   res.json(toContract(row));
 });
 
-router.post('/contracts', checkPermission('contract', 'create'), (req: AuthRequest, res) => {
+router.post('/contracts', checkPermission('contract', 'create'), validateBody(contractCreateSchema), (req: AuthRequest, res) => {
   const db = getDb();
   const c = req.body;
   const id = c.id || `CON-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -69,7 +70,7 @@ router.post('/contracts', checkPermission('contract', 'create'), (req: AuthReque
   res.status(201).json(toContract(row));
 });
 
-router.put('/contracts/:id', checkPermission('contract', 'update'), (req: AuthRequest, res) => {
+router.put('/contracts/:id', checkPermission('contract', 'update'), validateBody(contractCreateSchema.partial().extend({ code: contractCreateSchema.shape.code, name: contractCreateSchema.shape.name })), (req: AuthRequest, res) => {
   const db = getDb();
   const c = req.body;
   const id = req.params.id;
@@ -147,7 +148,7 @@ router.get('/remittances/:id', checkPermission('remittance', 'read'), (req, res)
   res.json(toRemittance(row));
 });
 
-router.post('/remittances', checkPermission('remittance', 'create'), (req: AuthRequest, res) => {
+router.post('/remittances', checkPermission('remittance', 'create'), validateBody(remittanceCreateSchema), (req: AuthRequest, res) => {
   const db = getDb();
   const r = req.body;
   const id = r.id || `REM-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -166,7 +167,7 @@ router.post('/remittances', checkPermission('remittance', 'create'), (req: AuthR
   res.status(201).json(toRemittance(row));
 });
 
-router.put('/remittances/:id', checkPermission('remittance', 'update'), (req: AuthRequest, res) => {
+router.put('/remittances/:id', checkPermission('remittance', 'update'), validateBody(remittanceCreateSchema.partial()), (req: AuthRequest, res) => {
   const db = getDb();
   const r = req.body;
   const id = req.params.id;
@@ -234,7 +235,7 @@ router.get('/invoices/:id', checkPermission('invoice', 'read'), (req, res) => {
   res.json(toInvoice(row));
 });
 
-router.post('/invoices', checkPermission('invoice', 'create'), (req: AuthRequest, res) => {
+router.post('/invoices', checkPermission('invoice', 'create'), validateBody(invoiceCreateSchema), (req: AuthRequest, res) => {
   const db = getDb();
   const i = req.body;
   const id = i.id || `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -259,7 +260,7 @@ router.post('/invoices', checkPermission('invoice', 'create'), (req: AuthRequest
   res.status(201).json(toInvoice(row));
 });
 
-router.put('/invoices/:id', checkPermission('invoice', 'update'), (req: AuthRequest, res) => {
+router.put('/invoices/:id', checkPermission('invoice', 'update'), validateBody(invoiceCreateSchema.partial()), (req: AuthRequest, res) => {
   const db = getDb();
   const i = req.body;
   const id = req.params.id;

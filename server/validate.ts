@@ -113,6 +113,157 @@ export const orderUpdateSchema = orderCreateSchema.partial().extend({
   customerName: z.string().min(1).max(200),
 }).passthrough();
 
+// ============================================================
+// Products
+// ============================================================
+export const productCreateSchema = z.object({
+  id: z.string().max(64).optional(),
+  name: z.string().min(1, '产品名称不能为空').max(300),
+  category: z.string().min(1).max(80),
+  subCategory: optStr(80),
+  description: optStr(2000),
+  status: z.enum(['OnShelf', 'OffShelf']).optional(),
+  tags: z.array(z.string().max(40)).max(50).optional(),
+  skus: z.array(z.any()).max(200).optional(),
+  composition: z.array(z.any()).max(200).optional(),
+  installPkgs: z.array(z.any()).max(50).optional(),
+  rights: z.array(z.any()).max(200).optional(),
+  licenseTpl: z.any().optional(),
+  productType: optStr(80),
+  onlineDelivery: optStr(80),
+  productClass: optStr(80),
+  productClassification: optStr(80),
+  productSeries: optStr(80),
+  productLine: optStr(80),
+  productCategory: optStr(80),
+  productClassFinance: optStr(80),
+  productLineFinance: optStr(80),
+  productSeriesFinance: optStr(80),
+  businessDeliveryName: optStr(200),
+  salesOrgName: optStr(200),
+  salesScope: z.array(z.any()).max(200).optional(),
+  linkedServices: z.array(z.any()).max(100).optional(),
+}).passthrough();
+
+export const productUpdateSchema = productCreateSchema.partial().extend({
+  name: z.string().min(1).max(300),
+});
+
+// ============================================================
+// Channels
+// ============================================================
+export const channelCreateSchema = z.object({
+  id: z.string().max(64).optional(),
+  name: z.string().min(1, '渠道名称不能为空').max(200),
+  type: z.string().min(1).max(40),
+  level: z.string().min(1).max(40),
+  contactName: z.string().min(1, '联系人不能为空').max(100),
+  contactPhone: z.string().min(1, '联系电话不能为空').max(30),
+  email: z.string().email('邮箱格式不正确').max(100),
+  region: z.string().min(1).max(80),
+  status: z.enum(['Active', 'Inactive']).optional(),
+  agreementDate: z.string().min(1).max(20),
+}).passthrough();
+
+export const channelUpdateSchema = channelCreateSchema.partial().extend({
+  name: z.string().min(1).max(200),
+});
+
+// ============================================================
+// Opportunities
+// ============================================================
+export const opportunityCreateSchema = z.object({
+  id: z.string().max(64).optional(),
+  name: z.string().min(1, '商机名称不能为空').max(300),
+  customerId: idStr,
+  customerName: z.string().min(1).max(200),
+  productType: optStr(80),
+  products: optStr(1000),
+  stage: z.string().max(40).optional(),
+  probability: z.number().min(0).max(100).optional(),
+  department: optStr(100),
+  amount: z.number().nonnegative().optional().nullable(),
+  expectedRevenue: z.number().nonnegative().optional(),
+  finalUserRev: z.number().nonnegative().optional().nullable(),
+  closeDate: z.string().min(1).max(20),
+  ownerId: idStr,
+  ownerName: z.string().min(1).max(100),
+}).passthrough();
+
+export const opportunityUpdateSchema = opportunityCreateSchema.partial().extend({
+  name: z.string().min(1).max(300),
+});
+
+// ============================================================
+// System: Auth Types / Sales Orgs
+// ============================================================
+export const authTypeSchema = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().min(1, '名称不能为空').max(100),
+  period: z.string().min(1).max(40),
+  nccBiz: z.string().max(100).optional(),
+  nccIncome: z.string().max(100).optional(),
+  hasUpgradeWarranty: z.boolean().optional(),
+  purchaseUnit: optStr(40),
+  auxPurchaseUnit: optStr(40),
+  sortOrder: z.number().int().nonnegative().optional(),
+});
+
+export const salesOrgSchema = z.object({
+  id: z.string().min(1).max(64),
+  no: z.number().int().nonnegative(),
+  name: z.string().min(1, '组织名称不能为空').max(200),
+  shortName: z.string().max(100).optional(),
+  financeCode: z.string().max(20).optional(),
+  orgType: z.enum(['金山', '数科']),
+  status: z.enum(['正常', '待补充']).optional(),
+});
+
+// ============================================================
+// Finance: Contracts / Remittances / Invoices
+// ============================================================
+export const contractCreateSchema = z.object({
+  id: z.string().max(64).optional(),
+  code: z.string().min(1).max(64),
+  name: z.string().min(1, '合同名称不能为空').max(300),
+  externalCode: optStr(64),
+  contractType: z.string().min(1).max(40),
+  partyA: optStr(200),
+  partyB: optStr(200),
+  verifyStatus: z.string().max(40).optional(),
+  verifyRemark: optStr(500),
+  amount: z.number().nonnegative().optional().nullable(),
+  signDate: optStr(20),
+  orderId: optStr(64),
+  customerId: optStr(64),
+}).passthrough();
+
+export const remittanceCreateSchema = z.object({
+  id: z.string().max(64).optional(),
+  erpDocNo: optStr(64),
+  bankTransactionNo: optStr(64),
+  type: z.string().min(1).max(40),
+  remitterName: z.string().min(1, '付款人不能为空').max(200),
+  remitterAccount: optStr(64),
+  paymentMethod: z.string().min(1).max(40),
+  amount: z.number().positive('金额必须大于0'),
+  receiverName: z.string().min(1, '收款人不能为空').max(200),
+  receiverAccount: optStr(64),
+  paymentTime: z.string().min(1).max(40),
+}).passthrough();
+
+export const invoiceCreateSchema = z.object({
+  id: z.string().max(64).optional(),
+  invoiceTitle: z.string().min(1, '发票抬头不能为空').max(200),
+  amount: z.number().positive('金额必须大于0'),
+  applyTime: z.string().min(1).max(40),
+  applyType: z.string().min(1).max(40),
+  status: z.string().max(40).optional(),
+  orderId: optStr(64),
+  taxId: optStr(64),
+  remark: optStr(500),
+}).passthrough();
+
 /**
  * 校验订单行中下级单位的业务规则：
  * - authCount 之和必须等于行 quantity

@@ -3,6 +3,7 @@ import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
 import { getUserName } from '../utils.ts';
+import { validateBody, authTypeSchema, salesOrgSchema } from '../validate.ts';
 
 const router = Router();
 router.use(authMiddleware);
@@ -36,7 +37,7 @@ router.get('/auth-types/:id', (req, res) => {
   res.json(toAuthType(row));
 });
 
-router.post('/auth-types', checkPermission('system', 'manage'), (req: AuthRequest, res) => {
+router.post('/auth-types', checkPermission('system', 'manage'), validateBody(authTypeSchema), (req: AuthRequest, res) => {
   const db = getDb();
   const b = req.body;
   const maxOrder = (db.prepare('SELECT MAX(sort_order) as m FROM auth_types').get() as any)?.m ?? -1;
@@ -54,7 +55,7 @@ router.post('/auth-types', checkPermission('system', 'manage'), (req: AuthReques
   res.status(201).json(toAuthType(db.prepare('SELECT * FROM auth_types WHERE id = ?').get(b.id)));
 });
 
-router.put('/auth-types/:id', checkPermission('system', 'manage'), (req: AuthRequest, res) => {
+router.put('/auth-types/:id', checkPermission('system', 'manage'), validateBody(authTypeSchema.partial().extend({ name: authTypeSchema.shape.name })), (req: AuthRequest, res) => {
   const db = getDb();
   const b = req.body;
   const id = req.params.id;
@@ -121,7 +122,7 @@ router.get('/sales-orgs/:id', (req, res) => {
   res.json(toSalesOrg(row));
 });
 
-router.post('/sales-orgs', checkPermission('system', 'manage'), (req: AuthRequest, res) => {
+router.post('/sales-orgs', checkPermission('system', 'manage'), validateBody(salesOrgSchema), (req: AuthRequest, res) => {
   const db = getDb();
   const b = req.body;
   db.prepare(`
@@ -136,7 +137,7 @@ router.post('/sales-orgs', checkPermission('system', 'manage'), (req: AuthReques
   res.status(201).json(toSalesOrg(db.prepare('SELECT * FROM sales_orgs WHERE id = ?').get(b.id)));
 });
 
-router.put('/sales-orgs/:id', checkPermission('system', 'manage'), (req: AuthRequest, res) => {
+router.put('/sales-orgs/:id', checkPermission('system', 'manage'), validateBody(salesOrgSchema.partial().extend({ name: salesOrgSchema.shape.name })), (req: AuthRequest, res) => {
   const db = getDb();
   const b = req.body;
   const id = req.params.id;

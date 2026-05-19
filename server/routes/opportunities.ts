@@ -3,6 +3,7 @@ import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
 import { safePagination, getUserName } from '../utils.ts';
+import { validateBody, opportunityCreateSchema, opportunityUpdateSchema } from '../validate.ts';
 
 const router = Router();
 router.use(authMiddleware);
@@ -50,7 +51,7 @@ router.get('/:id', checkPermission('opportunity', 'read'), (req, res) => {
   res.json(toOpportunity(row));
 });
 
-router.post('/', checkPermission('opportunity', 'create'), (req: AuthRequest, res) => {
+router.post('/', checkPermission('opportunity', 'create'), validateBody(opportunityCreateSchema), (req: AuthRequest, res) => {
   const db = getDb();
   const o = req.body;
   const id = o.id || `OPP-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -77,7 +78,7 @@ router.post('/', checkPermission('opportunity', 'create'), (req: AuthRequest, re
   res.status(201).json(toOpportunity(row));
 });
 
-router.put('/:id', checkPermission('opportunity', 'update'), (req: AuthRequest, res) => {
+router.put('/:id', checkPermission('opportunity', 'update'), validateBody(opportunityUpdateSchema), (req: AuthRequest, res) => {
   const db = getDb();
   const o = req.body;
   const id = req.params.id;

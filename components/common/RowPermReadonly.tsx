@@ -1,5 +1,5 @@
 import React from 'react';
-import { Database, Columns, CheckCircle, Check } from 'lucide-react';
+import { Database, Columns, CheckCircle, Check, X } from 'lucide-react';
 import type { RowLogicConfig } from '../../types';
 
 /* ── 类型 ── */
@@ -173,28 +173,28 @@ export const RowPermResourceBlock: React.FC<{
 };
 
 /**
- * 列权限只读展示：某个 resource 下的可见/不可见列。
+ * 列权限只读展示：某个 resource 下的隐藏列（勾选=不可见）。
  */
 export const ColPermResourceBlock: React.FC<{
   colCfg: ColCfgLike;
   rule: ColRuleLike;
 }> = ({ colCfg, rule }) => (
   <div className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
-    <div className="flex items-center gap-2 px-4 py-2.5 bg-purple-50/50 dark:bg-purple-900/10">
-      <Columns className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+    <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50/50 dark:bg-red-900/10">
+      <Columns className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
       <span className="font-bold text-sm text-gray-800 dark:text-gray-100">{colCfg.label}</span>
-      <span className="text-xs text-purple-500 ml-auto">{rule.allowedColumns.length}/{colCfg.columns.length} 列可见</span>
+      <span className="text-xs text-red-500 ml-auto">{rule.allowedColumns.length}/{colCfg.columns.length} 列已隐藏</span>
     </div>
     <div className="p-3 space-y-2">
       {colCfg.columns.map(col => {
-        const allowed = rule.allowedColumns.includes(col.id);
+        const isHidden = rule.allowedColumns.includes(col.id);
         return (
-          <div key={col.id} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border ${allowed ? 'bg-purple-50 dark:bg-purple-900/15 border-purple-200 dark:border-purple-800/40' : 'bg-gray-50 dark:bg-white/[0.02] border-gray-100 dark:border-white/10'}`}>
-            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${allowed ? 'bg-purple-500 border-purple-500' : 'border-gray-300 dark:border-gray-600'}`}>
-              {allowed && <Check className="w-2.5 h-2.5 text-white" />}
+          <div key={col.id} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border ${isHidden ? 'bg-red-50 dark:bg-red-900/15 border-red-200 dark:border-red-800/40' : 'bg-white dark:bg-white/[0.02] border-gray-100 dark:border-white/10'}`}>
+            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${isHidden ? 'bg-red-500 border-red-500' : 'border-gray-300 dark:border-gray-600'}`}>
+              {isHidden && <X className="w-2.5 h-2.5 text-white" />}
             </div>
-            <span className={`text-sm font-medium ${allowed ? 'text-purple-700 dark:text-purple-300' : 'text-gray-400 dark:text-gray-500 line-through'}`}>{col.label}</span>
-            {allowed && <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-500 dark:text-purple-400 font-bold">可见</span>}
+            <span className={`text-sm font-medium ${isHidden ? 'text-red-700 dark:text-red-300 line-through' : 'text-gray-600 dark:text-gray-400'}`}>{col.label}</span>
+            {isHidden ? <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-500 dark:text-red-400 font-bold">不可见</span> : <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 font-bold">可见</span>}
           </div>
         );
       })}

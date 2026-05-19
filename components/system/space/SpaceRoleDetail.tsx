@@ -694,7 +694,7 @@ const SpaceRoleDetail: React.FC<Props> = ({
                         <div className="flex-1 px-2 pb-2 space-y-0.5">
                           {space.columnConfig.map(res => {
                             const rule = (form.columnPermissions ?? []).find(r => r.resource === res.id);
-                            const checkedCount = rule ? (rule.allowedColumns || []).length : 0;
+                            const hiddenCnt = rule ? (rule.allowedColumns || []).length : 0;
                             const isActive = selectedColResource === res.id;
                             return (
                               <button key={res.id} onClick={() => setSelectedColResource(res.id)} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all ${isActive ? 'bg-purple-50 dark:bg-purple-900/20 shadow-sm' : 'hover:bg-gray-100 dark:hover:bg-white/5'}`}>
@@ -702,10 +702,10 @@ const SpaceRoleDetail: React.FC<Props> = ({
                                 <div className="flex-1 min-w-0">
                                   <div className={`text-sm font-semibold truncate ${isActive ? 'text-purple-700 dark:text-purple-300' : 'text-gray-700 dark:text-gray-300'}`}>{res.label}</div>
                                   <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                                    {checkedCount > 0 ? `${checkedCount}/${res.columns.length} 列可见` : `${res.columns.length} 个数据列`}
+                                    {hiddenCnt > 0 ? `${hiddenCnt}/${res.columns.length} 列已隐藏` : `${res.columns.length} 个数据列`}
                                   </div>
                                 </div>
-                                {checkedCount > 0 && <span className="w-5 h-5 rounded-full bg-purple-500 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{checkedCount}</span>}
+                                {hiddenCnt > 0 && <span className="w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{hiddenCnt}</span>}
                               </button>
                             );
                           })}
@@ -716,7 +716,8 @@ const SpaceRoleDetail: React.FC<Props> = ({
                           const colCfg = space.columnConfig.find(c => c.id === selectedColResource);
                           if (!colCfg) return null;
                           const rule = (form.columnPermissions ?? []).find(r => r.resource === selectedColResource);
-                          const checkedCount = rule ? (rule.allowedColumns || []).length : 0;
+                          const hiddenColumns = rule ? (rule.allowedColumns || []) : [];
+                          const hiddenCount = hiddenColumns.length;
                           const toggleCol = (colId: string) => {
                             setFormPatch(prev => {
                               const rules = prev.columnPermissions || [];
@@ -745,30 +746,30 @@ const SpaceRoleDetail: React.FC<Props> = ({
                               <div className="flex items-start justify-between gap-3">
                                 <div>
                                   <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200">{colCfg.label} — 列权限配置</h4>
-                                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">勾选代表该角色可以查看对应的数据列</p>
+                                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">勾选代表该角色<strong>不可见</strong>对应的数据列，不勾选默认可见</p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <button onClick={() => selectAllCols(true)} className="text-xs text-purple-600 dark:text-purple-400 hover:underline font-medium">全选</button>
+                                  <button onClick={() => selectAllCols(true)} className="text-xs text-red-600 dark:text-red-400 hover:underline font-medium">全部隐藏</button>
                                   <span className="text-gray-300 dark:text-gray-600">|</span>
-                                  <button onClick={() => selectAllCols(false)} className="text-xs text-gray-500 dark:text-gray-400 hover:underline font-medium">全不选</button>
+                                  <button onClick={() => selectAllCols(false)} className="text-xs text-gray-500 dark:text-gray-400 hover:underline font-medium">全部可见</button>
                                 </div>
                               </div>
                               <div className="space-y-2">
                                 {colCfg.columns.map(col => {
-                                  const isChecked = rule ? (rule.allowedColumns || []).includes(col.id) : false;
+                                  const isHidden = hiddenColumns.includes(col.id);
                                   return (
-                                    <label key={col.id} onClick={() => toggleCol(col.id)} className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${isChecked ? 'bg-purple-50 dark:bg-purple-900/15 border-purple-200 dark:border-purple-800/40' : 'bg-white dark:bg-white/[0.02] border-gray-100 dark:border-white/10 hover:border-purple-200 dark:hover:border-purple-800/30'}`}>
-                                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${isChecked ? 'bg-purple-500 border-purple-500' : 'border-gray-300 dark:border-gray-600'}`}>
-                                        {isChecked && <Check className="w-3 h-3 text-white" />}
+                                    <label key={col.id} onClick={() => toggleCol(col.id)} className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${isHidden ? 'bg-red-50 dark:bg-red-900/15 border-red-200 dark:border-red-800/40' : 'bg-white dark:bg-white/[0.02] border-gray-100 dark:border-white/10 hover:border-red-200 dark:hover:border-red-800/30'}`}>
+                                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${isHidden ? 'bg-red-500 border-red-500' : 'border-gray-300 dark:border-gray-600'}`}>
+                                        {isHidden && <X className="w-3 h-3 text-white" />}
                                       </div>
-                                      <span className={`text-sm font-medium ${isChecked ? 'text-purple-700 dark:text-purple-300' : 'text-gray-600 dark:text-gray-400'}`}>{col.label}</span>
-                                      {isChecked && <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-500 dark:text-purple-400 font-bold">可见</span>}
+                                      <span className={`text-sm font-medium ${isHidden ? 'text-red-700 dark:text-red-300' : 'text-gray-600 dark:text-gray-400'}`}>{col.label}</span>
+                                      {isHidden ? <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-500 dark:text-red-400 font-bold">不可见</span> : <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 font-bold">可见</span>}
                                     </label>
                                   );
                                 })}
                               </div>
                               <div className="text-xs text-gray-400 dark:text-gray-500 italic pt-2 border-t border-gray-200/60 dark:border-white/10">
-                                已选 <strong className="text-purple-600 dark:text-purple-400">{checkedCount}</strong> / {colCfg.columns.length} 列可见{checkedCount === 0 && '，默认可见所有列'}
+                                已隐藏 <strong className="text-red-600 dark:text-red-400">{hiddenCount}</strong> / {colCfg.columns.length} 列{hiddenCount === 0 && '，全部列默认可见'}
                               </div>
                             </>
                           );
