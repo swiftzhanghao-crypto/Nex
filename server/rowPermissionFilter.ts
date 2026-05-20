@@ -1,4 +1,8 @@
+import type Database from 'better-sqlite3';
 import { safeJsonParse } from './utils.ts';
+import { createLogger } from './logger.ts';
+
+const log = createLogger('rowPermission');
 
 type RowRule = {
   resource?: string;
@@ -8,19 +12,56 @@ type RowRule = {
 
 type PermissionResource = 'Order' | 'Customer' | 'Product';
 
-export function getRowRules(db: any, roleId: string | string[], resource: PermissionResource): RowRule[] {
+interface RoleRowPermissionsRow {
+  row_permissions: string;
+}
+
+interface OrderPermissionItem {
+  salesRepId?: string;
+  businessManagerId?: string;
+  creatorId?: string;
+  buyerType?: string;
+  buyerId?: string;
+  source?: string;
+  status?: string;
+  industryLine?: string;
+  province?: string;
+  customerIndustry?: string;
+  customerLevel?: string;
+}
+
+interface CustomerPermissionItem {
+  ownerId?: string;
+  industryLine?: string;
+  industry?: string;
+  province?: string;
+  region?: string;
+  channelId?: string;
+}
+
+interface ProductPermissionItem {
+  id?: string;
+  category?: string;
+  subCategory?: string;
+  status?: string;
+  tags?: string[];
+}
+
+type SqlParam = string | number | null;
+
+export function getRowRules(db: Database.Database, roleId: string | string[], resource: PermissionResource): RowRule[] {
   const ids = Array.isArray(roleId) ? roleId : [roleId];
   const allRules: RowRule[] = [];
   for (const id of ids) {
-    const role = db.prepare('SELECT row_permissions FROM roles WHERE id = ?').get(id) as any;
-    const rules = safeJsonParse(role?.row_permissions, []);
+    const role = db.prepare('SELECT row_permissions FROM roles WHERE id = ?').get(id) as RoleRowPermissionsRow | undefined;
+    const rules = safeJsonParse<RowRule[]>(role?.row_permissions, []);
     if (!Array.isArray(rules)) continue;
     allRules.push(...rules.filter((r: RowRule) => r?.resource === resource && Array.isArray(r.values) && r.values.length > 0));
   }
   return allRules;
 }
 
-export function getDescendantDeptIds(db: any, deptId: string): string[] {
+export function getDescendantDeptIds(db: Database.Database, deptId: string): string[] {
   const rows = db.prepare('SELECT id, parent_id FROM departments').all() as Array<{ id: string; parent_id: string | null }>;
   const childrenMap = new Map<string, string[]>();
   rows.forEach((row) => {
@@ -45,7 +86,7 @@ export function getDescendantDeptIds(db: any, deptId: string): string[] {
   return Array.from(result);
 }
 
-export function buildUserDeptMap(db: any): Map<string, string | null> {
+export function buildUserDeptMap(db: Database.Database): Map<string, string | null> {
   const userRows = db.prepare('SELECT id, department_id FROM users').all() as Array<{ id: string; department_id: string | null }>;
   const map = new Map<string, string | null>();
   userRows.forEach((u) => map.set(u.id, u.department_id || null));
@@ -71,7 +112,7 @@ function evaluatePersonDimension(
 
 function evaluateOrderRowRule(
   rule: RowRule,
-  order: any,
+  order: OrderPermissionItem,
   currentUserId: string,
   currentUserDeptId: string | null,
   deptAndChildrenIds: string[],
@@ -118,7 +159,7 @@ function evaluateOrderRowRule(
 
 function evaluateCustomerRowRule(
   rule: RowRule,
-  customer: any,
+  customer: CustomerPermissionItem,
   currentUserId: string,
   currentUserDeptId: string | null,
   deptAndChildrenIds: string[],
@@ -135,9 +176,9 @@ function evaluateCustomerRowRule(
       return !!ownerDeptId && vals.includes(ownerDeptId);
     }
     case 'industryLine':
-      return !!(customer.industryLine || customer.industry) && vals.includes(customer.industryLine || customer.industry);
+      return !!(customer.industryLine || customer.industry) && vals.includes(customer.industryLine || customer.industry!);
     case 'province':
-      return !!(customer.province || customer.region) && vals.includes(customer.province || customer.region);
+      return !!(customer.province || customer.region) && vals.includes(customer.province || customer.region!);
     case 'directChannelId':
       return !!customer.channelId && vals.includes(customer.channelId);
     default:
@@ -149,7 +190,7 @@ const warnedProductDimensions = new Set<string>();
 
 function evaluateProductRowRule(
   rule: RowRule,
-  product: any,
+  product: ProductPermissionItem,
 ): boolean {
   const vals = rule.values || [];
   if (vals.length === 0) return true;
@@ -175,7 +216,7 @@ function evaluateProductRowRule(
       const key = `Product:${rule.dimension}`;
       if (!warnedProductDimensions.has(key)) {
         warnedProductDimensions.add(key);
-        console.warn(`[rowPermission] Product 资源不支持维度 "${rule.dimension}"（产品表无对应字段），规则被忽略`);
+        log.warn('Product 资源不支持维度，规则被忽略', { dimension: rule.dimension });
       }
       return true;
     }
@@ -183,19 +224,37 @@ function evaluateProductRowRule(
       const key = `Product:${rule.dimension || 'unknown'}`;
       if (!warnedProductDimensions.has(key)) {
         warnedProductDimensions.add(key);
-        console.warn(`[rowPermission] Product 资源未识别维度 "${rule.dimension}"，规则被忽略`);
+        log.warn('Product 资源未识别维度，规则被忽略', { dimension: rule.dimension });
       }
       return true;
     }
   }
 }
 
-export function filterByRowPermissions(
-  db: any,
+export function filterByRowPermissions<T extends OrderPermissionItem>(
+  db: Database.Database,
+  user: { userId: string; roles: string[] },
+  resource: 'Order',
+  data: T[],
+): T[];
+export function filterByRowPermissions<T extends CustomerPermissionItem>(
+  db: Database.Database,
+  user: { userId: string; roles: string[] },
+  resource: 'Customer',
+  data: T[],
+): T[];
+export function filterByRowPermissions<T extends ProductPermissionItem>(
+  db: Database.Database,
+  user: { userId: string; roles: string[] },
+  resource: 'Product',
+  data: T[],
+): T[];
+export function filterByRowPermissions<T extends OrderPermissionItem | CustomerPermissionItem | ProductPermissionItem>(
+  db: Database.Database,
   user: { userId: string; roles: string[] },
   resource: PermissionResource,
-  data: any[],
-): any[] {
+  data: T[],
+): T[] {
   const safeRoles = Array.isArray(user.roles) ? user.roles : [];
   const rules = getRowRules(db, safeRoles, resource);
   if (rules.length === 0) return data;
@@ -204,28 +263,52 @@ export function filterByRowPermissions(
   const currentUserDeptId = userDeptMap.get(user.userId) || null;
   const deptAndChildrenIds = currentUserDeptId ? getDescendantDeptIds(db, currentUserDeptId) : [];
 
-  const evaluator = resource === 'Order'
-    ? evaluateOrderRowRule
-    : resource === 'Customer'
-      ? evaluateCustomerRowRule
-      : evaluateProductRowRule;
-
   if (resource === 'Product') {
-    return data.filter(item => rules.every(rule => evaluateProductRowRule(rule, item)));
+    return data.filter(item => rules.every(rule => evaluateProductRowRule(rule, item as ProductPermissionItem)));
+  }
+
+  if (resource === 'Customer') {
+    return data.filter(item =>
+      rules.every(rule => evaluateCustomerRowRule(rule, item as CustomerPermissionItem, user.userId, currentUserDeptId, deptAndChildrenIds, userDeptMap))
+    );
   }
 
   return data.filter(item =>
-    rules.every(rule => evaluator(rule, item, user.userId, currentUserDeptId, deptAndChildrenIds, userDeptMap))
+    rules.every(rule => evaluateOrderRowRule(rule, item as OrderPermissionItem, user.userId, currentUserDeptId, deptAndChildrenIds, userDeptMap))
   );
 }
 
 export function checkRowPermissionForSingle(
-  db: any,
+  db: Database.Database,
+  user: { userId: string; roles: string[] },
+  resource: 'Order',
+  item: OrderPermissionItem,
+): boolean;
+export function checkRowPermissionForSingle(
+  db: Database.Database,
+  user: { userId: string; roles: string[] },
+  resource: 'Customer',
+  item: CustomerPermissionItem,
+): boolean;
+export function checkRowPermissionForSingle(
+  db: Database.Database,
+  user: { userId: string; roles: string[] },
+  resource: 'Product',
+  item: ProductPermissionItem,
+): boolean;
+export function checkRowPermissionForSingle(
+  db: Database.Database,
   user: { userId: string; roles: string[] },
   resource: PermissionResource,
-  item: any,
+  item: OrderPermissionItem | CustomerPermissionItem | ProductPermissionItem,
 ): boolean {
-  return filterByRowPermissions(db, user, resource, [item]).length > 0;
+  if (resource === 'Order') {
+    return filterByRowPermissions(db, user, 'Order', [item as OrderPermissionItem]).length > 0;
+  }
+  if (resource === 'Customer') {
+    return filterByRowPermissions(db, user, 'Customer', [item as CustomerPermissionItem]).length > 0;
+  }
+  return filterByRowPermissions(db, user, 'Product', [item as ProductPermissionItem]).length > 0;
 }
 
 // ============================================================================
@@ -238,14 +321,14 @@ type Ctx = {
   deptAndChildrenIds: string[];
 };
 
-type Clause = { sql: string; params: any[] } | null;
+type Clause = { sql: string; params: SqlParam[] } | null;
 
 const warnedDims = new Set<string>();
 function warnDim(resource: string, dim: string | undefined, reason: string) {
   const key = `${resource}:${dim}:${reason}`;
   if (warnedDims.has(key)) return;
   warnedDims.add(key);
-  console.warn(`[rowPermission/SQL] ${resource} 维度 "${dim}" ${reason}，规则被忽略`);
+  log.warn('SQL dimension skipped', { resource, dim, reason });
 }
 
 /**
@@ -254,7 +337,7 @@ function warnDim(resource: string, dim: string | undefined, reason: string) {
  */
 function buildPersonClause(vals: string[], columnExpr: string, ctx: Ctx): Clause {
   const orParts: string[] = [];
-  const params: any[] = [];
+  const params: SqlParam[] = [];
   for (const v of vals) {
     if (v === 'self') {
       orParts.push(`${columnExpr} = ?`);
@@ -404,10 +487,10 @@ function buildProductRuleClause(rule: RowRule): Clause {
  *       products 的 EXISTS 子句使用了带表名的 `products.tags`，因此调用方主表别名需保持为 products。
  */
 export function buildRowPermissionWhere(
-  db: any,
+  db: Database.Database,
   user: { userId: string; roles: string[] },
   resource: PermissionResource,
-): { sql: string; params: any[] } {
+): { sql: string; params: SqlParam[] } {
   const roles = Array.isArray(user.roles) ? user.roles : [];
   const rules = getRowRules(db, roles, resource);
   if (rules.length === 0) return { sql: '', params: [] };
@@ -419,7 +502,7 @@ export function buildRowPermissionWhere(
   const ctx: Ctx = { userId: user.userId, currentUserDeptId, deptAndChildrenIds };
 
   const clauses: string[] = [];
-  const params: any[] = [];
+  const params: SqlParam[] = [];
   for (const rule of rules) {
     let c: Clause = null;
     if (resource === 'Order') c = buildOrderRuleClause(rule, ctx);

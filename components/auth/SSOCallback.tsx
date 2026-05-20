@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppContext } from '../../contexts/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 /**
  * SSO 回调页（Cookie+sid 方案）
@@ -13,7 +14,8 @@ import { useAppContext } from '../../contexts/AppContext';
 const SSOCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { completeSsoLogin, apiMode } = useAppContext();
+  const { completeSsoLogin } = useAuth();
+  const { apiMode } = useAppContext();
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {

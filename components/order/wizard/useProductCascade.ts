@@ -75,7 +75,7 @@ export function useProductCascade(products: Product[]) {
   const selectedProduct = products.find(p => p.id === tempProductId);
   const selectedSku = selectedProduct?.skus.find(s => s.id === tempSkuId);
   const selectedOption = selectedSku?.pricingOptions?.find(o => o.id === tempPricingOptionId);
-  const selectedLicenseType = selectedOption?.title || undefined;
+  const selectedLicenseType = selectedOption?.title || selectedOption?.name || undefined;
   const selectedLicensePeriodType = selectedOption
     ? selectedOption.license.periodUnit
     : undefined;

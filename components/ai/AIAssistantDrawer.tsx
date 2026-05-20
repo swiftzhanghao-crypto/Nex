@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { X, Send, Bot, Trash2, MapPin, Plus, MessageSquare, RefreshCcw, Database, FileText, Search, ChevronDown, Mic, Paperclip, Bookmark } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useAppContext } from '../../contexts/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 import AIMessageBubble from './AIMessageBubble';
 import ModalPortal from '../common/ModalPortal';
 import {
@@ -225,6 +226,7 @@ function formatRelativeTime(ts: number): string {
 
 const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({ open, onClose, initialQuery }) => {
   const appCtx = useAppContext();
+  const { currentUser } = useAuth();
   const location = useLocation();
 
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
@@ -572,7 +574,7 @@ const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({ open, onClose, in
 
     const report: import('../../types').WorkReport = {
       id: `wr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      userId: appCtx.currentUser.id,
+      userId: currentUser.id,
       type: reportType,
       title: card?.type === 'report' ? card.title : `${dateStr} ${reportType}`,
       date: dateStr,
@@ -585,7 +587,7 @@ const AIAssistantDrawer: React.FC<AIAssistantDrawerProps> = ({ open, onClose, in
     };
 
     appCtx.addWorkReport(report);
-  }, [activeSessionId, sessions, appCtx]);
+  }, [activeSessionId, sessions, appCtx, currentUser.id]);
 
   const handleDeleteSession = useCallback((id: string) => {
     setSessions(prev => {

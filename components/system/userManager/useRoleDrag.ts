@@ -49,9 +49,9 @@ export function useRoleDrag(
       setDragRoleId(null);
       setDragOverRoleId(null);
       if (apiMode) {
-        userApi.reorderRoles(currentRoles.map(r => r.id)).catch((err: any) => {
+        userApi.reorderRoles(currentRoles.map(r => r.id)).catch((err: unknown) => {
           setRoles(prevRoles);
-          alert(err?.message || '角色排序保存失败，已恢复原顺序。');
+          alert(err instanceof Error ? err.message : '角色排序保存失败，已恢复原顺序。');
         });
       }
     },

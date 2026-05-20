@@ -5,10 +5,32 @@ import { checkPermission } from '../rbac.ts';
 import { safePagination, getUserName } from '../utils.ts';
 import { validateBody, opportunityCreateSchema, opportunityUpdateSchema } from '../validate.ts';
 
+type SqlParam = string | number | null;
+
+interface OpportunityRow {
+  id: string;
+  crm_id: string | null;
+  name: string;
+  customer_id: string;
+  customer_name: string;
+  product_type: string | null;
+  products: string | null;
+  stage: string;
+  probability: number;
+  department: string | null;
+  amount: number | null;
+  expected_revenue: number;
+  final_user_rev: number | null;
+  close_date: string;
+  owner_id: string;
+  owner_name: string;
+  created_at: string;
+}
+
 const router = Router();
 router.use(authMiddleware);
 
-function toOpportunity(row: any) {
+function toOpportunity(row: OpportunityRow) {
   let products;
   try { products = row.products ? JSON.parse(row.products) : undefined; } catch { products = undefined; }
   return {
@@ -28,7 +50,7 @@ router.get('/', checkPermission('opportunity', 'list'), (req, res) => {
   const { customerId, stage, ownerId, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM opportunities WHERE 1=1';
-  const params: any[] = [];
+  const params: SqlParam[] = [];
 
   if (customerId) { sql += ' AND customer_id = ?'; params.push(customerId); }
   if (stage) { sql += ' AND stage = ?'; params.push(stage); }
@@ -42,11 +64,12 @@ router.get('/', checkPermission('opportunity', 'list'), (req, res) => {
   sql += ' ORDER BY close_date DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
 
-  res.json({ data: db.prepare(sql).all(...params).map(toOpportunity), total, page: pageNum, size: limit });
+  const rows = db.prepare(sql).all(...params) as OpportunityRow[];
+  res.json({ data: rows.map(toOpportunity), total, page: pageNum, size: limit });
 });
 
 router.get('/:id', checkPermission('opportunity', 'read'), (req, res) => {
-  const row = getDb().prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
+  const row = getDb().prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id) as OpportunityRow | undefined;
   if (!row) { res.status(404).json({ error: '商机不存在' }); return; }
   res.json(toOpportunity(row));
 });
@@ -74,7 +97,7 @@ router.post('/', checkPermission('opportunity', 'create'), validateBody(opportun
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, userName, 'CREATE', 'Opportunity', id, `创建商机 ${o.name}`);
 
-  const row = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(id);
+  const row = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(id) as OpportunityRow;
   res.status(201).json(toOpportunity(row));
 });
 
@@ -83,7 +106,7 @@ router.put('/:id', checkPermission('opportunity', 'update'), validateBody(opport
   const o = req.body;
   const id = req.params.id;
 
-  const existing = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(id) as any;
+  const existing = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(id) as OpportunityRow | undefined;
   if (!existing) { res.status(404).json({ error: '商机不存在' }); return; }
 
   if (o.stage && !VALID_STAGES.includes(o.stage)) {
@@ -104,13 +127,13 @@ router.put('/:id', checkPermission('opportunity', 'update'), validateBody(opport
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, userName, 'UPDATE', 'Opportunity', id, `更新商机 ${o.name}，阶段: ${o.stage}`);
 
-  const row = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(id);
+  const row = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(id) as OpportunityRow;
   res.json(toOpportunity(row));
 });
 
 router.delete('/:id', checkPermission('opportunity', 'delete'), (req: AuthRequest, res) => {
   const db = getDb();
-  const existing = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id) as any;
+  const existing = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id) as OpportunityRow | undefined;
   if (!existing) { res.status(404).json({ error: '商机不存在' }); return; }
 
   if (existing.stage === '赢单') {

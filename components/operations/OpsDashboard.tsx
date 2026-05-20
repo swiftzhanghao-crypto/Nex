@@ -67,9 +67,8 @@ const LineChart: React.FC<ChartProps> = ({ card }) => {
 
     const { actual, target, forecast } = card.series;
     const n = actual.length;
-    if (n === 0) return null;
 
-    const allVals = [...actual.map(p => p.value), ...target.map(p => p.value)];
+    const allVals = n > 0 ? [...actual.map(p => p.value), ...target.map(p => p.value)] : [0];
     const maxV = Math.max(...allVals) * 1.1;
     const minV = 0;
     const range = maxV - minV || 1;
@@ -90,11 +89,13 @@ const LineChart: React.FC<ChartProps> = ({ card }) => {
 
     const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
         const rect = svgRef.current?.getBoundingClientRect();
-        if (!rect) return;
+        if (!rect || n === 0) return;
         const mx = (e.clientX - rect.left) * (W / rect.width) - PL;
         const idx = Math.min(n - 1, Math.max(0, Math.round((mx / cw) * (n - 1))));
         setTooltip({ x: px(idx), y: py(actual[idx].value), idx });
     }, [n, actual, cw, px, py]);
+
+    if (n === 0) return null;
 
     return (
         <svg

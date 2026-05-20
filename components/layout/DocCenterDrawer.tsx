@@ -1,6 +1,12 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import { X, BookOpen, ExternalLink, ChevronRight, Search, FileText } from 'lucide-react';
+import manualContent from '../../docs/产品说明文档.md?raw';
+import designSpecContent from '../../docs/设计规范.md?raw';
+import operationManualContent from '../../docs/WPS365业务平台操作手册.md?raw';
+import aiManualContent from '../../docs/AI业务助手操作手册.md?raw';
+import openApiContent from '../../docs/开放API-订单下单.md?raw';
+import aiTechDocContent from '../../docs/AI业务助手技术文档.md?raw';
 
 interface DocItem {
   id: string;
@@ -11,36 +17,45 @@ interface DocItem {
 }
 
 interface DocCenterDrawerProps {
-  docs: DocItem[];
   onClose: () => void;
 }
 
-const mdComponents = {
-  h1: ({children}: any) => <h1 className="text-xl font-bold text-gray-900 dark:text-white mt-2 mb-4 pb-2 border-b border-gray-100 dark:border-white/10">{children}</h1>,
-  h2: ({children}: any) => <h2 id={typeof children === 'string' ? children : undefined} className="text-base font-bold text-gray-900 dark:text-white mt-8 mb-3 flex items-center gap-2 before:content-[''] before:w-1 before:h-4 before:bg-[#0071E3] before:rounded-full before:shrink-0 scroll-mt-4">{children}</h2>,
-  h3: ({children}: any) => <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100 mt-5 mb-2">{children}</h3>,
-  h4: ({children}: any) => <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mt-4 mb-1.5">{children}</h4>,
-  p: ({children}: any) => <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-3">{children}</p>,
-  ul: ({children}: any) => <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>,
-  ol: ({children}: any) => <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>,
-  li: ({children}: any) => <li className="text-sm text-gray-600 dark:text-gray-300">{children}</li>,
-  strong: ({children}: any) => <strong className="font-semibold text-gray-800 dark:text-gray-100">{children}</strong>,
-  em: ({children}: any) => <em className="italic text-gray-600 dark:text-gray-300">{children}</em>,
-  code: ({children, className}: any) => {
+const DOC_LIST: DocItem[] = [
+  { id: 'manual', title: '产品说明文档', icon: '📘', content: manualContent },
+  { id: 'design', title: '设计规范', icon: '🎨', content: designSpecContent },
+  { id: 'ops', title: '操作手册', icon: '📋', content: operationManualContent },
+  { id: 'prd', title: '产品 PRD', icon: '📄', link: 'https://365.kdocs.cn/l/cg9iaTHwv9VX' },
+  { id: 'ai-manual', title: 'AI 助手手册', icon: '🤖', content: aiManualContent },
+  { id: 'ai-tech', title: 'AI 技术文档', icon: '⚙️', content: aiTechDocContent },
+  { id: 'open-api', title: '开放 API', icon: '🔗', content: openApiContent },
+];
+
+const mdComponents: Components = {
+  h1: ({children}) => <h1 className="text-xl font-bold text-gray-900 dark:text-white mt-2 mb-4 pb-2 border-b border-gray-100 dark:border-white/10">{children}</h1>,
+  h2: ({children}) => <h2 id={typeof children === 'string' ? children : undefined} className="text-base font-bold text-gray-900 dark:text-white mt-8 mb-3 flex items-center gap-2 before:content-[''] before:w-1 before:h-4 before:bg-[#0071E3] before:rounded-full before:shrink-0 scroll-mt-4">{children}</h2>,
+  h3: ({children}) => <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100 mt-5 mb-2">{children}</h3>,
+  h4: ({children}) => <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mt-4 mb-1.5">{children}</h4>,
+  p: ({children}) => <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-3">{children}</p>,
+  ul: ({children}) => <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>,
+  ol: ({children}) => <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>,
+  li: ({children}) => <li className="text-sm text-gray-600 dark:text-gray-300">{children}</li>,
+  strong: ({children}) => <strong className="font-semibold text-gray-800 dark:text-gray-100">{children}</strong>,
+  em: ({children}) => <em className="italic text-gray-600 dark:text-gray-300">{children}</em>,
+  code: ({children, className}) => {
     const isBlock = className?.includes('language-');
     return isBlock
       ? <code className="block text-xs font-mono text-gray-700 dark:text-gray-200">{children}</code>
       : <code className="text-xs font-mono text-[#0071E3] dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">{children}</code>;
   },
-  pre: ({children}: any) => <pre className="bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl p-4 text-xs overflow-x-auto mb-4">{children}</pre>,
-  table: ({children}: any) => <div className="overflow-x-auto mb-4"><table className="w-full text-sm border-collapse">{children}</table></div>,
-  thead: ({children}: any) => <thead className="bg-gray-50 dark:bg-white/5">{children}</thead>,
-  th: ({children}: any) => <th className="text-left text-xs font-semibold text-gray-700 dark:text-gray-200 px-3 py-2 border-b border-gray-200 dark:border-white/10">{children}</th>,
-  td: ({children}: any) => <td className="text-xs text-gray-600 dark:text-gray-300 px-3 py-2 border-b border-gray-100 dark:border-white/5">{children}</td>,
-  tr: ({children}: any) => <tr className="hover:bg-gray-50/50 dark:hover:bg-white/[0.03] transition-colors">{children}</tr>,
-  blockquote: ({children}: any) => <blockquote className="border-l-2 border-[#0071E3] pl-4 my-3 text-sm text-gray-500 dark:text-gray-400 italic">{children}</blockquote>,
+  pre: ({children}) => <pre className="bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl p-4 text-xs overflow-x-auto mb-4">{children}</pre>,
+  table: ({children}) => <div className="overflow-x-auto mb-4"><table className="w-full text-sm border-collapse">{children}</table></div>,
+  thead: ({children}) => <thead className="bg-gray-50 dark:bg-white/5">{children}</thead>,
+  th: ({children}) => <th className="text-left text-xs font-semibold text-gray-700 dark:text-gray-200 px-3 py-2 border-b border-gray-200 dark:border-white/10">{children}</th>,
+  td: ({children}) => <td className="text-xs text-gray-600 dark:text-gray-300 px-3 py-2 border-b border-gray-100 dark:border-white/5">{children}</td>,
+  tr: ({children}) => <tr className="hover:bg-gray-50/50 dark:hover:bg-white/[0.03] transition-colors">{children}</tr>,
+  blockquote: ({children}) => <blockquote className="border-l-2 border-[#0071E3] pl-4 my-3 text-sm text-gray-500 dark:text-gray-400 italic">{children}</blockquote>,
   hr: () => <hr className="my-6 border-gray-100 dark:border-white/10" />,
-  a: ({children, href}: any) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-[#0071E3] dark:text-blue-400 hover:underline">{children}</a>,
+  a: ({children, href}) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-[#0071E3] dark:text-blue-400 hover:underline">{children}</a>,
 };
 
 function extractHeadings(markdown: string): { level: number; text: string }[] {
@@ -55,13 +70,13 @@ function extractHeadings(markdown: string): { level: number; text: string }[] {
   return headings;
 }
 
-const DocCenterDrawer: React.FC<DocCenterDrawerProps> = ({ docs, onClose }) => {
-  const [activeDocId, setActiveDocId] = useState(docs[0]?.id || '');
+const DocCenterDrawer: React.FC<DocCenterDrawerProps> = ({ onClose }) => {
+  const [activeDocId, setActiveDocId] = useState(DOC_LIST[0]?.id || '');
   const [tocSearch, setTocSearch] = useState('');
   const [isClosing, setIsClosing] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const activeDoc = docs.find(d => d.id === activeDocId);
+  const activeDoc = DOC_LIST.find(d => d.id === activeDocId);
   const headings = useMemo(() => {
     if (!activeDoc?.content) return [];
     return extractHeadings(activeDoc.content);
@@ -90,7 +105,7 @@ const DocCenterDrawer: React.FC<DocCenterDrawerProps> = ({ docs, onClose }) => {
   };
 
   const handleDocSwitch = (docId: string) => {
-    const doc = docs.find(d => d.id === docId);
+    const doc = DOC_LIST.find(d => d.id === docId);
     if (doc?.link) {
       window.open(doc.link, '_blank', 'noopener,noreferrer');
       return;
@@ -133,7 +148,7 @@ const DocCenterDrawer: React.FC<DocCenterDrawerProps> = ({ docs, onClose }) => {
             <div className="p-3 border-b border-gray-100 dark:border-white/10">
               <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-2">文档列表</div>
               <div className="space-y-0.5">
-                {docs.map(doc => (
+                {DOC_LIST.map(doc => (
                   <button
                     key={doc.id}
                     onClick={() => handleDocSwitch(doc.id)}

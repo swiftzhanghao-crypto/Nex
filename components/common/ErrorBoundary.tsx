@@ -1,4 +1,5 @@
 import React from 'react';
+import { reportError } from '../../services/errorReporter';
 
 interface Props {
     children: React.ReactNode;
@@ -18,7 +19,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
     }
 
     componentDidCatch(error: Error, info: React.ErrorInfo) {
-        console.error('[ErrorBoundary]', error, info.componentStack);
+        reportError(error, `ErrorBoundary:${this.props.fallbackTitle || 'unknown'}${info.componentStack ? '\n' + info.componentStack.slice(0, 500) : ''}`);
     }
 
     render() {

@@ -1,36 +1,95 @@
-import jwt from 'jsonwebtoken';
+import jwt, { type SignOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
 import { getDb } from './db.ts';
+import { createLogger } from './logger.ts';
+
+const log = createLogger('auth');
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const JWT_SECRET = (() => {
   const secret = process.env.JWT_SECRET;
   if (secret && secret.length >= 16) return secret;
   if (IS_PRODUCTION) {
-    console.error('[FATAL] 生产环境必须设置长度 ≥16 的 JWT_SECRET 环境变量');
+    log.error('生产环境必须设置长度 ≥16 的 JWT_SECRET 环境变量');
     process.exit(1);
   }
   const random = crypto.randomBytes(48).toString('hex');
-  console.warn('[auth] JWT_SECRET 未配置，已生成本次进程临时密钥（仅开发可用，重启后旧 token 失效）');
+  log.warn('JWT_SECRET 未配置，已生成本次进程临时密钥（仅开发可用，重启后旧 token 失效）');
   return random;
 })();
 
-const TOKEN_EXPIRY = (process.env.JWT_EXPIRES_IN as any) || '24h';
+const TOKEN_EXPIRY: SignOptions['expiresIn'] =
+  (process.env.JWT_EXPIRES_IN as SignOptions['expiresIn'] | undefined) || '24h';
+
+const REFRESH_TOKEN_EXPIRY: SignOptions['expiresIn'] = '7d';
+
+const tokenBlacklist = new Set<string>();
 
 // ── JWT ──────────────────────────────────────────────────────────────────────
 
 export interface JwtPayload {
   userId: string;
   roles: string[];
+  jti?: string;
+  type?: 'access' | 'refresh';
+}
+
+interface JwtClaims extends JwtPayload {
+  jti: string;
+  type: 'access' | 'refresh';
+}
+
+function stripClaims(claims: JwtClaims): JwtPayload {
+  return { userId: claims.userId, roles: claims.roles };
+}
+
+export function revokeToken(jti: string): void {
+  tokenBlacklist.add(jti);
+}
+
+export function isTokenRevoked(jti: string): boolean {
+  return tokenBlacklist.has(jti);
 }
 
 export function signToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
+  const jti = crypto.randomUUID();
+  return jwt.sign(
+    { ...payload, jti, type: 'access' },
+    JWT_SECRET,
+    { expiresIn: TOKEN_EXPIRY },
+  );
+}
+
+export function signRefreshToken(payload: JwtPayload): string {
+  const jti = crypto.randomUUID();
+  return jwt.sign(
+    { ...payload, jti, type: 'refresh' },
+    JWT_SECRET,
+    { expiresIn: REFRESH_TOKEN_EXPIRY },
+  );
 }
 
 export function verifyToken(token: string): JwtPayload {
-  return jwt.verify(token, JWT_SECRET) as JwtPayload;
+  const claims = jwt.verify(token, JWT_SECRET) as JwtClaims;
+  if (claims.type === 'refresh') {
+    throw new jwt.JsonWebTokenError('Invalid token type');
+  }
+  if (claims.jti && isTokenRevoked(claims.jti)) {
+    throw new jwt.JsonWebTokenError('Token revoked');
+  }
+  return stripClaims(claims);
+}
+
+export function verifyRefreshToken(token: string): JwtPayload {
+  const claims = jwt.verify(token, JWT_SECRET) as JwtClaims;
+  if (claims.type !== 'refresh') {
+    throw new jwt.JsonWebTokenError('Invalid token type');
+  }
+  if (claims.jti && isTokenRevoked(claims.jti)) {
+    throw new jwt.JsonWebTokenError('Token revoked');
+  }
+  return stripClaims(claims);
 }
 
 // ── Password hashing ─────────────────────────────────────────────────────────
@@ -67,7 +126,11 @@ export function verifyPassword(password: string, stored: string): boolean {
 export const SSO_COOKIE_NAME = process.env.COOKIE_NAME || 'itab-sid';
 const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 const COOKIE_SECURE = process.env.COOKIE_SECURE === 'true';
-const COOKIE_SAMESITE: 'lax' | 'strict' | 'none' = (process.env.COOKIE_SAMESITE as any) || 'lax';
+function parseSameSite(raw: string | undefined): 'lax' | 'strict' | 'none' {
+  if (raw === 'strict' || raw === 'none' || raw === 'lax') return raw;
+  return 'lax';
+}
+const COOKIE_SAMESITE = parseSameSite(process.env.COOKIE_SAMESITE);
 
 export function parseCookies(req: Request): Record<string, string> {
   const header = req.headers.cookie || '';
@@ -111,9 +174,9 @@ export function getSsoSession(sid: string): { userId: string; wpsUserId?: string
   const db = getDb();
   const row = db.prepare(
     `SELECT user_id, wps_user_id FROM sso_sessions WHERE sid = ? AND expires_at > datetime('now')`,
-  ).get(sid) as any;
+  ).get(sid) as { user_id: string; wps_user_id: string | null } | undefined;
   if (!row) return null;
-  return { userId: row.user_id, wpsUserId: row.wps_user_id };
+  return { userId: row.user_id, wpsUserId: row.wps_user_id ?? undefined };
 }
 
 export function deleteSsoSession(sid: string): void {
@@ -158,11 +221,15 @@ export interface AuthRequest extends Request {
   user?: JwtPayload;
 }
 
-function parseRolesField(raw: any): string[] {
-  if (Array.isArray(raw)) return raw;
+function parseRolesField(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((r): r is string => typeof r === 'string');
   if (typeof raw === 'string') {
-    try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : [raw]; }
-    catch { return raw.split(',').map((s: string) => s.trim()).filter(Boolean); }
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((r): r is string => typeof r === 'string') : [raw];
+    } catch {
+      return raw.split(',').map((s) => s.trim()).filter(Boolean);
+    }
   }
   return [];
 }
@@ -185,7 +252,7 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
     const session = getSsoSession(sid);
     if (session) {
       const db = getDb();
-      const user = db.prepare('SELECT id, role FROM users WHERE id = ?').get(session.userId) as any;
+      const user = db.prepare('SELECT id, role FROM users WHERE id = ?').get(session.userId) as { id: string; role: string } | undefined;
       if (user) {
         req.user = { userId: user.id, roles: parseRolesField(user.role) };
         next();

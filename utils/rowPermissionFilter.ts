@@ -71,9 +71,9 @@ function evaluateOrderRule(
         case 'orderStatus':
             return !!order.status && vals.includes(order.status);
         case 'industryLine':
-            return !!(order as any).industryLine && vals.includes((order as any).industryLine);
+            return !!order.industryLine && vals.includes(order.industryLine);
         case 'province':
-            return !!(order as any).province && vals.includes((order as any).province);
+            return !!order.province && vals.includes(order.province);
         case 'directChannelId':
         case 'channelId': {
             const directChannelId = order.buyerType === 'Channel' ? order.buyerId : undefined;
@@ -104,7 +104,8 @@ function evaluateCustomerRule(
         case 'province':
             return !!(customer.province || customer.region) && vals.includes(customer.province || customer.region || '');
         case 'directChannelId':
-            return !!(customer as any).channelId && vals.includes((customer as any).channelId);
+            return !!(customer as Customer & { channelId?: string }).channelId
+                && vals.includes((customer as Customer & { channelId?: string }).channelId!);
         case 'salesRep':
             return evaluatePersonDimension(vals, customer.ownerId, currentUser, deptAndChildrenIds, users);
         default:

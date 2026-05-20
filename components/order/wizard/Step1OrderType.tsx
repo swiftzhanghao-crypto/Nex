@@ -1,6 +1,7 @@
 import React from 'react';
 import { Target, Network, MousePointer2, Zap, Globe, Radio, User as UserIcon, FileText } from 'lucide-react';
 import type { BuyerType, OrderSource, User } from '../../../types';
+import { memoWithIgnoreCallbacks } from './wizardUtils';
 
 interface Step1OrderTypeProps {
   buyerType: BuyerType | '';
@@ -183,4 +184,4 @@ const Step1OrderType: React.FC<Step1OrderTypeProps> = ({
   );
 };
 
-export default Step1OrderType;
+export default memoWithIgnoreCallbacks(Step1OrderType);

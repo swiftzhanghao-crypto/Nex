@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PaginatedResult } from '../services/api';
 
-export interface UsePagedQueryOptions<TFilters extends object> {
+export interface UsePagedQueryOptions<T, TFilters extends object> {
   /**
    * 拉取分页数据的函数。
    * 接收 page/size 以及调用方传入的 filters 合并后的对象。
    * 必须返回符合 PaginatedResult 的结构。
    */
-  fetcher: (params: TFilters & { page: number; size: number }) => Promise<PaginatedResult<any>>;
+  fetcher: (params: TFilters & { page: number; size: number }) => Promise<PaginatedResult<T>>;
   /** 初始 filters（不包含 page/size） */
   initialFilters?: TFilters;
   /** 初始页号，默认 1 */
@@ -43,8 +43,8 @@ export interface UsePagedQueryResult<T, TFilters extends object> {
  *     initialSize: 20,
  *   });
  */
-export function usePagedQuery<T = any, TFilters extends object = Record<string, any>>(
-  options: UsePagedQueryOptions<TFilters>,
+export function usePagedQuery<T, TFilters extends object = Record<string, unknown>>(
+  options: UsePagedQueryOptions<T, TFilters>,
 ): UsePagedQueryResult<T, TFilters> {
   const {
     fetcher,
@@ -75,13 +75,13 @@ export function usePagedQuery<T = any, TFilters extends object = Record<string, 
       setLoading(true);
       setError(null);
       try {
-        const res = await fetcherRef.current({ ...(f as any), page: p, size: s });
+        const res = await fetcherRef.current({ ...f, page: p, size: s });
         if (reqId !== reqIdRef.current) return;
         setData(res.data || []);
         setTotal(res.total || 0);
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (reqId !== reqIdRef.current) return;
-        setError(e?.message || '加载失败');
+        setError(e instanceof Error ? e.message : '加载失败');
         setData([]);
         setTotal(0);
       } finally {

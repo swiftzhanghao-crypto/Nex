@@ -10,6 +10,24 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import { getDb } from '../db.ts';
 import { authMiddleware, verifyToken, type AuthRequest, type JwtPayload } from '../auth.ts';
+import { createLogger } from '../logger.ts';
+import { validateBody, crmXsySyncSchema } from '../validate.ts';
+
+const log = createLogger('crm-xsy');
+
+interface CrmTokenStatusRow {
+  id: string;
+  expires_at: string;
+}
+
+interface CrmTokenRow {
+  access_token: string;
+  expires_at: string;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
 const router = Router();
 
@@ -44,7 +62,7 @@ router.get('/status', authMiddleware, (req: AuthRequest, res) => {
   if (enabled && req.user) {
     const row = getDb()
       .prepare('SELECT id, expires_at FROM crm_xsy_tokens WHERE user_id = ?')
-      .get(req.user.userId) as any;
+      .get(req.user.userId) as CrmTokenStatusRow | undefined;
     if (row) {
       bound = new Date(row.expires_at + 'Z') > new Date();
     }
@@ -185,9 +203,10 @@ router.get('/callback', async (req, res) => {
     saveToken(entry.userId, tok);
     const q = new URLSearchParams({ status: 'ok', redirect: entry.redirect });
     res.redirect(302, `${FRONTEND_URL}/#/crm-callback?${q.toString()}`);
-  } catch (e: any) {
-    console.error('[crm-xsy/callback]', e?.message || e);
-    res.redirect(302, `${FRONTEND_URL}/#/crm-callback?status=fail&error=${encodeURIComponent(e?.message || 'CRM 授权失败')}`);
+  } catch (e: unknown) {
+    const msg = errorMessage(e);
+    log.error('callback failed', { message: msg });
+    res.redirect(302, `${FRONTEND_URL}/#/crm-callback?status=fail&error=${encodeURIComponent(msg || 'CRM 授权失败')}`);
   }
 });
 
@@ -196,7 +215,7 @@ router.get('/callback', async (req, res) => {
 function getValidToken(userId: string): string | null {
   const row = getDb()
     .prepare('SELECT access_token, expires_at FROM crm_xsy_tokens WHERE user_id = ?')
-    .get(userId) as any;
+    .get(userId) as CrmTokenRow | undefined;
   if (!row) return null;
   if (new Date(row.expires_at + 'Z') <= new Date()) return null;
   return row.access_token;
@@ -209,7 +228,7 @@ interface XoqlResponse {
   data?: {
     totalSize: number;
     count: number;
-    records: Record<string, any>[];
+    records: Record<string, unknown>[];
   };
 }
 
@@ -259,15 +278,15 @@ router.get('/customers', authMiddleware, async (req: AuthRequest, res) => {
       count: result.data?.count ?? 0,
       records: result.data?.records ?? [],
     });
-  } catch (e: any) {
-    console.error('[crm-xsy/customers]', e?.message || e);
+  } catch (e: unknown) {
+    log.error('customers query failed', { message: errorMessage(e) });
     res.status(502).json({ error: '销售易 CRM 请求失败' });
   }
 });
 
 // ---------- sync: 将销售易客户同步到本地 customers 表 ----------
 
-router.post('/sync-customers', authMiddleware, async (req: AuthRequest, res) => {
+router.post('/sync-customers', authMiddleware, validateBody(crmXsySyncSchema), async (req: AuthRequest, res) => {
   if (!crmEnabled()) {
     res.status(503).json({ error: '销售易 CRM 未配置' });
     return;
@@ -278,8 +297,10 @@ router.post('/sync-customers', authMiddleware, async (req: AuthRequest, res) => 
     return;
   }
 
+  const limit = req.body.limit ?? 500;
+
   try {
-    const xoql = `select id, accountName, phone, industry, address, ownerId, ownerId.name, createdDate from account limit 2000`;
+    const xoql = `select id, accountName, phone, industry, address, ownerId, ownerId.name, createdDate from account limit ${limit}`;
     const result = await queryXoql(token, xoql);
     if (result.code !== '200' || !result.data?.records) {
       res.status(502).json({ error: result.msg || 'XOQL 查询失败' });
@@ -318,9 +339,10 @@ router.post('/sync-customers', authMiddleware, async (req: AuthRequest, res) => 
 
     const synced = tx();
     res.json({ synced, total: result.data.records.length });
-  } catch (e: any) {
-    console.error('[crm-xsy/sync]', e?.message || e);
-    res.status(502).json({ error: '同步失败：' + (e?.message || '') });
+  } catch (e: unknown) {
+    const msg = errorMessage(e);
+    log.error('sync failed', { message: msg });
+    res.status(502).json({ error: '同步失败：' + msg });
   }
 });
 

@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 test-results
+coverage
+
+# macOS
+.DS_Store
+**/.DS_Store
 
 # Go build artifacts
 backend/nex-server
@@ -35,6 +40,13 @@ dist-upload*.zip
 
 # Playwright MCP screenshots
 .playwright-mcp/
+
+# Binary assets (screenshots, mockups, etc.)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.psd
 
 # Editor directories and files
 .vscode/*

@@ -5,12 +5,120 @@ import { checkPermission } from '../rbac.ts';
 import { safePagination, getUserName } from '../utils.ts';
 import { validateBody, contractCreateSchema, remittanceCreateSchema, invoiceCreateSchema } from '../validate.ts';
 
+type SqlParam = string | number | null;
+
+interface ContractRow {
+  id: string;
+  code: string;
+  name: string;
+  external_code: string | null;
+  contract_type: string;
+  party_a: string | null;
+  party_b: string | null;
+  verify_status: string;
+  verify_remark: string | null;
+  amount: number | null;
+  sign_date: string | null;
+  order_id: string | null;
+  customer_id: string | null;
+  created_at: string;
+}
+
+interface RemittanceRow {
+  id: string;
+  erp_doc_no: string | null;
+  bank_transaction_no: string | null;
+  type: string;
+  remitter_name: string;
+  remitter_account: string | null;
+  payment_method: string;
+  amount: number;
+  receiver_name: string;
+  receiver_account: string | null;
+  payment_time: string;
+}
+
+interface InvoiceRow {
+  id: string;
+  invoice_title: string;
+  amount: number;
+  apply_time: string;
+  apply_type: string;
+  status: string;
+  order_id: string | null;
+  tax_id: string | null;
+  remark: string | null;
+}
+
+interface PerformanceRow {
+  id: string;
+  order_id: string;
+  acceptance_detail_id: string;
+  order_status: string;
+  detail_amount_subtotal: number;
+  acceptance_ratio: number;
+  deferral_ratio: number;
+  post_contract_status: string;
+  discount: number;
+  cost_amount: number;
+  sales_performance: number;
+  weighted_sales_performance: number;
+  project_weight_coeff: number;
+  product_weight_coeff_sub: number;
+  product_weight_coeff_auth: number;
+  service_type: string;
+  owner: string;
+}
+
+interface AuthorizationRow {
+  id: string;
+  auth_code: string;
+  order_id: string;
+  licensee: string;
+  customer_name: string;
+  customer_id: string;
+  product_name: string;
+  product_code: string;
+  auth_start_date: string;
+  auth_end_date: string;
+  service_start_date: string | null;
+  service_end_date: string | null;
+}
+
+interface DeliveryInfoRow {
+  id: string;
+  delivery_type: string;
+  order_id: string;
+  quantity: number;
+  auth_type: string;
+  licensee: string;
+  customer_name: string;
+  customer_id: string;
+  auth_code: string | null;
+  auth_duration: string | null;
+  auth_start_date: string | null;
+  auth_end_date: string | null;
+  service_start_date: string | null;
+  service_end_date: string | null;
+}
+
+interface AuditLogRow {
+  id: number;
+  user_id: string;
+  user_name: string;
+  action: string;
+  resource: string;
+  resource_id: string;
+  detail: string;
+  created_at: string;
+}
+
 const router = Router();
 router.use(authMiddleware);
 
 // ======================== Contracts ========================
 
-function toContract(row: any) {
+function toContract(row: ContractRow) {
   return {
     id: row.id, code: row.code, name: row.name, externalCode: row.external_code,
     contractType: row.contract_type, partyA: row.party_a, partyB: row.party_b,
@@ -26,7 +134,7 @@ router.get('/contracts', checkPermission('contract', 'list'), (req, res) => {
   const { status, orderId, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM contracts WHERE 1=1';
-  const params: any[] = [];
+  const params: SqlParam[] = [];
   if (status) { sql += ' AND verify_status = ?'; params.push(status); }
   if (orderId) { sql += ' AND order_id = ?'; params.push(orderId); }
   if (search) { sql += ' AND (name LIKE ? OR code LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
@@ -35,12 +143,12 @@ router.get('/contracts', checkPermission('contract', 'list'), (req, res) => {
   const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
-  const rows = db.prepare(sql).all(...params) as any[];
+  const rows = db.prepare(sql).all(...params) as ContractRow[];
   res.json({ data: rows.map(toContract), total, page: pageNum, size: limit });
 });
 
 router.get('/contracts/:id', checkPermission('contract', 'read'), (req, res) => {
-  const row = getDb().prepare('SELECT * FROM contracts WHERE id = ?').get(req.params.id);
+  const row = getDb().prepare('SELECT * FROM contracts WHERE id = ?').get(req.params.id) as ContractRow | undefined;
   if (!row) { res.status(404).json({ error: '合同不存在' }); return; }
   res.json(toContract(row));
 });
@@ -66,7 +174,7 @@ router.post('/contracts', checkPermission('contract', 'create'), validateBody(co
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, getUserName(db, req.user!.userId), 'CREATE', 'Contract', id, `创建合同 ${c.name}`);
 
-  const row = db.prepare('SELECT * FROM contracts WHERE id = ?').get(id);
+  const row = db.prepare('SELECT * FROM contracts WHERE id = ?').get(id) as ContractRow;
   res.status(201).json(toContract(row));
 });
 
@@ -75,7 +183,7 @@ router.put('/contracts/:id', checkPermission('contract', 'update'), validateBody
   const c = req.body;
   const id = req.params.id;
 
-  const existing = db.prepare('SELECT * FROM contracts WHERE id = ?').get(id) as any;
+  const existing = db.prepare('SELECT * FROM contracts WHERE id = ?').get(id) as ContractRow | undefined;
   if (!existing) { res.status(404).json({ error: '合同不存在' }); return; }
 
   if (existing.verify_status === 'APPROVED' && c.verifyStatus !== 'APPROVED') {
@@ -94,13 +202,13 @@ router.put('/contracts/:id', checkPermission('contract', 'update'), validateBody
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, getUserName(db, req.user!.userId), 'UPDATE', 'Contract', id, `更新合同 ${c.name}，状态: ${c.verifyStatus}`);
 
-  const row = db.prepare('SELECT * FROM contracts WHERE id = ?').get(id);
+  const row = db.prepare('SELECT * FROM contracts WHERE id = ?').get(id) as ContractRow;
   res.json(toContract(row));
 });
 
 router.delete('/contracts/:id', checkPermission('contract', 'delete'), (req: AuthRequest, res) => {
   const db = getDb();
-  const existing = db.prepare('SELECT * FROM contracts WHERE id = ?').get(req.params.id) as any;
+  const existing = db.prepare('SELECT * FROM contracts WHERE id = ?').get(req.params.id) as ContractRow | undefined;
   if (!existing) { res.status(404).json({ error: '合同不存在' }); return; }
 
   if (existing.verify_status === 'APPROVED') {
@@ -116,7 +224,7 @@ router.delete('/contracts/:id', checkPermission('contract', 'delete'), (req: Aut
 
 // ======================== Remittances ========================
 
-function toRemittance(row: any) {
+function toRemittance(row: RemittanceRow) {
   return {
     id: row.id, erpDocNo: row.erp_doc_no, bankTransactionNo: row.bank_transaction_no,
     type: row.type, remitterName: row.remitter_name, remitterAccount: row.remitter_account,
@@ -130,7 +238,7 @@ router.get('/remittances', checkPermission('remittance', 'list'), (req, res) => 
   const { type, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM remittances WHERE 1=1';
-  const params: any[] = [];
+  const params: SqlParam[] = [];
   if (type) { sql += ' AND type = ?'; params.push(type); }
   if (search) { sql += ' AND (remitter_name LIKE ? OR receiver_name LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
   const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total');
@@ -138,12 +246,12 @@ router.get('/remittances', checkPermission('remittance', 'list'), (req, res) => 
   const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY payment_time DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
-  const rows = db.prepare(sql).all(...params) as any[];
+  const rows = db.prepare(sql).all(...params) as RemittanceRow[];
   res.json({ data: rows.map(toRemittance), total, page: pageNum, size: limit });
 });
 
 router.get('/remittances/:id', checkPermission('remittance', 'read'), (req, res) => {
-  const row = getDb().prepare('SELECT * FROM remittances WHERE id = ?').get(req.params.id);
+  const row = getDb().prepare('SELECT * FROM remittances WHERE id = ?').get(req.params.id) as RemittanceRow | undefined;
   if (!row) { res.status(404).json({ error: '回款记录不存在' }); return; }
   res.json(toRemittance(row));
 });
@@ -163,7 +271,7 @@ router.post('/remittances', checkPermission('remittance', 'create'), validateBod
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, getUserName(db, req.user!.userId), 'CREATE', 'Remittance', id, `创建回款 ${r.remitterName} ¥${r.amount}`);
 
-  const row = db.prepare('SELECT * FROM remittances WHERE id = ?').get(id);
+  const row = db.prepare('SELECT * FROM remittances WHERE id = ?').get(id) as RemittanceRow;
   res.status(201).json(toRemittance(row));
 });
 
@@ -172,7 +280,7 @@ router.put('/remittances/:id', checkPermission('remittance', 'update'), validate
   const r = req.body;
   const id = req.params.id;
 
-  const existing = db.prepare('SELECT * FROM remittances WHERE id = ?').get(id);
+  const existing = db.prepare('SELECT * FROM remittances WHERE id = ?').get(id) as RemittanceRow | undefined;
   if (!existing) { res.status(404).json({ error: '回款记录不存在' }); return; }
 
   db.prepare(`
@@ -186,7 +294,7 @@ router.put('/remittances/:id', checkPermission('remittance', 'update'), validate
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, getUserName(db, req.user!.userId), 'UPDATE', 'Remittance', id, `更新回款 ${id}`);
 
-  const row = db.prepare('SELECT * FROM remittances WHERE id = ?').get(id);
+  const row = db.prepare('SELECT * FROM remittances WHERE id = ?').get(id) as RemittanceRow;
   res.json(toRemittance(row));
 });
 
@@ -202,7 +310,7 @@ router.delete('/remittances/:id', checkPermission('remittance', 'delete'), (req:
 
 // ======================== Invoices ========================
 
-function toInvoice(row: any) {
+function toInvoice(row: InvoiceRow) {
   return {
     id: row.id, invoiceTitle: row.invoice_title, amount: row.amount,
     applyTime: row.apply_time, applyType: row.apply_type, status: row.status,
@@ -216,7 +324,7 @@ router.get('/invoices', checkPermission('invoice', 'list'), (req, res) => {
   const { status, orderId, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM invoices WHERE 1=1';
-  const params: any[] = [];
+  const params: SqlParam[] = [];
   if (status) { sql += ' AND status = ?'; params.push(status); }
   if (orderId) { sql += ' AND order_id = ?'; params.push(orderId); }
   if (search) { sql += ' AND invoice_title LIKE ?'; params.push(`%${search}%`); }
@@ -225,12 +333,12 @@ router.get('/invoices', checkPermission('invoice', 'list'), (req, res) => {
   const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY apply_time DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
-  const rows = db.prepare(sql).all(...params) as any[];
+  const rows = db.prepare(sql).all(...params) as InvoiceRow[];
   res.json({ data: rows.map(toInvoice), total, page: pageNum, size: limit });
 });
 
 router.get('/invoices/:id', checkPermission('invoice', 'read'), (req, res) => {
-  const row = getDb().prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id);
+  const row = getDb().prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id) as InvoiceRow | undefined;
   if (!row) { res.status(404).json({ error: '发票不存在' }); return; }
   res.json(toInvoice(row));
 });
@@ -256,7 +364,7 @@ router.post('/invoices', checkPermission('invoice', 'create'), validateBody(invo
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, userName, 'CREATE', 'Invoice', id, `创建发票 ${i.invoiceTitle} ¥${i.amount}`);
 
-  const row = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id);
+  const row = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id) as InvoiceRow;
   res.status(201).json(toInvoice(row));
 });
 
@@ -265,7 +373,7 @@ router.put('/invoices/:id', checkPermission('invoice', 'update'), validateBody(i
   const i = req.body;
   const id = req.params.id;
 
-  const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id) as any;
+  const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id) as InvoiceRow | undefined;
   if (!existing) { res.status(404).json({ error: '发票不存在' }); return; }
 
   if (existing.status === 'ISSUED' && i.status !== 'ISSUED') {
@@ -287,13 +395,13 @@ router.put('/invoices/:id', checkPermission('invoice', 'update'), validateBody(i
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, getUserName(db, req.user!.userId), 'UPDATE', 'Invoice', id, `更新发票 ${id}，状态: ${i.status}`);
 
-  const row = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id);
+  const row = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id) as InvoiceRow;
   res.json(toInvoice(row));
 });
 
 router.delete('/invoices/:id', checkPermission('invoice', 'delete'), (req: AuthRequest, res) => {
   const db = getDb();
-  const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id) as any;
+  const existing = db.prepare('SELECT * FROM invoices WHERE id = ?').get(req.params.id) as InvoiceRow | undefined;
   if (!existing) { res.status(404).json({ error: '发票不存在' }); return; }
 
   if (existing.status === 'ISSUED') {
@@ -309,7 +417,7 @@ router.delete('/invoices/:id', checkPermission('invoice', 'delete'), (req: AuthR
 
 // ======================== Performances ========================
 
-function toPerformance(row: any) {
+function toPerformance(row: PerformanceRow) {
   return {
     id: row.id, orderId: row.order_id, acceptanceDetailId: row.acceptance_detail_id,
     orderStatus: row.order_status, detailAmountSubtotal: row.detail_amount_subtotal,
@@ -328,7 +436,7 @@ router.get('/performances', checkPermission('performance', 'list'), (req, res) =
   const { orderId, owner, serviceType, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM performances WHERE 1=1';
-  const params: any[] = [];
+  const params: SqlParam[] = [];
   if (orderId) { sql += ' AND order_id = ?'; params.push(orderId); }
   if (owner) { sql += ' AND owner = ?'; params.push(owner); }
   if (serviceType) { sql += ' AND service_type = ?'; params.push(serviceType); }
@@ -338,19 +446,19 @@ router.get('/performances', checkPermission('performance', 'list'), (req, res) =
   const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY id DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
-  const rows = db.prepare(sql).all(...params) as any[];
+  const rows = db.prepare(sql).all(...params) as PerformanceRow[];
   res.json({ data: rows.map(toPerformance), total, page: pageNum, size: limit });
 });
 
 router.get('/performances/:id', checkPermission('performance', 'read'), (req, res) => {
-  const row = getDb().prepare('SELECT * FROM performances WHERE id = ?').get(req.params.id);
+  const row = getDb().prepare('SELECT * FROM performances WHERE id = ?').get(req.params.id) as PerformanceRow | undefined;
   if (!row) { res.status(404).json({ error: '业绩记录不存在' }); return; }
   res.json(toPerformance(row));
 });
 
 // ======================== Authorizations ========================
 
-function toAuthorization(row: any) {
+function toAuthorization(row: AuthorizationRow) {
   return {
     id: row.id, authCode: row.auth_code, orderId: row.order_id,
     licensee: row.licensee, customerName: row.customer_name, customerId: row.customer_id,
@@ -364,7 +472,7 @@ router.get('/authorizations', checkPermission('authorization', 'list'), (req, re
   const { customerId, orderId, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM authorizations WHERE 1=1';
-  const params: any[] = [];
+  const params: SqlParam[] = [];
   if (customerId) { sql += ' AND customer_id = ?'; params.push(customerId); }
   if (orderId) { sql += ' AND order_id = ?'; params.push(orderId); }
   if (search) { sql += ' AND (customer_name LIKE ? OR product_name LIKE ? OR licensee LIKE ?)'; params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
@@ -373,12 +481,12 @@ router.get('/authorizations', checkPermission('authorization', 'list'), (req, re
   const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY auth_start_date DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
-  const rows = db.prepare(sql).all(...params) as any[];
+  const rows = db.prepare(sql).all(...params) as AuthorizationRow[];
   res.json({ data: rows.map(toAuthorization), total, page: pageNum, size: limit });
 });
 
 router.get('/authorizations/:id', checkPermission('authorization', 'read'), (req, res) => {
-  const row = getDb().prepare('SELECT * FROM authorizations WHERE id = ?').get(req.params.id);
+  const row = getDb().prepare('SELECT * FROM authorizations WHERE id = ?').get(req.params.id) as AuthorizationRow | undefined;
   if (!row) { res.status(404).json({ error: '授权记录不存在' }); return; }
   res.json(toAuthorization(row));
 });
@@ -398,13 +506,13 @@ router.post('/authorizations', checkPermission('authorization', 'create'), (req:
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, getUserName(db, req.user!.userId), 'CREATE', 'Authorization', id, `创建授权 ${a.licensee} - ${a.productName}`);
 
-  const row = db.prepare('SELECT * FROM authorizations WHERE id = ?').get(id);
+  const row = db.prepare('SELECT * FROM authorizations WHERE id = ?').get(id) as AuthorizationRow;
   res.status(201).json(toAuthorization(row));
 });
 
 // ======================== DeliveryInfos ========================
 
-function toDeliveryInfo(row: any) {
+function toDeliveryInfo(row: DeliveryInfoRow) {
   return {
     id: row.id, deliveryType: row.delivery_type, orderId: row.order_id,
     quantity: row.quantity, authType: row.auth_type,
@@ -419,7 +527,7 @@ router.get('/delivery-infos', checkPermission('delivery', 'list'), (req, res) =>
   const { customerId, orderId, deliveryType, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM delivery_infos WHERE 1=1';
-  const params: any[] = [];
+  const params: SqlParam[] = [];
   if (customerId) { sql += ' AND customer_id = ?'; params.push(customerId); }
   if (orderId) { sql += ' AND order_id = ?'; params.push(orderId); }
   if (deliveryType) { sql += ' AND delivery_type = ?'; params.push(deliveryType); }
@@ -429,12 +537,12 @@ router.get('/delivery-infos', checkPermission('delivery', 'list'), (req, res) =>
   const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY id DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
-  const rows = db.prepare(sql).all(...params) as any[];
+  const rows = db.prepare(sql).all(...params) as DeliveryInfoRow[];
   res.json({ data: rows.map(toDeliveryInfo), total, page: pageNum, size: limit });
 });
 
 router.get('/delivery-infos/:id', checkPermission('delivery', 'read'), (req, res) => {
-  const row = getDb().prepare('SELECT * FROM delivery_infos WHERE id = ?').get(req.params.id);
+  const row = getDb().prepare('SELECT * FROM delivery_infos WHERE id = ?').get(req.params.id) as DeliveryInfoRow | undefined;
   if (!row) { res.status(404).json({ error: '交付信息不存在' }); return; }
   res.json(toDeliveryInfo(row));
 });
@@ -456,7 +564,7 @@ router.post('/delivery-infos', checkPermission('delivery', 'create'), (req: Auth
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, getUserName(db, req.user!.userId), 'CREATE', 'DeliveryInfo', id, `创建交付信息 ${d.licensee}`);
 
-  const row = db.prepare('SELECT * FROM delivery_infos WHERE id = ?').get(id);
+  const row = db.prepare('SELECT * FROM delivery_infos WHERE id = ?').get(id) as DeliveryInfoRow;
   res.status(201).json(toDeliveryInfo(row));
 });
 
@@ -466,7 +574,7 @@ router.get('/audit-logs', checkPermission('auditlog', 'list'), (req, res) => {
   const { resource, resourceId, userId, action, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM audit_logs WHERE 1=1';
-  const params: any[] = [];
+  const params: SqlParam[] = [];
   if (resource) { sql += ' AND resource = ?'; params.push(resource); }
   if (resourceId) { sql += ' AND resource_id = ?'; params.push(resourceId); }
   if (userId) { sql += ' AND user_id = ?'; params.push(userId); }
@@ -476,7 +584,7 @@ router.get('/audit-logs', checkPermission('auditlog', 'list'), (req, res) => {
   const { limit, offset, pageNum } = safePagination(page, size);
   sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
-  const rows = db.prepare(sql).all(...params) as any[];
+  const rows = db.prepare(sql).all(...params) as AuditLogRow[];
   res.json({
     data: rows.map(r => ({
       id: r.id, userId: r.user_id, userName: r.user_name,

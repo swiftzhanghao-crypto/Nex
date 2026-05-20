@@ -1,8 +1,11 @@
-import express from 'express';
+import express, { type ErrorRequestHandler } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { initSchema } from './db.ts';
+import fs from 'fs';
+import { createLogger } from './logger.ts';
+import { initSchema, getDb, getDbPath } from './db.ts';
+import { requestTimingMiddleware, csrfProtection, getMetrics } from './middleware.ts';
 import { seedDatabase } from './seed.ts';
 import authRoutes from './routes/auth.ts';
 import wpsAuthRoutes from './routes/wps-auth.ts';
@@ -17,6 +20,13 @@ import aiRoutes from './routes/ai.ts';
 import spacesRoutes from './routes/spaces.ts';
 import crmXsyRoutes from './routes/crm-xiaoshouyi.ts';
 import systemRoutes from './routes/system.ts';
+import auditRoutes from './routes/audit.ts';
+import importRoutes from './routes/import.ts';
+import notificationRoutes from './routes/notifications.ts';
+import { openApiSpec } from './openapi.ts';
+
+const log = createLogger('server');
+const serverStartTime = Date.now();
 
 const PORT = parseInt(process.env.PORT || '3001');
 const app = express();
@@ -35,13 +45,15 @@ app.use(cors({
     if (!origin || ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true);
     } else {
-      console.warn(`[cors] blocked origin: ${origin}`);
+      log.warn('cors blocked origin', { origin });
       callback(null, false);
     }
   },
   credentials: true,
 }));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '1mb' }));
+app.use(requestTimingMiddleware);
+app.use(csrfProtection(ALLOWED_ORIGINS));
 
 const globalLimiter = rateLimit({
   windowMs: 60_000,
@@ -63,12 +75,92 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 
 app.use((req, _res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  log.debug(`${req.method} ${req.path}`);
   next();
 });
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
+  const memoryUsage = process.memoryUsage();
+  let dbOk = false;
+  let dbSize: number | null = null;
+  try {
+    getDb().prepare('SELECT 1 AS ok').get();
+    dbOk = true;
+    const stat = fs.statSync(getDbPath());
+    dbSize = stat.size;
+  } catch (err) {
+    log.error('health check db failed', { message: err instanceof Error ? err.message : String(err) });
+  }
+  const status = dbOk ? 'ok' : 'degraded';
+  res.status(dbOk ? 200 : 503).json({
+    status,
+    time: new Date().toISOString(),
+    db: { ok: dbOk, sizeBytes: dbSize },
+    memoryUsage: {
+      rss: memoryUsage.rss,
+      heapTotal: memoryUsage.heapTotal,
+      heapUsed: memoryUsage.heapUsed,
+      external: memoryUsage.external,
+    },
+  });
+});
+
+app.get('/api/metrics', (_req, res) => {
+  res.json({
+    ...getMetrics(),
+    uptimeSeconds: Math.floor((Date.now() - serverStartTime) / 1000),
+  });
+});
+
+app.post('/api/errors', (req, res) => {
+  const errors = Array.isArray(req.body) ? req.body : [req.body];
+  for (const e of errors) {
+    log.warn('client error', { message: e?.message, source: e?.source, url: e?.url });
+  }
+  res.status(204).end();
+});
+
+app.post('/api/metrics/vitals', (req, res) => {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  log.info('web vitals', {
+    name: body.name,
+    value: body.value,
+    rating: body.rating,
+    url: body.url,
+    id: body.id,
+  });
+  res.status(204).end();
+});
+
+app.get('/api/docs', (_req, res) => {
+  res.json(openApiSpec);
+});
+
+app.get('/api/docs/ui', (_req, res) => {
+  const html = [
+    '<!DOCTYPE html>',
+    '<html lang="zh-CN">',
+    '<head>',
+    '  <meta charset="UTF-8" />',
+    '  <meta name="viewport" content="width=device-width, initial-scale=1" />',
+    '  <title>业务平台 API 文档</title>',
+    '  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />',
+    '</head>',
+    '<body>',
+    '  <div id="swagger-ui"></div>',
+    '  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>',
+    '  <script>',
+    '    SwaggerUIBundle({',
+    "      url: '/api/docs',",
+    "      dom_id: '#swagger-ui',",
+    '      presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],',
+    "      layout: 'BaseLayout',",
+    '    });',
+    '  </script>',
+    '</body>',
+    '</html>',
+  ].join('\n');
+  res.type('html').send(html);
 });
 
 app.use('/api/auth', wpsAuthRoutes);
@@ -84,54 +176,38 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/spaces', spacesRoutes);
 app.use('/api/crm/xsy', crmXsyRoutes);
 app.use('/api/system', systemRoutes);
+app.use('/api/audit', auditRoutes);
+app.use('/api/import', importRoutes);
+app.use('/api/notifications', notificationRoutes);
 
-app.use(((err: any, _req: any, res: any, _next: any) => {
-  // 详细错误仅写入服务端日志，不外泄给客户端
-  console.error(`[error] ${err?.code || ''} ${err?.message}`);
-  if (err.code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
+const errorHandler: ErrorRequestHandler = (err: unknown, _req, res, _next) => {
+  const code = typeof err === 'object' && err !== null && 'code' in err
+    ? String((err as { code: unknown }).code)
+    : undefined;
+  const message = err instanceof Error ? err.message : undefined;
+  log.error('unhandled error', { code, message });
+  if (code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
     res.status(400).json({ error: '关联数据不存在，请检查外键引用' });
     return;
   }
-  if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+  if (code === 'SQLITE_CONSTRAINT_UNIQUE') {
     res.status(400).json({ error: '数据重复，违反唯一约束' });
     return;
   }
-  if (err.code?.startsWith?.('SQLITE_')) {
+  if (code?.startsWith('SQLITE_')) {
     res.status(400).json({ error: '数据库操作失败' });
     return;
   }
   res.status(500).json({ error: '服务器内部错误' });
-}) as any);
+};
+app.use(errorHandler);
 
 initSchema();
 seedDatabase();
 
 app.listen(PORT, () => {
-  console.log(`\n  API Server running at http://localhost:${PORT}`);
-  console.log(`  Endpoints:`);
-  console.log(`     POST   /api/auth/login`);
-  console.log(`     GET    /api/auth/me`);
-  console.log(`     GET    /api/auth/wps/status | /wps/login | /wps/callback (WPS SSO)`);
-  console.log(`     CRUD   /api/users`);
-  console.log(`     CRUD   /api/orders          + POST /:id/approve, POST /:id/submit`);
-  console.log(`     CRUD   /api/customers`);
-  console.log(`     CRUD   /api/products`);
-  console.log(`     CRUD   /api/channels`);
-  console.log(`     CRUD   /api/opportunities`);
-  console.log(`     CRUD   /api/finance/contracts`);
-  console.log(`     CRUD   /api/finance/remittances`);
-  console.log(`     CRUD   /api/finance/invoices`);
-  console.log(`     GET    /api/finance/performances`);
-  console.log(`     GET    /api/finance/authorizations`);
-  console.log(`     GET    /api/finance/delivery-infos`);
-  console.log(`     GET    /api/finance/audit-logs`);
-  console.log(`     POST   /api/ai/generate, /api/ai/category-suggest, /api/ai/generate-json`);
-  console.log(`     GET    /api/crm/xsy/status | /login | /callback | /customers  POST /sync-customers`);
-  console.log(`     CRUD   /api/system/auth-types`);
-  console.log(`     CRUD   /api/system/sales-orgs`);
+  log.info(`API Server running on port ${PORT}`, { port: PORT, env: process.env.NODE_ENV || 'development' });
   if (process.env.NODE_ENV !== 'production') {
-    console.log(`\n  [dev] Default login: any user email + password "123456"\n`);
-  } else {
-    console.log('');
+    log.info('Dev mode: any user email + password "123456"');
   }
 });

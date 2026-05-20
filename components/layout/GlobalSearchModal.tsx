@@ -115,7 +115,7 @@ const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ open, onClose, on
         type: 'customer',
         id: c.id,
         title: c.companyName,
-        subtitle: `${c.id} · ${(c as any).industry || '企业客户'}`,
+        subtitle: `${c.id} · ${c.industry || '企业客户'}`,
         path: `/customers/${c.id}`,
       });
     }
@@ -129,7 +129,7 @@ const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ open, onClose, on
         type: 'product',
         id: p.id,
         title: p.name,
-        subtitle: `${p.id} · ${(p as any).category || '产品'}`,
+        subtitle: `${p.id} · ${p.category || '产品'}`,
         path: `/products/${p.id}`,
       });
     }

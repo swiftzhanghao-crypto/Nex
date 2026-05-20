@@ -8,10 +8,17 @@
     "dev:server": "tsx --env-file=.env server/index.ts",
     "dev:all": "npx concurrently \"npm run dev:server\" \"npm run dev\"",
     "build": "vite build",
+    "build:api": "VITE_API_MODE=true vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
+    "lint:eslint": "eslint . --quiet",
     "db:seed": "tsx server/seed.ts",
-    "db:backup": "tsx scripts/backup-db.ts --keep 7"
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "db:backup": "tsx scripts/backup-db.ts --keep 7",
+    "prepare": "husky"
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
@@ -32,6 +39,12 @@
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "bash -c 'npx tsc --noEmit --skipLibCheck'"
+    ]
+  },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@types/better-sqlite3": "^7.6.13",
@@ -40,13 +53,27 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.14.0",
     "@types/react-dom": "^19.2.3",
+    "@types/supertest": "^7.2.0",
+    "@eslint/js": "^9.39.2",
+    "@testing-library/react": "^16.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.50.0",
+    "@typescript-eslint/parser": "^8.50.0",
     "@vitejs/plugin-react": "^5.1.1",
+    "eslint": "^9.39.2",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "jsdom": "^26.1.0",
+    "typescript-eslint": "^8.50.0",
+    "@vitest/coverage-v8": "^4.1.6",
     "autoprefixer": "^10.4.27",
     "concurrently": "^9.1.2",
     "dotenv": "^17.4.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.5",
     "postcss": "^8.5.8",
+    "supertest": "^7.2.2",
     "tailwindcss": "^3.4.19",
     "typescript": "~5.8.2",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "vitest": "^4.1.6"
   }
 }

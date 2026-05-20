@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Order, OrderStatus, OrderItem, ActivationMethod, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, DeliveryMethod, OrderDraft, ConversionOrder, CustomerContact, PurchaseNature, SubUnitAuthMode, OnlineDeliveryEntry, Subscription, SubscriptionLineProductSnapshot } from '../../types';
+import { Order, OrderStatus, OrderItem, ActivationMethod, AcceptanceType, AcceptancePhase, OrderSource, BuyerType, InvoiceInfo, AcceptanceInfo, PaymentMethod, DeliveryMethod, OrderDraft, ConversionOrder, CustomerContact, PurchaseNature, SubUnitAuthMode, OnlineDeliveryEntry, Subscription, SubscriptionLineProductSnapshot, LinkedService } from '../../types';
 import { initialConversionOrders, ALL_INSTALL_PKG_ROWS } from '../../data/staticData';
 import { User as UserIcon, Plus, Trash2, CheckCircle, FileText, CreditCard, Truck, ShoppingBag, X, Target, MousePointer2, ClipboardCheck, ArrowUpRight, Percent, Layers, Network, Globe, Radio, RefreshCcw, Wallet, Zap, Box, Settings, MapPin, Briefcase, XCircle, Search, Save, ScrollText, Phone, Mail, Users, Banknote, Calendar, Check, ChevronRight, ChevronDown, Pencil, Key, Building2, Sparkles, Upload, Download, Wrench, Tag, Package } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import Pagination from '../common/Pagination';
 import { useAppContext, useEnsureData } from '../../contexts/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   inferOrderLinePurchaseNatureFromSubscription,
   purchaseNatureDisplay,
@@ -40,6 +41,14 @@ import {
 } from './wizard/wizardValidation';
 import { FieldError, ValidationToast, StepValidationBanner } from './wizard/ValidationFeedback';
 import OrderConfirmModal from './wizard/OrderConfirmModal';
+import Step2BasicInfo from './wizard/Step2BasicInfo';
+import Step3ProductSelect from './wizard/Step3ProductSelect';
+import Step4CommerceDelivery from './wizard/Step4CommerceDelivery';
+import ConversionPickerModal from './wizard/ConversionPickerModal';
+import ContractPickerModal from './wizard/ContractPickerModal';
+import OpportunityPickerModal from './wizard/OpportunityPickerModal';
+import NewContactModal from './wizard/NewContactModal';
+import WizardStepNav from './wizard/WizardStepNav';
 
 interface OrderCreateWizardProps {
   isOpen: boolean;
@@ -51,7 +60,8 @@ interface OrderCreateWizardProps {
 }
 
 const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, renewalOrder, subscriptionCheckout, initialDraft }) => {
-  const { products, customers, setCustomers, channels, opportunities, contracts, users, orders, setOrders, currentUser, standaloneEnterprises, orderDrafts, setOrderDrafts, apiMode, refreshOrders, subscriptions } = useAppContext();
+  const { products, customers, setCustomers, channels, opportunities, contracts, users, orders, setOrders, standaloneEnterprises, orderDrafts, setOrderDrafts, apiMode, refreshOrders, subscriptions } = useAppContext();
+  const { currentUser } = useAuth();
   useEnsureData(['customers', 'orders', 'contracts']);
   const navigate = useNavigate();
 
@@ -142,7 +152,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     updateTempSubUnit,
     removeTempSubUnit,
     handleTempSubUnitImport,
-  } = useTempSubUnits(customers as any);
+  } = useTempSubUnits(customers);
 
   const {
     enableConversion,
@@ -285,7 +295,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     reader.onload = (e) => {
       const text = e.target?.result as string;
       if (!text) return;
-      const newSubs = parseSubUnitsCSV(text, customers as any, 'su_imp', msg => alert(msg));
+      const newSubs = parseSubUnitsCSV(text, customers, 'su_imp', msg => alert(msg));
       if (newSubs.length === 0) return;
       setNewOrderItems(prev => prev.map((it, i) => {
         if (i !== itemIdx) return it;
@@ -298,13 +308,6 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   };
 
   const enableSubUnitAuth = newOrderItems.some(it => it.subUnitAuthMode && it.subUnitAuthMode !== 'none');
-
-  const wizardSteps = [
-      { id: 1, label: '订单类型', desc: '来源与模式', icon: Layers },
-      { id: 2, label: '客户信息', desc: '客户/商机', icon: UserIcon },
-      { id: 3, label: '产品配置', desc: '规格/价格', icon: ShoppingBag },
-      { id: 4, label: '交付信息', desc: '备注/验收', icon: ClipboardCheck },
-  ];
 
   const selectedCustomerObj = customers.find(c => c.id === newOrderCustomer);
 
@@ -497,7 +500,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
               skuId: sku.id, skuName: sku.name, skuCode: sku.code,
               quantity: 1, priceAtPurchase: price,
               pricingOptionId: pricingOpt?.id, pricingOptionName: pricingOpt?.title,
-              licenseType: pricingOpt?.title || op.licenseType,
+              licenseType: pricingOpt?.title || pricingOpt?.name || op.licenseType,
               licensePeriod: isPermanent ? '永久' : undefined,
               activationMethod: (buyerType === 'Customer' || buyerType === 'Channel') ? 'Account' : 'LicenseKey',
               capabilitiesSnapshot: prod.composition?.map(c => c.name) || [],
@@ -632,8 +635,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
     const finalPrice = negotiatedPrice !== null ? negotiatedPrice : (selectedOption ? selectedOption.price : selectedSku.price);
 
-    const derivedLicenseType = selectedOption?.title || undefined;
     const isPermanent = selectedOption ? selectedOption.license.periodUnit === 'Forever' : true;
+    const derivedLicenseType = selectedOption?.title || selectedOption?.name || undefined;
     const needsManualPeriod = !isPermanent;
 
     const endCustomerId = (buyerType === 'Customer' || buyerType === 'Channel') ? newOrderCustomer : undefined;
@@ -759,7 +762,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     setPurchaseNatureManualByRow({});
     setNewOrderItems(prev => prev.filter((_, i) => i !== index));
   };
-  const handleUpdateItem = (index: number, field: keyof OrderItem, value: any) => {
+  const handleUpdateItem = <K extends keyof OrderItem>(index: number, field: K, value: OrderItem[K]) => {
       if (field === 'purchaseNature' || field === 'purchaseNature365') {
         setPurchaseNatureManualByRow(prev => ({ ...prev, [index]: true }));
       }
@@ -830,7 +833,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
   const hasServiceConfig = useMemo(() => {
     return newOrderItems.some(item => {
       const product = products.find(p => p.id === item.productId);
-      return product && (product as any).linkedServices && (product as any).linkedServices.length > 0;
+      return product && product.linkedServices && product.linkedServices.length > 0;
     });
   }, [newOrderItems, products]);
 
@@ -849,8 +852,8 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
     newOrderItems.forEach((orderItem, idx) => {
       const product = products.find(p => p.id === orderItem.productId);
       if (!product) return;
-      const linkedServices = (product as any).linkedServices || [];
-      linkedServices.forEach((svc: any, sIdx: number) => {
+      const linkedServices = product.linkedServices || [];
+      linkedServices.forEach((svc: LinkedService, sIdx: number) => {
         const svcProduct = products.find(p => p.id === svc.productId);
         if (!svcProduct) return;
         const svcSku = svc.skuId
@@ -863,10 +866,10 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
           : orderItem.licensePeriod || '1年';
         items.push({
           id: `svc_${idx}_${sIdx}`,
-          productType: (svcProduct as any).productType || svcProduct.subCategory || '-',
+          productType: svcProduct.productType || svcProduct.subCategory || '-',
           productSpec: svcSku?.name || '-',
           productName: svcProduct.name,
-          serviceMethod: (svcProduct as any).activationMethods?.[0] || '在线服务',
+          serviceMethod: svcProduct.activationMethods?.[0] || '在线服务',
           servicePeriod: period,
           quantity: orderItem.quantity,
           unitPrice,
@@ -1130,7 +1133,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
 
     const totalAmount = calculateNewOrderTotal();
     
-    let phases: AcceptancePhase[] = [];
+    const phases: AcceptancePhase[] = [];
     const hasPhased = productAcceptanceRows.some(r => r.method === '分期验收');
     const resolvedAcceptanceType: AcceptanceType = hasPhased ? 'Phased' : 'OneTime';
     let phaseIdx = 0;
@@ -1220,9 +1223,9 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
             await refreshOrders();
             setShowConfirmModal(false);
             onClose(); resetCreateForm(); navigate(`/orders/${created.id}`);
-        } catch (e: any) {
+        } catch (e: unknown) {
             setIsSubmitting(false);
-            alert(e.message || '创建订单失败');
+            alert(e instanceof Error ? e.message : '创建订单失败');
             return;
         }
     } else {
@@ -1359,34 +1362,7 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                 </button>
             </div>
 
-            {/* Stepper Header */}
-            <div className="px-6 py-4 bg-gray-50/50 dark:bg-white/5 border-b border-gray-100/50 dark:border-white/10 overflow-x-auto no-scrollbar">
-                <div className="flex justify-between items-start relative">
-                    <div className="absolute top-5 h-1 bg-gray-100 dark:bg-white/10 -z-0 rounded-full overflow-hidden" style={{ left: `calc(100% / ${wizardSteps.length} / 2)`, right: `calc(100% / ${wizardSteps.length} / 2)` }}>
-                        <div
-                            className="h-full bg-[#0071E3] dark:bg-[#0A84FF] transition-all duration-500 ease-out"
-                            style={{ width: `${((currentStep - 1) / (wizardSteps.length - 1)) * 100}%` }}
-                        ></div>
-                    </div>
-                    {wizardSteps.map((s) => (
-                        <div key={s.id} className="flex flex-col items-center gap-1.5 relative z-10 flex-1 transition-all group">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-apple ${
-                                currentStep > s.id
-                                ? 'bg-green-500 text-white ring-4 ring-green-100 dark:ring-green-900/20'
-                                : currentStep === s.id
-                                    ? 'bg-[#0071E3] dark:bg-[#0A84FF] text-white ring-4 ring-blue-100 dark:ring-blue-900/30 shadow-xl scale-110'
-                                    : 'bg-white dark:bg-[#2C2C2E] border-2 border-gray-200 dark:border-gray-600 text-gray-400'
-                            }`}>
-                                {currentStep > s.id ? <CheckCircle className="w-4 h-4"/> : <s.icon className="w-5 h-5"/>}
-                            </div>
-                            <div className="text-center">
-                                <div className={`text-sm font-bold ${currentStep > s.id ? 'text-green-600' : currentStep === s.id ? 'text-[#0071E3] dark:text-[#0A84FF]' : 'text-gray-400'}`}>{s.label}</div>
-                                <div className="text-[10px] text-gray-400 hidden md:block mt-0.5">{s.desc}</div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
+            <WizardStepNav currentStep={currentStep} />
 
             <div className="p-5 overflow-y-auto flex-1 custom-scrollbar bg-gray-50/30 dark:bg-black/20">
                 {/* 步骤级校验错误 Banner */}
@@ -1408,2209 +1384,272 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
                     />
                 )}
 
-                {/* Step 2: Basic Info */}
                 {currentStep === 2 && (
-                    <div className="space-y-2.5 animate-fade-in">
-
-                        {/* 关联商机 */}
-                        {buyerType !== 'SelfDeal' && (
-                        <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-3">
-                            <div className="flex items-center justify-between">
-                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                    <Briefcase className="w-4 h-4 text-purple-500"/> 关联商机 <span className="text-red-500 text-sm">*</span>
-                                </h4>
-                                <div className="flex gap-2">
-                                    <button onClick={() => setHasOpportunity('yes')} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${hasOpportunity === 'yes' ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 shadow-sm' : 'border-gray-200 dark:border-white/10 text-gray-400 hover:border-gray-300 dark:hover:border-white/20'}`}>
-                                        <CheckCircle className="w-3.5 h-3.5"/>有商机
-                                    </button>
-                                    {buyerType !== 'Customer' && (
-                                    <button onClick={() => setHasOpportunity('no')} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${hasOpportunity === 'no' ? 'border-gray-500 bg-gray-100 dark:bg-gray-700/40 text-gray-700 dark:text-gray-200 shadow-sm' : 'border-gray-200 dark:border-white/10 text-gray-400 hover:border-gray-300 dark:hover:border-white/20'}`}>
-                                        <XCircle className="w-3.5 h-3.5"/>无商机
-                                    </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* 有商机：选择商机 */}
-                            {hasOpportunity === 'yes' && (
-                                <div>
-                                    {linkedOpportunityId ? (() => {
-                                        const linkedOppObj = opportunities.find(o => o.id === linkedOpportunityId);
-                                        const stageClass = linkedOppObj?.stage === '赢单' ? 'unified-tag-green !rounded-full' : linkedOppObj?.stage === '输单' ? 'unified-tag-gray !rounded-full' : linkedOppObj?.stage === '需求判断' ? 'unified-tag-blue !rounded-full' : linkedOppObj?.stage === '确认商机' ? 'unified-tag-indigo !rounded-full' : linkedOppObj?.stage === '确认渠道' ? 'unified-tag-purple !rounded-full' : 'unified-tag-yellow !rounded-full';
-                                        return (
-                                        <div className="p-3 bg-green-50/50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/30 rounded-xl space-y-3">
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="flex-1 min-w-0 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2">
-                                                    <div>
-                                                        <div className="text-[10px] text-gray-400 uppercase">商机名称</div>
-                                                        <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{linkedOppObj?.name}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-[10px] text-gray-400 uppercase">商机编号</div>
-                                                        <div className="text-xs font-mono text-gray-600 dark:text-gray-300">{linkedOppObj?.id}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-[10px] text-gray-400 uppercase">客户名称</div>
-                                                        <div className="text-xs text-gray-700 dark:text-gray-300">{linkedOppObj?.customerName}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-[10px] text-gray-400 uppercase">商机阶段</div>
-                                                        <span className={stageClass}>{linkedOppObj?.stage}</span>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-[10px] text-gray-400 uppercase">所属部门</div>
-                                                        <div className="text-xs text-gray-600 dark:text-gray-400">{linkedOppObj?.department || '-'}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-[10px] text-gray-400 uppercase">负责人</div>
-                                                        <div className="text-xs text-gray-600 dark:text-gray-400">{linkedOppObj?.ownerName || '-'}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-[10px] text-gray-400 uppercase">预计收入</div>
-                                                        <div className="text-xs font-mono text-gray-700 dark:text-gray-300">{linkedOppObj?.expectedRevenue != null ? `¥${linkedOppObj.expectedRevenue.toLocaleString()}` : '-'}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-[10px] text-gray-400 uppercase">预计关闭</div>
-                                                        <div className="text-xs text-gray-600 dark:text-gray-400">{linkedOppObj?.closeDate ? new Date(linkedOppObj.closeDate).toLocaleDateString('zh-CN') : '-'}</div>
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    onClick={() => { setLinkedOpportunityId(''); setNewOrderCustomer(''); setOrderEnterpriseId(''); setNewOrderItems([]); setSellerName(''); setOppItemWarnings([]); }}
-                                                    className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition shrink-0"
-                                                >
-                                                    <X className="w-3.5 h-3.5"/>
-                                                </button>
-                                            </div>
-                                            {linkedOppObj?.products && linkedOppObj.products.length > 0 && (
-                                                <div className="flex flex-wrap gap-1.5 pt-2 border-t border-green-200/50 dark:border-green-800/20">
-                                                    <span className="text-[10px] text-gray-400 uppercase mr-1 self-center">产品:</span>
-                                                    {linkedOppObj.products.map((p, pi) => (
-                                                        <span key={pi} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/70 dark:bg-black/20 border border-green-200/60 dark:border-green-700/30 rounded-lg text-xs">
-                                                            <span className="font-medium text-gray-800 dark:text-gray-200">{p.productName}</span>
-                                                            {p.skuName && <span className="text-gray-400 dark:text-gray-500">/ {p.skuName}</span>}
-                                                            {p.licenseType && <span className="text-green-600 dark:text-green-400 text-[10px]">({p.licenseType})</span>}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                        );
-                                    })() : (
-                                        <button
-                                            onClick={() => setIsOppPickerOpen(true)}
-                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border-2 border-dashed border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400 dark:text-gray-500 hover:border-[#0071E3] dark:hover:border-[#FF2D55] hover:text-[#0071E3] dark:hover:text-[#FF2D55] transition flex items-center justify-center gap-2"
-                                        >
-                                            <Briefcase className="w-4 h-4"/> 点击选择商机
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-
-                            {hasOpportunity === 'no' && (
-                                <div className="text-xs text-gray-400 dark:text-gray-500">无关联商机，将手动填写客户信息。</div>
-                            )}
-                        </div>
-                        )}
-
-                        {/* 客户与买方信息 */}
-                        {(buyerType === 'SelfDeal' || hasOpportunity === 'no' || (hasOpportunity === 'yes' && linkedOpportunityId)) && (
-                        <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-4">
-                            <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-2">
-                                <UserIcon className="w-4 h-4 text-indigo-500"/> 客户与买方信息
-                            </h4>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                {buyerType === 'SelfDeal' ? (
-                                <>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">企业 ID <span className="text-red-500">*</span></label>
-                                    <div className="relative">
-                                        <select
-                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm"
-                                            value={orderEnterpriseId}
-                                            onChange={e => handleSelfDealEnterpriseChange(e.target.value)}
-                                        >
-                                            <option value="">-- 请选择企业 --</option>
-                                            {allEnterprises.map(ent => (
-                                                <option key={ent.entId} value={ent.entId}>{ent.entName} (ID: {ent.entId})</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    {orderEnterpriseId && !allEnterprises.find(e => e.entId === orderEnterpriseId) && (
-                                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">该企业 ID 未匹配到已有客户</p>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">关联客户</label>
-                                    {newOrderCustomer ? (
-                                        <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30 rounded-xl">
-                                            <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
-                                            <div>
-                                                <div className="text-sm font-bold text-gray-900 dark:text-white">{selectedCustomerObj?.companyName}</div>
-                                                <div className="text-xs text-gray-500 mt-0.5">自动匹配</div>
-                                            </div>
-                                        </div>
-                                    ) : orderEnterpriseId ? (
-                                        <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 rounded-xl">
-                                            <div className="w-5 h-5 rounded-full border-2 border-amber-400 dark:border-amber-500 flex items-center justify-center shrink-0">
-                                                <span className="text-amber-500 text-xs font-bold">?</span>
-                                            </div>
-                                            <div className="text-sm font-medium text-amber-700 dark:text-amber-400">企业暂未关联客户</div>
-                                        </div>
-                                    ) : (
-                                        <div className="p-4 bg-gray-50 dark:bg-black/30 border border-dashed border-gray-300 dark:border-white/10 rounded-xl text-sm text-gray-400 dark:text-gray-500">
-                                            选择企业后自动匹配
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">是否代理商订单</label>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setIsAgentOrder(!isAgentOrder); if (isAgentOrder) setAgentCode(''); }}
-                                        className={`flex items-center gap-3 w-full p-4 rounded-xl border-2 transition-all ${
-                                            isAgentOrder
-                                                ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/40 dark:bg-white/5'
-                                                : 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30'
-                                        }`}
-                                    >
-                                        <div className={`w-10 h-5 rounded-full relative transition-colors ${isAgentOrder ? 'bg-[#0071E3] dark:bg-[#FF2D55]' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                                            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${isAgentOrder ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                                        </div>
-                                        <span className={`text-sm font-medium ${isAgentOrder ? 'text-[#0071E3] dark:text-[#FF2D55]' : 'text-gray-500 dark:text-gray-400'}`}>
-                                            {isAgentOrder ? '是（代理商订单）' : '否'}
-                                        </span>
-                                    </button>
-                                </div>
-                                {isAgentOrder && (
-                                <div className="space-y-2 md:col-span-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">代理商编号 <span className="text-red-500">*</span></label>
-                                    <input
-                                        type="text"
-                                        value={agentCode}
-                                        onChange={e => setAgentCode(e.target.value)}
-                                        placeholder="请输入代理商编号"
-                                        className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm text-gray-800 dark:text-white placeholder:text-gray-400"
-                                    />
-                                </div>
-                                )}
-                                </>
-                                ) : hasOpportunity === 'yes' ? (
-                                <>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">选择客户 <span className="text-red-500">*</span></label>
-                                    <select className={`w-full p-3 bg-white dark:bg-[#1C1C1E] border rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm ${getVisibleFieldError('newOrderCustomer') ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`} value={newOrderCustomer} onChange={e => handleCustomerChange(e.target.value)} onBlur={() => markFieldTouched('newOrderCustomer')}>
-                                        <option value="">-- 请选择客户 --</option>
-                                        {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
-                                    </select>
-                                    <FieldError error={getVisibleFieldError('newOrderCustomer')} />
-                                    {linkedOpportunityId && (
-                                        <div className="flex items-center gap-2 text-xs text-blue-500 dark:text-blue-400 mt-1">
-                                            <Briefcase className="w-3 h-3 shrink-0" />
-                                            <span>商机带入: {opportunities.find(o => o.id === linkedOpportunityId)?.name}，可手动调整</span>
-                                        </div>
-                                    )}
-                                </div>
-                                </>
-                                ) : (
-                                <>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">选择客户 <span className="text-red-500">*</span></label>
-                                    {subscriptionLock && (
-                                        <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-1">来自订阅续费/增购，客户不可更换。</p>
-                                    )}
-                                    <select disabled={!!subscriptionLock} className={`w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm disabled:opacity-60 disabled:cursor-not-allowed ${subscriptionLock ? 'bg-gray-100 dark:bg-white/5' : 'bg-white dark:bg-[#1C1C1E]'} ${getVisibleFieldError('newOrderCustomer') ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`} value={newOrderCustomer} onChange={e => handleCustomerChange(e.target.value)} onBlur={() => markFieldTouched('newOrderCustomer')}>
-                                        <option value="">-- 请选择客户 --</option>
-                                        {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
-                                    </select>
-                                    <FieldError error={getVisibleFieldError('newOrderCustomer')} />
-                                </div>
-                                </>
-                                )}
-
-                                {buyerType === 'Customer' && (
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">买方名称（客户）</label>
-                                    <select
-                                        className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm"
-                                        value={selectedBuyerNameId}
-                                        onChange={e => setSelectedBuyerNameId(e.target.value)}
-                                    >
-                                        <option value="">-- 请选择买方 --</option>
-                                        {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
-                                    </select>
-                                </div>
-                                )}
-
-                                {buyerType === 'Channel' && (
-                                    <>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">买方名称（代理商） <span className="text-red-500">*</span></label>
-                                        <select className={`w-full p-3 bg-white dark:bg-[#1C1C1E] border rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm ${getVisibleFieldError('selectedChannelId') ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`} value={selectedChannelId} onChange={e => setSelectedChannelId(e.target.value)} onBlur={() => markFieldTouched('selectedChannelId')}>
-                                            <option value="">-- 选择渠道商 --</option>
-                                            {channels.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                        </select>
-                                        <FieldError error={getVisibleFieldError('selectedChannelId')} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">直接下级渠道</label>
-                                        <input type="text" className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" placeholder="买方订购本订单产品的渠道商" value={directChannel} onChange={e => setDirectChannel(e.target.value)} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">终端渠道</label>
-                                        <input type="text" className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" placeholder="向最终用户销售本订单产品的渠道，与直接下级渠道不同时需要填写" value={terminalChannel} onChange={e => setTerminalChannel(e.target.value)} />
-                                    </div>
-                                    </>
-                                )}
-                                {buyerType !== 'SelfDeal' && (
-                                <>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">销售负责人</label>
-                                    <select className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={salesRepId} onChange={e => setSalesRepId(e.target.value)}>
-                                        <option value="">-- 分配销售人员 --</option>
-                                        {salesUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                                    </select>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">商务负责人</label>
-                                    <select className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm" value={businessManagerId} onChange={e => setBusinessManagerId(e.target.value)}>
-                                        <option value="">-- 分配商务人员 --</option>
-                                        {users.filter(u => u.roles?.includes('Business') || u.roles?.includes('Admin')).map(u => <option key={u.id} value={u.id}>{u.name.replace(/\s*\(.*?\)/g, '')}</option>)}
-                                    </select>
-                                </div>
-                                {linkedOpportunityId ? (
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">卖方名称 <span className="text-red-500">*</span></label>
-                                    <div className={`flex items-center gap-3 p-3 border rounded-xl ${sellerName ? 'bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800/30' : getVisibleFieldError('sellerName') ? 'bg-red-50 dark:bg-red-900/10 border-red-300 dark:border-red-700' : 'bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800/30'}`}>
-                                        <Briefcase className="w-4 h-4 text-teal-500 shrink-0"/>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{sellerName || '—'}</div>
-                                            <div className="text-[10px] text-teal-600 dark:text-teal-400 mt-0.5">来自商机产品的销售组织</div>
-                                        </div>
-                                        <button onClick={() => setSellerName('')} className="text-gray-400 hover:text-red-500 p-0.5 transition shrink-0"><X className="w-3.5 h-3.5"/></button>
-                                    </div>
-                                </div>
-                                ) : (
-                                <>
-                                <div className="space-y-2 relative" ref={sellerCategoryPickerRef}>
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">产品类型 <span className="text-red-500">*</span></label>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setIsSellerCategoryPickerOpen(!isSellerCategoryPickerOpen); if (!isSellerCategoryPickerOpen && !sellerHoverCategory && categoryTree.length > 0) setSellerHoverCategory(categoryTree[0].label); }}
-                                        onBlur={() => markFieldTouched('sellerProductCategory')}
-                                        className={`w-full p-3 bg-white dark:bg-[#1C1C1E] border rounded-xl outline-none text-sm text-left flex items-center justify-between transition ${isSellerCategoryPickerOpen ? 'ring-2 ring-[#0071E3] border-[#0071E3]' : getVisibleFieldError('sellerProductCategory') ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}
-                                    >
-                                        <span className={sellerProductCategory ? 'text-gray-900 dark:text-white' : 'text-gray-400'}>{sellerCategoryLabel || '-- 请选择产品类型 --'}</span>
-                                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isSellerCategoryPickerOpen ? 'rotate-180' : ''}`}/>
-                                    </button>
-                                    {isSellerCategoryPickerOpen && (
-                                        <div className="absolute z-50 bottom-full left-0 mb-1 w-[480px] bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/15 rounded-2xl shadow-2xl overflow-hidden flex" style={{ height: 320 }}>
-                                            <div className="w-[180px] border-r border-gray-100 dark:border-white/10 overflow-y-auto py-1">
-                                                {categoryTree.map(cat => (
-                                                    <div
-                                                        key={cat.label}
-                                                        onMouseEnter={() => setSellerHoverCategory(cat.label)}
-                                                        className={`flex items-center justify-between px-4 py-2.5 cursor-pointer text-sm transition-colors ${
-                                                            sellerHoverCategory === cat.label
-                                                                ? 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-blue-400 font-bold'
-                                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
-                                                        }`}
-                                                    >
-                                                        <span className="truncate">{cat.label}</span>
-                                                        <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-50"/>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div className="flex-1 overflow-y-auto py-1">
-                                                {categoryTree.find(c => c.label === sellerHoverCategory)?.subs.map(sub => (
-                                                    <div
-                                                        key={sub}
-                                                        onClick={() => { if (sellerProductCategory !== sub) { setSellerProductCategory(sub); setSellerName(''); } setIsSellerCategoryPickerOpen(false); }}
-                                                        className={`flex items-center gap-2 px-4 py-2.5 cursor-pointer text-sm transition-colors ${
-                                                            sellerProductCategory === sub
-                                                                ? 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-blue-400 font-bold'
-                                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
-                                                        }`}
-                                                    >
-                                                        {sellerProductCategory === sub && <Check className="w-3.5 h-3.5 text-[#0071E3] dark:text-blue-400 shrink-0"/>}
-                                                        <span className="truncate">{sub}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                    <FieldError error={getVisibleFieldError('sellerProductCategory')} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">卖方名称（销售组织） <span className="text-red-500">*</span></label>
-                                    <select
-                                        className={`w-full p-3 bg-white dark:bg-[#1C1C1E] border rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm disabled:opacity-50 disabled:cursor-not-allowed ${getVisibleFieldError('sellerName') ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}
-                                        value={sellerName}
-                                        onChange={e => setSellerName(e.target.value)}
-                                        onBlur={() => markFieldTouched('sellerName')}
-                                        disabled={sellerAvailableOrgs.length === 0}
-                                    >
-                                        <option value="">{sellerAvailableOrgs.length === 0 ? (sellerProductCategory ? '该分类下暂无销售组织' : '请先选择产品类型') : '-- 请选择卖方名称 --'}</option>
-                                        {sellerAvailableOrgs.map(org => (
-                                            <option key={org} value={org}>{org}</option>
-                                        ))}
-                                    </select>
-                                    <FieldError error={getVisibleFieldError('sellerName')} />
-                                </div>
-                                </>
-                                )}
-                                </>
-                                )}
-                            </div>
-                        </div>
-                        )}
-
-                        {/* 订单联系人选择 */}
-                        {newOrderCustomer && (
-                        <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-3">
-                            <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-2">
-                                <Users className="w-4 h-4 text-teal-500"/> 订单联系人
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                                {/* 采购联系人 */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">采购联系人 <span className="text-red-500">*</span></label>
-                                    <div className="flex items-center gap-2">
-                                        <select
-                                            value={selectedPurchasingContactId}
-                                            onChange={e => setSelectedPurchasingContactId(e.target.value)}
-                                            onBlur={() => markFieldTouched('selectedPurchasingContactId')}
-                                            className={`flex-1 px-3 py-2 border rounded-xl text-sm bg-white dark:bg-[#2C2C2E] text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 outline-none transition ${getVisibleFieldError('selectedPurchasingContactId') ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}
-                                        >
-                                            <option value="">请选择采购联系人</option>
-                                            {purchasingContacts.map(c => (
-                                                <option key={c.id} value={c.id}>{c.name}{c.isPrimary ? '（主要）' : ''}{c.position ? ` · ${c.position}` : ''}</option>
-                                            ))}
-                                        </select>
-                                        <button
-                                            onClick={() => { setNewContactForm({ name: '', phone: '', email: '', position: '' }); setShowNewContactModal('Purchasing'); }}
-                                            className="shrink-0 flex items-center gap-1 px-3 py-2 text-xs font-bold text-[#0071E3] dark:text-[#0A84FF] bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800 rounded-xl transition"
-                                        >
-                                            <Plus className="w-3.5 h-3.5"/>新建
-                                        </button>
-                                    </div>
-                                    <FieldError error={getVisibleFieldError('selectedPurchasingContactId')} />
-                                    {selectedPurchasingContactId && (() => {
-                                        const c = purchasingContacts.find(x => x.id === selectedPurchasingContactId);
-                                        if (!c) return null;
-                                        return (
-                                            <div className="flex items-center gap-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/40 rounded-xl text-xs text-gray-600 dark:text-gray-300">
-                                                {c.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3 text-blue-500"/>{c.phone}</span>}
-                                                {c.email && <span className="flex items-center gap-1"><Mail className="w-3 h-3 text-blue-500"/>{c.email}</span>}
-                                                {!c.phone && !c.email && <span className="text-gray-400">暂无联系方式</span>}
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-
-                                {/* IT 联系人 */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">IT 联系人 <span className="text-red-500">*</span></label>
-                                    <div className="flex items-center gap-2">
-                                        <select
-                                            value={selectedItContactId}
-                                            onChange={e => setSelectedItContactId(e.target.value)}
-                                            onBlur={() => markFieldTouched('selectedItContactId')}
-                                            className={`flex-1 px-3 py-2 border rounded-xl text-sm bg-white dark:bg-[#2C2C2E] text-gray-800 dark:text-white focus:ring-2 focus:ring-purple-500/30 focus:border-purple-400 outline-none transition ${getVisibleFieldError('selectedItContactId') ? 'border-red-300 dark:border-red-700' : 'border-gray-200 dark:border-white/10'}`}
-                                        >
-                                            <option value="">请选择 IT 联系人</option>
-                                            {itContacts.map(c => (
-                                                <option key={c.id} value={c.id}>{c.name}{c.isPrimary ? '（主要）' : ''}{c.position ? ` · ${c.position}` : ''}</option>
-                                            ))}
-                                        </select>
-                                        <button
-                                            onClick={() => { setNewContactForm({ name: '', phone: '', email: '', position: '' }); setShowNewContactModal('IT'); }}
-                                            className="shrink-0 flex items-center gap-1 px-3 py-2 text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 border border-purple-200 dark:border-purple-800 rounded-xl transition"
-                                        >
-                                            <Plus className="w-3.5 h-3.5"/>新建
-                                        </button>
-                                    </div>
-                                    <FieldError error={getVisibleFieldError('selectedItContactId')} />
-                                    {selectedItContactId && (() => {
-                                        const c = itContacts.find(x => x.id === selectedItContactId);
-                                        if (!c) return null;
-                                        return (
-                                            <div className="flex items-center gap-3 px-3 py-2 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800/40 rounded-xl text-xs text-gray-600 dark:text-gray-300">
-                                                {c.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3 text-purple-500"/>{c.phone}</span>}
-                                                {c.email && <span className="flex items-center gap-1"><Mail className="w-3 h-3 text-purple-500"/>{c.email}</span>}
-                                                {!c.phone && !c.email && <span className="text-gray-400">暂无联系方式</span>}
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-                            </div>
-                        </div>
-                        )}
-
-                        {/* 关联合同 - 官网订单和自成交订单不需要选择合同 */}
-                        {orderSource !== 'OnlineStore' && buyerType !== 'SelfDeal' && <div>
-                            <div className="flex items-center justify-between mb-3">
-                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                    <ScrollText className="w-4 h-4 text-blue-500"/> 关联合同
-                                    {linkedContractIds.length > 0 && (
-                                        <span className="text-sm font-normal text-gray-400 ml-1">({linkedContractIds.length}/5)</span>
-                                    )}
-                                </h4>
-                                {linkedContractIds.length > 0 && linkedContractIds.length < 5 && (
-                                    <button
-                                        onClick={() => setIsContractPickerOpen(true)}
-                                        className="flex items-center gap-1.5 text-sm font-medium text-[#0071E3] hover:text-blue-700 transition"
-                                    >
-                                        <Plus className="w-4 h-4"/> 添加合同
-                                    </button>
-                                )}
-                            </div>
-                            <div className="space-y-2">
-                                {linkedContractIds.map(cid => {
-                                    const c = contracts.find(ct => ct.id === cid);
-                                    return (
-                                        <div key={cid} className="flex items-center gap-3 p-3.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30 rounded-xl">
-                                            <ScrollText className="w-4 h-4 text-[#0071E3] shrink-0" />
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{c?.name || cid}</div>
-                                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-mono">{c?.code}{c?.contractType ? ` · ${c.contractType}` : ''}</div>
-                                            </div>
-                                            <button
-                                                onClick={() => setLinkedContractIds(prev => prev.filter(id => id !== cid))}
-                                                className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition shrink-0"
-                                            >
-                                                <X className="w-4 h-4"/>
-                                            </button>
-                                        </div>
-                                    );
-                                })}
-                                {linkedContractIds.length === 0 && (
-                                    <button
-                                        onClick={() => setIsContractPickerOpen(true)}
-                                        className="w-full p-4 bg-white dark:bg-[#2C2C2E] border-2 border-dashed border-gray-200 dark:border-white/10 rounded-2xl text-sm text-gray-400 dark:text-gray-500 hover:border-[#0071E3] dark:hover:border-[#0A84FF] hover:text-[#0071E3] dark:hover:text-[#0A84FF] transition flex items-center justify-center gap-2"
-                                    >
-                                        <ScrollText className="w-4 h-4"/> 点击选择关联合同（选填，最多 5 个）
-                                    </button>
-                                )}
-                                {linkedContractIds.length === 5 && (
-                                    <p className="text-xs text-amber-500 dark:text-amber-400 flex items-center gap-1 pl-1">
-                                        <span>已达到最多 5 个合同的上限</span>
-                                    </p>
-                                )}
-                            </div>
-                        </div>}
-                    </div>
+                    <Step2BasicInfo
+                        agentCode={agentCode}
+                        allEnterprises={allEnterprises}
+                        businessManagerId={businessManagerId}
+                        buyerType={buyerType}
+                        categoryTree={categoryTree}
+                        channels={channels}
+                        contracts={contracts}
+                        customers={customers}
+                        directChannel={directChannel}
+                        getVisibleFieldError={getVisibleFieldError}
+                        handleCustomerChange={handleCustomerChange}
+                        handleSelfDealEnterpriseChange={handleSelfDealEnterpriseChange}
+                        hasOpportunity={hasOpportunity}
+                        isAgentOrder={isAgentOrder}
+                        isSellerCategoryPickerOpen={isSellerCategoryPickerOpen}
+                        itContacts={itContacts}
+                        linkedContractIds={linkedContractIds}
+                        linkedOpportunityId={linkedOpportunityId}
+                        markFieldTouched={markFieldTouched}
+                        newOrderCustomer={newOrderCustomer}
+                        opportunities={opportunities}
+                        orderEnterpriseId={orderEnterpriseId}
+                        orderSource={orderSource}
+                        products={products}
+                        purchasingContacts={purchasingContacts}
+                        salesRepId={salesRepId}
+                        salesUsers={salesUsers}
+                        selectedBuyerNameId={selectedBuyerNameId}
+                        selectedChannelId={selectedChannelId}
+                        selectedCustomerObj={selectedCustomerObj}
+                        selectedItContactId={selectedItContactId}
+                        selectedPurchasingContactId={selectedPurchasingContactId}
+                        sellerAvailableOrgs={sellerAvailableOrgs}
+                        sellerCategoryLabel={sellerCategoryLabel}
+                        sellerCategoryPickerRef={sellerCategoryPickerRef}
+                        sellerHoverCategory={sellerHoverCategory}
+                        sellerName={sellerName}
+                        sellerProductCategory={sellerProductCategory}
+                        setAgentCode={setAgentCode}
+                        setBusinessManagerId={setBusinessManagerId}
+                        setDirectChannel={setDirectChannel}
+                        setHasOpportunity={setHasOpportunity}
+                        setIsAgentOrder={setIsAgentOrder}
+                        setIsContractPickerOpen={setIsContractPickerOpen}
+                        setIsOppPickerOpen={setIsOppPickerOpen}
+                        setIsSellerCategoryPickerOpen={setIsSellerCategoryPickerOpen}
+                        setLinkedContractIds={setLinkedContractIds}
+                        setLinkedOpportunityId={setLinkedOpportunityId}
+                        setNewContactForm={setNewContactForm}
+                        setNewOrderCustomer={setNewOrderCustomer}
+                        setNewOrderItems={setNewOrderItems}
+                        setOppItemWarnings={setOppItemWarnings}
+                        setOrderEnterpriseId={setOrderEnterpriseId}
+                        setSalesRepId={setSalesRepId}
+                        setSelectedBuyerNameId={setSelectedBuyerNameId}
+                        setSelectedChannelId={setSelectedChannelId}
+                        setSelectedItContactId={setSelectedItContactId}
+                        setSelectedPurchasingContactId={setSelectedPurchasingContactId}
+                        setSellerHoverCategory={setSellerHoverCategory}
+                        setSellerName={setSellerName}
+                        setSellerProductCategory={setSellerProductCategory}
+                        setShowNewContactModal={setShowNewContactModal}
+                        setTerminalChannel={setTerminalChannel}
+                        subscriptionLock={subscriptionLock}
+                        terminalChannel={terminalChannel}
+                        users={users}
+                    />
                 )}
 
-                {/* Step 3: Merchandise Selection */}
                 {currentStep === 3 && (
-                    <div className="space-y-2.5 animate-fade-in">
-                        {orderSource === 'Renewal' && originalOrderId && (
-                            <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 p-4 rounded-2xl text-sm text-indigo-700 dark:text-indigo-300 flex items-center gap-3">
-                                <RefreshCcw className="w-5 h-5"/>
-                                <span>续费模式：正在基于订单 <strong>{originalOrderId}</strong> 的明细进行续费。您可以继续添加或移除产品。</span>
-                            </div>
-                        )}
-
-                        {linkedOpportunityId && (newOrderItems.length > 0 || oppItemWarnings.length > 0) && (
-                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 rounded-2xl text-sm text-amber-700 dark:text-amber-300 space-y-2">
-                                {newOrderItems.length > 0 && (
-                                    <>
-                                        <div className="flex items-center gap-2 font-bold">
-                                            <Briefcase className="w-4 h-4 shrink-0"/>
-                                            <span>已从商机自动带入 {newOrderItems.length} 个产品，以下信息需要您补充完善：</span>
-                                        </div>
-                                        <ul className="list-disc list-inside text-xs space-y-1 ml-6 text-amber-600 dark:text-amber-400">
-                                            <li>订购性质 — 系统会结合「续费管理」订阅自动判断，请核对；365 订购性质请按需选择</li>
-                                            <li>数量、授权/服务期限 — 请确认或修改</li>
-                                            <li>激活方式、安装包类型、介质数量 — 请点击编辑按钮补充</li>
-                                        </ul>
-                                    </>
-                                )}
-                                {oppItemWarnings.length > 0 && (
-                                    <div className={`space-y-1 ${newOrderItems.length > 0 ? 'mt-2 pt-2 border-t border-amber-200 dark:border-amber-700/50' : ''}`}>
-                                        {newOrderItems.length === 0 && (
-                                            <div className="flex items-center gap-2 font-bold mb-2">
-                                                <XCircle className="w-4 h-4 text-red-500 shrink-0"/>
-                                                <span className="text-red-600 dark:text-red-400">商机产品匹配失败，请手动添加产品：</span>
-                                            </div>
-                                        )}
-                                        {oppItemWarnings.map((w, wi) => (
-                                            <div key={wi} className="text-xs flex items-start gap-1.5">
-                                                <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5"/>
-                                                <span><strong>{w.productName}</strong>：{w.missingFields.join('、')}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* 订单产品明细列表 - 置顶 */}
-                        <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-white/5 overflow-hidden shadow-apple">
-                            <div className="flex items-center justify-between px-5 pt-4 pb-2">
-                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                    <ShoppingBag className="w-4 h-4 text-blue-500"/> 订单产品明细
-                                    {newOrderItems.length > 0 && <span className="text-xs font-mono bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full ml-1">{newOrderItems.length}</span>}
-                                </h4>
-                                <div className="flex items-center gap-3">
-                                    {newOrderItems.length > 0 && (
-                                        <div className="text-sm text-gray-500">总计：<span className="text-lg font-bold text-red-600 dark:text-red-400">¥{calculateNewOrderTotal().toLocaleString()}</span></div>
-                                    )}
-                                    <button
-                                        onClick={() => { setEditingItemIndex(null); setTempPurchaseNature('New'); setTempPurchaseNature365('New'); setTempSubUnitMode('none'); setTempSubUnits([]); setShowAddProductModal(true); }}
-                                        disabled={!!subscriptionLock || (enableSubUnitAuth && newOrderItems.length >= 1)}
-                                        title={subscriptionLock ? '订阅续费/增购模式下不可再添加产品' : (enableSubUnitAuth && newOrderItems.length >= 1 ? '下级单位授权模式下仅允许一个产品明细' : undefined)}
-                                        className="flex items-center gap-1.5 px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-xl text-xs font-bold transition shadow-apple disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#0071E3]"
-                                    >
-                                        <Plus className="w-3.5 h-3.5"/> 添加产品
-                                    </button>
-                                </div>
-                            </div>
-                            {(buyerType === 'Customer' || buyerType === 'Channel') && newOrderCustomer && !renewalOrder && !subscriptionCheckout && newOrderItems.length > 0 && (
-                                <p className="text-[11px] text-gray-500 dark:text-gray-400 px-5 pb-2 leading-relaxed">
-                                    每条明细<strong>下方</strong>为与「续费管理」订阅的比对结果；如需修改订购性质，请点击<strong>编辑</strong>按钮。
-                                </p>
-                            )}
-                            {newOrderItems.length > 0 ? (
-                                <table className="w-full text-left text-sm min-w-[600px]">
-                                    <thead className="unified-table-header">
-                                        <tr><th className="p-3 pl-4 text-center w-16 whitespace-nowrap">明细编号</th><th className="p-3">产品/规格</th><th className="p-3">订购性质</th><th className="p-3">365订购性质</th><th className="p-3">授权类型</th><th className="p-3 text-center">数量</th><th className="p-3 text-center">授权/服务期限</th>{(buyerType === 'Customer' || buyerType === 'Channel') && <th className="p-3">激活方式</th>}<th className="p-3 text-right">单价</th><th className="p-3 text-right">小计</th><th className="p-3 text-center">操作</th></tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                                        {newOrderItems.map((item, idx) => {
-                                            const rowLocked = !!subscriptionLock && idx === 0;
-                                            const addonTimeLocked = rowLocked && subscriptionLock?.mode === 'addon';
-                                            const lineColSpan = 10 + (buyerType === 'Customer' || buyerType === 'Channel' ? 1 : 0);
-                                            return (
-                                            <React.Fragment key={idx}>
-                                            <tr className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                                <td className="p-3 pl-4 text-center">
-                                                    <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 text-xs font-bold font-mono text-[#0071E3] dark:text-[#0A84FF]">{String(idx + 1).padStart(3, '0')}</span>
-                                                </td>
-                                                <td className="p-3"><div className="font-bold text-gray-900 dark:text-white text-sm">{item.productName}</div><div className="text-xs text-gray-500 mt-0.5">{item.skuName}</div>{item.ecoProductName && <div className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1"><Tag className="w-2.5 h-2.5"/>生态: {item.ecoProductName}</div>}{rowLocked && <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">（来自订阅，不可更换产品）</div>}</td>
-                                                <td className="p-3"><span className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-bold ${purchaseNatureBadgeClass((item.purchaseNature || 'New') as PurchaseNature)}`}>{purchaseNatureDisplay((item.purchaseNature || 'New') as PurchaseNature)}</span></td>
-                                                <td className="p-3"><span className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-bold ${purchaseNatureBadgeClass((item.purchaseNature365 || 'New') as PurchaseNature)}`}>{purchaseNatureDisplay((item.purchaseNature365 || 'New') as PurchaseNature)}</span></td>
-                                                <td className="p-3"><span className="text-xs bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-lg text-gray-600 dark:text-gray-300 font-medium">{item.pricingOptionName || '默认'}</span></td>
-                                                <td className="p-3 text-center"><span className="text-sm font-medium text-gray-900 dark:text-white">{item.quantity}</span></td>
-                                                <td className="p-3 text-center">
-                                                    {addonTimeLocked ? (
-                                                        <div className="text-xs text-gray-700 dark:text-gray-300 space-y-1">
-                                                            <div><span className="text-gray-400">起</span> {item.licenseStartDate || '-'}</div>
-                                                            <div><span className="text-gray-400">止</span> {item.licenseEndDate || '-'}</div>
-                                                            <div className="inline-flex px-2 py-0.5 text-[11px] font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-100 dark:border-teal-800">{item.licensePeriod}</div>
-                                                        </div>
-                                                    ) : item.licensePeriod && item.licensePeriod !== '永久' ? (
-                                                        <span className="inline-flex px-2.5 py-1 text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800 rounded-lg">{item.licensePeriod}</span>
-                                                    ) : (
-                                                        <span className="text-gray-300 dark:text-gray-600">-</span>
-                                                    )}
-                                                </td>
-                                                {(buyerType === 'Customer' || buyerType === 'Channel') && (
-                                                    <td className="p-3"><span className="text-xs text-gray-700 dark:text-gray-300">{({ Account: '账号激活', SerialKey: '序列号激活', AccountAndSerialKey: '账号+序列号', LicenseKey: '授权码激活', Online: '在线激活', Dongle: '硬件加密狗' } as Record<string, string>)[item.activationMethod || 'Account'] || '账号激活'}</span></td>
-                                                )}
-                                                <td className="p-3 text-right"><span className="text-sm font-medium text-gray-900 dark:text-white" style={{fontVariantNumeric:'tabular-nums'}}>¥{item.priceAtPurchase.toLocaleString()}</span></td>
-                                                <td className="p-3 text-right font-bold text-red-600 dark:text-red-400">¥{(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
-                                                <td className="p-3 text-center">
-                                                    <div className="flex items-center justify-center gap-1">
-                                                    <button type="button" onClick={() => handleEditItem(idx)} disabled={rowLocked} className="text-gray-400 hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20 transition disabled:opacity-30 disabled:pointer-events-none" title="编辑"><Pencil className="w-3.5 h-3.5"/></button>
-                                                    <button type="button" onClick={() => handleRemoveItem(idx)} disabled={rowLocked} className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition disabled:opacity-30 disabled:pointer-events-none" title="删除"><Trash2 className="w-3.5 h-3.5"/></button>
-                                                    </div>
-                                                    {item.subUnitAuthMode && item.subUnitAuthMode !== 'none' && item.subUnits && item.subUnits.length > 0 && (
-                                                        <div className="text-[10px] text-indigo-500 dark:text-indigo-400 mt-1 font-bold flex items-center justify-center gap-1"><Building2 className="w-3 h-3"/>{item.subUnits.length} 个下级单位</div>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                            </React.Fragment>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            ) : (
-                                <div className="px-5 pb-4 pt-1">
-                                    <div className="flex flex-col items-center justify-center py-10 text-gray-300 dark:text-gray-600">
-                                        <ShoppingBag className="w-10 h-10 mb-3 opacity-40"/>
-                                        <p className="text-sm font-medium">暂无产品，请点击右上方"添加产品"按钮</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* 产品服务信息 */}
-                        {hasServiceConfig && newOrderItems.length > 0 && (
-                        <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple overflow-hidden">
-                            <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
-                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                    <Wrench className="w-4 h-4 text-teal-500"/> 产品服务信息
-                                </h4>
-                            </div>
-                            <div className="px-5 py-4 space-y-4">
-                                {/* 采购方式选择 */}
-                                <div className="flex items-center gap-4">
-                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300 shrink-0">产品和服务是否分开采购</label>
-                                    <div className="flex items-center gap-3">
-                                        <label className="flex items-center gap-2 cursor-pointer">
-                                            <input type="radio" name="serviceProcurement" checked={serviceProcurementMode === 'separate'} onChange={() => setServiceProcurementMode('separate')} className="w-4 h-4 text-blue-600" />
-                                            <span className="text-sm text-gray-700 dark:text-gray-300">产品和服务分开采购</span>
-                                        </label>
-                                        <label className="flex items-center gap-2 cursor-pointer">
-                                            <input type="radio" name="serviceProcurement" checked={serviceProcurementMode === 'together'} onChange={() => setServiceProcurementMode('together')} className="w-4 h-4 text-blue-600" />
-                                            <span className="text-sm text-gray-700 dark:text-gray-300">产品和服务一并采购</span>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                {serviceProcurementMode === 'separate' && (
-                                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 rounded-lg px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
-                                        分开采购模式下，服务将作为独立的产品行添加到订单产品列表，通过产品明细编号与主产品关联。
-                                    </div>
-                                )}
-
-                                {/* 一并采购模式 - 服务明细表格 */}
-                                {showServiceDetailTable && serviceDetailItems.length > 0 && (
-                                    <div className="border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden">
-                                        <div className="px-4 py-2.5 bg-gray-50 dark:bg-[#1C1C1E] border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
-                                            <span className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                                                服务明细
-                                                <span className="text-xs font-mono bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded-full">{serviceDetailItems.length}</span>
-                                            </span>
-                                            <div className="flex items-center gap-2">
-                                                <button type="button" className="text-xs font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline flex items-center gap-1">
-                                                    <Plus className="w-3 h-3"/> 新增服务
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-left text-sm min-w-[700px]">
-                                                <thead className="bg-gray-50/80 dark:bg-[#2C2C2E]">
-                                                    <tr>
-                                                        <th className="p-2.5 pl-4 text-center w-12 text-xs font-bold text-gray-500 dark:text-gray-400">编号</th>
-                                                        <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400">产品类型</th>
-                                                        <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400">产品规格</th>
-                                                        <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400">产品名称</th>
-                                                        <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400">授权方式/服务方式</th>
-                                                        <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400 text-center">授权或服务期限</th>
-                                                        <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400 text-center">数量</th>
-                                                        {buyerType !== 'Channel' && <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400 text-right">服务成本预提单价</th>}
-                                                        {buyerType !== 'Channel' && <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400 text-right">服务成本预提金额小计(含税)</th>}
-                                                        <th className="p-2.5 text-xs font-bold text-gray-500 dark:text-gray-400 text-center">操作</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                                                    {serviceDetailItems.map((svc, idx) => (
-                                                        <tr key={svc.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                                            <td className="p-2.5 pl-4 text-center">
-                                                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-teal-50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800/40 text-[10px] font-bold font-mono text-teal-600 dark:text-teal-400">{idx + 1}</span>
-                                                            </td>
-                                                            <td className="p-2.5 text-xs text-gray-700 dark:text-gray-300">{svc.productType}</td>
-                                                            <td className="p-2.5 text-xs text-gray-700 dark:text-gray-300">{svc.productSpec}</td>
-                                                            <td className="p-2.5 text-xs font-medium text-gray-900 dark:text-white">{svc.productName}</td>
-                                                            <td className="p-2.5 text-xs text-gray-700 dark:text-gray-300">{svc.serviceMethod}</td>
-                                                            <td className="p-2.5 text-center">
-                                                                <span className="inline-flex px-1.5 py-0.5 text-[10px] font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800 rounded">{svc.servicePeriod}</span>
-                                                            </td>
-                                                            <td className="p-2.5 text-center text-xs font-medium text-gray-900 dark:text-white">{svc.quantity}</td>
-                                                            {buyerType !== 'Channel' && <td className="p-2.5 text-right text-xs font-mono text-gray-700 dark:text-gray-300">¥{svc.unitPrice.toLocaleString()}</td>}
-                                                            {buyerType !== 'Channel' && <td className="p-2.5 text-right text-xs font-bold font-mono text-gray-900 dark:text-white">¥{svc.subtotal.toLocaleString()}</td>}
-                                                            <td className="p-2.5 text-center">
-                                                                <div className="flex items-center justify-center gap-2">
-                                                                    <button type="button" className="text-[10px] font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline">编辑</button>
-                                                                    <button type="button" className="text-[10px] font-medium text-[#0071E3] dark:text-[#0A84FF] hover:underline">详情</button>
-                                                                    <button type="button" className="text-[10px] font-medium text-red-500 hover:underline">删除</button>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                                {buyerType !== 'Channel' && (
-                                                    <tfoot className="border-t border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/5">
-                                                        <tr>
-                                                            <td colSpan={8} className="p-2.5 pl-4 text-right font-bold text-xs text-gray-700 dark:text-gray-300">合计</td>
-                                                            <td className="p-2.5 text-right font-bold text-xs font-mono text-red-600 dark:text-red-400">¥{serviceDetailItems.reduce((sum, s) => sum + s.subtotal, 0).toLocaleString()}</td>
-                                                            <td className="p-2.5"></td>
-                                                        </tr>
-                                                    </tfoot>
-                                                )}
-                                            </table>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {serviceProcurementMode === 'together' && !showServiceDetailTable && (
-                                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-lg px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                                        请完善产品的订购性质、单价和数量后，系统将自动匹配并带出基础服务和必选服务。
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        )}
-
-                        {/* 折算抵扣 - 仅自成交订单 */}
-                        {buyerType === 'SelfDeal' && (
-                        <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-3">
-                            <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2 border-b border-gray-100 dark:border-white/10 pb-2">
-                                <Percent className="w-4 h-4 text-amber-500"/> 折算抵扣
-                            </h4>
-                            <div className="flex items-center gap-4">
-                                <label className="text-sm font-bold text-gray-700 dark:text-gray-300">是否折算</label>
-                                <button
-                                    onClick={() => { setEnableConversion(!enableConversion); if (enableConversion) { setSelectedConversionIds([]); } }}
-                                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${enableConversion ? 'bg-[#0071E3]' : 'bg-gray-300 dark:bg-gray-600'}`}
-                                >
-                                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${enableConversion ? 'translate-x-6' : 'translate-x-1'}`} />
-                                </button>
-                                <span className="text-sm text-gray-500 dark:text-gray-400">{enableConversion ? '需要折算' : '不需要折算'}</span>
-                            </div>
-                            {enableConversion && (
-                                <div className="space-y-4">
-                                    <button
-                                        onClick={() => { setConversionSearch(''); setIsConversionPickerOpen(true); }}
-                                        className="flex items-center gap-2 px-5 py-3 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition text-sm font-medium"
-                                    >
-                                        <Search className="w-4 h-4"/> 选择关联折算单
-                                    </button>
-                                    {selectedConversionIds.length > 0 && (
-                                        <div className="space-y-3">
-                                            <div className="grid gap-2">
-                                                {selectedConversionIds.map(cid => {
-                                                    const co = availableConversionOrders.find(c => c.id === cid);
-                                                    if (!co) return null;
-                                                    return (
-                                                        <div key={cid} className="flex items-center justify-between p-3 bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 rounded-xl">
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="text-xs font-mono text-gray-500 dark:text-gray-400">{co.id}</div>
-                                                                <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-0.5">{co.enterpriseName}</div>
-                                                            </div>
-                                                            <div className="flex items-center gap-3">
-                                                                <span className="text-sm font-bold text-amber-600 dark:text-amber-400">¥{co.amount.toLocaleString()}</span>
-                                                                <button onClick={() => setSelectedConversionIds(prev => prev.filter(id => id !== cid))} className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition"><X className="w-3.5 h-3.5"/></button>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 dark:border-white/10">
-                                                <span className="text-sm font-bold text-gray-500 dark:text-gray-400">折算总金额:</span>
-                                                <span className="text-lg font-bold text-amber-600 dark:text-amber-400">¥{conversionTotalAmount.toLocaleString()}</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                        )}
-
-
-                        {/* 添加产品抽屉 */}
-                        {showAddProductModal && (
-                        <ModalPortal>
-                        <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-[600] animate-fade-in" onClick={() => { setShowAddProductModal(false); setEditingItemIndex(null); }}/>
-                        <div className="fixed inset-y-0 right-0 z-[601] w-[85vw] max-w-[1600px] flex flex-col bg-white dark:bg-[#1C1C1E] shadow-[-8px_0_30px_rgba(0,0,0,0.12)] dark:shadow-[-8px_0_30px_rgba(0,0,0,0.5)] animate-drawer-enter">
-                            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/10 shrink-0 bg-white dark:bg-[#1C1C1E]">
-                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                    <ShoppingBag className="w-4 h-4 text-blue-500"/> {editingItemIndex !== null ? '编辑产品' : '添加产品'}
-                                </h4>
-                                <button onClick={() => { setShowAddProductModal(false); setEditingItemIndex(null); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition">
-                                    <X className="w-4 h-4"/>
-                                </button>
-                            </div>
-                            <div className="flex-1 overflow-y-auto px-6 py-5 pb-8 space-y-5">
-
-                            {/* ═══ 产品信息 ═══ */}
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-white/10">
-                                    <ShoppingBag className="w-4 h-4 text-blue-500"/>
-                                    <span className="text-sm font-bold text-gray-900 dark:text-white">产品信息</span>
-                                </div>
-                                <div className="grid grid-cols-4 gap-4">
-                                <div className="space-y-2 relative" ref={categoryPickerRef}>
-                                    <label className="text-xs font-bold text-gray-500 uppercase">产品分类 <span className="text-red-500">*</span></label>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setIsCategoryPickerOpen(!isCategoryPickerOpen); if (!isCategoryPickerOpen && !tempHoverCategory && categoryTree.length > 0) setTempHoverCategory(categoryTree[0].label); }}
-                                        className={`w-full p-3 bg-white dark:bg-[#1C1C1E] border rounded-xl outline-none text-sm text-left flex items-center justify-between transition ${isCategoryPickerOpen ? 'ring-2 ring-[#0071E3] border-[#0071E3]' : 'border-gray-200 dark:border-white/10'}`}
-                                    >
-                                        <span className={tempCategory ? 'text-gray-900 dark:text-white' : 'text-gray-400'}>{selectedCategoryLabel || '-- 请选择分类 --'}</span>
-                                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isCategoryPickerOpen ? 'rotate-180' : ''}`}/>
-                                    </button>
-                                    {isCategoryPickerOpen && (
-                                        <div className="absolute z-50 top-full left-0 mt-1 w-[480px] bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/15 rounded-2xl shadow-2xl overflow-hidden flex" style={{ maxHeight: 320 }}>
-                                            <div className="w-[180px] border-r border-gray-100 dark:border-white/10 overflow-y-auto py-1">
-                                                {categoryTree.map(cat => (
-                                                    <div
-                                                        key={cat.label}
-                                                        onMouseEnter={() => setTempHoverCategory(cat.label)}
-                                                        className={`flex items-center justify-between px-4 py-2.5 cursor-pointer text-sm transition-colors ${
-                                                            tempHoverCategory === cat.label
-                                                                ? 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-blue-400 font-bold'
-                                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
-                                                        }`}
-                                                    >
-                                                        <span className="truncate">{cat.label}</span>
-                                                        <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-50"/>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div className="flex-1 overflow-y-auto py-1">
-                                                {categoryTree.find(c => c.label === tempHoverCategory)?.subs.map(sub => (
-                                                    <div
-                                                        key={sub}
-                                                        onClick={() => { setTempCategory(sub); setIsCategoryPickerOpen(false); }}
-                                                        className={`flex items-center gap-2 px-4 py-2.5 cursor-pointer text-sm transition-colors ${
-                                                            tempCategory === sub
-                                                                ? 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] dark:text-blue-400 font-bold'
-                                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
-                                                        }`}
-                                                    >
-                                                        {tempCategory === sub && <Check className="w-3.5 h-3.5 text-[#0071E3] dark:text-blue-400 shrink-0"/>}
-                                                        <span className="truncate">{sub}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">选择产品 <span className="text-red-500">*</span></label>
-                                    <select 
-                                        className={`w-full p-3 border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50 disabled:cursor-not-allowed ${!tempCategory ? 'bg-gray-100 dark:bg-white/5' : 'bg-white dark:bg-[#1C1C1E]'}`}
-                                        value={tempProductId && tempSkuId ? `${tempProductId}||${tempSkuId}` : tempProductId ? `${tempProductId}||` : ''}
-                                        onChange={e => {
-                                            const val = e.target.value;
-                                            if (!val) { setTempProductId(''); return; }
-                                            const [pId, sId] = val.split('||');
-                                            if (sId) {
-                                                setTempProductWithSku(pId, sId);
-                                            } else {
-                                                setTempProductId(pId);
-                                            }
-                                        }}
-                                        disabled={!tempCategory}
-                                    >
-                                        <option value="">-- {tempCategory ? '请选择产品' : '请先选择分类'} --</option>
-                                        {products.filter(p => p.status === 'OnShelf' && p.subCategory === tempCategory).map(p => {
-                                            const activeSkus = p.skus.filter(s => s.status === 'Active');
-                                            const uniqueSpecs = Array.from(new Map(activeSkus.map(s => [s.name, s])).values());
-                                            if (uniqueSpecs.length <= 1) {
-                                                return <option key={p.id} value={`${p.id}||${uniqueSpecs[0]?.id || ''}`}>{p.name}{uniqueSpecs[0] ? ` / ${uniqueSpecs[0].name}` : ''}</option>;
-                                            }
-                                            return (
-                                                <optgroup key={p.id} label={p.name}>
-                                                    {uniqueSpecs.map(s => (
-                                                        <option key={`${p.id}-${s.id}`} value={`${p.id}||${s.id}`}>{p.name} / {s.name}</option>
-                                                    ))}
-                                                </optgroup>
-                                            );
-                                        })}
-                                    </select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">产品规格</label>
-                                    <div className={`w-full p-3 border border-gray-200 dark:border-white/10 rounded-xl text-sm min-h-[46px] flex items-center ${selectedProduct ? 'bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white' : 'bg-gray-100 dark:bg-white/5 text-gray-400'}`}>
-                                        {(() => {
-                                            if (!selectedProduct) return '选择产品后自动带出';
-                                            const activeSkus = selectedProduct.skus.filter(s => s.status === 'Active');
-                                            const uniqueNames = Array.from(new Set(activeSkus.map(s => s.name)));
-                                            if (uniqueNames.length === 0) return <span className="text-gray-400">无规格</span>;
-                                            if (selectedSku) return <span className="font-medium">{selectedSku.name}</span>;
-                                            return <span className="font-medium">{uniqueNames.join(' / ')}</span>;
-                                        })()}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">授权类型 <span className="text-red-500">*</span></label>
-                                    {(() => {
-                                        const activeSkus = selectedProduct?.skus.filter(s => s.status === 'Active') || [];
-                                        const allOptions = activeSkus.flatMap(s => (s.pricingOptions || []).map(opt => ({ ...opt, skuId: s.id, skuCode: s.code })));
-                                        if (!tempProductId) {
-                                            return <div className="w-full p-3 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400 cursor-not-allowed">请先选择产品</div>;
-                                        }
-                                        if (allOptions.length === 0) {
-                                            return <div className="w-full p-3 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-400 cursor-not-allowed">该产品无授权类型</div>;
-                                        }
-                                        return (
-                                            <select
-                                                className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
-                                                value={tempPricingOptionId}
-                                                onChange={e => {
-                                                    const optId = e.target.value;
-                                                    setTempPricingOptionId(optId);
-                                                    const matched = allOptions.find(o => o.id === optId);
-                                                    if (matched && matched.skuId !== tempSkuId) {
-                                                        setTempSkuIdFromOption(matched.skuId);
-                                                    }
-                                                }}
-                                            >
-                                                <option value="">-- 请选择授权类型 --</option>
-                                                {allOptions.map(opt => (
-                                                    <option key={opt.id} value={opt.id}>{opt.title} ({opt.skuCode})</option>
-                                                ))}
-                                            </select>
-                                        );
-                                    })()}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">数量 <span className="text-red-500">*</span></label>
-                                    <input type="number" className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm" min="1" value={tempQuantity} onChange={e => setTempQuantity(Number(e.target.value))} />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-teal-600 uppercase flex items-center gap-1">授权/服务期限</label>
-                                    {showLicensePeriod ? (
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            placeholder="请输入"
-                                            className="flex-1 p-3 bg-white dark:bg-[#1C1C1E] border border-teal-200 dark:border-teal-900/30 rounded-xl outline-none focus:ring-2 focus:ring-teal-200 transition text-sm font-medium text-teal-700 dark:text-teal-400"
-                                            value={tempLicensePeriodNum}
-                                            onChange={e => setTempLicensePeriodNum(e.target.value === '' ? '' : Number(e.target.value))}
-                                        />
-                                        <select
-                                            className="w-20 p-3 bg-white dark:bg-[#1C1C1E] border border-teal-200 dark:border-teal-900/30 rounded-xl outline-none focus:ring-2 focus:ring-teal-200 transition text-sm font-medium text-teal-700 dark:text-teal-400"
-                                            value={tempLicensePeriodUnit}
-                                            onChange={e => setTempLicensePeriodUnit(e.target.value as '年' | '月' | '日')}
-                                        >
-                                            <option value="年">年</option>
-                                            <option value="月">月</option>
-                                            <option value="日">日</option>
-                                        </select>
-                                    </div>
-                                    ) : (
-                                    <div className="w-full p-3 bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-900/30 rounded-xl text-sm font-medium text-teal-700 dark:text-teal-400">
-                                        永久
-                                    </div>
-                                    )}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-orange-500 uppercase flex items-center gap-1"><ArrowUpRight className="w-3 h-3"/> 单价 <span className="text-red-500">*</span></label>
-                                    <div className="relative">
-                                        <input 
-                                            type="number" 
-                                            className="w-full p-3 pr-16 bg-white dark:bg-[#1C1C1E] border border-orange-200 dark:border-orange-900/30 rounded-xl outline-none focus:ring-2 focus:ring-orange-200 transition text-sm font-bold text-orange-600" 
-                                            value={negotiatedPrice !== null ? negotiatedPrice : ''} 
-                                            onChange={e => setNegotiatedPrice(Number(e.target.value))} 
-                                            placeholder={`基准: ¥${selectedOption?.price || selectedSku?.price || 0}`} 
-                                        />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-orange-400 font-medium pointer-events-none">
-                                            {showLicensePeriod ? `元/${tempLicensePeriodUnit}` : '元'}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-orange-400 uppercase flex items-center gap-1">计价单价</label>
-                                    <div className="relative">
-                                        <input
-                                            type="number"
-                                            className="w-full p-3 pr-16 bg-gray-100 dark:bg-white/5 border border-orange-100 dark:border-orange-900/20 rounded-xl outline-none transition text-sm font-medium text-orange-500 cursor-not-allowed"
-                                            value={negotiatedPrice !== null ? negotiatedPrice : (selectedOption?.price || selectedSku?.price || 0)}
-                                            readOnly
-                                        />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-orange-300 font-medium pointer-events-none">
-                                            {showLicensePeriod ? `元/${tempLicensePeriodUnit}` : '元'}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-red-500 uppercase flex items-center gap-1">产品金额</label>
-                                    {(() => {
-                                        const unitPrice = negotiatedPrice !== null ? negotiatedPrice : (selectedOption?.price || selectedSku?.price || 0);
-                                        const periodMultiplier = showLicensePeriod && tempLicensePeriodNum
-                                            ? (tempLicensePeriodUnit === '年' ? Number(tempLicensePeriodNum) : tempLicensePeriodUnit === '月' ? Number(tempLicensePeriodNum) / 12 : Number(tempLicensePeriodNum) / 365)
-                                            : 1;
-                                        const totalAmount = unitPrice * tempQuantity * periodMultiplier;
-                                        const divisor = tempQuantity * periodMultiplier;
-                                        return (
-                                            <div className="relative">
-                                                <input
-                                                    type="number"
-                                                    className="w-full p-3 pr-10 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-xl outline-none focus:ring-2 focus:ring-red-200 transition text-sm font-bold text-red-600 dark:text-red-400 text-right font-mono"
-                                                    value={Math.round(totalAmount * 100) / 100}
-                                                    onChange={e => {
-                                                        const val = Number(e.target.value);
-                                                        if (!isFinite(val) || divisor === 0) return;
-                                                        setNegotiatedPrice(Math.round((val / divisor) * 100) / 100);
-                                                    }}
-                                                    min="0"
-                                                    step="0.01"
-                                                />
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-red-400 font-medium pointer-events-none">¥</span>
-                                                {(showLicensePeriod && tempLicensePeriodNum ? true : tempQuantity > 1) && (
-                                                    <div className="text-[10px] font-normal text-red-400 dark:text-red-500 mt-1.5 text-right">
-                                                        反推单价: ¥{unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                        {showLicensePeriod && tempLicensePeriodNum
-                                                            ? ` × ${tempQuantity} × ${tempLicensePeriodNum}${tempLicensePeriodUnit}`
-                                                            : ` × ${tempQuantity}`
-                                                        }
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-
-                                {selectedProduct?.tags?.includes('生态') && (
-                                <div className="col-span-2 space-y-2">
-                                    <label className="text-xs font-bold text-emerald-600 uppercase flex items-center gap-1"><Tag className="w-3 h-3"/> 生态产品名称</label>
-                                    <input
-                                        type="text"
-                                        className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-emerald-200 dark:border-emerald-900/30 rounded-xl outline-none focus:ring-2 focus:ring-emerald-200 transition text-sm text-emerald-700 dark:text-emerald-400 placeholder:text-gray-400"
-                                        placeholder="请输入生态产品具体名称"
-                                        value={tempEcoProductName}
-                                        onChange={e => setTempEcoProductName(e.target.value)}
-                                    />
-                                </div>
-                                )}
-
-                                </div>
-                            </div>
-
-                            {/* ═══ 服务信息 ═══ */}
-                            {(() => {
-                                const linkedSvcs = selectedProduct?.linkedServices || [];
-                                if (linkedSvcs.length === 0) return null;
-                                return linkedSvcs.map((svc) => {
-                                    const svcProduct = products.find(p => p.id === svc.productId);
-                                    if (!svcProduct || svcProduct.status !== 'OnShelf') return null;
-                                    const svcSku = svc.skuId
-                                        ? svcProduct.skus.find(s => s.id === svc.skuId && s.status === 'Active')
-                                        : svcProduct.skus.find(s => s.status === 'Active');
-                                    if (!svcSku) return null;
-                                    const svcOption = svcSku.pricingOptions?.[0];
-                                    const unitPrice = svcOption?.price ?? svcSku.price;
-                                    const licenseTitle = svcOption?.title || '—';
-                                    const periodUnit = svcOption?.license?.periodUnit;
-                                    const periodNum = svcOption?.license?.period ?? 1;
-                                    const periodLabel = periodUnit === 'Forever' ? '永久'
-                                        : periodUnit === 'Year' ? `${periodNum}年`
-                                        : periodUnit === 'Month' ? `${periodNum}月`
-                                        : periodUnit === 'Day' ? `${periodNum}日` : '—';
-                                    const priceUnitLabel = periodUnit === 'Year' ? '元/年'
-                                        : periodUnit === 'Month' ? '元/月'
-                                        : periodUnit === 'Day' ? '元/日' : '元';
-                                    const qty = tempQuantity || 1;
-                                    const totalCost = unitPrice * qty;
-                                    return (
-                                    <div key={svc.productId} className="space-y-4">
-                                        <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-white/10">
-                                            <Wrench className="w-4 h-4 text-orange-500"/>
-                                            <span className="text-sm font-bold text-gray-900 dark:text-white">服务明细详情</span>
-                                            {svc.required && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-bold border border-red-200 dark:border-red-800/40">必选</span>}
-                                            {!svc.required && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-gray-500 font-bold">可选</span>}
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-x-12 gap-y-4 text-sm">
-                                            <div className="flex items-baseline gap-3">
-                                                <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap min-w-[130px] text-right italic">产品类型：</span>
-                                                <span className="text-gray-900 dark:text-white font-medium">{svcProduct.subCategory || svcProduct.productType || '—'}</span>
-                                            </div>
-                                            <div className="flex items-baseline gap-3">
-                                                <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap min-w-[130px] text-right italic">产品规格：</span>
-                                                <span className="text-gray-900 dark:text-white font-medium">{svcSku.name}</span>
-                                            </div>
-                                            <div className="flex items-baseline gap-3">
-                                                <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap min-w-[130px] text-right italic">产品名称：</span>
-                                                <span className="text-gray-900 dark:text-white font-medium">{svcProduct.name}</span>
-                                            </div>
-                                            <div className="flex items-baseline gap-3">
-                                                <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap min-w-[130px] text-right italic">授权/服务方式：</span>
-                                                <span className="text-gray-900 dark:text-white font-medium">{licenseTitle}</span>
-                                            </div>
-                                            <div className="flex items-baseline gap-3">
-                                                <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap min-w-[130px] text-right italic">数量：</span>
-                                                <span className="text-gray-900 dark:text-white font-medium">{qty}</span>
-                                            </div>
-                                            <div className="flex items-baseline gap-3">
-                                                <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap min-w-[130px] text-right italic">授权/服务期限：</span>
-                                                <span className="text-gray-900 dark:text-white font-medium">{periodLabel}</span>
-                                            </div>
-                                            <div className="flex items-baseline gap-3">
-                                                <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap min-w-[130px] text-right italic">服务成本预提计价单价：</span>
-                                                <span className="text-gray-900 dark:text-white font-medium">¥ {unitPrice.toLocaleString('zh-CN', { minimumFractionDigits: 2 })} 元/{qty > 1 ? '个' : '个'}/{priceUnitLabel.replace('元/', '')}</span>
-                                            </div>
-                                            <div className="flex items-baseline gap-3">
-                                                <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap min-w-[130px] text-right italic">服务成本预提单价：</span>
-                                                <span className="text-gray-900 dark:text-white font-medium">¥ {unitPrice.toLocaleString('zh-CN', { minimumFractionDigits: 2 })} {priceUnitLabel}</span>
-                                            </div>
-                                        </div>
-                                        <div className="pt-2 border-t border-gray-100 dark:border-white/10">
-                                            <div className="flex items-baseline gap-3">
-                                                <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap min-w-[130px] text-right italic font-medium">服务成本预提金额小计(含税)：</span>
-                                                <span className="text-lg font-bold text-orange-600 dark:text-orange-400">¥ {totalCost.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    );
-                                });
-                            })()}
-
-                            {/* ═══ 交付物信息 ═══ */}
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-white/10">
-                                    <Box className="w-4 h-4 text-indigo-500"/>
-                                    <span className="text-sm font-bold text-gray-900 dark:text-white">交付物信息</span>
-                                </div>
-                                <div className="grid grid-cols-3 gap-4">
-                                    {(buyerType === 'Customer' || buyerType === 'Channel') && (
-                                    <div className="col-span-3 space-y-2">
-                                        <label className="text-xs font-bold text-purple-500 uppercase flex items-center gap-1"><Zap className="w-3 h-3"/> 激活方式</label>
-                                        <div className="flex gap-1.5">
-                                            {([
-                                                { id: 'Account' as ActivationMethod, label: '账号激活' },
-                                                { id: 'SerialKey' as ActivationMethod, label: '序列号激活' },
-                                                { id: 'AccountAndSerialKey' as ActivationMethod, label: '账号+序列号' },
-                                            ]).map(opt => (
-                                                <button
-                                                    key={opt.id}
-                                                    type="button"
-                                                    onClick={() => setTempActivationMethod(opt.id)}
-                                                    className={`flex-1 py-2 px-1.5 rounded-lg text-xs font-bold transition border ${
-                                                        tempActivationMethod === opt.id
-                                                            ? 'border-purple-400 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400'
-                                                            : 'border-gray-200 dark:border-white/10 text-gray-500 hover:border-purple-300 dark:hover:border-purple-700'
-                                                    }`}
-                                                >
-                                                    {opt.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    )}
-
-                                    {/* 介质数量 */}
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">介质数量</label>
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            value={tempMediaCount}
-                                            onChange={e => setTempMediaCount(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))}
-                                            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 outline-none transition"
-                                            placeholder="请输入介质数量"
-                                        />
-                                    </div>
-
-                                    {/* 端年场地授权覆盖的PC数量 */}
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">端年场地授权覆盖的PC数量</label>
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            value={tempSiteLicensePcCount}
-                                            onChange={e => setTempSiteLicensePcCount(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
-                                            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 outline-none transition"
-                                            placeholder="请输入PC数量"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 安装包选择 */}
-                            {(() => {
-                                if (!selectedProduct) return null;
-                                const allPkgRows = ALL_INSTALL_PKG_ROWS.filter(r => r.productId === selectedProduct.id && r.enabled);
-
-                                const universalPkgs = allPkgRows.filter(r => r.packageType === 'public');
-                                const customPkgs = allPkgRows.filter(r => r.packageType === 'private');
-
-                                const universalCpuOptions = Array.from(new Set(universalPkgs.map(p => p.cpu).filter(v => v && v !== '-')));
-                                const universalOsOptions = Array.from(new Set(universalPkgs.map(p => p.os).filter(v => v && v !== '-')));
-                                const customCpuOptions = Array.from(new Set(customPkgs.map(p => p.cpu).filter(v => v && v !== '-')));
-                                const customOsOptions = Array.from(new Set(
-                                    customPkgs.filter(p => !tempPkgCpu || p.cpu === tempPkgCpu).map(p => p.os).filter(v => v && v !== '-')
-                                ));
-
-                                if (allPkgRows.length === 0) return null;
-
-                                let previewPkg: typeof allPkgRows[0] | null = null;
-                                if (tempPkgType === '通用' && tempPkgCpu && tempPkgOs) {
-                                    previewPkg = universalPkgs.find(p => p.cpu === tempPkgCpu && p.os === tempPkgOs) || null;
-                                } else if (tempPkgType === '通用' && tempPkgOs) {
-                                    previewPkg = universalPkgs.find(p => p.os === tempPkgOs) || null;
-                                } else if (tempPkgType === '通用' && universalPkgs.length === 1) {
-                                    previewPkg = universalPkgs[0] || null;
-                                }
-
-                                return (
-                                    <div className="space-y-3">
-
-                                        <div className="flex items-center gap-2 pb-1">
-                                            <Package className="w-4 h-4 text-indigo-500"/>
-                                            <span className="text-sm font-bold text-gray-900 dark:text-white">安装包信息 <span className="text-red-500">*</span></span>
-                                        </div>
-
-                                        {/* 通用 / 定制 切换 */}
-                                        <div className="flex gap-3">
-                                            <button
-                                                onClick={() => setTempPkgType('通用')}
-                                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${
-                                                    tempPkgType === '通用'
-                                                    ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/40 dark:bg-white/5 text-[#0071E3] dark:text-[#FF2D55]'
-                                                    : 'border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-300 dark:hover:border-white/20'
-                                                }`}
-                                            >
-                                                <Globe className="w-4 h-4"/> 通用
-                                            </button>
-                                            <button
-                                                onClick={() => setTempPkgType('定制')}
-                                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${
-                                                    tempPkgType === '定制'
-                                                    ? 'border-[#0071E3] dark:border-[#FF2D55] bg-blue-50/40 dark:bg-white/5 text-[#0071E3] dark:text-[#FF2D55]'
-                                                    : 'border-gray-200 dark:border-white/10 text-gray-500 hover:border-gray-300 dark:hover:border-white/20'
-                                                }`}
-                                            >
-                                                <Settings className="w-4 h-4"/> 定制
-                                            </button>
-                                            {tempPkgType && (
-                                                <button onClick={() => setTempPkgType('')} className="text-xs text-gray-400 hover:text-gray-600 px-2 transition">清除</button>
-                                            )}
-                                        </div>
-
-                                        {/* 通用：选择 CPU 和操作系统 */}
-                                        {tempPkgType === '通用' && universalPkgs.length > 0 && (
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                                {universalCpuOptions.length > 0 && (
-                                                <div className="space-y-1.5">
-                                                    <label className="text-xs font-bold text-gray-500 uppercase">CPU</label>
-                                                    <select
-                                                        className="w-full p-2.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
-                                                        value={tempPkgCpu}
-                                                        onChange={e => { setTempPkgCpu(e.target.value); setTempPkgOs(''); }}
-                                                    >
-                                                        <option value="">-- 请选择 CPU --</option>
-                                                        {universalCpuOptions.map(cpu => <option key={cpu} value={cpu}>{cpu}</option>)}
-                                                    </select>
-                                                </div>
-                                                )}
-                                                {universalOsOptions.length > 0 && (
-                                                <div className="space-y-1.5">
-                                                    <label className="text-xs font-bold text-gray-500 uppercase">操作系统</label>
-                                                    <select
-                                                        className="w-full p-2.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
-                                                        value={tempPkgOs}
-                                                        onChange={e => setTempPkgOs(e.target.value)}
-                                                    >
-                                                        <option value="">-- 请选择系统 --</option>
-                                                        {Array.from(new Set(
-                                                            universalPkgs.filter(p => !tempPkgCpu || p.cpu === tempPkgCpu).map(p => p.os).filter(v => v && v !== '-')
-                                                        )).map(os => <option key={os} value={os}>{os}</option>)}
-                                                    </select>
-                                                </div>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* 定制：先选发布平台/OS（如有定制安装包数据），再填安装包链接 */}
-                                        {tempPkgType === '定制' && (
-                                            <div className="space-y-4">
-                                                {customCpuOptions.length > 0 && (
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-xs font-bold text-gray-500 uppercase">发布平台</label>
-                                                            <select
-                                                                className="w-full p-2.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm"
-                                                                value={tempPkgCpu}
-                                                                onChange={e => { setTempPkgCpu(e.target.value); setTempPkgOs(''); }}
-                                                            >
-                                                                <option value="">-- 请选择发布平台 --</option>
-                                                                {customCpuOptions.map(cpu => <option key={cpu} value={cpu}>{cpu}</option>)}
-                                                            </select>
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-xs font-bold text-gray-500 uppercase">操作系统</label>
-                                                            <select
-                                                                className={`w-full p-2.5 border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm disabled:opacity-50 disabled:cursor-not-allowed ${!tempPkgCpu ? 'bg-gray-100 dark:bg-white/5' : 'bg-white dark:bg-[#1C1C1E]'}`}
-                                                                value={tempPkgOs}
-                                                                onChange={e => setTempPkgOs(e.target.value)}
-                                                                disabled={!tempPkgCpu}
-                                                            >
-                                                                <option value="">-- {tempPkgCpu ? '请选择系统' : '请先选 CPU'} --</option>
-                                                                {customOsOptions.map(os => <option key={os} value={os}>{os}</option>)}
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                <div className="space-y-1.5">
-                                                    <label className="text-xs font-bold text-gray-500 uppercase">安装包链接 <span className="text-red-400 text-[10px] normal-case font-normal ml-1">定制安装包请粘贴链接</span></label>
-                                                    <div className="flex gap-2">
-                                                        <input
-                                                            type="url"
-                                                            value={tempPkgLink}
-                                                            onChange={e => setTempPkgLink(e.target.value)}
-                                                            placeholder="请粘贴定制安装包下载链接"
-                                                            className="flex-1 p-2.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] transition text-sm text-gray-800 dark:text-white placeholder:text-gray-400"
-                                                        />
-                                                        {tempPkgLink && (
-                                                            <button onClick={() => setTempPkgLink('')} className="px-3 text-xs text-gray-400 hover:text-gray-600 border border-gray-200 dark:border-white/10 rounded-xl transition">清除</button>
-                                                        )}
-                                                    </div>
-                                                    {tempPkgLink && (
-                                                        <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 mt-1">
-                                                            <CheckCircle className="w-3 h-3"/>
-                                                            <span>已填写安装包链接</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* 已确认的安装包预览 */}
-                                        {previewPkg && (
-                                            <div className="flex items-center gap-3 p-3.5 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/30 rounded-xl">
-                                                <CheckCircle className="w-4 h-4 text-indigo-500 shrink-0"/>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="text-sm font-bold text-indigo-800 dark:text-indigo-300">{previewPkg.deliveryItemName}</div>
-                                                    <div className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
-                                                        {[previewPkg.platform, previewPkg.cpu, previewPkg.os].filter(v => v && v !== '-').join(' · ')}
-                                                        {previewPkg.productSpec && <span className="ml-2 text-indigo-400">({previewPkg.productSpec})</span>}
-                                                    </div>
-                                                </div>
-                                                <span className="text-xs font-mono text-indigo-400 shrink-0">{previewPkg.id}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })()}
-
-                            {/* ═══ 产品交付信息 ═══ */}
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-white/10">
-                                    <Truck className="w-4 h-4 text-cyan-500"/>
-                                    <span className="text-sm font-bold text-gray-900 dark:text-white">产品交付信息</span>
-                                </div>
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-cyan-500 uppercase flex items-center gap-1"><UserIcon className="w-3 h-3"/> 被授权方</label>
-                                        <input
-                                            type="text"
-                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-cyan-200 dark:border-cyan-900/30 rounded-xl outline-none focus:ring-2 focus:ring-cyan-200 transition text-sm text-cyan-700 dark:text-cyan-400"
-                                            placeholder="默认取客户名称"
-                                            value={tempLicensee}
-                                            onChange={e => setTempLicensee(e.target.value)}
-                                        />
-                                    </div>
-
-                                    {(buyerType === 'Customer' || buyerType === 'Channel') && newOrderCustomer && selectedCustomerObj?.enterprises && selectedCustomerObj.enterprises.length > 0 && (
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-indigo-500 uppercase flex items-center gap-1"><Briefcase className="w-3 h-3"/> 关联企业 ID <span className="text-red-500">*</span></label>
-                                        <select
-                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-indigo-200 dark:border-indigo-900/30 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200 transition text-sm text-indigo-700 dark:text-indigo-400"
-                                            value={tempEnterpriseId}
-                                            onChange={e => setTempEnterpriseId(e.target.value)}
-                                        >
-                                            <option value="">-- 请选择关联企业 --</option>
-                                            {selectedCustomerObj.enterprises.map(ent => (
-                                                <option key={ent.id} value={ent.id}>{ent.name} (ID: {ent.id})</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    )}
-
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-teal-500 uppercase flex items-center gap-1"><Briefcase className="w-3 h-3"/> 供货组织（卖方名称）</label>
-                                        <div className={`w-full p-3 border border-teal-200 dark:border-teal-900/30 rounded-xl text-sm min-h-[46px] flex items-center ${sellerName ? 'bg-teal-50 dark:bg-teal-900/10 text-teal-700 dark:text-teal-400 font-medium' : 'bg-gray-50 dark:bg-white/5 text-gray-400'}`}>
-                                            {sellerName || '请在第二步"产品类型"中选择'}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* ═══ 续费信息 ═══ */}
-                            {(() => {
-                                const canInfer = (buyerType === 'Customer' || buyerType === 'Channel') && !!newOrderCustomer && !renewalOrder && !subscriptionCheckout && !!tempProductId;
-                                const tempItem: OrderItem = {
-                                    productId: tempProductId,
-                                    skuId: tempSkuId,
-                                    productName: selectedProduct?.name || '',
-                                    skuName: selectedSku?.name || '',
-                                    quantity: tempQuantity,
-                                    licensePeriod: tempLicensePeriodNum ? `${tempLicensePeriodNum}${tempLicensePeriodUnit}` : undefined,
-                                    purchaseNature: tempPurchaseNature,
-                                    purchaseNature365: tempPurchaseNature365,
-                                } as OrderItem;
-                                const modalInf = canInfer ? inferOrderLinePurchaseNatureFromSubscription(tempItem, newOrderCustomer, subscriptions) : null;
-                                return (
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-white/10">
-                                    <Layers className="w-4 h-4 text-blue-500"/>
-                                    <span className="text-sm font-bold text-gray-900 dark:text-white">续费信息</span>
-                                </div>
-                                <div className="grid grid-cols-4 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase">订购性质</label>
-                                        <select
-                                            value={tempPurchaseNature}
-                                            onChange={e => setTempPurchaseNature(e.target.value as PurchaseNature)}
-                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-blue-200 transition text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
-                                        >
-                                            <option value="New">新购</option>
-                                            <option value="Renewal">续费</option>
-                                            <option value="AddOn">增购</option>
-                                            <option value="Upgrade">升级</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase">365 订购性质</label>
-                                        <select
-                                            value={tempPurchaseNature365}
-                                            onChange={e => setTempPurchaseNature365(e.target.value as PurchaseNature)}
-                                            className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-blue-200 transition text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
-                                        >
-                                            <option value="New">新购</option>
-                                            <option value="Renewal">续费</option>
-                                            <option value="AddOn">增购</option>
-                                            <option value="Upgrade">升级</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                {modalInf && (
-                                <div className="border-l-2 border-teal-500/80 pl-3 pr-2 py-3 space-y-2.5 rounded-r-xl bg-teal-50/40 dark:bg-teal-950/20">
-                                    <div className="text-[11px] font-bold text-teal-900 dark:text-teal-200 flex items-center gap-1.5">
-                                        <Sparkles className="w-3.5 h-3.5 text-teal-600 dark:text-teal-300"/>
-                                        订购性质识别
-                                    </div>
-                                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                                        <span className="text-gray-500">当前选择</span>
-                                        <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-bold ${purchaseNatureBadgeClass(tempPurchaseNature)}`}>{purchaseNatureDisplay(tempPurchaseNature)}</span>
-                                        <span className="text-gray-400">·</span>
-                                        <span className="text-gray-500">系统推荐</span>
-                                        {modalInf.purchaseNature ? (
-                                            <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-bold ${purchaseNatureBadgeClass(modalInf.purchaseNature)}`}>{purchaseNatureDisplay(modalInf.purchaseNature)}</span>
-                                        ) : (
-                                            <span className="text-[11px] text-gray-500">待完善授权信息后判定</span>
-                                        )}
-                                        {modalInf.purchaseNature && modalInf.purchaseNature !== tempPurchaseNature && (
-                                            <button type="button" onClick={() => { setTempPurchaseNature(modalInf.purchaseNature!); setTempPurchaseNature365(modalInf.purchaseNature!); }} className="ml-1 text-[11px] text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-200 underline underline-offset-2 font-bold transition">
-                                                采纳推荐
-                                            </button>
-                                        )}
-                                    </div>
-                                    {modalInf.matchedSubscription && modalInf.matchedProduct && (
-                                        <div className="rounded-xl border border-teal-100/90 dark:border-teal-800/40 bg-teal-50/40 dark:bg-teal-950/25 px-3 py-2.5 space-y-2 text-xs text-gray-800 dark:text-gray-200">
-                                            <div>
-                                                <span className="text-gray-500">对应订阅批</span>{' '}
-                                                <span className="font-mono font-semibold text-[#0071E3] dark:text-[#0A84FF]">{modalInf.matchedSubscription.id}</span>
-                                                <span className="text-gray-400 mx-1">·</span>
-                                                <span className="text-gray-500">产品线</span> {modalInf.matchedSubscription.productLine}
-                                            </div>
-                                            <div>
-                                                <div className="text-gray-500 mb-1">匹配产品（链上快照）</div>
-                                                <div className="grid gap-1.5 sm:grid-cols-2">
-                                                    <div><span className="text-gray-500">产品</span> {modalInf.matchedProduct.productName}</div>
-                                                    <div><span className="text-gray-500">编码</span> {modalInf.matchedProduct.productCode}</div>
-                                                    <div><span className="text-gray-500">SKU</span> {modalInf.matchedProduct.skuName}</div>
-                                                    <div><span className="text-gray-500">当前数量</span> {modalInf.matchedProduct.currentQuantity}</div>
-                                                    <div className="sm:col-span-2"><span className="text-gray-500">周期</span> {modalInf.matchedProduct.startDate} ~ {modalInf.matchedProduct.endDate} · {subscriptionStatusLabel(modalInf.matchedProduct.status)}</div>
-                                                    <div className="sm:col-span-2"><span className="text-gray-500">授权类型</span> {modalInf.matchedProduct.licenseType}</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {modalInf.headline && (
-                                        <p className="text-sm font-medium text-gray-900 dark:text-white leading-relaxed">{modalInf.headline}</p>
-                                    )}
-                                    {modalInf.bullets.length > 0 && (
-                                        <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 pl-4 list-disc marker:text-teal-600">
-                                            {modalInf.bullets.map((b, bi) => (
-                                                <li key={bi} className="leading-relaxed">{b}</li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </div>
-                                )}
-                                {!canInfer && (
-                                <div className="text-xs text-gray-400 dark:text-gray-500 leading-relaxed">
-                                    点击「确认添加」后，系统会根据当前订单客户与本产品授权期限，自动推断订购性质；您也可手动选择。
-                                </div>
-                                )}
-                            </div>
-                                );
-                            })()}
-
-                            {/* ═══ 下级单位授权 ═══ */}
-                            {(buyerType !== 'SelfDeal' && selectedProduct?.subUnitLicenseAllowed !== false) && (
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-white/10">
-                                    <Building2 className="w-4 h-4 text-indigo-500"/>
-                                    <span className="text-sm font-bold text-gray-900 dark:text-white">下级单位授权</span>
-                                    {selectedProduct?.subUnitLicenseAllowed === true && (
-                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 font-bold border border-green-100 dark:border-green-800">产品已启用</span>
-                                    )}
-                                </div>
-                                <div className="flex items-start gap-4 flex-wrap">
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 flex items-start gap-1.5"><span className="text-blue-500 shrink-0 mt-px">ⓘ</span><span>选此方式表示由交付邮件的接收方在同一企业ID下查看一份电子授权信息（包含下级清单）；金山将交付邮件发送至线上收货"指定接收邮箱"</span></p>
-                                    <p className="text-xs text-orange-500 dark:text-orange-400 flex items-start gap-1.5 shrink-0"><span className="shrink-0 mt-px">⚠</span><span>下级单位【卖方业务联系人】需要与主订单【卖方业务联系人】保持一致，否则存在退单可能性</span></p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="text-xs font-bold text-gray-500 dark:text-gray-400 shrink-0">按下级单位授权</span>
-                                    <select
-                                        value={tempSubUnitMode}
-                                        onChange={e => { const mode = e.target.value as SubUnitAuthMode; setTempSubUnitMode(mode); if (mode === 'none') { setTempSubUnits([]); } else if (tempSubUnits.length === 0) { setTempSubUnits([{ id: `su_${Date.now()}_0`, unitName: '', enterpriseId: '', enterpriseName: '-', authCount: '', itContact: '', phone: '', email: '', customerType: '-', industryLine: '-', sellerContact: '-' }, { id: `su_${Date.now()}_1`, unitName: '', enterpriseId: '', enterpriseName: '-', authCount: '', itContact: '', phone: '', email: '', customerType: '-', industryLine: '-', sellerContact: '-' }]); } }}
-                                        className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-xs font-medium text-gray-700 dark:text-gray-300 outline-none focus:border-indigo-400 transition min-w-[280px]"
-                                    >
-                                        <option value="none">无下级单位</option>
-                                        <option value="separate_auth_separate_eid">授权分别呈现，企业ID分别管理</option>
-                                        <option value="separate_auth_unified_eid">授权分别呈现，企业ID统一管理</option>
-                                        <option value="unified_auth_with_list">授权和企业ID统一管理并提供下级清单</option>
-                                    </select>
-                                </div>
-                                {tempSubUnitMode !== 'none' && (() => {
-                                    const subTotal = tempSubUnits.reduce((s, u) => s + (parseInt(u.authCount) || 0), 0);
-                                    const matched = tempSubUnits.length > 0 && subTotal === tempQuantity;
-                                    const hasSubData = tempSubUnits.length > 0 && tempSubUnits.some(u => u.authCount);
-                                    return (
-                                    <div>
-                                        <div className="px-5 py-2.5 flex items-center justify-between gap-3">
-                                            <div className="flex-1">
-                                                {hasSubData && (
-                                                    <div className={`inline-flex items-center gap-2 text-[11px] font-bold px-2.5 py-1 rounded-lg border ${matched ? 'bg-green-50 dark:bg-green-900/20 text-green-600 border-green-200' : 'bg-red-50 dark:bg-red-900/20 text-red-600 border-red-200'}`}>
-                                                        <span>合计: {subTotal}</span>
-                                                        <span className="text-gray-300">|</span>
-                                                        <span>明细数量: {tempQuantity}</span>
-                                                        <span className="text-gray-300">|</span>
-                                                        <span>{matched ? '✓ 匹配' : '✗ 不匹配'}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-2 shrink-0">
-                                                <button onClick={addTempSubUnit} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition">
-                                                    <Plus className="w-3 h-3"/> 新增下级单位
-                                                </button>
-                                                <button onClick={() => tempSubUnitImportRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-[#1C1C1E] hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700 rounded-lg text-xs font-bold transition">
-                                                    <Upload className="w-3 h-3"/> 批量导入
-                                                </button>
-                                                <button onClick={downloadSubUnitTemplate} className="flex items-center gap-1.5 px-3 py-1.5 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg text-xs font-medium transition">
-                                                    <Download className="w-3 h-3"/> 下载模板
-                                                </button>
-                                            </div>
-                                        </div>
-                                        {(() => {
-                                            const isUnifiedEid = tempSubUnitMode === 'separate_auth_unified_eid' || tempSubUnitMode === 'unified_auth_with_list';
-                                            const colCount = isUnifiedEid ? 10 : 12;
-                                            return (
-                                        <div className="overflow-x-auto max-h-[260px] overflow-y-auto">
-                                            <table className="w-full text-left text-xs" style={{ minWidth: isUnifiedEid ? 900 : 1100 }}>
-                                                <thead className="sticky top-0 z-10"><tr className="bg-indigo-100/80 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300">
-                                                    <th className="p-2 pl-5 w-8 text-center">#</th>
-                                                    <th className="p-2 whitespace-nowrap">客户下级单位名称</th>
-                                                    {!isUnifiedEid && <th className="p-2 whitespace-nowrap">企业ID</th>}
-                                                    {!isUnifiedEid && <th className="p-2 whitespace-nowrap">企业名称</th>}
-                                                    <th className="p-2 whitespace-nowrap">授权数量</th>
-                                                    <th className="p-2 whitespace-nowrap">IT联系人</th>
-                                                    <th className="p-2 whitespace-nowrap">手机</th>
-                                                    <th className="p-2 whitespace-nowrap">邮箱</th>
-                                                    <th className="p-2 whitespace-nowrap">客户类型</th>
-                                                    <th className="p-2 whitespace-nowrap">行业条线</th>
-                                                    <th className="p-2 whitespace-nowrap">卖方联系人</th>
-                                                    <th className="p-2 pr-5 text-center whitespace-nowrap">操作</th>
-                                                </tr></thead>
-                                                <tbody className="divide-y divide-indigo-100 dark:divide-indigo-800/20">
-                                                    {tempSubUnits.map((unit, si) => (
-                                                    <tr key={unit.id} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-colors align-top">
-                                                        <td className="p-2 pl-5 text-center text-gray-400 font-mono">{si + 1}</td>
-                                                        <td className="p-2">
-                                                            <select value={unit.unitName} onChange={e => { const cust = customers.find(c => c.companyName === e.target.value); updateTempSubUnit(unit.id, 'unitName', e.target.value); updateTempSubUnit(unit.id, 'enterpriseId', ''); updateTempSubUnit(unit.id, 'enterpriseName', '-'); if (cust) { updateTempSubUnit(unit.id, 'customerType', cust.customerType || '-'); updateTempSubUnit(unit.id, 'industryLine', cust.industryLine || cust.industry || '-'); } }} className={`w-full min-w-[140px] px-2 py-1 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400 ${!unit.unitName ? 'border-red-300' : 'border-gray-200 dark:border-white/10'}`}>
-                                                                <option value="">请选择客户</option>
-                                                                {customers.filter(c => c.id !== newOrderCustomer).map(c => <option key={c.id} value={c.companyName}>{c.companyName}</option>)}
-                                                            </select>
-                                                        </td>
-                                                        {!isUnifiedEid && <td className="p-2">{(() => { const uc = customers.find(c => c.companyName === unit.unitName); const ents = uc?.enterprises; return ents && ents.length > 0 ? (<select value={unit.enterpriseId} onChange={e => { const ent = ents.find(en => en.id === e.target.value); updateTempSubUnit(unit.id, 'enterpriseId', e.target.value); updateTempSubUnit(unit.id, 'enterpriseName', ent?.name || '-'); }} className={`w-full min-w-[90px] px-2 py-1 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400 ${!unit.enterpriseId ? 'border-red-300' : 'border-gray-200 dark:border-white/10'}`}><option value="">选择</option>{ents.map(ent => <option key={ent.id} value={ent.id}>{ent.id} ({ent.name})</option>)}</select>) : <span className="text-[10px] text-gray-400">{unit.unitName ? '无关联企业' : '请先选择'}</span>; })()}</td>}
-                                                        {!isUnifiedEid && <td className="p-2 text-gray-500">{unit.enterpriseName}</td>}
-                                                        <td className="p-2"><input type="number" min={1} value={unit.authCount} onChange={e => updateTempSubUnit(unit.id, 'authCount', e.target.value)} placeholder="数量" className={`w-full min-w-[60px] px-2 py-1 border rounded-lg text-xs outline-none transition bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400 ${!unit.authCount ? 'border-red-300' : 'border-gray-200 dark:border-white/10'}`}/></td>
-                                                        <td className="p-2"><input value={unit.itContact} onChange={e => updateTempSubUnit(unit.id, 'itContact', e.target.value)} placeholder="联系人" className="w-full min-w-[80px] px-2 py-1 border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400"/></td>
-                                                        <td className="p-2"><input value={unit.phone} onChange={e => updateTempSubUnit(unit.id, 'phone', e.target.value)} placeholder="手机号" className="w-full min-w-[90px] px-2 py-1 border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400"/></td>
-                                                        <td className="p-2"><input type="email" value={unit.email} onChange={e => updateTempSubUnit(unit.id, 'email', e.target.value)} placeholder="邮箱" className={`w-full min-w-[100px] px-2 py-1 border rounded-lg text-xs outline-none bg-white dark:bg-black/30 dark:text-white focus:border-indigo-400 ${!unit.email ? 'border-red-300' : 'border-gray-200 dark:border-white/10'}`}/></td>
-                                                        <td className="p-2 text-gray-400 whitespace-nowrap">{unit.customerType}</td>
-                                                        <td className="p-2 text-gray-400 whitespace-nowrap">{unit.industryLine}</td>
-                                                        <td className="p-2 text-gray-400 whitespace-nowrap">{unit.sellerContact}</td>
-                                                        <td className="p-2 pr-5 text-center whitespace-nowrap"><button onClick={() => removeTempSubUnit(unit.id)} className="text-red-500 hover:text-red-700 text-xs font-bold hover:underline">删除</button></td>
-                                                    </tr>
-                                                    ))}
-                                                    {tempSubUnits.length === 0 && <tr><td colSpan={colCount} className="px-3 py-6 text-center text-gray-400 text-xs">暂无下级单位，请点击"新增下级单位"或"批量导入"添加</td></tr>}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                            );
-                                        })()}
-                                    </div>
-                                    );
-                                })()}
-                            </div>
-                            )}
-                            <input ref={tempSubUnitImportRef} type="file" accept=".csv,.txt" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleTempSubUnitImport(f); e.target.value = ''; }} />
-
-                            </div>
-                            {/* 底部操作栏 */}
-                            <div className="shrink-0 px-6 py-4 border-t border-gray-100 dark:border-white/10 bg-white dark:bg-[#1C1C1E] flex items-center justify-between">
-                                <button onClick={() => { setShowAddProductModal(false); setEditingItemIndex(null); }} className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition">取消</button>
-                                <button
-                                    onClick={handleAddItem}
-                                    disabled={!canAddItem}
-                                    className="px-8 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-xl text-sm font-bold flex items-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-apple"
-                                >
-                                    {editingItemIndex !== null ? <><Check className="w-4 h-4"/> 保存修改</> : <><Plus className="w-4 h-4"/> 加入清单</>}
-                                </button>
-                            </div>
-                        </div>
-                        </ModalPortal>
-                        )}
-
-
-                    </div>
+                    <Step3ProductSelect
+                        SUB_UNIT_CSV_HEADERS={SUB_UNIT_CSV_HEADERS}
+                        addItemSubUnit={addItemSubUnit}
+                        addTempSubUnit={addTempSubUnit}
+                        availableConversionOrders={availableConversionOrders}
+                        buyerType={buyerType}
+                        calculateNewOrderTotal={calculateNewOrderTotal}
+                        canAddItem={canAddItem}
+                        categoryPickerRef={categoryPickerRef}
+                        categoryTree={categoryTree}
+                        conversionTotalAmount={conversionTotalAmount}
+                        customers={customers}
+                        downloadSubUnitTemplate={downloadSubUnitTemplate}
+                        editingItemIndex={editingItemIndex}
+                        enableConversion={enableConversion}
+                        enableSubUnitAuth={enableSubUnitAuth}
+                        expandedSubUnitIdx={expandedSubUnitIdx}
+                        handleAddItem={handleAddItem}
+                        handleEditItem={handleEditItem}
+                        handleRemoveItem={handleRemoveItem}
+                        handleSubUnitImport={handleSubUnitImport}
+                        handleTempSubUnitImport={handleTempSubUnitImport}
+                        handleUpdateItem={handleUpdateItem}
+                        hasServiceConfig={hasServiceConfig}
+                        isCategoryPickerOpen={isCategoryPickerOpen}
+                        linkedOpportunityId={linkedOpportunityId}
+                        negotiatedPrice={negotiatedPrice}
+                        newOrderCustomer={newOrderCustomer}
+                        newOrderItems={newOrderItems}
+                        oppItemWarnings={oppItemWarnings}
+                        orderSource={orderSource}
+                        originalOrderId={originalOrderId}
+                        products={products}
+                        removeItemSubUnit={removeItemSubUnit}
+                        removeTempSubUnit={removeTempSubUnit}
+                        renewalOrder={renewalOrder}
+                        selectedCategoryLabel={selectedCategoryLabel}
+                        selectedConversionIds={selectedConversionIds}
+                        selectedCustomerObj={selectedCustomerObj}
+                        selectedLicensePeriodType={selectedLicensePeriodType}
+                        selectedLicenseType={selectedLicenseType}
+                        selectedOption={selectedOption}
+                        selectedProduct={selectedProduct}
+                        selectedSku={selectedSku}
+                        sellerContact={sellerContact}
+                        sellerName={sellerName}
+                        serviceDetailItems={serviceDetailItems}
+                        serviceProcurementMode={serviceProcurementMode}
+                        setAgentCode={setAgentCode}
+                        setBusinessManagerId={setBusinessManagerId}
+                        setConversionSearch={setConversionSearch}
+                        setDirectChannel={setDirectChannel}
+                        setEditingItemIndex={setEditingItemIndex}
+                        setEnableConversion={setEnableConversion}
+                        setExpandedSubUnitIdx={setExpandedSubUnitIdx}
+                        setHasOpportunity={setHasOpportunity}
+                        setImportTargetIdx={setImportTargetIdx}
+                        setIsAgentOrder={setIsAgentOrder}
+                        setIsCategoryPickerOpen={setIsCategoryPickerOpen}
+                        setIsContractPickerOpen={setIsContractPickerOpen}
+                        setIsConversionPickerOpen={setIsConversionPickerOpen}
+                        setIsOppPickerOpen={setIsOppPickerOpen}
+                        setIsSellerCategoryPickerOpen={setIsSellerCategoryPickerOpen}
+                        setLinkedContractIds={setLinkedContractIds}
+                        setLinkedOpportunityId={setLinkedOpportunityId}
+                        setNegotiatedPrice={setNegotiatedPrice}
+                        setNewContactForm={setNewContactForm}
+                        setNewOrderItems={setNewOrderItems}
+                        setOppItemWarnings={setOppItemWarnings}
+                        setOrderEnterpriseId={setOrderEnterpriseId}
+                        setPurchaseNatureManualByRow={setPurchaseNatureManualByRow}
+                        setSalesRepId={setSalesRepId}
+                        setSelectedBuyerNameId={setSelectedBuyerNameId}
+                        setSelectedChannelId={setSelectedChannelId}
+                        setSelectedConversionIds={setSelectedConversionIds}
+                        setSelectedItContactId={setSelectedItContactId}
+                        setSelectedPurchasingContactId={setSelectedPurchasingContactId}
+                        setSellerHoverCategory={setSellerHoverCategory}
+                        setSellerName={setSellerName}
+                        setSellerProductCategory={setSellerProductCategory}
+                        setServiceProcurementMode={setServiceProcurementMode}
+                        setShowAddProductModal={setShowAddProductModal}
+                        setShowNewContactModal={setShowNewContactModal}
+                        setTempActivationMethod={setTempActivationMethod}
+                        setTempCategory={setTempCategory}
+                        setTempEcoProductName={setTempEcoProductName}
+                        setTempEnterpriseId={setTempEnterpriseId}
+                        setTempHoverCategory={setTempHoverCategory}
+                        setTempLicensePeriod={setTempLicensePeriod}
+                        setTempLicensePeriodNum={setTempLicensePeriodNum}
+                        setTempLicensePeriodUnit={setTempLicensePeriodUnit}
+                        setTempLicensee={setTempLicensee}
+                        setTempMediaCount={setTempMediaCount}
+                        setTempPkgCpu={setTempPkgCpu}
+                        setTempPkgLink={setTempPkgLink}
+                        setTempPkgOs={setTempPkgOs}
+                        setTempPkgType={setTempPkgType}
+                        setTempPricingOptionId={setTempPricingOptionId}
+                        setTempProductId={setTempProductId}
+                        setTempProductWithSku={setTempProductWithSku}
+                        setTempPurchaseNature={setTempPurchaseNature}
+                        setTempPurchaseNature365={setTempPurchaseNature365}
+                        setTempQuantity={setTempQuantity}
+                        setTempSiteLicensePcCount={setTempSiteLicensePcCount}
+                        setTempSkuId={setTempSkuId}
+                        setTempSkuIdFromOption={setTempSkuIdFromOption}
+                        setTempSubUnitMode={setTempSubUnitMode}
+                        setTempSubUnits={setTempSubUnits}
+                        setTerminalChannel={setTerminalChannel}
+                        showAddProductModal={showAddProductModal}
+                        showLicensePeriod={showLicensePeriod}
+                        showServiceDetailTable={showServiceDetailTable}
+                        subUnitImportRef={subUnitImportRef}
+                        subscriptionCheckout={subscriptionCheckout}
+                        subscriptionLock={subscriptionLock}
+                        subscriptions={subscriptions}
+                        tempActivationMethod={tempActivationMethod}
+                        tempCategory={tempCategory}
+                        tempEcoProductName={tempEcoProductName}
+                        tempEnterpriseId={tempEnterpriseId}
+                        tempHoverCategory={tempHoverCategory}
+                        tempLicensePeriodNum={tempLicensePeriodNum}
+                        tempLicensePeriodUnit={tempLicensePeriodUnit}
+                        tempLicensee={tempLicensee}
+                        tempMediaCount={tempMediaCount}
+                        tempPkgCpu={tempPkgCpu}
+                        tempPkgLink={tempPkgLink}
+                        tempPkgOs={tempPkgOs}
+                        tempPkgType={tempPkgType}
+                        tempPricingOptionId={tempPricingOptionId}
+                        tempProductId={tempProductId}
+                        tempPurchaseNature={tempPurchaseNature}
+                        tempPurchaseNature365={tempPurchaseNature365}
+                        tempQuantity={tempQuantity}
+                        tempSiteLicensePcCount={tempSiteLicensePcCount}
+                        tempSkuId={tempSkuId}
+                        tempSubUnitImportRef={tempSubUnitImportRef}
+                        tempSubUnitMode={tempSubUnitMode}
+                        tempSubUnits={tempSubUnits}
+                        updateItemSubUnit={updateItemSubUnit}
+                        updateItemSubUnitMode={updateItemSubUnitMode}
+                        updateTempSubUnit={updateTempSubUnit}
+                    />
                 )}
 
-                {/* Step 4: Commerce & Delivery */}
                 {currentStep === 4 && (
-                    <div className="space-y-2.5 animate-fade-in">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                        <div className="space-y-4">
-                            <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-4">
-                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><Key className="w-4 h-4 text-amber-500"/> 序列号需求</h4>
-                                <div className="grid grid-cols-3 gap-3">
-                                    {(['生成新序列号', '沿用正式序列号', '沿用测试序列号'] as const).map(opt => (
-                                        <button
-                                            key={opt}
-                                            onClick={() => { setSerialNumberRequirement(opt); if (opt === '生成新序列号') setReuseSerialNumber(''); }}
-                                            className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 text-sm font-bold transition-all ${
-                                                serialNumberRequirement === opt
-                                                    ? 'border-amber-500 dark:border-amber-400 bg-amber-50/60 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
-                                                    : 'border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-white/20'
-                                            }`}
-                                        >
-                                            {serialNumberRequirement === opt && <Check className="w-4 h-4 shrink-0" />}
-                                            {opt}
-                                        </button>
-                                    ))}
-                                </div>
-                                {serialNumberRequirement !== '生成新序列号' && (
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                                            <Key className="w-3 h-3"/> 请输入沿用的序列号（20位）
-                                        </label>
-                                        <input
-                                            type="text"
-                                            maxLength={20}
-                                            value={reuseSerialNumber}
-                                            onChange={e => setReuseSerialNumber(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase())}
-                                            className={`w-full p-3 bg-white dark:bg-[#1C1C1E] border rounded-xl text-sm outline-none dark:text-white font-mono tracking-widest focus:ring-2 transition ${
-                                                reuseSerialNumber.length === 20
-                                                    ? 'border-green-300 dark:border-green-700 focus:ring-green-500/20'
-                                                    : reuseSerialNumber.length > 0
-                                                        ? 'border-amber-300 dark:border-amber-700 focus:ring-amber-500/20'
-                                                        : 'border-gray-200 dark:border-white/10 focus:ring-blue-500/20'
-                                            }`}
-                                            placeholder="例如：A1B2C3D4E5F6G7H8I9J0"
-                                        />
-                                        <div className="flex items-center justify-between text-[10px]">
-                                            <span className={`font-bold ${reuseSerialNumber.length === 20 ? 'text-green-600' : reuseSerialNumber.length > 0 ? 'text-amber-500' : 'text-gray-400'}`}>
-                                                {reuseSerialNumber.length}/20 位
-                                                {reuseSerialNumber.length === 20 && ' ✓'}
-                                            </span>
-                                            <span className="text-gray-400">仅支持字母和数字</span>
-                                        </div>
-                                        <FieldError error={getVisibleFieldError('reuseSerialNumber')} />
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* 结算方式 */}
-                            <div className={`bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border shadow-apple space-y-4 ${getVisibleFieldError('settlementMethod') ? 'border-red-300 dark:border-red-800' : 'border-gray-100 dark:border-white/5'}`}>
-                                <div className="flex items-center justify-between">
-                                    <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><Banknote className="w-4 h-4 text-emerald-500"/> 结算方式 <span className="text-red-500 text-sm">*</span></h4>
-                                    {getVisibleFieldError('settlementMethod') && <span className="text-xs text-red-500 font-medium">{getVisibleFieldError('settlementMethod')}</span>}
-                                </div>
-
-                                {/* 第一层：现结销售 vs 信用额度 */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button
-                                        onClick={() => { setSettlementMethod('cash'); setSettlementType('once'); setInstallmentPlans([]); setExpectedPaymentDate(''); }}
-                                        className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
-                                            settlementMethod === 'cash'
-                                                ? 'border-emerald-500 dark:border-emerald-400 bg-emerald-50/60 dark:bg-emerald-900/20'
-                                                : 'border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20'
-                                        }`}
-                                    >
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${settlementMethod === 'cash' ? 'bg-emerald-500 text-white' : 'bg-gray-100 dark:bg-white/10 text-gray-400'}`}>
-                                            <Banknote className="w-4 h-4"/>
-                                        </div>
-                                        <div className="text-left">
-                                            <div className={`text-sm font-bold ${settlementMethod === 'cash' ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-600 dark:text-gray-300'}`}>现结销售</div>
-                                            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">款到发货，一次性结清</div>
-                                        </div>
-                                    </button>
-                                    <button
-                                        onClick={() => { setSettlementMethod('credit'); setSettlementType('once'); setInstallmentPlans([]); }}
-                                        className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
-                                            settlementMethod === 'credit'
-                                                ? 'border-blue-500 dark:border-blue-400 bg-blue-50/60 dark:bg-blue-900/20'
-                                                : 'border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20'
-                                        }`}
-                                    >
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${settlementMethod === 'credit' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-white/10 text-gray-400'}`}>
-                                            <CreditCard className="w-4 h-4"/>
-                                        </div>
-                                        <div className="text-left">
-                                            <div className={`text-sm font-bold ${settlementMethod === 'credit' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-300'}`}>信用额度</div>
-                                            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">先货后款，支持分期</div>
-                                        </div>
-                                    </button>
-                                </div>
-
-                                {/* 现结销售提示 */}
-                                {settlementMethod === 'cash' && (
-                                    <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 text-xs text-emerald-600 dark:text-emerald-300 rounded-xl border border-emerald-100 dark:border-emerald-900/30 leading-relaxed flex items-center gap-2">
-                                        <Check className="w-4 h-4 shrink-0"/>
-                                        <span>现结销售：订单全部款项将在发货前一次性结清，无需分期。</span>
-                                    </div>
-                                )}
-
-                                {/* 信用额度：第二层 - 一次性付款 vs 分期付款 */}
-                                {settlementMethod === 'credit' && (
-                                    <div className="space-y-4">
-                                        <div className="flex bg-gray-100 dark:bg-white/10 p-1.5 rounded-xl">
-                                            <button
-                                                onClick={() => { setSettlementType('once'); setInstallmentPlans([]); }}
-                                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${settlementType === 'once' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}
-                                            >
-                                                一次性付款
-                                            </button>
-                                            <button
-                                                onClick={() => { setSettlementType('installment'); setExpectedPaymentDate(''); if (installmentPlans.length < 2) { const total = calculateNewOrderTotal(); const half = Math.round(total / 2 * 100) / 100; setInstallmentPlans([{ amount: half, expectedDate: '', actualDate: '', paidAmount: 0 }, { amount: Math.round((total - half) * 100) / 100, expectedDate: '', actualDate: '', paidAmount: 0 }]); } }}
-                                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${settlementType === 'installment' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}
-                                            >
-                                                分期付款
-                                            </button>
-                                        </div>
-
-                                        {/* 一次性付款：填写预计付款时间 */}
-                                        {settlementType === 'once' && (
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-gray-500">预计付款时间</label>
-                                                <input
-                                                    type="date"
-                                                    value={expectedPaymentDate}
-                                                    onChange={e => setExpectedPaymentDate(e.target.value)}
-                                                    className="w-full md:w-64 p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0071E3] dark:focus:ring-[#FF2D55] transition text-sm"
-                                                />
-                                                <p className="text-[10px] text-gray-400 dark:text-gray-500">信用额度模式下，全部款项将在上述日期前一次性付清。</p>
-                                            </div>
-                                        )}
-
-                                        {/* 分期付款：填写每期金额与预计付款时间 */}
-                                        {settlementType === 'installment' && (
-                                            <div className="space-y-3">
-                                                <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-white/10">
-                                                    <table className="w-full text-left text-sm">
-                                                        <thead>
-                                                            <tr className="bg-gray-50 dark:bg-white/5 border-b border-gray-100 dark:border-white/10">
-                                                                <th className="px-4 py-2.5 text-xs font-bold text-gray-500 whitespace-nowrap">分期计划</th>
-                                                                <th className="px-4 py-2.5 text-xs font-bold text-gray-500 whitespace-nowrap">分期金额</th>
-                                                                <th className="px-4 py-2.5 text-xs font-bold text-gray-500 whitespace-nowrap">预计付款时间</th>
-                                                                <th className="px-4 py-2.5 w-10"></th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-gray-50 dark:divide-white/5">
-                                                            {installmentPlans.map((plan, idx) => (
-                                                                <tr key={idx} className="hover:bg-gray-50/50 dark:hover:bg-white/3">
-                                                                    <td className="px-4 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 whitespace-nowrap">第{idx + 1}期</td>
-                                                                    <td className="px-4 py-2.5">
-                                                                        <input
-                                                                            type="number"
-                                                                            value={plan.amount || ''}
-                                                                            onChange={e => { const next = [...installmentPlans]; next[idx] = { ...next[idx], amount: Number(e.target.value) }; setInstallmentPlans(next); }}
-                                                                            className="w-28 p-1.5 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/20 text-right font-mono"
-                                                                            placeholder="0.00"
-                                                                        />
-                                                                    </td>
-                                                                    <td className="px-4 py-2.5">
-                                                                        <input
-                                                                            type="date"
-                                                                            value={plan.expectedDate}
-                                                                            onChange={e => { const next = [...installmentPlans]; next[idx] = { ...next[idx], expectedDate: e.target.value }; setInstallmentPlans(next); }}
-                                                                            className="w-36 p-1.5 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/20"
-                                                                        />
-                                                                    </td>
-                                                                    <td className="px-4 py-2.5">
-                                                                        {installmentPlans.length > 2 && (
-                                                                            <button onClick={() => setInstallmentPlans(installmentPlans.filter((_, i) => i !== idx))} className="text-gray-400 hover:text-red-500 p-1 transition"><X className="w-3.5 h-3.5"/></button>
-                                                                        )}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <button
-                                                        onClick={() => setInstallmentPlans([...installmentPlans, { amount: 0, expectedDate: '', actualDate: '', paidAmount: 0 }])}
-                                                        className="flex items-center gap-1.5 text-xs font-bold text-blue-500 hover:text-blue-700 transition"
-                                                    >
-                                                        <Plus className="w-3.5 h-3.5"/> 添加分期
-                                                    </button>
-                                                    <div className="text-xs text-gray-500">
-                                                        分期合计：<span className={`font-bold font-mono ${Math.abs(installmentPlans.reduce((s, p) => s + p.amount, 0) - calculateNewOrderTotal()) < 0.01 ? 'text-green-600' : 'text-red-500'}`}>¥{installmentPlans.reduce((s, p) => s + p.amount, 0).toLocaleString()}</span>
-                                                        <span className="mx-1.5">/</span>
-                                                        订单总额：<span className="font-bold font-mono text-gray-700 dark:text-gray-300">¥{calculateNewOrderTotal().toLocaleString()}</span>
-                                                    </div>
-                                                </div>
-                                                <FieldError error={getVisibleFieldError('installmentPlans') || getVisibleFieldError('installmentPlansTotal')} />
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className="bg-white dark:bg-[#2C2C2E] p-5 rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple space-y-4">
-                                <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><MapPin className="w-4 h-4 text-red-500"/> 收货信息</h4>
-
-                                {/* 发货方式切换 */}
-                                <div className="flex bg-gray-100 dark:bg-white/10 p-1.5 rounded-xl">
-                                    <button
-                                        onClick={() => setDeliveryMethod('Online')}
-                                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${deliveryMethod === 'Online' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}
-                                    >
-                                        <Mail className="w-3.5 h-3.5"/> 线上发货
-                                    </button>
-                                    <button
-                                        onClick={() => setDeliveryMethod('Offline')}
-                                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${deliveryMethod === 'Offline' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}
-                                    >
-                                        <Truck className="w-3.5 h-3.5"/> 线下发货
-                                    </button>
-                                    <button
-                                        onClick={() => setDeliveryMethod('Hybrid')}
-                                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${deliveryMethod === 'Hybrid' ? 'bg-white dark:bg-[#2C2C2E] shadow text-[#0071E3] dark:text-white' : 'text-gray-500'}`}
-                                    >
-                                        <Layers className="w-3.5 h-3.5"/> 混合发货
-                                    </button>
-                                </div>
-
-                                {/* 线上发货 - 多条记录 */}
-                                {(deliveryMethod === 'Online' || deliveryMethod === 'Hybrid') && (
-                                    <div className="space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs font-bold text-blue-500 uppercase flex items-center gap-1"><Mail className="w-3 h-3"/> 线上发货信息</span>
-                                            <span className="text-[10px] text-gray-400">{onlineDeliveries.length} 条记录</span>
-                                        </div>
-                                        <div className="space-y-2">
-                                            {onlineDeliveries.map((entry, idx) => (
-                                                <div key={entry.id} className="relative p-4 bg-blue-50/40 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-800/30 space-y-3">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-[11px] font-bold text-blue-500">#{idx + 1}</span>
-                                                        {onlineDeliveries.length > 1 && (
-                                                            <button onClick={() => setOnlineDeliveries(onlineDeliveries.filter(e => e.id !== entry.id))} className="text-gray-400 hover:text-red-500 p-0.5 transition"><X className="w-3.5 h-3.5"/></button>
-                                                        )}
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <div>
-                                                            <label className="text-[10px] font-bold text-gray-400 block mb-1">收货方</label>
-                                                            <select
-                                                                className="w-full p-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
-                                                                value={entry.receivingParty}
-                                                                onChange={e => { const next = [...onlineDeliveries]; next[idx] = { ...next[idx], receivingParty: e.target.value }; setOnlineDeliveries(next); }}
-                                                            >
-                                                                <option value="买方">买方</option>
-                                                                <option value="代理商">代理商</option>
-                                                                <option value="最终用户">最终用户</option>
-                                                            </select>
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[10px] font-bold text-gray-400 block mb-1">收货单位名称</label>
-                                                            <input
-                                                                className="w-full p-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
-                                                                value={entry.receivingCompany}
-                                                                onChange={e => { const next = [...onlineDeliveries]; next[idx] = { ...next[idx], receivingCompany: e.target.value }; setOnlineDeliveries(next); }}
-                                                                placeholder="收货单位全称..."
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[10px] font-bold text-gray-400 block mb-1">收货邮箱 <span className="text-red-400">*</span></label>
-                                                            <input
-                                                                type="email"
-                                                                className="w-full p-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
-                                                                value={entry.email}
-                                                                onChange={e => { const next = [...onlineDeliveries]; next[idx] = { ...next[idx], email: e.target.value }; setOnlineDeliveries(next); }}
-                                                                placeholder="接收开通通知的邮箱..."
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[10px] font-bold text-gray-400 block mb-1">联系电话</label>
-                                                            <input
-                                                                type="tel"
-                                                                className="w-full p-2 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg text-xs outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
-                                                                value={entry.phone || ''}
-                                                                onChange={e => { const next = [...onlineDeliveries]; next[idx] = { ...next[idx], phone: e.target.value }; setOnlineDeliveries(next); }}
-                                                                placeholder="联系电话..."
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <button
-                                            onClick={() => setOnlineDeliveries([...onlineDeliveries, { id: generateId(), receivingParty: '买方', receivingCompany: '', email: '', phone: '' }])}
-                                            className="flex items-center gap-1.5 text-xs font-bold text-blue-500 hover:text-blue-700 transition"
-                                        >
-                                            <Plus className="w-3.5 h-3.5"/> 添加线上发货记录
-                                        </button>
-                                    </div>
-                                )}
-
-                                {/* 线下发货 - 单条收货信息 */}
-                                {(deliveryMethod === 'Offline' || deliveryMethod === 'Hybrid') && (
-                                    <div className="space-y-3">
-                                        {deliveryMethod === 'Hybrid' && (
-                                            <span className="text-xs font-bold text-orange-500 uppercase flex items-center gap-1"><Truck className="w-3 h-3"/> 线下发货信息</span>
-                                        )}
-                                        <div>
-                                            <label className="text-[10px] font-bold text-gray-400 block mb-1">收货方</label>
-                                            <select
-                                                className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
-                                                value={receivingParty}
-                                                onChange={e => setReceivingParty(e.target.value)}
-                                            >
-                                                <option value="买方">买方</option>
-                                                <option value="代理商">代理商</option>
-                                                <option value="最终用户">最终用户</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] font-bold text-gray-400 block mb-1">收货单位名称</label>
-                                            <input
-                                                className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
-                                                value={receivingCompany}
-                                                onChange={e => setReceivingCompany(e.target.value)}
-                                                placeholder="请输入收货单位全称..."
-                                            />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="text-[10px] font-bold text-gray-400 block mb-1">联系电话</label>
-                                                <input
-                                                    type="tel"
-                                                    className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
-                                                    value={shippingPhone}
-                                                    onChange={e => setShippingPhone(e.target.value)}
-                                                    placeholder="请输入收货联系电话..."
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] font-bold text-gray-400 block mb-1">联系邮箱</label>
-                                                <input
-                                                    type="email"
-                                                    className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20"
-                                                    value={shippingEmail}
-                                                    onChange={e => setShippingEmail(e.target.value)}
-                                                    placeholder="请输入收货联系邮箱..."
-                                                />
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] font-bold text-gray-400 block mb-1">收货地址</label>
-                                            <textarea
-                                                className="w-full p-3 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl text-sm outline-none dark:text-white focus:ring-2 focus:ring-blue-500/20 h-20 resize-none"
-                                                value={shippingAddress}
-                                                onChange={e => setShippingAddress(e.target.value)}
-                                                placeholder="请输入详细收货地址..."
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                        </div>
-                    </div>
-
-                    {/* 验收计划 - 整行展示 */}
-                    <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-white/5 shadow-apple overflow-hidden">
-                        <div className="px-5 pt-4 pb-2 flex items-center justify-between">
-                            <h4 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2"><ClipboardCheck className="w-4 h-4 text-green-500"/> 验收计划</h4>
-                            {newOrderItems.length > 0 && (
-                                <div className="relative group/add-accept">
-                                    <button className="flex items-center gap-1.5 text-xs font-bold text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 px-3 py-1.5 rounded-lg border border-green-200 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-900/20 transition">
-                                        <Plus className="w-3.5 h-3.5"/> 添加验收条目
-                                    </button>
-                                    <div className="absolute right-0 top-full mt-1 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg py-1 z-20 min-w-[200px] opacity-0 invisible group-hover/add-accept:opacity-100 group-hover/add-accept:visible transition-all">
-                                        {newOrderItems.map((item, idx) => (
-                                            <button
-                                                key={idx}
-                                                onClick={() => {
-                                                    const existingRows = productAcceptanceRows.filter(r => r.productIdx === idx);
-                                                    const totalPct = existingRows.reduce((s, r) => s + r.percentage, 0);
-                                                    setProductAcceptanceRows(prev => [...prev, {
-                                                        productIdx: idx,
-                                                        method: '分期验收' as const,
-                                                        condition: '视同验收',
-                                                        expectedDate: '',
-                                                        percentage: Math.max(0, 100 - totalPct),
-                                                        content: '',
-                                                    }]);
-                                                    if (existingRows.length === 1 && existingRows[0].method === '一次性验收') {
-                                                        setProductAcceptanceRows(prev => prev.map(r =>
-                                                            r.productIdx === idx ? { ...r, method: '分期验收' as const } : r
-                                                        ));
-                                                    }
-                                                }}
-                                                className="w-full text-left px-4 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition flex items-center gap-2"
-                                            >
-                                                <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-green-50 dark:bg-green-900/20 text-[10px] font-bold text-green-600 dark:text-green-400">{idx + 1}</span>
-                                                <span className="truncate">{item.productName}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                        {newOrderItems.length > 0 ? (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-sm">
-                                    <thead className="unified-table-header">
-                                        <tr>
-                                            <th className="px-4 py-3 pl-5 text-center w-16">明细编号</th>
-                                            <th className="px-4 py-3">产品名称</th>
-                                            <th className="px-4 py-3 text-center w-16">验收期数</th>
-                                            <th className="px-4 py-3">验收方式</th>
-                                            <th className="px-4 py-3">验收内容</th>
-                                            <th className="px-4 py-3">验收条件</th>
-                                            <th className="px-4 py-3">预计验收时间</th>
-                                            <th className="px-4 py-3 text-center">验收比例</th>
-                                            <th className="px-4 py-3 text-right">验收金额</th>
-                                            <th className="px-4 py-3 text-center w-10"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                                        {newOrderItems.map((item, itemIdx) => {
-                                            const rows = productAcceptanceRows.filter(r => r.productIdx === itemIdx);
-                                            const itemAmount = item.priceAtPurchase * item.quantity;
-                                            return rows.map((row, rowIdx) => {
-                                                const globalIdx = productAcceptanceRows.indexOf(row);
-                                                const isFirst = rowIdx === 0;
-                                                const rowAmount = Math.round(itemAmount * row.percentage / 100 * 100) / 100;
-                                                return (
-                                                    <tr key={`${itemIdx}-${rowIdx}`} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                                        {isFirst && (
-                                                            <td className="px-4 py-3 pl-5 text-center align-top" rowSpan={rows.length}>
-                                                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800/40 text-xs font-bold font-mono text-green-600 dark:text-green-400">{itemIdx + 1}</span>
-                                                            </td>
-                                                        )}
-                                                        {isFirst && (
-                                                            <td className="px-4 py-3 align-top" rowSpan={rows.length}>
-                                                                <div className="font-bold text-gray-900 dark:text-white text-sm">{item.productName}</div>
-                                                                {item.skuName && <div className="text-xs text-gray-500 mt-0.5">{item.skuName}</div>}
-                                                            </td>
-                                                        )}
-                                                        <td className="px-4 py-3 text-center">
-                                                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gray-100 dark:bg-white/10 text-xs font-bold font-mono text-gray-600 dark:text-gray-300">{rowIdx + 1}</span>
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            <select value={row.method} onChange={e => {
-                                                                const next = [...productAcceptanceRows];
-                                                                const newMethod = e.target.value as '一次性验收' | '分期验收';
-                                                                next[globalIdx] = { ...next[globalIdx], method: newMethod };
-                                                                if (newMethod === '一次性验收') {
-                                                                    const filtered = next.filter(r => !(r.productIdx === itemIdx && next.indexOf(r) !== globalIdx));
-                                                                    filtered[filtered.indexOf(next[globalIdx])] = { ...next[globalIdx], percentage: 100 };
-                                                                    setProductAcceptanceRows(filtered);
-                                                                } else {
-                                                                    setProductAcceptanceRows(next);
-                                                                }
-                                                            }} className="text-xs font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1.5 bg-white dark:bg-black/30 dark:text-white outline-none focus:border-[#0071E3] transition cursor-pointer">
-                                                                <option value="一次性验收">一次性验收</option>
-                                                                <option value="分期验收">分期验收</option>
-                                                            </select>
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            <input type="text" value={row.content || ''} onChange={e => {
-                                                                const next = [...productAcceptanceRows];
-                                                                next[globalIdx] = { ...next[globalIdx], content: e.target.value };
-                                                                setProductAcceptanceRows(next);
-                                                            }} placeholder="请输入验收内容" className="text-xs border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1.5 bg-white dark:bg-black/30 dark:text-white outline-none focus:border-[#0071E3] transition w-full min-w-[120px]"/>
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            <select value={row.condition} onChange={e => {
-                                                                const next = [...productAcceptanceRows];
-                                                                next[globalIdx] = { ...next[globalIdx], condition: e.target.value };
-                                                                setProductAcceptanceRows(next);
-                                                            }} className="text-xs font-medium border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1.5 bg-white dark:bg-black/30 dark:text-white outline-none focus:border-[#0071E3] transition cursor-pointer">
-                                                                <option value="视同验收">视同验收</option>
-                                                                <option value="签字验收">签字验收</option>
-                                                                <option value="系统验收">系统验收</option>
-                                                            </select>
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            <input type="date" value={row.expectedDate} onChange={e => {
-                                                                const next = [...productAcceptanceRows];
-                                                                next[globalIdx] = { ...next[globalIdx], expectedDate: e.target.value };
-                                                                setProductAcceptanceRows(next);
-                                                            }} className="text-xs border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1.5 bg-white dark:bg-black/30 dark:text-white outline-none focus:border-[#0071E3] transition w-32"/>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-center">
-                                                            <div className="flex items-center justify-center gap-0.5">
-                                                                <input type="number" min={0} max={100} value={row.percentage} onChange={e => {
-                                                                    const next = [...productAcceptanceRows];
-                                                                    next[globalIdx] = { ...next[globalIdx], percentage: Math.min(100, Math.max(0, Number(e.target.value) || 0)) };
-                                                                    setProductAcceptanceRows(next);
-                                                                }} className="w-14 text-center text-xs font-mono border border-gray-200 dark:border-white/10 rounded-lg px-1 py-1.5 bg-white dark:bg-black/30 dark:text-white outline-none focus:border-[#0071E3] transition"/>
-                                                                <span className="text-xs text-gray-400">%</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right font-mono font-bold text-gray-900 dark:text-white text-xs">¥{rowAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                                        <td className="px-4 py-3 text-center">
-                                                            {rows.length > 1 ? (
-                                                                <button onClick={() => {
-                                                                    setProductAcceptanceRows(prev => {
-                                                                        const next = prev.filter((_, i) => i !== globalIdx);
-                                                                        const remaining = next.filter(r => r.productIdx === itemIdx);
-                                                                        if (remaining.length === 1) {
-                                                                            return next.map(r => r.productIdx === itemIdx ? { ...r, method: '一次性验收' as const, percentage: 100 } : r);
-                                                                        }
-                                                                        return next;
-                                                                    });
-                                                                }} className="text-gray-400 hover:text-red-500 p-0.5 transition" title="删除此验收条目"><X className="w-3.5 h-3.5"/></button>
-                                                            ) : null}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            });
-                                        })}
-                                    </tbody>
-                                </table>
-                                <div className="px-5 py-3 border-t border-gray-100 dark:border-white/5 flex flex-wrap items-center gap-2">
-                                    <span className="text-xs text-gray-400 dark:text-gray-500 mr-1">快速添加：</span>
-                                    {newOrderItems.map((item, idx) => {
-                                        const rows = productAcceptanceRows.filter(r => r.productIdx === idx);
-                                        const totalPct = rows.reduce((s, r) => s + r.percentage, 0);
-                                        return (
-                                            <button key={idx} onClick={() => {
-                                                setProductAcceptanceRows(prev => {
-                                                    const next = [...prev, { productIdx: idx, method: '分期验收' as const, condition: '视同验收', expectedDate: '', percentage: Math.max(0, 100 - totalPct), content: '' }];
-                                                    return next.map(r => r.productIdx === idx ? { ...r, method: '分期验收' as const } : r);
-                                                });
-                                            }} className="flex items-center gap-1 text-xs font-bold text-blue-500 hover:text-blue-700 px-3 py-1.5 rounded-lg border border-dashed border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition">
-                                                <Plus className="w-3 h-3"/> {item.productName}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="px-5 pb-4 pt-1">
-                                <div className="flex flex-col items-center justify-center py-6 text-gray-300 dark:text-gray-600">
-                                    <ClipboardCheck className="w-8 h-8 mb-2 opacity-50"/>
-                                    <p className="text-sm font-medium">请先添加产品后配置验收计划</p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    </div>
+                    <Step4CommerceDelivery
+                        acceptanceForm={acceptanceForm}
+                        acceptanceType={acceptanceType}
+                        calculateNewOrderTotal={calculateNewOrderTotal}
+                        deliveryMethod={deliveryMethod}
+                        expectedPaymentDate={expectedPaymentDate}
+                        getVisibleFieldError={getVisibleFieldError}
+                        installmentPlans={installmentPlans}
+                        invoiceForm={invoiceForm}
+                        markFieldTouched={markFieldTouched}
+                        newOrderItems={newOrderItems}
+                        onlineDeliveries={onlineDeliveries}
+                        paymentMethod={paymentMethod}
+                        paymentTerms={paymentTerms}
+                        phaseDrafts={phaseDrafts}
+                        productAcceptanceRows={productAcceptanceRows}
+                        receivingCompany={receivingCompany}
+                        receivingMethod={receivingMethod}
+                        receivingParty={receivingParty}
+                        reuseSerialNumber={reuseSerialNumber}
+                        serialNumberRequirement={serialNumberRequirement}
+                        setAcceptanceForm={setAcceptanceForm}
+                        setAcceptanceType={setAcceptanceType}
+                        setDeliveryMethod={setDeliveryMethod}
+                        setExpectedPaymentDate={setExpectedPaymentDate}
+                        setInstallmentPlans={setInstallmentPlans}
+                        setInvoiceForm={setInvoiceForm}
+                        setOnlineDeliveries={setOnlineDeliveries}
+                        setPaymentMethod={setPaymentMethod}
+                        setPaymentTerms={setPaymentTerms}
+                        setPhaseDrafts={setPhaseDrafts}
+                        setProductAcceptanceRows={setProductAcceptanceRows}
+                        setReceivingCompany={setReceivingCompany}
+                        setReceivingMethod={setReceivingMethod}
+                        setReceivingParty={setReceivingParty}
+                        setReuseSerialNumber={setReuseSerialNumber}
+                        setSerialNumberRequirement={setSerialNumberRequirement}
+                        setSettlementMethod={setSettlementMethod}
+                        setSettlementType={setSettlementType}
+                        setShippingAddress={setShippingAddress}
+                        setShippingEmail={setShippingEmail}
+                        setShippingPhone={setShippingPhone}
+                        settlementMethod={settlementMethod}
+                        settlementType={settlementType}
+                        shippingAddress={shippingAddress}
+                        shippingEmail={shippingEmail}
+                        shippingPhone={shippingPhone}
+                    />
                 )}
 
             </div>
@@ -3714,438 +1753,49 @@ const OrderCreateWizard: React.FC<OrderCreateWizardProps> = ({ isOpen, onClose, 
             reuseSerialNumber={reuseSerialNumber}
         />
 
-        {/* 折算单选择弹窗 */}
-        {isConversionPickerOpen && (
-            <ModalPortal>
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[600] p-4 animate-fade-in">
-                <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col border-white/10 animate-modal-enter">
-                    <div className="p-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-white/50 dark:bg-white/5 shrink-0">
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">选择关联折算单</h3>
-                        <button onClick={() => setIsConversionPickerOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full text-gray-400 hover:text-gray-600 transition">
-                            <X className="w-5 h-5"/>
-                        </button>
-                    </div>
-                    <div className="p-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center gap-3 shrink-0">
-                        <select className="bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm outline-none" value={conversionSearchField} onChange={e => setConversionSearchField(e.target.value as 'enterpriseName' | 'id')}>
-                            <option value="enterpriseName">企业名称</option>
-                            <option value="id">折算单号</option>
-                        </select>
-                        <div className="flex items-center gap-2 flex-1 bg-white dark:bg-black border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2">
-                            <Search className="w-4 h-4 text-gray-400 shrink-0"/>
-                            <input
-                                type="text"
-                                placeholder="请输入"
-                                className="bg-transparent border-none outline-none flex-1 text-gray-700 dark:text-gray-200 placeholder-gray-400 text-sm"
-                                value={conversionSearch}
-                                onChange={e => setConversionSearch(e.target.value)}
-                                autoFocus
-                            />
-                            {conversionSearch && (
-                                <button onClick={() => setConversionSearch('')} className="text-gray-400 hover:text-gray-600 transition"><X className="w-4 h-4"/></button>
-                            )}
-                        </div>
-                    </div>
-                    <div className="overflow-y-auto flex-1 custom-scrollbar">
-                        <table className="w-full text-left text-sm">
-                            <thead className="unified-table-header sticky top-0">
-                                <tr>
-                                    <th className="p-4 pl-5 w-10">
-                                        <input
-                                            type="checkbox"
-                                            className="w-4 h-4 accent-[#0071E3] rounded"
-                                            checked={filteredConversionOrders.length > 0 && filteredConversionOrders.every(c => selectedConversionIds.includes(c.id))}
-                                            ref={(el) => { if (el) el.indeterminate = filteredConversionOrders.some(c => selectedConversionIds.includes(c.id)) && !filteredConversionOrders.every(c => selectedConversionIds.includes(c.id)); }}
-                                            onChange={e => {
-                                                if (e.target.checked) {
-                                                    const newIds = new Set([...selectedConversionIds, ...filteredConversionOrders.map(c => c.id)]);
-                                                    setSelectedConversionIds(Array.from(newIds));
-                                                } else {
-                                                    const removeIds = new Set(filteredConversionOrders.map(c => c.id));
-                                                    setSelectedConversionIds(prev => prev.filter(id => !removeIds.has(id)));
-                                                }
-                                            }}
-                                        />
-                                    </th>
-                                    <th className="p-4 whitespace-nowrap">折算单号</th>
-                                    <th className="p-4 whitespace-nowrap text-center">折算金额</th>
-                                    <th className="p-4 whitespace-nowrap">企业名称</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                                {filteredConversionOrders.length === 0 ? (
-                                    <tr><td colSpan={4} className="p-10 text-center text-sm text-gray-400 dark:text-gray-500">未找到可用的折算单</td></tr>
-                                ) : filteredConversionOrders.map(co => {
-                                    const isSelected = selectedConversionIds.includes(co.id);
-                                    return (
-                                        <tr
-                                            key={co.id}
-                                            onClick={() => {
-                                                if (isSelected) setSelectedConversionIds(prev => prev.filter(id => id !== co.id));
-                                                else setSelectedConversionIds(prev => [...prev, co.id]);
-                                            }}
-                                            className={`cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/80 dark:bg-blue-900/20' : 'hover:bg-blue-50/60 dark:hover:bg-white/[0.06]'}`}
-                                        >
-                                            <td className="p-4 pl-5"><input type="checkbox" className="w-4 h-4 accent-[#0071E3] rounded pointer-events-none" checked={isSelected} readOnly /></td>
-                                            <td className="p-4 font-mono text-xs text-gray-600 dark:text-gray-300">{co.id}</td>
-                                            <td className="p-4 text-center font-medium text-gray-900 dark:text-white">¥{co.amount.toLocaleString()}</td>
-                                            <td className="p-4 text-gray-700 dark:text-gray-300 font-medium">{co.enterpriseName}</td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div className="p-4 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center justify-between shrink-0">
-                        <span className="text-sm font-bold text-gray-700 dark:text-gray-300">
-                            折算总金额: <span className="text-amber-600 dark:text-amber-400">¥{selectedConversionIds.reduce((s, id) => s + (availableConversionOrders.find(c => c.id === id)?.amount ?? 0), 0).toLocaleString()}</span>
-                        </span>
-                        <div className="flex items-center gap-3">
-                            <button onClick={() => setIsConversionPickerOpen(false)} className="px-5 py-2 text-sm text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition">取消</button>
-                            <button onClick={() => setIsConversionPickerOpen(false)} className="unified-button-primary bg-[#0071E3] text-sm">确定</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            </ModalPortal>
-        )}
+                <ConversionPickerModal
+            availableConversionOrders={availableConversionOrders}
+            conversionSearch={conversionSearch}
+            conversionSearchField={conversionSearchField}
+            filteredConversionOrders={filteredConversionOrders}
+            isConversionPickerOpen={isConversionPickerOpen}
+            selectedConversionIds={selectedConversionIds}
+            setConversionSearch={setConversionSearch}
+            setConversionSearchField={setConversionSearchField}
+            setIsConversionPickerOpen={setIsConversionPickerOpen}
+            setSelectedConversionIds={setSelectedConversionIds}
+        />
 
-        {/* 商机选择器弹窗 */}
-        {isContractPickerOpen && (
-            <ModalPortal>
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[600] p-4 animate-fade-in">
-                <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-6xl max-h-[85vh] flex flex-col border-white/10 animate-modal-enter">
-                    <div className="p-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-white/50 dark:bg-white/5 shrink-0">
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            <ScrollText className="w-5 h-5 text-blue-500"/> 选择关联合同
-                            <span className="text-sm font-normal text-gray-400">（已选 {linkedContractIds.length}/5）</span>
-                        </h3>
-                        <button onClick={() => { setIsContractPickerOpen(false); setContractPickerSearch(''); }} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full text-gray-400 hover:text-gray-600 transition">
-                            <X className="w-5 h-5"/>
-                        </button>
-                    </div>
-                    <div className="p-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center gap-3 shrink-0">
-                        <Search className="w-4 h-4 text-gray-400 shrink-0"/>
-                        <input
-                            type="text"
-                            placeholder="搜索合同名称、编号、甲方或乙方..."
-                            className="bg-transparent border-none outline-none flex-1 text-gray-700 dark:text-gray-200 placeholder-gray-400 text-sm"
-                            value={contractPickerSearch}
-                            onChange={e => { setContractPickerSearch(e.target.value); setContractPickerPage(1); }}
-                            autoFocus
-                        />
-                        {contractPickerSearch && (
-                            <button onClick={() => setContractPickerSearch('')} className="text-gray-400 hover:text-gray-600 transition">
-                                <X className="w-4 h-4"/>
-                            </button>
-                        )}
-                    </div>
-                    <div className="overflow-y-auto flex-1 custom-scrollbar">
-                        <table className="w-full text-left text-sm">
-                            <thead className="unified-table-header sticky top-0">
-                                <tr>
-                                    <th className="p-4 pl-5 whitespace-nowrap">合同名称</th>
-                                    <th className="p-4 whitespace-nowrap">合同编号</th>
-                                    <th className="p-4 whitespace-nowrap">合同类型</th>
-                                    <th className="p-4 whitespace-nowrap">甲方</th>
-                                    <th className="p-4 whitespace-nowrap text-right">签约金额</th>
-                                    <th className="p-4 whitespace-nowrap">签署日期</th>
-                                    <th className="p-4 whitespace-nowrap">状态</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                                {(() => {
-                                    const q = contractPickerSearch.toLowerCase();
-                                    const filtered = contracts.filter(c =>
-                                        !q ||
-                                        c.name.toLowerCase().includes(q) ||
-                                        c.code.toLowerCase().includes(q) ||
-                                        (c.partyA || '').toLowerCase().includes(q) ||
-                                        (c.partyB || '').toLowerCase().includes(q)
-                                    );
-                                    if (filtered.length === 0) return (
-                                        <tr>
-                                            <td colSpan={7} className="p-10 text-center text-sm text-gray-400 dark:text-gray-500">
-                                                未找到匹配的合同
-                                            </td>
-                                        </tr>
-                                    );
-                                    const statusLabel: Record<string, string> = {
-                                        PENDING_BUSINESS: '待商务审核', PENDING: '待审核',
-                                        VERIFIED: '已审核', APPROVED: '已批准', REJECTED: '已拒绝',
-                                    };
-                                    const statusTagClass: Record<string, string> = {
-                                        PENDING_BUSINESS: 'unified-tag-yellow !rounded-full',
-                                        PENDING: 'unified-tag-blue !rounded-full',
-                                        VERIFIED: 'unified-tag-indigo !rounded-full',
-                                        APPROVED: 'unified-tag-green !rounded-full',
-                                        REJECTED: 'unified-tag-red !rounded-full',
-                                    };
-                                    const paginated = filtered.slice((contractPickerPage - 1) * CONTRACT_PAGE_SIZE, contractPickerPage * CONTRACT_PAGE_SIZE);
-                                    return paginated.map(c => {
-                                        const isSelected = linkedContractIds.includes(c.id);
-                                        const isDisabled = !isSelected && linkedContractIds.length >= 5;
-                                        return (
-                                            <tr
-                                                key={c.id}
-                                                onClick={() => {
-                                                    if (isDisabled) return;
-                                                    if (isSelected) {
-                                                        setLinkedContractIds(prev => prev.filter(id => id !== c.id));
-                                                    } else {
-                                                        setLinkedContractIds(prev => [...prev, c.id]);
-                                                    }
-                                                }}
-                                                className={`transition-colors ${
-                                                    isDisabled
-                                                        ? 'opacity-40 cursor-not-allowed'
-                                                        : isSelected
-                                                        ? 'bg-blue-50/80 dark:bg-blue-900/20 cursor-pointer'
-                                                        : 'hover:bg-blue-50/60 dark:hover:bg-white/[0.06] cursor-pointer group'
-                                                }`}
-                                            >
-                                                <td className="p-4 pl-5 max-w-[220px]">
-                                                    <div className={`font-medium truncate flex items-center gap-2 ${isSelected ? 'text-[#0071E3] dark:text-[#0A84FF]' : 'text-gray-900 dark:text-white group-hover:text-[#0071E3] dark:group-hover:text-[#0A84FF]'} transition-colors`}>
-                                                        {isSelected && <CheckCircle className="w-3.5 h-3.5 shrink-0" />}
-                                                        {c.name}
-                                                    </div>
-                                                    {c.externalCode && <div className="text-xs text-gray-400 font-mono mt-0.5">{c.externalCode}</div>}
-                                                </td>
-                                                <td className="p-4 text-gray-600 dark:text-gray-300 font-mono whitespace-nowrap">{c.code}</td>
-                                                <td className="p-4 text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.contractType}</td>
-                                                <td className="p-4 text-gray-700 dark:text-gray-300 max-w-[160px]">
-                                                    <div className="truncate">{c.partyA || '-'}</div>
-                                                </td>
-                                                <td className="p-4 text-right whitespace-nowrap font-mono text-gray-700 dark:text-gray-300">
-                                                    {c.amount != null ? `¥${c.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
-                                                </td>
-                                                <td className="p-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                                                    {c.signDate ? new Date(c.signDate).toLocaleDateString('zh-CN') : '-'}
-                                                </td>
-                                                <td className="p-4 whitespace-nowrap">
-                                                    <span className={statusTagClass[c.verifyStatus] || 'unified-tag-gray !rounded-full'}>
-                                                        {statusLabel[c.verifyStatus] || c.verifyStatus}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    });
-                                })()}
-                            </tbody>
-                        </table>
-                    </div>
-                    {/* 分页 + 底部确认栏 */}
-                    <div className="p-4 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center justify-between shrink-0">
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
-                            {linkedContractIds.length === 0 ? '点击行选择合同' : `已选 ${linkedContractIds.length} 个合同`}
-                        </span>
-                        {(() => {
-                            const q = contractPickerSearch.toLowerCase();
-                            const totalFiltered = contracts.filter(c =>
-                                !q || c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || (c.partyA || '').toLowerCase().includes(q) || (c.partyB || '').toLowerCase().includes(q)
-                            ).length;
-                            if (totalFiltered <= CONTRACT_PAGE_SIZE) return null;
-                            return (
-                                <Pagination
-                                    page={contractPickerPage}
-                                    size={CONTRACT_PAGE_SIZE}
-                                    total={totalFiltered}
-                                    onPageChange={setContractPickerPage}
-                                    className="flex items-center gap-3"
-                                />
-                            );
-                        })()}
-                        <button
-                            onClick={() => { setIsContractPickerOpen(false); setContractPickerSearch(''); }}
-                            className="unified-button-primary bg-[#0071E3] text-sm"
-                        >
-                            确定
-                        </button>
-                    </div>
-                </div>
-            </div>
-            </ModalPortal>
-        )}
+                <ContractPickerModal
+            CONTRACT_PAGE_SIZE={CONTRACT_PAGE_SIZE}
+            contractPickerPage={contractPickerPage}
+            contractPickerSearch={contractPickerSearch}
+            contracts={contracts}
+            isContractPickerOpen={isContractPickerOpen}
+            linkedContractIds={linkedContractIds}
+            setContractPickerPage={setContractPickerPage}
+            setContractPickerSearch={setContractPickerSearch}
+            setIsContractPickerOpen={setIsContractPickerOpen}
+            setLinkedContractIds={setLinkedContractIds}
+        />
 
-        {isOppPickerOpen && (
-            <ModalPortal>
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[600] p-4 animate-fade-in">
-                <div className="unified-card dark:bg-[#1C1C1E] shadow-2xl w-full max-w-6xl max-h-[80vh] flex flex-col border-white/10 animate-modal-enter">
-                    <div className="p-5 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-white/50 dark:bg-white/5 shrink-0">
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            <Briefcase className="w-5 h-5 text-purple-500"/> 选择商机
-                        </h3>
-                        <button onClick={() => { setIsOppPickerOpen(false); setOppPickerSearch(''); }} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full text-gray-400 hover:text-gray-600 transition">
-                            <X className="w-5 h-5"/>
-                        </button>
-                    </div>
-                    <div className="p-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center gap-3 shrink-0">
-                        <Search className="w-4 h-4 text-gray-400 shrink-0"/>
-                        <input
-                            type="text"
-                            placeholder="搜索商机名称、客户名称或商机编号..."
-                            className="bg-transparent border-none outline-none flex-1 text-gray-700 dark:text-gray-200 placeholder-gray-400 text-sm"
-                            value={oppPickerSearch}
-                            onChange={e => setOppPickerSearch(e.target.value)}
-                            autoFocus
-                        />
-                        {oppPickerSearch && (
-                            <button onClick={() => setOppPickerSearch('')} className="text-gray-400 hover:text-gray-600 transition">
-                                <X className="w-4 h-4"/>
-                            </button>
-                        )}
-                    </div>
-                    <div className="overflow-y-auto flex-1 custom-scrollbar">
-                        <table className="w-full text-left text-sm">
-                            <thead className="unified-table-header sticky top-0">
-                                <tr>
-                                    <th className="p-4 pl-5 whitespace-nowrap">商机编号</th>
-                                    <th className="p-4 whitespace-nowrap">商机名称</th>
-                                    <th className="p-4 whitespace-nowrap">客户名称</th>
-                                    <th className="p-4 whitespace-nowrap">产品名称/授权类型</th>
-                                    <th className="p-4 whitespace-nowrap">所属部门</th>
-                                    <th className="p-4 whitespace-nowrap">商机阶段</th>
-                                    <th className="p-4 whitespace-nowrap">最终成交金额</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                                {opportunities
-                                    .filter(o =>
-                                        !oppPickerSearch ||
-                                        o.name.toLowerCase().includes(oppPickerSearch.toLowerCase()) ||
-                                        o.customerName.toLowerCase().includes(oppPickerSearch.toLowerCase()) ||
-                                        o.id.toLowerCase().includes(oppPickerSearch.toLowerCase())
-                                    )
-                                    .map(o => (
-                                        <tr
-                                            key={o.id}
-                                            onClick={() => {
-                                                handleOpportunityChange(o.id);
-                                                setIsOppPickerOpen(false);
-                                                setOppPickerSearch('');
-                                            }}
-                                            className="cursor-pointer hover:bg-blue-50/60 dark:hover:bg-white/[0.06] transition-colors group"
-                                        >
-                                            <td className="p-4 pl-5 text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap text-xs">{o.id}</td>
-                                            <td className="p-4 max-w-[200px]">
-                                                <div className="font-medium text-gray-900 dark:text-white group-hover:text-[#0071E3] dark:group-hover:text-[#FF2D55] transition-colors line-clamp-2">{o.name}</div>
-                                            </td>
-                                            <td className="p-4 text-gray-700 dark:text-gray-300 whitespace-nowrap">{o.customerName}</td>
-                                            <td className="p-4 text-gray-600 dark:text-gray-400 max-w-[240px]">
-                                                {o.products && o.products.length > 0 ? (
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {o.products.map((p, pi) => (
-                                                            <span key={pi} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 dark:bg-white/10 rounded text-[11px] leading-tight">
-                                                                <span className="font-medium text-gray-700 dark:text-gray-300">{p.productName}</span>
-                                                                {p.skuName && <span className="text-gray-400">/{p.skuName}</span>}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-xs">{o.productType || '-'}</div>
-                                                )}
-                                            </td>
-                                            <td className="p-4 text-gray-600 dark:text-gray-400 whitespace-nowrap text-xs">{o.department || '-'}</td>
-                                            <td className="p-4">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap ${
-                                                    o.stage === '赢单' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                                    o.stage === '输单' ? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' :
-                                                    o.stage === '需求判断' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                                                    o.stage === '确认商机' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' :
-                                                    o.stage === '确认渠道' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                                                    'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                                                }`}>{o.stage}</span>
-                                            </td>
-                                            <td className="p-4 text-gray-900 dark:text-white whitespace-nowrap font-medium">
-                                                {o.finalUserRevenue != null ? `${o.finalUserRevenue.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 元` : o.amount != null ? `${o.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 元` : '-'}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                {opportunities.filter(o =>
-                                    !oppPickerSearch ||
-                                    o.name.toLowerCase().includes(oppPickerSearch.toLowerCase()) ||
-                                    o.customerName.toLowerCase().includes(oppPickerSearch.toLowerCase())
-                                ).length === 0 && (
-                                    <tr>
-                                        <td colSpan={7} className="p-10 text-center text-sm text-gray-400 dark:text-gray-500">
-                                            未找到匹配的商机
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            </ModalPortal>
-        )}
+                <OpportunityPickerModal
+            handleOpportunityChange={handleOpportunityChange}
+            isOppPickerOpen={isOppPickerOpen}
+            oppPickerSearch={oppPickerSearch}
+            opportunities={opportunities}
+            products={products}
+            setIsOppPickerOpen={setIsOppPickerOpen}
+            setOppPickerSearch={setOppPickerSearch}
+        />
 
-        {/* New Contact Modal */}
-        {showNewContactModal && (
-            <ModalPortal>
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[600] animate-fade-in" onClick={() => setShowNewContactModal(null)}>
-                <div className="bg-white dark:bg-[#2C2C2E] rounded-2xl shadow-2xl w-[440px] animate-modal-enter" onClick={e => e.stopPropagation()}>
-                    <div className="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
-                        <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                            新建{showNewContactModal === 'Purchasing' ? '采购' : 'IT'}联系人
-                        </h3>
-                        <button onClick={() => setShowNewContactModal(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition">
-                            <X className="w-4 h-4"/>
-                        </button>
-                    </div>
-                    <div className="p-6 space-y-4">
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 block">姓名 <span className="text-red-500">*</span></label>
-                            <input
-                                value={newContactForm.name}
-                                onChange={e => setNewContactForm(f => ({ ...f, name: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-[#1C1C1E] text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-                                placeholder="请输入联系人姓名"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 block">职位</label>
-                            <input
-                                value={newContactForm.position}
-                                onChange={e => setNewContactForm(f => ({ ...f, position: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-[#1C1C1E] text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-                                placeholder="请输入职位"
-                            />
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 block">手机号</label>
-                                <input
-                                    value={newContactForm.phone}
-                                    onChange={e => setNewContactForm(f => ({ ...f, phone: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-[#1C1C1E] text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-                                    placeholder="请输入手机号"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 block">邮箱</label>
-                                <input
-                                    value={newContactForm.email}
-                                    onChange={e => setNewContactForm(f => ({ ...f, email: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-[#1C1C1E] text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-                                    placeholder="请输入邮箱"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    <div className="px-6 py-4 border-t border-gray-100 dark:border-white/10 flex justify-end gap-2">
-                        <button onClick={() => setShowNewContactModal(null)} className="px-4 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition">取消</button>
-                        <button
-                            onClick={handleSaveNewContact}
-                            disabled={!newContactForm.name.trim()}
-                            className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-xl text-sm font-medium transition disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                            确定创建
-                        </button>
-                    </div>
-                </div>
-            </div>
-            </ModalPortal>
-        )}
+                <NewContactModal
+            handleSaveNewContact={handleSaveNewContact}
+            newContactForm={newContactForm}
+            setNewContactForm={setNewContactForm}
+            setShowNewContactModal={setShowNewContactModal}
+            showNewContactModal={showNewContactModal}
+        />
 
         {/* 下级单位批量导入隐藏文件输入 */}
         <input

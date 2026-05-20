@@ -1,27 +1,27 @@
-.PHONY: dev dev-frontend dev-backend build build-frontend build-backend clean
+.PHONY: dev dev-all dev-server build test lint backup
 
-# 开发模式
-dev: dev-backend dev-frontend
+# 开发：前后端并行（API 模式需在 .env 设置 VITE_API_MODE=true）
+dev-all:
+	npm run dev:all
 
-dev-frontend:
-	cd frontend && npm run dev
+dev-server:
+	npm run dev:server
 
-dev-backend:
-	cd backend && DB_PATH=../data/app.db go run ./cmd/server/ &
+dev:
+	npm run dev
 
-# 构建
-build: build-frontend build-backend
+build:
+	npm run build
 
-build-frontend:
-	cd frontend && npm run build
+test:
+	npm test
 
-build-backend:
-	cd backend && CGO_ENABLED=1 go build -o ../dist/nex-server ./cmd/server/
+lint:
+	npm run lint
 
-# 生产模式运行
-run-prod:
-	cd dist && DB_PATH=../data/app.db STATIC_DIR=. GIN_MODE=release ./nex-server
+backup:
+	npm run db:backup
 
-# 清理
-clean:
-	rm -rf frontend/dist dist/nex-server
+# 备选：Go 后端（非生产路径）
+dev-go:
+	cd backend && DB_PATH=../data/app.db go run ./cmd/server/

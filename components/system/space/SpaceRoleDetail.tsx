@@ -7,7 +7,7 @@ import type { Space, SpaceRole, SpaceMember, User } from '../../../types';
 import { spaceApi } from '../../../services/api';
 import { usePermissionTreeExpansion } from '../userManager/usePermissionTreeExpansion';
 import { useFunctionalPermissions } from '../userManager/useFunctionalPermissions';
-import type { PermGroup } from '../permissionConfig';
+import type { PermGroup, PermSubgroup, PermCategory } from '../permissionConfig';
 import { getSubgroupPermIds } from '../permissionConfig';
 import ModalPortal from '../../common/ModalPortal';
 import PermissionReadonlyTree from '../../common/PermissionReadonlyTree';
@@ -161,7 +161,7 @@ const SpaceRoleDetail: React.FC<Props> = ({
   const safeEditing = isEditing || isNew;
 
   const setFormPatch: React.Dispatch<React.SetStateAction<Partial<SpaceRole>>> = (v) => {
-    setForm(prev => (typeof v === 'function' ? (v as any)(prev) : v));
+    setForm(prev => (typeof v === 'function' ? v(prev) : v));
   };
 
   const treeAsPermGroup = useMemo(() => {
@@ -276,8 +276,8 @@ const SpaceRoleDetail: React.FC<Props> = ({
         setIsEditing(false);
         onSaved(builtRole);
       }
-    } catch (e: any) {
-      alert(e?.message || '保存失败');
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : '保存失败');
     } finally {
       setSaving(false);
     }
@@ -301,8 +301,8 @@ const SpaceRoleDetail: React.FC<Props> = ({
     try {
       await spaceApi.addMember(space.id, { userId, roleId: role.id, isAdmin: false });
       onMembersChange?.();
-    } catch (e: any) {
-      alert(e?.message || '添加失败');
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : '添加失败');
     }
   };
 
@@ -314,8 +314,8 @@ const SpaceRoleDetail: React.FC<Props> = ({
     try {
       await spaceApi.removeMember(space.id, member.id);
       onMembersChange?.();
-    } catch (e: any) {
-      alert(e?.message || '移除失败');
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : '移除失败');
     }
   };
 
@@ -984,9 +984,9 @@ export default SpaceRoleDetail;
 const ViewFunctionalPerms: React.FC<{
   tree: PermGroup[]; perms: string[];
   // 以下 helpers 当前不再使用，保留 props 以最小化调用方变更
-  allPermsInSubgroup?: (sg: any) => string[];
-  allPermsInGroup?: (g: any) => string[];
-  allPermsInCategory?: (cat: any) => string[];
+  allPermsInSubgroup?: (sg: PermSubgroup) => string[];
+  allPermsInGroup?: (g: PermGroup) => string[];
+  allPermsInCategory?: (cat: PermCategory) => string[];
   getCheckState?: (ids: string[], current: string[]) => 'all' | 'some' | 'none';
 }> = ({ tree, perms }) => (
   <div className="animate-fade-in">

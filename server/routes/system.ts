@@ -5,6 +5,30 @@ import { checkPermission } from '../rbac.ts';
 import { getUserName } from '../utils.ts';
 import { validateBody, authTypeSchema, salesOrgSchema } from '../validate.ts';
 
+type SqlParam = string | number | null;
+
+interface AuthTypeRow {
+  id: string;
+  name: string;
+  period: string;
+  ncc_biz: string;
+  ncc_income: string;
+  has_upgrade_warranty: number;
+  purchase_unit: string | null;
+  aux_purchase_unit: string | null;
+  sort_order: number;
+}
+
+interface SalesOrgRow {
+  id: string;
+  no: string;
+  name: string;
+  short_name: string;
+  finance_code: string;
+  org_type: string;
+  status: string;
+}
+
 const router = Router();
 router.use(authMiddleware);
 
@@ -12,7 +36,7 @@ router.use(authMiddleware);
 // 授权类型 /api/system/auth-types
 // ============================================================
 
-function toAuthType(row: any) {
+function toAuthType(row: AuthTypeRow) {
   return {
     id: row.id,
     name: row.name,
@@ -27,12 +51,12 @@ function toAuthType(row: any) {
 }
 
 router.get('/auth-types', (req, res) => {
-  const rows = getDb().prepare('SELECT * FROM auth_types ORDER BY sort_order ASC, rowid ASC').all();
+  const rows = getDb().prepare('SELECT * FROM auth_types ORDER BY sort_order ASC, rowid ASC').all() as AuthTypeRow[];
   res.json(rows.map(toAuthType));
 });
 
 router.get('/auth-types/:id', (req, res) => {
-  const row = getDb().prepare('SELECT * FROM auth_types WHERE id = ?').get(req.params.id);
+  const row = getDb().prepare('SELECT * FROM auth_types WHERE id = ?').get(req.params.id) as AuthTypeRow | undefined;
   if (!row) { res.status(404).json({ error: '授权类型不存在' }); return; }
   res.json(toAuthType(row));
 });
@@ -40,7 +64,7 @@ router.get('/auth-types/:id', (req, res) => {
 router.post('/auth-types', checkPermission('system', 'manage'), validateBody(authTypeSchema), (req: AuthRequest, res) => {
   const db = getDb();
   const b = req.body;
-  const maxOrder = (db.prepare('SELECT MAX(sort_order) as m FROM auth_types').get() as any)?.m ?? -1;
+  const maxOrder = (db.prepare('SELECT MAX(sort_order) as m FROM auth_types').get() as { m: number | null } | undefined)?.m ?? -1;
   db.prepare(`
     INSERT INTO auth_types (id, name, period, ncc_biz, ncc_income, has_upgrade_warranty, purchase_unit, aux_purchase_unit, sort_order)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -52,7 +76,7 @@ router.post('/auth-types', checkPermission('system', 'manage'), validateBody(aut
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, userName, 'CREATE', 'AuthType', b.id, `创建授权类型 ${b.name}`);
 
-  res.status(201).json(toAuthType(db.prepare('SELECT * FROM auth_types WHERE id = ?').get(b.id)));
+  res.status(201).json(toAuthType(db.prepare('SELECT * FROM auth_types WHERE id = ?').get(b.id) as AuthTypeRow));
 });
 
 router.put('/auth-types/:id', checkPermission('system', 'manage'), validateBody(authTypeSchema.partial().extend({ name: authTypeSchema.shape.name })), (req: AuthRequest, res) => {
@@ -74,7 +98,7 @@ router.put('/auth-types/:id', checkPermission('system', 'manage'), validateBody(
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, userName, 'UPDATE', 'AuthType', id, `更新授权类型 ${b.name}`);
 
-  res.json(toAuthType(db.prepare('SELECT * FROM auth_types WHERE id = ?').get(id)));
+  res.json(toAuthType(db.prepare('SELECT * FROM auth_types WHERE id = ?').get(id) as AuthTypeRow));
 });
 
 router.delete('/auth-types/:id', checkPermission('system', 'manage'), (req: AuthRequest, res) => {
@@ -92,7 +116,7 @@ router.delete('/auth-types/:id', checkPermission('system', 'manage'), (req: Auth
 // 销售组织 /api/system/sales-orgs
 // ============================================================
 
-function toSalesOrg(row: any) {
+function toSalesOrg(row: SalesOrgRow) {
   return {
     id: row.id,
     no: row.no,
@@ -108,16 +132,16 @@ router.get('/sales-orgs', (req, res) => {
   const { orgType, status, search } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM sales_orgs WHERE 1=1';
-  const params: any[] = [];
+  const params: SqlParam[] = [];
   if (orgType) { sql += ' AND org_type = ?'; params.push(orgType); }
   if (status) { sql += ' AND status = ?'; params.push(status); }
   if (search) { sql += ' AND (name LIKE ? OR short_name LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
   sql += ' ORDER BY no ASC';
-  res.json(db.prepare(sql).all(...params).map(toSalesOrg));
+  res.json((db.prepare(sql).all(...params) as SalesOrgRow[]).map(toSalesOrg));
 });
 
 router.get('/sales-orgs/:id', (req, res) => {
-  const row = getDb().prepare('SELECT * FROM sales_orgs WHERE id = ?').get(req.params.id);
+  const row = getDb().prepare('SELECT * FROM sales_orgs WHERE id = ?').get(req.params.id) as SalesOrgRow | undefined;
   if (!row) { res.status(404).json({ error: '销售组织不存在' }); return; }
   res.json(toSalesOrg(row));
 });
@@ -134,7 +158,7 @@ router.post('/sales-orgs', checkPermission('system', 'manage'), validateBody(sal
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, userName, 'CREATE', 'SalesOrg', b.id, `创建销售组织 ${b.name}`);
 
-  res.status(201).json(toSalesOrg(db.prepare('SELECT * FROM sales_orgs WHERE id = ?').get(b.id)));
+  res.status(201).json(toSalesOrg(db.prepare('SELECT * FROM sales_orgs WHERE id = ?').get(b.id) as SalesOrgRow));
 });
 
 router.put('/sales-orgs/:id', checkPermission('system', 'manage'), validateBody(salesOrgSchema.partial().extend({ name: salesOrgSchema.shape.name })), (req: AuthRequest, res) => {
@@ -153,7 +177,7 @@ router.put('/sales-orgs/:id', checkPermission('system', 'manage'), validateBody(
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, userName, 'UPDATE', 'SalesOrg', id, `更新销售组织 ${b.name}`);
 
-  res.json(toSalesOrg(db.prepare('SELECT * FROM sales_orgs WHERE id = ?').get(id)));
+  res.json(toSalesOrg(db.prepare('SELECT * FROM sales_orgs WHERE id = ?').get(id) as SalesOrgRow));
 });
 
 router.delete('/sales-orgs/:id', checkPermission('system', 'manage'), (req: AuthRequest, res) => {

@@ -1,3 +1,4 @@
+import React from 'react';
 import type { PurchaseNature } from '../../../types';
 
 /** 生成 UUID（兼容旧浏览器）。 */
@@ -39,4 +40,24 @@ export function purchaseNatureBadgeClass(nature: PurchaseNature): string {
     default:
       return 'bg-gray-100 text-gray-800 dark:bg-gray-800/40 dark:text-gray-200';
   }
+}
+
+/** 忽略回调函数的 React.memo HOC，以应对父组件中大量未 memoize 的事件处理函数。 */
+export function memoWithIgnoreCallbacks<P extends object>(
+  Component: React.ComponentType<P>
+): React.MemoExoticComponent<React.ComponentType<P>> {
+  return React.memo(Component, (prevProps: Record<string, any>, nextProps: Record<string, any>) => {
+    const prevKeys = Object.keys(prevProps);
+    const nextKeys = Object.keys(nextProps);
+    if (prevKeys.length !== nextKeys.length) return false;
+    for (const key of prevKeys) {
+      const prevVal = prevProps[key];
+      const nextVal = nextProps[key];
+      if (typeof prevVal === 'function' && typeof nextVal === 'function') {
+        continue;
+      }
+      if (prevVal !== nextVal) return false;
+    }
+    return true;
+  });
 }

@@ -1,4 +1,9 @@
+import type Database from 'better-sqlite3';
 import { getDb, initSchema } from './db.ts';
+import { createLogger } from './logger.ts';
+import type { Customer, Order, Product, RoleDefinition, User } from '../types.ts';
+
+const log = createLogger('seed');
 import {
   initialProducts, initialMerchandises, initialAtomicCapabilities,
   initialAuthTypes, initialSalesOrgs,
@@ -19,7 +24,35 @@ function hash(password: string): string {
   return hashPassword(password);
 }
 
-function ensureSpaceSeedData(db: any) {
+interface SpaceResourceConfigRow {
+  id: string;
+  resource_config: string;
+}
+
+interface CustomerDbRow {
+  id: string;
+  company_name: string;
+  industry: string;
+  customer_type: string;
+  level: string;
+  region: string;
+}
+
+interface ProductDbRow {
+  id: string;
+  name: string;
+  category: string;
+  sub_category: string | null;
+  skus: string;
+}
+
+interface UserDbRow {
+  id: string;
+  name: string;
+  role: string;
+}
+
+function ensureSpaceSeedData(db: Database.Database) {
   const insertSpace = db.prepare(`
     INSERT OR IGNORE INTO spaces (id, name, description, icon, perm_tree, resource_config, column_config, sort_order)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -117,17 +150,17 @@ function ensureSpaceSeedData(db: any) {
   }
 }
 
-function migrateRolesToArray(db: any) {
+function migrateRolesToArray(db: Database.Database) {
   const rows = db.prepare("SELECT id, role FROM users WHERE role NOT LIKE '[%'").all() as Array<{ id: string; role: string }>;
   if (rows.length === 0) return;
-  console.log(`[seed] Migrating ${rows.length} user(s) from single role to roles array...`);
+  log.info(`Migrating ${rows.length} user(s) from single role to roles array`);
   const update = db.prepare('UPDATE users SET role = ? WHERE id = ?');
   for (const row of rows) {
     update.run(JSON.stringify([row.role]), row.id);
   }
 }
 
-function migrateSpaceTextToApp(db: any) {
+function migrateSpaceTextToApp(db: Database.Database) {
   let total = 0;
   // 角色名称：空间管理员 → 应用管理员
   const r1 = db.prepare("UPDATE space_roles SET name = REPLACE(name, '空间', '应用') WHERE name LIKE '%空间%'").run();
@@ -136,7 +169,7 @@ function migrateSpaceTextToApp(db: any) {
   const r2 = db.prepare("UPDATE space_roles SET description = REPLACE(description, '空间', '应用') WHERE description LIKE '%空间%'").run();
   total += r2.changes || 0;
   // 应用描述（resourceConfig 里的 JSON 字段）
-  const spaces = db.prepare("SELECT id, resource_config FROM spaces WHERE resource_config LIKE '%空间%'").all() as any[];
+  const spaces = db.prepare("SELECT id, resource_config FROM spaces WHERE resource_config LIKE '%空间%'").all() as SpaceResourceConfigRow[];
   if (spaces.length > 0) {
     const updRC = db.prepare('UPDATE spaces SET resource_config = ? WHERE id = ?');
     for (const s of spaces) {
@@ -145,20 +178,20 @@ function migrateSpaceTextToApp(db: any) {
     total += spaces.length;
   }
   if (total > 0) {
-    console.log(`[seed] Migrated "空间" → "应用" text in ${total} record(s).`);
+    log.info(`Migrated "空间" → "应用" text in ${total} record(s)`);
   }
 }
 
-function migrateSpaceAdminRoleName(db: any) {
+function migrateSpaceAdminRoleName(db: Database.Database) {
   const r = db.prepare(
     "UPDATE space_roles SET name = '应用管理员' WHERE sort_order = 0 AND name != '应用管理员'"
   ).run();
   if (r.changes > 0) {
-    console.log(`[seed] Renamed ${r.changes} first role(s) to "应用管理员".`);
+    log.info(`Renamed ${r.changes} first role(s) to "应用管理员"`);
   }
 }
 
-function migrateOrdersRemoveSubUnitsWhenMultiItems(db: any) {
+function migrateOrdersRemoveSubUnitsWhenMultiItems(db: Database.Database) {
   const rows = db.prepare("SELECT id, items FROM orders WHERE items LIKE '%subUnits%' OR items LIKE '%subUnitAuthMode%'").all() as Array<{ id: string; items: string }>;
   if (rows.length === 0) return;
 
@@ -175,11 +208,11 @@ function migrateOrdersRemoveSubUnitsWhenMultiItems(db: any) {
   }
 
   if (changed > 0) {
-    console.log(`[seed] Cleaned sub-unit auth fields for ${changed} multi-item order(s).`);
+    log.info(`Cleaned sub-unit auth fields for ${changed} multi-item order(s)`);
   }
 }
 
-function migrateOrdersRemoveSubUnitsForSelfDeal(db: any) {
+function migrateOrdersRemoveSubUnitsForSelfDeal(db: Database.Database) {
   const rows = db.prepare(
     "SELECT id, items FROM orders WHERE buyer_type = 'SelfDeal' AND (items LIKE '%subUnits%' OR items LIKE '%subUnitAuthMode%')"
   ).all() as Array<{ id: string; items: string }>;
@@ -197,34 +230,41 @@ function migrateOrdersRemoveSubUnitsForSelfDeal(db: any) {
   }
 
   if (changed > 0) {
-    console.log(`[seed] Cleaned sub-unit auth fields for ${changed} SelfDeal order(s).`);
+    log.info(`Cleaned sub-unit auth fields for ${changed} SelfDeal order(s)`);
   }
 }
 
-function ensureSubscriptionChainOrders(db: any) {
+function ensureSubscriptionChainOrders(db: Database.Database) {
   const existing = db.prepare(
     "SELECT COUNT(*) as n FROM orders WHERE order_remark = '【订阅链】与续费管理订阅同源，勿删'"
   ).get() as { n: number };
   if (existing.n > 0) return;
 
   // 需要客户和产品数据从 DB 读取（Seed 阶段 static data 已入库）
-  const customers = (db.prepare('SELECT * FROM customers').all() as any[]).map((r: any) => ({
+  const customers: Customer[] = (db.prepare('SELECT * FROM customers').all() as CustomerDbRow[]).map((r) => ({
     id: r.id, companyName: r.company_name, industry: r.industry,
-    customerType: r.customer_type, level: r.level, region: r.region,
+    customerType: r.customer_type as Customer['customerType'],
+    level: r.level as Customer['level'],
+    region: r.region,
+    address: '', shippingAddress: '', status: 'Active' as const, contacts: [],
   }));
-  const products = (db.prepare('SELECT * FROM products').all() as any[]).map((r: any) => ({
-    id: r.id, name: r.name, category: r.category, subCategory: r.sub_category,
-    skus: JSON.parse(r.skus || '[]'),
+  const products: Product[] = (db.prepare('SELECT * FROM products').all() as ProductDbRow[]).map((r) => ({
+    id: r.id, name: r.name, category: r.category, subCategory: r.sub_category ?? undefined,
+    status: 'OnShelf' as const,
+    skus: JSON.parse(r.skus || '[]') as Product['skus'],
   }));
-  const users = (db.prepare('SELECT * FROM users').all() as any[]).map((r: any) => ({
-    id: r.id, name: r.name, roles: (() => {
-      try { return JSON.parse(r.role); } catch { return [r.role]; }
+  const users: User[] = (db.prepare('SELECT * FROM users').all() as UserDbRow[]).map((r) => ({
+    id: r.id, name: r.name,
+    accountId: r.id,
+    email: '',
+    roles: (() => {
+      try { return JSON.parse(r.role) as string[]; } catch { return [r.role]; }
     })(),
+    userType: 'Internal' as const,
+    status: 'Active' as const,
   }));
 
-  const subOrders = generateSubscriptionChainOrders({
-    customers: customers as any, products: products as any, users: users as any,
-  });
+  const subOrders = generateSubscriptionChainOrders({ customers, products, users });
 
   if (subOrders.length === 0) return;
 
@@ -238,10 +278,10 @@ function ensureSubscriptionChainOrders(db: any) {
       const extra = JSON.stringify({
         directChannel: o.directChannel, terminalChannel: o.terminalChannel,
         orderType: o.orderType, creatorId: o.creatorId, creatorName: o.creatorName,
-        settlementMethod: (o as any).settlementMethod, settlementType: (o as any).settlementType,
-        expectedPaymentDate: (o as any).expectedPaymentDate, installmentPlans: (o as any).installmentPlans,
-        purchasingContactId: (o as any).purchasingContactId, itContactId: (o as any).itContactId,
-        linkedContractIds: (o as any).linkedContractIds, linkedContractNames: (o as any).linkedContractNames,
+        settlementMethod: o.settlementMethod, settlementType: o.settlementType,
+        expectedPaymentDate: o.expectedPaymentDate, installmentPlans: o.installmentPlans,
+        purchasingContactId: o.purchasingContactId, itContactId: o.itContactId,
+        linkedContractIds: o.linkedContractIds, linkedContractNames: o.linkedContractNames,
       });
       ins.run(
         o.id, o.customerId, o.customerName, o.customerType ?? null,
@@ -253,15 +293,15 @@ function ensureSubscriptionChainOrders(db: any) {
         JSON.stringify(o.approval), JSON.stringify(o.approvalRecords),
         o.salesRepId ?? null, o.salesRepName ?? null,
         o.businessManagerId ?? null, o.businessManagerName ?? null,
-        (o as any).orderRemark ?? null, extra,
+        o.orderRemark ?? null, extra,
       );
     }
   });
   tx();
-  console.log(`[seed] Inserted ${subOrders.length} subscription chain order(s) for 续费管理.`);
+  log.info(`Inserted ${subOrders.length} subscription chain order(s) for 续费管理`);
 }
 
-function ensureAuthTypesSeed(db: any) {
+function ensureAuthTypesSeed(db: Database.Database) {
   const insertAuthType = db.prepare(`
     INSERT OR IGNORE INTO auth_types
       (id, name, period, ncc_biz, ncc_income, has_upgrade_warranty, purchase_unit, aux_purchase_unit, sort_order)
@@ -278,7 +318,7 @@ function ensureAuthTypesSeed(db: any) {
   });
 }
 
-function ensureSalesOrgsSeed(db: any) {
+function ensureSalesOrgsSeed(db: Database.Database) {
   const insertSalesOrg = db.prepare(`
     INSERT OR IGNORE INTO sales_orgs (id, no, name, short_name, finance_code, org_type, status)
     VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -286,6 +326,29 @@ function ensureSalesOrgsSeed(db: any) {
   for (const s of initialSalesOrgs) {
     insertSalesOrg.run(s.id, s.no, s.name, s.shortName ?? '', s.financeCode ?? '', s.orgType, s.status);
   }
+}
+
+function syncProductPricingOptions(db: Database.Database) {
+  const staticMap = new Map<string, string>();
+  for (const p of initialProducts as Product[]) {
+    const hasPO = p.skus?.some(s => s.pricingOptions && s.pricingOptions.length > 0);
+    if (hasPO) staticMap.set(p.id, JSON.stringify(p.skus));
+  }
+  if (staticMap.size === 0) return;
+
+  const update = db.prepare('UPDATE products SET skus = ? WHERE id = ?');
+  let synced = 0;
+  for (const [id, skusJson] of staticMap) {
+    const row = db.prepare('SELECT skus FROM products WHERE id = ?').get(id) as { skus: string } | undefined;
+    if (!row) continue;
+    const existingSkus = JSON.parse(row.skus || '[]');
+    const hasPO = existingSkus.some((s: any) => s.pricingOptions && s.pricingOptions.length > 0);
+    if (!hasPO) {
+      update.run(skusJson, id);
+      synced++;
+    }
+  }
+  if (synced > 0) log.info(`Synced pricingOptions for ${synced} products`);
 }
 
 export function seedDatabase() {
@@ -303,11 +366,12 @@ export function seedDatabase() {
     migrateOrdersRemoveSubUnitsWhenMultiItems(db);
     migrateOrdersRemoveSubUnitsForSelfDeal(db);
     ensureSubscriptionChainOrders(db);
-    console.log('[seed] Database already has data, skipping seed.');
+    syncProductPricingOptions(db);
+    log.info('Database already has data, skipping seed');
     return;
   }
 
-  console.log('[seed] Seeding database...');
+  log.info('Seeding database...');
   const defaultPassword = hash('123456');
 
   // --- Users ---
@@ -329,11 +393,11 @@ export function seedDatabase() {
 
   // --- Roles ---
   const insertRole = db.prepare(`INSERT INTO roles (id, name, description, permissions, is_system, row_permissions, row_logic, column_permissions, app_permissions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-  for (const r of initialRoles) {
+  for (const r of initialRoles as RoleDefinition[]) {
     insertRole.run(
       r.id, r.name, r.description, JSON.stringify(r.permissions), r.isSystem ? 1 : 0,
-      JSON.stringify(r.rowPermissions ?? []), JSON.stringify((r as any).rowLogic ?? {}),
-      JSON.stringify(r.columnPermissions ?? []), JSON.stringify((r as any).appPermissions ?? {}),
+      JSON.stringify(r.rowPermissions ?? []), JSON.stringify(r.rowLogic ?? {}),
+      JSON.stringify(r.columnPermissions ?? []), JSON.stringify(r.appPermissions ?? {}),
     );
   }
 
@@ -345,7 +409,7 @@ export function seedDatabase() {
       business_delivery_name, sales_org_name, sales_scope, linked_services)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  for (const p of initialProducts) {
+  for (const p of initialProducts as Product[]) {
     const scopeEntries = productSalesOrgMap[p.id] ?? [];
     const salesScope = scopeEntries.map(e => ({
       salesOrg: e.salesOrg,
@@ -357,20 +421,20 @@ export function seedDatabase() {
       status: 'listed',
       billingStatus: 'unmaintained',
     }));
-    const salesOrgName = (p as any).salesOrgName ?? (scopeEntries.length > 0 ? scopeEntries[0].salesOrg : null);
+    const salesOrgName = p.salesOrgName ?? (scopeEntries.length > 0 ? scopeEntries[0].salesOrg : null);
     insertProduct.run(
       p.id, p.name, p.category, p.subCategory ?? null, p.description ?? null,
       p.status, JSON.stringify(p.tags ?? []), JSON.stringify(p.skus),
       JSON.stringify(p.composition ?? []), JSON.stringify(p.installPackages ?? []),
       p.licenseTemplate ? JSON.stringify(p.licenseTemplate) : null,
-      (p as any).productType ?? null, (p as any).onlineDelivery ?? null,
-      (p as any).productClass ?? null, (p as any).productClassification ?? null,
-      (p as any).productSeries ?? null, (p as any).productLine ?? null,
-      (p as any).productCategory ?? null, (p as any).productClassFinance ?? null,
-      (p as any).productLineFinance ?? null, (p as any).productSeriesFinance ?? null,
-      (p as any).businessDeliveryName ?? null, salesOrgName,
+      p.productType ?? null, p.onlineDelivery ?? null,
+      p.productClass ?? null, p.productClassification ?? null,
+      p.productSeries ?? null, p.productLine ?? null,
+      p.productCategory ?? null, p.productClassFinance ?? null,
+      p.productLineFinance ?? null, p.productSeriesFinance ?? null,
+      p.businessDeliveryName ?? null, salesOrgName,
       JSON.stringify(salesScope),
-      JSON.stringify((p as any).linkedServices ?? []),
+      JSON.stringify(p.linkedServices ?? []),
     );
   }
 
@@ -429,7 +493,7 @@ export function seedDatabase() {
     INSERT INTO orders (id, customer_id, customer_name, customer_type, customer_level, customer_industry, customer_region, date, status, total, items, source, buyer_type, buyer_name, buyer_id, shipping_address, delivery_method, is_paid, payment_date, payment_method, payment_terms, payment_record, approval, approval_records, sales_rep_id, sales_rep_name, biz_manager_id, biz_manager_name, invoice_info, acceptance_info, acceptance_config, opportunity_id, opportunity_name, original_order_id, refund_reason, refund_amount, order_remark, extra)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  for (const o of allOrders) {
+  for (const o of allOrders as Order[]) {
     const extra = JSON.stringify({
       receivingParty: o.receivingParty, receivingCompany: o.receivingCompany,
       receivingMethod: o.receivingMethod, directChannel: o.directChannel,
@@ -441,10 +505,10 @@ export function seedDatabase() {
       isShippingConfirmed: o.isShippingConfirmed, shippingConfirmedDate: o.shippingConfirmedDate,
       isCDBurned: o.isCDBurned, cdBurnedDate: o.cdBurnedDate,
       shippedDate: o.shippedDate, carrier: o.carrier, trackingNumber: o.trackingNumber,
-      settlementMethod: (o as any).settlementMethod, settlementType: (o as any).settlementType,
-      expectedPaymentDate: (o as any).expectedPaymentDate, installmentPlans: (o as any).installmentPlans,
-      purchasingContactId: (o as any).purchasingContactId, itContactId: (o as any).itContactId,
-      linkedContractIds: (o as any).linkedContractIds, linkedContractNames: (o as any).linkedContractNames,
+      settlementMethod: o.settlementMethod, settlementType: o.settlementType,
+      expectedPaymentDate: o.expectedPaymentDate, installmentPlans: o.installmentPlans,
+      purchasingContactId: o.purchasingContactId, itContactId: o.itContactId,
+      linkedContractIds: o.linkedContractIds, linkedContractNames: o.linkedContractNames,
     });
     insertOrder.run(o.id, o.customerId, o.customerName, o.customerType ?? null,
       o.customerLevel ?? null, o.customerIndustry ?? null, o.customerRegion ?? null,
@@ -460,7 +524,7 @@ export function seedDatabase() {
       o.acceptanceConfig ? JSON.stringify(o.acceptanceConfig) : null,
       o.opportunityId ?? null, o.opportunityName ?? null, o.originalOrderId ?? null,
       o.refundReason ?? null, o.refundAmount ?? null,
-      (o as any).orderRemark ?? null, extra);
+      o.orderRemark ?? null, extra);
   }
 
   // --- Contracts (insert) ---
@@ -533,5 +597,5 @@ export function seedDatabase() {
   // --- Sales Orgs ---
   ensureSalesOrgsSeed(db);
 
-  console.log(`[seed] Done. Users: ${initialUsers.length}, Customers: ${customers.length}, Orders: ${orders.length}, Products: ${initialProducts.length}, Performances: ${performances.length}, Authorizations: ${authorizations.length}, DeliveryInfos: ${deliveryInfos.length}, Spaces: ${initialSpaces.length}, AuthTypes: ${initialAuthTypes.length}, SalesOrgs: ${initialSalesOrgs.length}`);
+  log.info('Seed complete', { users: initialUsers.length, customers: customers.length, orders: orders.length, products: initialProducts.length, spaces: initialSpaces.length, authTypes: initialAuthTypes.length, salesOrgs: initialSalesOrgs.length });
 }

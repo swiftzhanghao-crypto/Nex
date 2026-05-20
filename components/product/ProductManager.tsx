@@ -1,24 +1,231 @@
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Product, ProductSku } from '../../types';
-import { Plus, Search, Sparkles, Loader2, X, Key, Package as PackageIcon, RotateCcw, Filter, ChevronDown, Copy, Check } from 'lucide-react';
+import { Plus, Search, Sparkles, Loader2, X, Key, Package as PackageIcon, RotateCcw, SlidersHorizontal, ChevronDown, Copy, Check, Trash2 } from 'lucide-react';
 import { generateProductDescription, suggestCategory } from '../../services/geminiService';
 import { useNavigate } from 'react-router-dom';
 import ModalPortal from '../common/ModalPortal';
 import Pagination from '../common/Pagination';
+import { Badge } from '../ui';
 import { useAppContext } from '../../contexts/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
+
+type ProductFilterMode = '多选' | '单选';
+
+interface ProductFilterCondition {
+    id: string;
+    fieldId: string;
+    mode: ProductFilterMode;
+    value: string | string[];
+}
+
+const availableProductFilterFields = [
+    { id: 'productLine', label: '产品条线', defaultMode: '多选' as ProductFilterMode },
+    { id: 'productType', label: '产品类型', defaultMode: '多选' as ProductFilterMode },
+    { id: 'status', label: '产品状态', defaultMode: '多选' as ProductFilterMode },
+    { id: 'productCategory', label: '产品一级分类', defaultMode: '多选' as ProductFilterMode },
+    { id: 'subCategory', label: '产品二级分类', defaultMode: '多选' as ProductFilterMode },
+];
 
 const tabPermissionMap: Record<string, string> = {
   SPU: 'product_tab_spu',
   SKU: 'product_tab_sku',
 };
 
+const SPU_COL_GROUP = (
+    <colgroup>
+        <col style={{ width: 44 }} />
+        <col style={{ width: 280 }} />
+        <col style={{ width: 160 }} />
+        <col style={{ width: 90 }} />
+        <col style={{ width: 120 }} />
+        <col style={{ width: 120 }} />
+        <col style={{ width: 140 }} />
+        <col style={{ width: 100 }} />
+    </colgroup>
+);
+
+interface SPUTableProps {
+    pageItems: Product[];
+    selectedIds: Set<string>;
+    setSelectedIds: React.Dispatch<React.SetStateAction<Set<string>>>;
+    navigate: (path: string) => void;
+}
+
+const SPUTable = React.memo<SPUTableProps>(function SPUTable({ pageItems, selectedIds, setSelectedIds, navigate }) {
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const useVirtual = pageItems.length > 50;
+    const rowVirtualizer = useVirtualizer({
+        count: pageItems.length,
+        getScrollElement: () => scrollRef.current,
+        estimateSize: () => 52,
+        overscan: 10,
+        enabled: useVirtual,
+    });
+
+    const rows = useVirtual ? rowVirtualizer.getVirtualItems() : pageItems.map((_, i) => ({ index: i, start: 0, end: 0, size: 0, key: i, lane: 0 }));
+    const paddingTop = useVirtual && rows.length > 0 ? rows[0].start : 0;
+    const paddingBottom = useVirtual && rows.length > 0 ? rowVirtualizer.getTotalSize() - rows[rows.length - 1].end : 0;
+
+    return (
+        <div ref={scrollRef} className="overflow-x-auto overflow-y-auto flex-1 min-h-0 custom-scrollbar">
+            <table className="w-full text-left border-separate border-spacing-0 min-w-[1100px]" style={{ tableLayout: 'fixed' }}>
+                {SPU_COL_GROUP}
+                <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E]">
+                    <tr>
+                        <th className="pl-6 pr-2 py-2.5 border-b border-gray-200/50 dark:border-white/10">
+                            <input
+                                type="checkbox"
+                                checked={pageItems.length > 0 && pageItems.every(p => selectedIds.has(p.id))}
+                                onChange={(e) => {
+                                    const ids = pageItems.map(p => p.id);
+                                    setSelectedIds(prev => {
+                                        const next = new Set(prev);
+                                        if (e.target.checked) ids.forEach(id => next.add(id));
+                                        else ids.forEach(id => next.delete(id));
+                                        return next;
+                                    });
+                                }}
+                                className="w-4 h-4 rounded border-gray-300 dark:border-white/20 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                            />
+                        </th>
+                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品业务编码 / 产品名称</th>
+                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品规格</th>
+                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">状态</th>
+                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品一级分类</th>
+                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品二级分类</th>
+                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品条线</th>
+                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品类型</th>
+                    </tr>
+                </thead>
+                <tbody className="text-sm">
+                    {pageItems.length === 0 ? (
+                        <tr><td colSpan={8} className="p-12 text-center text-gray-400 dark:text-gray-500 text-sm">暂无匹配的产品数据</td></tr>
+                    ) : (
+                        <>
+                            {paddingTop > 0 && <tr aria-hidden="true"><td colSpan={8} style={{ height: paddingTop, padding: 0, border: 'none' }} /></tr>}
+                            {rows.map((vRow) => {
+                                const product = pageItems[vRow.index];
+                                return (
+                                    <tr key={product.id} className={`group cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors border-b border-gray-100/50 dark:border-white/5 last:border-0 ${product.status === 'OffShelf' ? 'opacity-60' : ''}`}>
+                                        <td className="pl-6 pr-2 py-2.5" onClick={e => e.stopPropagation()}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.has(product.id)}
+                                                onChange={() => {
+                                                    setSelectedIds(prev => {
+                                                        const next = new Set(prev);
+                                                        if (next.has(product.id)) next.delete(product.id);
+                                                        else next.add(product.id);
+                                                        return next;
+                                                    });
+                                                }}
+                                                className="w-4 h-4 rounded border-gray-300 dark:border-white/20 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2.5 max-w-[260px]" onClick={() => navigate(`/products/${product.id}`)}>
+                                            <div className="font-mono text-xs text-gray-400 dark:text-gray-500 leading-none mb-1">{product.id}</div>
+                                            <span className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline cursor-pointer truncate block leading-snug" title={product.name}>{product.name}</span>
+                                        </td>
+                                        <td className="px-3 py-2.5 max-w-[160px]">
+                                            <span className="text-gray-500 dark:text-gray-400 truncate block" title={product.skus.map(s => s.name).join('、') || undefined}>{product.skus.map(s => s.name).join('、') || '—'}</span>
+                                        </td>
+                                        <td className="px-3 py-2.5 whitespace-nowrap">
+                                            {product.status === 'OnShelf'
+                                                ? <Badge color="green" pill>已上架</Badge>
+                                                : <Badge color="gray" pill>已下架</Badge>
+                                            }
+                                        </td>
+                                        <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">{product.productCategory || '—'}</td>
+                                        <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">{product.subCategory || '—'}</td>
+                                        <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap truncate" title={product.productLine || undefined}>{product.productLine || '—'}</td>
+                                        <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">{product.productType || '—'}</td>
+                                    </tr>
+                                );
+                            })}
+                            {paddingBottom > 0 && <tr aria-hidden="true"><td colSpan={8} style={{ height: paddingBottom, padding: 0, border: 'none' }} /></tr>}
+                        </>
+                    )}
+                </tbody>
+            </table>
+        </div>
+    );
+});
+
+interface SKUTableProps {
+    pageItems: (ProductSku & { parentName: string; parentId: string })[];
+    navigate: (path: string) => void;
+}
+
+const SKUTable = React.memo<SKUTableProps>(function SKUTable({ pageItems, navigate }) {
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const useVirtual = pageItems.length > 50;
+    const rowVirtualizer = useVirtualizer({
+        count: pageItems.length,
+        getScrollElement: () => scrollRef.current,
+        estimateSize: () => 48,
+        overscan: 10,
+        enabled: useVirtual,
+    });
+
+    const rows = useVirtual ? rowVirtualizer.getVirtualItems() : pageItems.map((_, i) => ({ index: i, start: 0, end: 0, size: 0, key: i, lane: 0 }));
+    const paddingTop = useVirtual && rows.length > 0 ? rows[0].start : 0;
+    const paddingBottom = useVirtual && rows.length > 0 ? rowVirtualizer.getTotalSize() - rows[rows.length - 1].end : 0;
+
+    return (
+        <div ref={scrollRef} className="overflow-x-auto overflow-y-auto flex-1 min-h-0 custom-scrollbar">
+            <table className="w-full text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed' }}>
+                <colgroup>
+                    <col style={{ width: 180 }} />
+                    <col style={{ width: 280 }} />
+                    <col style={{ width: 200 }} />
+                    <col style={{ width: 200 }} />
+                </colgroup>
+                <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E]">
+                    <tr>
+                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">SKU编码</th>
+                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品业务编码 / 产品名称</th>
+                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">规格</th>
+                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">授权类型</th>
+                    </tr>
+                </thead>
+                <tbody className="text-sm">
+                    {pageItems.length === 0 ? (
+                        <tr><td colSpan={4} className="py-20 text-center text-gray-400 dark:text-gray-500 text-sm">暂无匹配的规格数据</td></tr>
+                    ) : (
+                        <>
+                            {paddingTop > 0 && <tr aria-hidden="true"><td colSpan={4} style={{ height: paddingTop, padding: 0, border: 'none' }} /></tr>}
+                            {rows.map((vRow) => {
+                                const sku = pageItems[vRow.index];
+                                return (
+                                    <tr key={sku.id} className="group hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors border-b border-gray-100/50 dark:border-white/5 last:border-0">
+                                        <td className="px-3 py-2.5 font-mono font-bold text-gray-500 dark:text-gray-400">{sku.code}</td>
+                                        <td className="px-3 py-2.5 max-w-[260px]" onClick={() => navigate(`/products/${sku.parentId}`)}>
+                                            <div className="font-mono text-xs text-gray-400 dark:text-gray-500 leading-none mb-1">{sku.parentId}</div>
+                                            <span className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline cursor-pointer truncate block leading-snug" title={sku.parentName}>{sku.parentName}</span>
+                                        </td>
+                                        <td className="px-3 py-2.5 font-medium text-gray-900 dark:text-white">{sku.name}</td>
+                                        <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300">{sku.pricingOptions?.map(o => o.title).join('、') || '—'}</td>
+                                    </tr>
+                                );
+                            })}
+                            {paddingBottom > 0 && <tr aria-hidden="true"><td colSpan={4} style={{ height: paddingBottom, padding: 0, border: 'none' }} /></tr>}
+                        </>
+                    )}
+                </tbody>
+            </table>
+        </div>
+    );
+});
+
 const ProductManager: React.FC = () => {
   const {
     products, setProducts,
     authTypes,
-    currentUser, roles,
+    roles,
   } = useAppContext();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
 
   const currentUserRole = roles.find(r => currentUser.roles?.includes(r.id));
@@ -32,20 +239,26 @@ const ProductManager: React.FC = () => {
     (visibleTabs[0] as typeof allTabs[number]) || 'SPU'
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
-  // SPU State
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchField, setSearchField] = useState<'id' | 'name' | 'spec'>('id');
+  const [isSearchFieldOpen, setIsSearchFieldOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [statusFilter, setStatusFilter] = useState<'All' | 'OnShelf' | 'OffShelf'>('All');
   const [tableCopied, setTableCopied] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [filterProductLine, setFilterProductLine] = useState('');
-  const [filterProductType, setFilterProductType] = useState('');
-  const [filterProductId, setFilterProductId] = useState('');
-  const [filterProductName, setFilterProductName] = useState('');
-  const hasActiveFilters = !!(filterProductLine || filterProductType || filterProductId || filterProductName);
-  
+
+  // Advanced filter drawer
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [isFilterClosing, setIsFilterClosing] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState<ProductFilterCondition[]>([]);
+  const [appliedFilters, setAppliedFilters] = useState<ProductFilterCondition[]>([]);
+
+  const closeFilterDrawer = () => {
+      setIsFilterClosing(true);
+      setTimeout(() => { setIsFilterDrawerOpen(false); setIsFilterClosing(false); }, 280);
+  };
+
   const [tempPrice, setTempPrice] = useState<number>(0);
   const [tempStock, setTempStock] = useState<number>(0);
   const [tempTag, setTempTag] = useState('');
@@ -61,9 +274,54 @@ const ProductManager: React.FC = () => {
     tags: []
   });
 
-
   const [generatingAI, setGeneratingAI] = useState(false);
   const [suggestingCat, setSuggestingCat] = useState(false);
+
+  const searchFieldOptions: { value: 'id' | 'name' | 'spec'; label: string; placeholder: string }[] = [
+    { value: 'id', label: '产品编码', placeholder: '搜索产品业务编码…' },
+    { value: 'name', label: '产品名称', placeholder: '搜索产品名称…' },
+    { value: 'spec', label: '产品规格', placeholder: '搜索产品规格…' },
+  ];
+  const currentSearchOption = searchFieldOptions.find(o => o.value === searchField)!;
+
+  // Dynamic filter option sources
+  const productLineOptions = useMemo(() => [...new Set(products.map(p => p.productLine).filter(Boolean))].sort(), [products]);
+  const productTypeOptions = useMemo(() => [...new Set(products.map(p => p.productType).filter(Boolean))].sort(), [products]);
+  const productCategoryOptions = useMemo(() => [...new Set(products.map(p => p.productCategory).filter(Boolean))].sort(), [products]);
+  const subCategoryOptions = useMemo(() => [...new Set(products.map(p => p.subCategory).filter(Boolean))].sort(), [products]);
+
+  const getFilterOptions = (fieldId: string): { value: string; label: string }[] => {
+      if (fieldId === 'productLine') return productLineOptions.map(v => ({ value: v!, label: v! }));
+      if (fieldId === 'productType') return productTypeOptions.map(v => ({ value: v!, label: v! }));
+      if (fieldId === 'status') return [{ value: 'OnShelf', label: '已上架' }, { value: 'OffShelf', label: '已下架' }];
+      if (fieldId === 'productCategory') return productCategoryOptions.map(v => ({ value: v!, label: v! }));
+      if (fieldId === 'subCategory') return subCategoryOptions.map(v => ({ value: v!, label: v! }));
+      return [];
+  };
+
+  const toggleFilterValue = (filterId: string, val: string) => {
+      setAdvancedFilters(prev => prev.map(f => {
+          if (f.id !== filterId) return f;
+          const arr = Array.isArray(f.value) ? f.value as string[] : [];
+          return { ...f, value: arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val] };
+      }));
+  };
+
+  const removeFilterCondition = (id: string) => {
+      setAdvancedFilters(prev => prev.filter(f => f.id !== id));
+  };
+
+  const applyFilters = () => {
+      setAppliedFilters([...advancedFilters]);
+      closeFilterDrawer();
+  };
+
+  const clearAdvancedFilters = () => {
+      setAdvancedFilters([]);
+      setAppliedFilters([]);
+  };
+
+  const hasActiveFilters = appliedFilters.some(f => Array.isArray(f.value) ? f.value.length > 0 : !!f.value);
 
   // --- SPU Handlers ---
   const handleOpenModal = () => {
@@ -168,19 +426,31 @@ const ProductManager: React.FC = () => {
     setGeneratingAI(false);
   };
 
-  const productLineOptions = useMemo(() => [...new Set(products.map(p => p.productLine).filter(Boolean))].sort(), [products]);
-  const productTypeOptions = useMemo(() => [...new Set(products.map(p => p.productType).filter(Boolean))].sort(), [products]);
-
   const filteredItems = useMemo(() => {
       if (activeTab === 'SPU') {
           return products.filter(p => {
-              const matchSearch = !searchTerm || p.id.toLowerCase().includes(searchTerm.toLowerCase()) || p.name.toLowerCase().includes(searchTerm.toLowerCase());
+              const searchLower = searchTerm.toLowerCase();
+              const matchSearch = !searchTerm || (
+                  searchField === 'id' ? p.id.toLowerCase().includes(searchLower) :
+                  searchField === 'name' ? p.name.toLowerCase().includes(searchLower) :
+                  p.skus.some(s => s.name.toLowerCase().includes(searchLower))
+              );
               const matchStatus = statusFilter === 'All' || p.status === statusFilter;
-              const matchLine = !filterProductLine || p.productLine === filterProductLine;
-              const matchType = !filterProductType || p.productType === filterProductType;
-              const matchId = !filterProductId || p.id.toLowerCase().includes(filterProductId.toLowerCase());
-              const matchName = !filterProductName || p.name.toLowerCase().includes(filterProductName.toLowerCase());
-              return matchSearch && matchStatus && matchLine && matchType && matchId && matchName;
+
+              const matchAdvanced = appliedFilters.every(filter => {
+                  const vals = Array.isArray(filter.value) ? filter.value as string[] : [];
+                  if (vals.length === 0) return true;
+                  switch (filter.fieldId) {
+                      case 'productLine': return vals.includes(p.productLine || '');
+                      case 'productType': return vals.includes(p.productType || '');
+                      case 'status': return vals.includes(p.status || '');
+                      case 'productCategory': return vals.includes(p.productCategory || '');
+                      case 'subCategory': return vals.includes(p.subCategory || '');
+                      default: return true;
+                  }
+              });
+
+              return matchSearch && matchStatus && matchAdvanced;
           });
       }
       if (activeTab === 'SKU') {
@@ -190,7 +460,7 @@ const ProductManager: React.FC = () => {
           return allSkus.filter(s => s.code.toLowerCase().includes(q) || s.parentId.toLowerCase().includes(q) || s.parentName.toLowerCase().includes(q));
       }
       return [];
-  }, [activeTab, products, searchTerm, statusFilter]);
+  }, [activeTab, products, searchTerm, searchField, statusFilter, appliedFilters]);
 
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
   const safePage = Math.min(currentPage, totalPages);
@@ -199,9 +469,9 @@ const ProductManager: React.FC = () => {
       return filteredItems.slice(end - itemsPerPage, end);
   }, [filteredItems, safePage, itemsPerPage]);
 
-  React.useEffect(() => {
+  useEffect(() => {
       setCurrentPage(1);
-  }, [searchTerm, activeTab, statusFilter, filterProductLine, filterProductType, filterProductId, filterProductName]);
+  }, [searchTerm, searchField, activeTab, statusFilter, appliedFilters]);
 
   const handleCopyTable = useCallback(() => {
       const headers = ['产品业务编码', '产品名称', '产品规格', '产品一级分类', '产品二级分类', '产品条线', '产品类型'];
@@ -228,7 +498,7 @@ const ProductManager: React.FC = () => {
 
   return (
     <div className="page-container animate-page-enter pb-2 h-full flex flex-col gap-2.5 min-w-0 overflow-hidden">
-      {/* ── Top Bar: title + tabs + search + filter (OrderManager style) ── */}
+      {/* ── Top Bar ── */}
       <div className="flex items-center gap-3 flex-wrap shrink-0">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">产品管理</h1>
 
@@ -266,14 +536,41 @@ const ProductManager: React.FC = () => {
 
         <div className="flex-1" />
 
-        {/* Search bar — OrderManager style */}
+        {/* Search bar with field selector — OrderManager style */}
         <div className="flex items-stretch h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] w-[280px] lg:w-[320px] shrink-0 focus-within:border-blue-400 dark:focus-within:border-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)] transition shadow-apple">
+            {/* Field selector */}
+            <div className="relative flex-shrink-0">
+                <button
+                    onClick={() => setIsSearchFieldOpen(v => !v)}
+                    className="h-full flex items-center gap-1.5 pl-3 pr-2.5 text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-white/5 rounded-l-lg border-r border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none whitespace-nowrap"
+                >
+                    {currentSearchOption.label}
+                    <ChevronDown className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform duration-150 ${isSearchFieldOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {isSearchFieldOpen && (
+                    <>
+                        <div className="fixed inset-0 z-40" onClick={() => setIsSearchFieldOpen(false)} />
+                        <div className="absolute left-0 top-full mt-1.5 w-28 bg-white dark:bg-[#2C2C2E] border border-gray-100 dark:border-white/10 rounded-xl shadow-xl z-50 py-1 animate-fade-in">
+                            {searchFieldOptions.map(opt => (
+                                <button
+                                    key={opt.value}
+                                    onClick={() => { setSearchField(opt.value); setSearchTerm(''); setIsSearchFieldOpen(false); }}
+                                    className={`w-full text-left px-3 py-2 text-sm font-medium transition-colors ${searchField === opt.value ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                )}
+            </div>
+            {/* Input */}
             <div className="relative flex-1 flex items-center min-w-0">
                 <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 pointer-events-none shrink-0" />
                 <input
                     type="text"
-                    placeholder={activeTab === 'SPU' ? '搜索产品业务编码、产品名称…' : '搜索SKU编码、产品名称…'}
-                    className="w-full h-full pl-9 pr-8 bg-transparent text-sm outline-none text-gray-900 dark:text-white placeholder:text-gray-400"
+                    placeholder={currentSearchOption.placeholder}
+                    className="w-full h-full pl-8 pr-8 bg-transparent text-sm outline-none text-gray-900 dark:text-white placeholder:text-gray-400"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -288,12 +585,23 @@ const ProductManager: React.FC = () => {
         {/* Filter button — OrderManager style */}
         {activeTab === 'SPU' && (
             <button
-                onClick={() => setIsFilterOpen(v => !v)}
-                className={`relative p-2 rounded-lg border transition shadow-apple ${isFilterOpen || hasActiveFilters ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
+                onClick={() => {
+                    if (!isFilterDrawerOpen && advancedFilters.length === 0) {
+                        const defaults = availableProductFilterFields.map((field, idx) => ({
+                            id: String(idx + 1),
+                            fieldId: field.id,
+                            mode: field.defaultMode,
+                            value: [] as string[],
+                        }));
+                        setAdvancedFilters(defaults);
+                    }
+                    setIsFilterDrawerOpen(!isFilterDrawerOpen);
+                }}
+                className={`relative p-2 rounded-lg border transition shadow-apple ${isFilterDrawerOpen || hasActiveFilters ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
                 title="筛选"
             >
-                <Filter className="w-4 h-4" />
-                {hasActiveFilters && !isFilterOpen && (
+                <SlidersHorizontal className="w-4 h-4" />
+                {hasActiveFilters && !isFilterDrawerOpen && (
                     <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#0071E3] dark:bg-[#0A84FF]" />
                 )}
             </button>
@@ -301,9 +609,9 @@ const ProductManager: React.FC = () => {
 
         {/* Reset button */}
         <button
-            onClick={() => { setSearchTerm(''); setStatusFilter('All'); setFilterProductLine(''); setFilterProductType(''); setFilterProductId(''); setFilterProductName(''); }}
-            className="p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition shadow-apple"
-            title="重置筛选"
+            onClick={() => { setSearchTerm(''); setStatusFilter('All'); clearAdvancedFilters(); }}
+            className="p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-500 dark:text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:border-red-800 dark:hover:text-red-400 transition shadow-apple"
+            title="重置所有筛选"
         >
             <RotateCcw className="w-4 h-4" />
         </button>
@@ -316,194 +624,24 @@ const ProductManager: React.FC = () => {
         )}
       </div>
 
-      {/* Filter popover */}
-      {isFilterOpen && activeTab === 'SPU' && (
-          <>
-              <div className="fixed inset-0 z-40" onClick={() => setIsFilterOpen(false)} />
-              <div className="absolute right-4 top-[60px] w-72 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl z-50 animate-fade-in">
-                  <div className="p-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
-                      <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">筛选条件</span>
-                      {hasActiveFilters && (
-                          <button
-                              onClick={() => { setFilterProductLine(''); setFilterProductType(''); setFilterProductId(''); setFilterProductName(''); }}
-                              className="text-[10px] font-medium text-red-500 hover:text-red-600 transition"
-                          >清除全部</button>
-                      )}
-                  </div>
-                  <div className="p-3 space-y-3">
-                      <div>
-                          <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">产品业务编码</label>
-                          <input
-                              type="text"
-                              value={filterProductId}
-                              onChange={e => setFilterProductId(e.target.value)}
-                              placeholder="输入编码筛选…"
-                              className="w-full h-8 px-2.5 text-sm rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-blue-400 transition"
-                          />
-                      </div>
-                      <div>
-                          <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">产品名称</label>
-                          <input
-                              type="text"
-                              value={filterProductName}
-                              onChange={e => setFilterProductName(e.target.value)}
-                              placeholder="输入名称筛选…"
-                              className="w-full h-8 px-2.5 text-sm rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-blue-400 transition"
-                          />
-                      </div>
-                      <div>
-                          <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">产品条线</label>
-                          <select
-                              value={filterProductLine}
-                              onChange={e => setFilterProductLine(e.target.value)}
-                              className="w-full h-8 px-2 text-sm rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 text-gray-900 dark:text-white outline-none focus:border-blue-400 transition appearance-none cursor-pointer"
-                          >
-                              <option value="">全部</option>
-                              {productLineOptions.map(v => <option key={v} value={v}>{v}</option>)}
-                          </select>
-                      </div>
-                      <div>
-                          <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">产品类型</label>
-                          <select
-                              value={filterProductType}
-                              onChange={e => setFilterProductType(e.target.value)}
-                              className="w-full h-8 px-2 text-sm rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 text-gray-900 dark:text-white outline-none focus:border-blue-400 transition appearance-none cursor-pointer"
-                          >
-                              <option value="">全部</option>
-                              {productTypeOptions.map(v => <option key={v} value={v}>{v}</option>)}
-                          </select>
-                      </div>
-                  </div>
-              </div>
-          </>
-      )}
-
       <div className="unified-card overflow-hidden flex-1 min-h-0 flex flex-col">
 
           {/* SPU (Product) List */}
           {activeTab === 'SPU' && (
-              <>
-                <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 custom-scrollbar">
-                <table className="w-full text-left border-separate border-spacing-0 min-w-[1100px]" style={{ tableLayout: 'fixed' }}>
-                    <colgroup>
-                        <col style={{ width: 44 }} />
-                        <col style={{ width: 280 }} />
-                        <col style={{ width: 160 }} />
-                        <col style={{ width: 90 }} />
-                        <col style={{ width: 120 }} />
-                        <col style={{ width: 120 }} />
-                        <col style={{ width: 140 }} />
-                        <col style={{ width: 100 }} />
-                    </colgroup>
-                    <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E]">
-                    <tr>
-                        <th className="pl-6 pr-2 py-2.5 border-b border-gray-200/50 dark:border-white/10">
-                            <input
-                                type="checkbox"
-                                checked={pageItems.length > 0 && (pageItems as Product[]).every(p => selectedIds.has(p.id))}
-                                onChange={(e) => {
-                                    const ids = (pageItems as Product[]).map(p => p.id);
-                                    setSelectedIds(prev => {
-                                        const next = new Set(prev);
-                                        if (e.target.checked) ids.forEach(id => next.add(id));
-                                        else ids.forEach(id => next.delete(id));
-                                        return next;
-                                    });
-                                }}
-                                className="w-4 h-4 rounded border-gray-300 dark:border-white/20 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                            />
-                        </th>
-                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品业务编码 / 产品名称</th>
-                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品规格</th>
-                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">状态</th>
-                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品一级分类</th>
-                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品二级分类</th>
-                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品条线</th>
-                        <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品类型</th>
-                    </tr>
-                    </thead>
-                    <tbody className="text-sm">
-                    {(pageItems as Product[]).length === 0 ? (
-                        <tr><td colSpan={8} className="p-12 text-center text-gray-400 dark:text-gray-500 text-sm">暂无匹配的产品数据</td></tr>
-                    ) : (pageItems as Product[]).map((product) => (
-                        <tr key={product.id} className={`group cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors border-b border-gray-100/50 dark:border-white/5 last:border-0 ${product.status === 'OffShelf' ? 'opacity-60' : ''}`}>
-                        <td className="pl-6 pr-2 py-2.5" onClick={e => e.stopPropagation()}>
-                            <input
-                                type="checkbox"
-                                checked={selectedIds.has(product.id)}
-                                onChange={() => {
-                                    setSelectedIds(prev => {
-                                        const next = new Set(prev);
-                                        if (next.has(product.id)) next.delete(product.id);
-                                        else next.add(product.id);
-                                        return next;
-                                    });
-                                }}
-                                className="w-4 h-4 rounded border-gray-300 dark:border-white/20 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                            />
-                        </td>
-                        <td className="px-3 py-2.5 max-w-[260px]" onClick={() => navigate(`/products/${product.id}`)}>
-                            <div className="font-mono text-xs text-gray-400 dark:text-gray-500 leading-none mb-1">{product.id}</div>
-                            <span className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline cursor-pointer truncate block leading-snug" title={product.name}>{product.name}</span>
-                        </td>
-                        <td className="px-3 py-2.5 max-w-[160px]">
-                            <span className="text-gray-500 dark:text-gray-400 truncate block" title={product.skus.map(s => s.name).join('、') || undefined}>{product.skus.map(s => s.name).join('、') || '—'}</span>
-                        </td>
-                        <td className="px-3 py-2.5 whitespace-nowrap">
-                            {product.status === 'OnShelf'
-                                ? <span className="unified-tag-green !rounded-full">已上架</span>
-                                : <span className="unified-tag-gray !rounded-full">已下架</span>
-                            }
-                        </td>
-                        <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">{product.productCategory || '—'}</td>
-                        <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">{product.subCategory || '—'}</td>
-                        <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap truncate" title={product.productLine || undefined}>{product.productLine || '—'}</td>
-                        <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">{product.productType || '—'}</td>
-                        </tr>
-                    ))}
-                    </tbody>
-                </table>
-                </div>
-                </>
+              <SPUTable
+                  pageItems={pageItems as Product[]}
+                  selectedIds={selectedIds}
+                  setSelectedIds={setSelectedIds}
+                  navigate={navigate}
+              />
           )}
 
           {/* SKU List */}
           {activeTab === 'SKU' && (
-              <>
-                  <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 custom-scrollbar">
-                  <table className="w-full text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed' }}>
-                      <colgroup>
-                          <col style={{ width: 180 }} />
-                          <col style={{ width: 280 }} />
-                          <col style={{ width: 200 }} />
-                          <col style={{ width: 200 }} />
-                      </colgroup>
-                      <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E]">
-                          <tr>
-                              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">SKU编码</th>
-                              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">产品业务编码 / 产品名称</th>
-                              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">规格</th>
-                              <th className="px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10">授权类型</th>
-                          </tr>
-                      </thead>
-                      <tbody className="text-sm">
-                          {(pageItems as (ProductSku & { parentName: string; parentId: string })[]).length === 0 ? (
-                              <tr><td colSpan={4} className="py-20 text-center text-gray-400 dark:text-gray-500 text-sm">暂无匹配的规格数据</td></tr>
-                          ) : (pageItems as (ProductSku & { parentName: string; parentId: string })[]).map(sku => (
-                              <tr key={sku.id} className="group hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors border-b border-gray-100/50 dark:border-white/5 last:border-0">
-                                  <td className="px-3 py-2.5 font-mono font-bold text-gray-500 dark:text-gray-400">{sku.code}</td>
-                                  <td className="px-3 py-2.5 max-w-[260px]" onClick={() => navigate(`/products/${sku.parentId}`)}>
-                                      <div className="font-mono text-xs text-gray-400 dark:text-gray-500 leading-none mb-1">{sku.parentId}</div>
-                                      <span className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline cursor-pointer truncate block leading-snug" title={sku.parentName}>{sku.parentName}</span>
-                                  </td>
-                                  <td className="px-3 py-2.5 font-medium text-gray-900 dark:text-white">{sku.name}</td>
-                                  <td className="px-3 py-2.5 text-gray-700 dark:text-gray-300">{sku.pricingOptions?.map(o => o.title).join('、') || '—'}</td>
-                              </tr>
-                          ))}
-                      </tbody>
-                  </table>
-                  </div>
-              </>
+              <SKUTable
+                  pageItems={pageItems as (ProductSku & { parentName: string; parentId: string })[]}
+                  navigate={navigate}
+              />
           )}
 
 
@@ -533,6 +671,86 @@ const ProductManager: React.FC = () => {
               />
           </div>
       </div>
+
+      {/* Advanced Filter Drawer — OrderManager style */}
+      {isFilterDrawerOpen && (
+          <ModalPortal>
+              <div className="fixed inset-0 z-[500] flex justify-end">
+                  <div className={`absolute inset-0 bg-black/30 backdrop-blur-[2px] ${isFilterClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'}`} onClick={closeFilterDrawer} />
+                  <div className={`relative w-[380px] max-w-[90vw] h-full bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col ${isFilterClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
+                      {/* Header */}
+                      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/10 shrink-0">
+                          <h3 className="text-base font-bold text-gray-900 dark:text-white">筛选条件</h3>
+                          <button onClick={closeFilterDrawer} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">
+                              <X className="w-4 h-4" />
+                          </button>
+                      </div>
+
+                      {/* Filter body */}
+                      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                          {advancedFilters.map((filter) => {
+                              const fieldDef = availableProductFilterFields.find(f => f.id === filter.fieldId);
+                              if (!fieldDef) return null;
+                              const options = getFilterOptions(filter.fieldId);
+                              const selectedVals = Array.isArray(filter.value) ? filter.value as string[] : [];
+                              return (
+                                  <div key={filter.id} className="rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
+                                      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 dark:bg-white/5">
+                                          <span className="text-xs font-bold text-gray-600 dark:text-gray-300">{fieldDef.label}</span>
+                                          <div className="flex items-center gap-2">
+                                              {selectedVals.length > 0 && (
+                                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-bold">{selectedVals.length}</span>
+                                              )}
+                                              <button onClick={() => removeFilterCondition(filter.id)} className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-white/10 text-gray-400 hover:text-red-500 transition">
+                                                  <Trash2 className="w-3 h-3" />
+                                              </button>
+                                          </div>
+                                      </div>
+                                      <div className="px-4 py-3 flex flex-wrap gap-2">
+                                          {options.map(opt => {
+                                              const isSelected = selectedVals.includes(opt.value);
+                                              return (
+                                                  <button
+                                                      key={opt.value}
+                                                      onClick={() => toggleFilterValue(filter.id, opt.value)}
+                                                      className={`px-2.5 py-1.5 text-xs font-medium rounded-lg border transition ${
+                                                          isSelected
+                                                              ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-[#0071E3] dark:text-[#0A84FF]'
+                                                              : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-blue-200 dark:hover:border-blue-700'
+                                                      }`}
+                                                  >
+                                                      {opt.label}
+                                                  </button>
+                                              );
+                                          })}
+                                          {options.length === 0 && (
+                                              <span className="text-xs text-gray-400 italic">暂无可选项</span>
+                                          )}
+                                      </div>
+                                  </div>
+                              );
+                          })}
+                      </div>
+
+                      {/* Footer */}
+                      <div className="px-5 py-4 border-t border-gray-100 dark:border-white/10 flex items-center gap-3 shrink-0">
+                          <button
+                              onClick={clearAdvancedFilters}
+                              className="flex-1 h-9 rounded-lg border border-gray-200 dark:border-white/10 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 transition"
+                          >
+                              重置
+                          </button>
+                          <button
+                              onClick={applyFilters}
+                              className="flex-1 h-9 rounded-lg bg-[#0071E3] dark:bg-[#0A84FF] text-white text-sm font-bold hover:bg-[#0060C0] dark:hover:bg-[#007AEB] transition shadow-apple"
+                          >
+                              应用筛选
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </ModalPortal>
+      )}
 
       {/* SPU Modal */}
       {isModalOpen && (

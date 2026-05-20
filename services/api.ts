@@ -1,4 +1,9 @@
-import type { User, RoleDefinition, Department, Space, SpaceRole, SpaceMember } from '../types';
+import type {
+  User, RoleDefinition, Department, Space, SpaceRole, SpaceMember,
+  Order, Customer, Product, Channel, Opportunity,
+  Contract, Remittance, Invoice, Performance, Authorization, DeliveryInfo,
+  AuthTypeData, SalesOrg,
+} from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -12,14 +17,20 @@ export function setToken(token: string | null) {
 
 export function getToken() { return _token; }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+interface RequestOptions extends RequestInit {
+  /** When true, suppress the global error toast on failure */
+  silent?: boolean;
+}
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { silent, ...fetchOptions } = options;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string> || {}),
+    ...(fetchOptions.headers as Record<string, string> || {}),
   };
   if (_token) headers['Authorization'] = `Bearer ${_token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers, credentials: 'include' });
+  const res = await fetch(`${API_BASE}${path}`, { ...fetchOptions, headers, credentials: 'include' });
 
   if (res.status === 401) {
     setToken(null);
@@ -31,13 +42,18 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     const msg = body.error || `请求失败 (${res.status})`;
-    if (typeof window !== 'undefined') {
+    if (!silent && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('api:error', { detail: msg }));
     }
     throw new Error(msg);
   }
   if (res.status === 204) return undefined as unknown as T;
   return res.json();
+}
+
+/** Same as request but never fires the global error toast */
+function silentRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return request<T>(path, { ...options, silent: true });
 }
 
 // ============================================================================
@@ -56,8 +72,9 @@ export interface PaginationParams {
   size?: number;
 }
 
-/** 把 page/size 等参数序列化为 query string，过滤掉 undefined/空 */
-function buildQuery(params?: Record<string, string | number | boolean | null | undefined>): string {
+type QueryParams = Record<string, string | number | boolean | null | undefined>;
+
+function buildQuery(params?: QueryParams): string {
   if (!params) return '';
   const sp = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -92,7 +109,7 @@ export type RoleUpdatePayload = Partial<Omit<RoleDefinition, 'id' | 'isSystem'>>
 
 export const userApi = {
   list: (params?: UserListParams) =>
-    request<PaginatedResult<User>>(`/users${buildQuery(params as Record<string, string | number | boolean | null | undefined>)}`),
+    request<PaginatedResult<User>>(`/users${buildQuery(params as QueryParams)}`),
   get: (id: string) => request<User>(`/users/${id}`),
   update: (id: string, data: UserUpdatePayload) =>
     request<User>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -122,14 +139,14 @@ export interface OrderListParams extends PaginationParams {
 
 export const orderApi = {
   list: (params?: OrderListParams) =>
-    request<PaginatedResult<any>>(`/orders${buildQuery(params as any)}`),
-  get: (id: string) => request<any>(`/orders/${id}`),
-  create: (data: any) => request<any>('/orders', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => request<any>(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    request<PaginatedResult<Order>>(`/orders${buildQuery(params as QueryParams)}`),
+  get: (id: string) => request<Order>(`/orders/${id}`),
+  create: (data: Partial<Order>) => request<Order>('/orders', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Order>) => request<Order>(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => request<void>(`/orders/${id}`, { method: 'DELETE' }),
-  logs: (id: string) => request<any[]>(`/orders/${id}/logs`),
+  logs: (id: string) => request<{ id: number; action: string; detail: string; createdAt: string }[]>(`/orders/${id}/logs`),
   subUnitList: (params?: { keyword?: string; page?: number; size?: number }) =>
-    request<PaginatedResult<any>>(`/orders/sub-units/list${buildQuery(params as any)}`),
+    request<PaginatedResult<Record<string, unknown>>>(`/orders/sub-units/list${buildQuery(params as QueryParams)}`),
 };
 
 // ---- Customers ----
@@ -144,10 +161,10 @@ export interface CustomerListParams extends PaginationParams {
 
 export const customerApi = {
   list: (params?: CustomerListParams) =>
-    request<PaginatedResult<any>>(`/customers${buildQuery(params as any)}`),
-  get: (id: string) => request<any>(`/customers/${id}`),
-  create: (data: any) => request<any>('/customers', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => request<any>(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    request<PaginatedResult<Customer>>(`/customers${buildQuery(params as QueryParams)}`),
+  get: (id: string) => request<Customer>(`/customers/${id}`),
+  create: (data: Partial<Customer>) => request<Customer>('/customers', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Customer>) => request<Customer>(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => request<void>(`/customers/${id}`, { method: 'DELETE' }),
 };
 
@@ -160,27 +177,34 @@ export interface ProductListParams extends PaginationParams {
 
 export const productApi = {
   list: (params?: ProductListParams) =>
-    request<PaginatedResult<any>>(`/products${buildQuery(params as any)}`),
-  get: (id: string) => request<any>(`/products/${id}`),
-  create: (data: any) => request<any>('/products', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => request<any>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    request<PaginatedResult<Product>>(`/products${buildQuery(params as QueryParams)}`),
+  get: (id: string) => request<Product>(`/products/${id}`),
+  create: (data: Partial<Product>) => request<Product>('/products', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Product>) => request<Product>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => request<void>(`/products/${id}`, { method: 'DELETE' }),
-  channels: () => request<any[]>('/products/meta/channels'),
-  opportunities: () => request<any[]>('/products/meta/opportunities'),
+  channels: () => request<Channel[]>('/products/meta/channels'),
+  opportunities: () => request<Opportunity[]>('/products/meta/opportunities'),
 };
 
 // ---- Channels ----
+export interface ChannelListParams extends PaginationParams {
+  search?: string;
+  type?: string;
+  level?: string;
+  status?: string;
+}
+
 export const channelApi = {
-  list: (params?: { page?: number; size?: number; search?: string; type?: string; level?: string; status?: string }) =>
-    request<{ data: any[]; total: number }>(`/channels${buildQuery(params as any)}`),
-  get: (id: string) => request<any>(`/channels/${id}`),
-  create: (data: any) => request<any>('/channels', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => request<any>(`/channels/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  list: (params?: ChannelListParams) =>
+    request<PaginatedResult<Channel>>(`/channels${buildQuery(params as QueryParams)}`),
+  get: (id: string) => request<Channel>(`/channels/${id}`),
+  create: (data: Partial<Channel>) => request<Channel>('/channels', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Channel>) => request<Channel>(`/channels/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => request<void>(`/channels/${id}`, { method: 'DELETE' }),
   users: (channelId: string) => request<User[]>(`/channels/${channelId}/users`),
 };
 
-// ---- 销售易 CRM（OAuth 由浏览器整页跳转 /api/crm/xsy/login，回调 #/crm-callback）----
+// ---- 销售易 CRM ----
 export interface CrmXsyStatus {
   enabled: boolean;
   bound: boolean;
@@ -188,27 +212,22 @@ export interface CrmXsyStatus {
 
 export const crmXsyApi = {
   status: () => request<CrmXsyStatus>('/crm/xsy/status'),
-  /** 将销售易 account 同步写入本地 customers 表（需已授权） */
   syncCustomers: () =>
     request<{ synced: number; total: number }>('/crm/xsy/sync-customers', { method: 'POST' }),
 };
 
-/**
- * 构建销售易 OAuth 登录入口 URL（需已登录 JWT）。
- * 与 `CRM_XSY_REDIRECT_URI` 对应的后端 `/api/crm/xsy/callback` 换票后，会 302 回前端 `/#/crm-callback`。
- */
 export function buildCrmXsyOAuthLoginUrl(redirectPath = '/customers'): string {
   const token = getToken();
   if (!token) return '';
   const apiBase = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
-  const path = '/crm/xsy/login';
+  const p = '/crm/xsy/login';
   const safeRedirect = redirectPath.startsWith('/') && !redirectPath.startsWith('//') ? redirectPath : '/customers';
   const qs = new URLSearchParams({ token, redirect: safeRedirect }).toString();
   if (typeof window === 'undefined') return '';
   if (apiBase.startsWith('http')) {
-    return `${apiBase}${path}?${qs}`;
+    return `${apiBase}${p}?${qs}`;
   }
-  return `${window.location.origin}${apiBase}${path}?${qs}`;
+  return `${window.location.origin}${apiBase}${p}?${qs}`;
 }
 
 // ---- Opportunities ----
@@ -221,10 +240,10 @@ export interface OpportunityListParams extends PaginationParams {
 
 export const opportunityApi = {
   list: (params?: OpportunityListParams) =>
-    request<PaginatedResult<any>>(`/opportunities${buildQuery(params as any)}`),
-  get: (id: string) => request<any>(`/opportunities/${id}`),
-  create: (data: any) => request<any>('/opportunities', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => request<any>(`/opportunities/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    request<PaginatedResult<Opportunity>>(`/opportunities${buildQuery(params as QueryParams)}`),
+  get: (id: string) => request<Opportunity>(`/opportunities/${id}`),
+  create: (data: Partial<Opportunity>) => request<Opportunity>('/opportunities', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Opportunity>) => request<Opportunity>(`/opportunities/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => request<void>(`/opportunities/${id}`, { method: 'DELETE' }),
 };
 
@@ -240,19 +259,19 @@ export interface FinanceListParams extends PaginationParams {
   [key: string]: string | number | boolean | null | undefined;
 }
 
-function financeList<T = any>(resource: string) {
+function financeList<T>(resource: string) {
   return (params?: FinanceListParams) =>
-    request<PaginatedResult<T>>(`/finance/${resource}${buildQuery(params as Record<string, string | number | boolean | null | undefined>)}`);
+    request<PaginatedResult<T>>(`/finance/${resource}${buildQuery(params as QueryParams)}`);
 }
 
 export const financeApi = {
-  contracts: financeList('contracts'),
-  remittances: financeList('remittances'),
-  invoices: financeList('invoices'),
-  performances: financeList('performances'),
-  authorizations: financeList('authorizations'),
-  deliveryInfos: financeList('delivery-infos'),
-  auditLogs: financeList('audit-logs'),
+  contracts: financeList<Contract>('contracts'),
+  remittances: financeList<Remittance>('remittances'),
+  invoices: financeList<Invoice>('invoices'),
+  performances: financeList<Performance>('performances'),
+  authorizations: financeList<Authorization>('authorizations'),
+  deliveryInfos: financeList<DeliveryInfo>('delivery-infos'),
+  auditLogs: financeList<{ id: number; userId: string; userName: string; action: string; resource: string; resourceId: string; detail: string; createdAt: string }>('audit-logs'),
 };
 
 // ---- Spaces ----
@@ -262,7 +281,7 @@ export type SpaceRoleCreatePayload = Partial<Omit<SpaceRole, 'id' | 'spaceId'>>;
 export type SpaceRoleUpdatePayload = Partial<Omit<SpaceRole, 'id' | 'spaceId'>>;
 
 export const spaceApi = {
-  list: () => request<Space[]>('/spaces'),
+  list: (opts?: { silent?: boolean }) => opts?.silent ? silentRequest<Space[]>('/spaces') : request<Space[]>('/spaces'),
   get: (id: string) => request<Space>(`/spaces/${id}`),
   create: (data: SpaceCreatePayload) =>
     request<Space>('/spaces', { method: 'POST', body: JSON.stringify(data) }),
@@ -287,17 +306,70 @@ export const spaceApi = {
     request<void>(`/spaces/${spaceId}/members/${memberId}`, { method: 'DELETE' }),
 };
 
+// ---- Audit Logs ----
+export interface AuditLogListParams extends PaginationParams {
+  resource?: string;
+  action?: string;
+  userId?: string;
+}
+
+export interface AuditLogEntry {
+  id: number;
+  userId: string;
+  userName: string;
+  action: string;
+  resource: string;
+  resourceId: string;
+  detail: string | null;
+  createdAt: string;
+}
+
+export const auditApi = {
+  list: (params?: AuditLogListParams) =>
+    request<PaginatedResult<AuditLogEntry>>(`/audit${buildQuery(params as QueryParams)}`),
+};
+
+// ---- Notifications ----
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
+export const notificationApi = {
+  list: (opts?: { silent?: boolean }) => opts?.silent
+    ? silentRequest<{ data: Notification[]; unreadCount: number }>('/notifications')
+    : request<{ data: Notification[]; unreadCount: number }>('/notifications'),
+  markRead: (id: string) =>
+    request<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'PUT' }),
+  markAllRead: () =>
+    request<{ ok: boolean }>(`/notifications/read-all`, { method: 'PUT' }),
+};
+
+// ---- Import ----
+export const importApi = {
+  customers: (items: Record<string, unknown>[]) =>
+    request<{ imported: number; ids: string[] }>('/import/customers', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    }),
+  products: (items: Record<string, unknown>[]) =>
+    request<{ imported: number; ids: string[] }>('/import/products', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    }),
+};
+
 // ---- Health check ----
 export const healthCheck = () => request<{ status: string; time: string }>('/health');
 
-// ============================================================
-// System: 授权类型 & 销售组织
-// ============================================================
-import type { AuthTypeData, SalesOrg } from '../types';
-
+// ---- System: 授权类型 & 销售组织 ----
 export const systemApi = {
-  // 授权类型
-  listAuthTypes: () => request<AuthTypeData[]>('/system/auth-types'),
+  listAuthTypes: (opts?: { silent?: boolean }) => opts?.silent ? silentRequest<AuthTypeData[]>('/system/auth-types') : request<AuthTypeData[]>('/system/auth-types'),
   getAuthType: (id: string) => request<AuthTypeData>(`/system/auth-types/${id}`),
   createAuthType: (data: AuthTypeData) =>
     request<AuthTypeData>('/system/auth-types', { method: 'POST', body: JSON.stringify(data) }),
@@ -306,14 +378,15 @@ export const systemApi = {
   deleteAuthType: (id: string) =>
     request<{ ok: boolean }>(`/system/auth-types/${id}`, { method: 'DELETE' }),
 
-  // 销售组织
-  listSalesOrgs: (params?: { orgType?: string; status?: string; search?: string }) => {
+  listSalesOrgs: (params?: { orgType?: string; status?: string; search?: string; silent?: boolean }) => {
     const q = new URLSearchParams();
     if (params?.orgType) q.set('orgType', params.orgType);
     if (params?.status) q.set('status', params.status);
     if (params?.search) q.set('search', params.search);
     const qs = q.toString();
-    return request<SalesOrg[]>(`/system/sales-orgs${qs ? `?${qs}` : ''}`);
+    return params?.silent
+      ? silentRequest<SalesOrg[]>(`/system/sales-orgs${qs ? `?${qs}` : ''}`)
+      : request<SalesOrg[]>(`/system/sales-orgs${qs ? `?${qs}` : ''}`);
   },
   getSalesOrg: (id: string) => request<SalesOrg>(`/system/sales-orgs/${id}`),
   createSalesOrg: (data: SalesOrg) =>

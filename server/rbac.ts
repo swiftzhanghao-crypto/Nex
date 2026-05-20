@@ -1,5 +1,8 @@
 import type { AuthRequest } from './auth.ts';
 import type { Response, NextFunction } from 'express';
+import { createLogger } from './logger.ts';
+
+const log = createLogger('rbac');
 
 /**
  * Centralized RBAC permission matrix.
@@ -86,6 +89,9 @@ const PERMISSION_MATRIX: Record<string, string[]> = {
   // --- Finance: Audit Logs ---
   'auditlog:list':       ['Admin', 'Business'],
 
+  // --- System Audit Logs ---
+  'audit:list':          ['Admin'],
+
   // --- Opportunities ---
   'opportunity:list':    ['Admin', 'Sales', 'Business', 'Executive', 'Commerce'],
   'opportunity:read':    ['Admin', 'Sales', 'Business', 'Executive', 'Commerce'],
@@ -110,7 +116,7 @@ export function checkPermission(resource: string, action: string): (req: AuthReq
     }
     const allowedRoles = PERMISSION_MATRIX[key];
     if (!allowedRoles) {
-      console.warn(`[rbac] unknown permission key: ${key}, denying access`);
+      log.warn('unknown permission key, denying access', { key });
       res.status(403).json({ error: '权限未定义' });
       return;
     }

@@ -6,6 +6,7 @@ import type { Subscription, SubscriptionLineProductSnapshot, SubscriptionStatus,
 import { CustomerContact, ContactRole } from '../../types';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext, useEnsureData } from '../../contexts/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { SubscriptionOrderChain } from '../common/SubscriptionOrderChain';
 import {
   subscriptionRollupEndDate,
@@ -45,7 +46,8 @@ function renderSubscriptionCountdown(endDate: string) {
 }
 
 const CustomerDetails: React.FC = () => {
-  const { customers, setCustomers, filteredCustomers, users, currentUser, subscriptions } = useAppContext();
+  const { customers, setCustomers, filteredCustomers, users, subscriptions } = useAppContext();
+  const { currentUser } = useAuth();
   useEnsureData(['customers', 'orders']);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -509,7 +511,7 @@ const CustomerDetails: React.FC = () => {
                               <div key={f.key}>
                                   <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{f.label}{f.required && <span className="text-red-500 ml-0.5">*</span>}</label>
                                   <input
-                                      value={(createEntForm as any)[f.key]}
+                                      value={createEntForm[f.key as keyof typeof createEntForm]}
                                       onChange={e => setCreateEntForm(prev => ({ ...prev, [f.key]: e.target.value }))}
                                       placeholder={f.placeholder}
                                       className="w-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 rounded-xl p-2.5 text-sm outline-none focus:border-[#0071E3] dark:text-white"
@@ -617,7 +619,7 @@ const CustomerDetails: React.FC = () => {
                               <div key={f.key}>
                                   <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{f.label}{f.required && <span className="text-red-500 ml-0.5">*</span>}</label>
                                   <input
-                                      value={(contactForm as any)[f.key]}
+                                      value={contactForm[f.key as 'name' | 'phone' | 'email']}
                                       onChange={e => setContactForm(prev => ({ ...prev, [f.key]: e.target.value }))}
                                       placeholder={f.placeholder}
                                       className="w-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 rounded-xl p-2.5 text-sm outline-none focus:border-[#0071E3] dark:text-white"
@@ -733,7 +735,7 @@ const CustomerDetails: React.FC = () => {
                                   <div key={f.key} className={f.span === 2 ? 'col-span-2' : ''}>
                                       <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{f.label}{f.required && <span className="text-red-500 ml-0.5">*</span>}</label>
                                       <input
-                                          value={(addrForm as any)[f.key]}
+                                          value={addrForm[f.key as keyof typeof addrForm]}
                                           onChange={e => setAddrForm(prev => ({ ...prev, [f.key]: e.target.value }))}
                                           className="w-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 rounded-xl p-2.5 text-sm outline-none focus:border-[#0071E3] dark:text-white"
                                       />
@@ -1142,7 +1144,7 @@ const CustomerDetails: React.FC = () => {
                               { label: '银行账户', key: 'accountNumber', placeholder: '请输入银行账户号码' },
                               { label: '开户银行', key: 'bankName', placeholder: '请输入开户银行名称' },
                           ].map(f => {
-                              const val = (invoiceForm as any)[f.key];
+                              const val = invoiceForm[f.key as keyof typeof invoiceForm];
                               const invalid = invoiceFormTouched && !val;
                               return (
                                   <div key={f.key}>

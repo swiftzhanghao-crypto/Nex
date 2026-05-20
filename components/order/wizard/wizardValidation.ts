@@ -1,4 +1,4 @@
-import type { BuyerType, OrderSource, OrderItem } from '../../../types';
+import type { BuyerType, OrderSource, OrderItem, CustomerContact } from '../../../types';
 
 export interface ValidationError {
   field: string;
@@ -16,9 +16,9 @@ export interface WizardFormState {
   newOrderCustomer: string;
   orderEnterpriseId: string;
   selectedChannelId: string;
-  purchasingContacts: any[];
+  purchasingContacts: CustomerContact[];
   selectedPurchasingContactId: string;
-  itContacts: any[];
+  itContacts: CustomerContact[];
   selectedItContactId: string;
   isAgentOrder: boolean;
   agentCode: string;
@@ -114,12 +114,12 @@ export function validateStep3(state: Pick<WizardFormState, 'newOrderItems'>): Va
       errors.push({ field: `item_${idx}_price`, message: `产品"${item.productName}"的价格不能为负数`, step: 3 });
     }
     if (item.subUnitAuthMode && item.subUnitAuthMode !== 'none' && item.subUnits && item.subUnits.length > 0) {
-      const subs = item.subUnits as any[];
-      const subTotal = subs.reduce((s: number, u: any) => s + (parseInt(u.authCount) || 0), 0);
+      const subs = item.subUnits ?? [];
+      const subTotal = subs.reduce((s, u) => s + (parseInt(String(u.authCount), 10) || 0), 0);
       if (subTotal !== item.quantity) {
         errors.push({ field: `item_${idx}_subUnits`, message: `产品"${item.productName}"的下级单位授权合计(${subTotal})与数量(${item.quantity})不一致`, step: 3 });
       }
-      const emptyUnit = subs.find((u: any) => !u.unitName || !u.enterpriseId || !u.authCount || !u.itContact || !u.phone);
+      const emptyUnit = subs.find(u => !u.unitName || !u.enterpriseId || !u.authCount || !u.itContact || !u.phone);
       if (emptyUnit) {
         errors.push({ field: `item_${idx}_subUnitFields`, message: `产品"${item.productName}"的下级单位存在未填写的必填字段`, step: 3 });
       }

@@ -9,6 +9,7 @@
 import { Router, type Request, type Response } from 'express';
 import crypto from 'crypto';
 import { getDb } from '../db.ts';
+import { createLogger } from '../logger.ts';
 import {
   hashPassword,
   createSsoSession,
@@ -21,7 +22,39 @@ import {
   cleanupExpiredSessions,
   type AuthRequest,
 } from '../auth.ts';
+
+const log = createLogger('wps-auth');
 import { parseRoles } from '../utils.ts';
+
+interface WpsUserApiData {
+  id: string;
+  user_name?: string;
+  name?: string;
+  nick_name?: string;
+  avatar?: string;
+  avatar_url?: string;
+  company_id?: string;
+  email?: string;
+  phone?: string;
+  mobile?: string;
+  department_name?: string;
+  dept_name?: string;
+}
+
+interface UserRow {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  role: string;
+  avatar: string | null;
+}
+
+type SqlParam = string | number | null;
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
 const router = Router();
 
@@ -131,7 +164,7 @@ async function fetchWpsCurrentUser(accessToken: string): Promise<WpsUserData> {
   const r = await fetch(`${WPS_BASE}/v7/users/current`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  const j = (await r.json()) as { code?: number; msg?: string; data?: any };
+  const j = (await r.json()) as { code?: number; msg?: string; data?: WpsUserApiData };
   if (!r.ok || j.code !== 0 || !j.data?.id) {
     throw new Error(j.msg || '获取 WPS 用户信息失败');
   }
@@ -154,11 +187,11 @@ function safeEmailLocal(wpsUserId: string): string {
 
 function findOrCreateLocalUser(wpsUser: WpsUserData): { id: string; role: string; isNew: boolean } {
   const db = getDb();
-  const existing = db.prepare('SELECT * FROM users WHERE wps_user_id = ?').get(wpsUser.id) as any;
+  const existing = db.prepare('SELECT * FROM users WHERE wps_user_id = ?').get(wpsUser.id) as UserRow | undefined;
   if (existing) {
     // 每次 SSO 登录都同步最新信息
     const updates: string[] = [];
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     if (wpsUser.user_name && wpsUser.user_name !== existing.name) {
       updates.push('name = ?');
@@ -199,7 +232,7 @@ function findOrCreateLocalUser(wpsUser: WpsUserData): { id: string; role: string
      VALUES (?, ?, ?, ?, ?, ?, ?, 'Internal', 'Active', ?, NULL, NULL, ?)`,
   ).run(id, accountId, displayName, email, wpsUser.phone ?? null, passwordPlaceholder, roleJson, wpsUser.avatar ?? null, wpsUser.id);
 
-  console.log(`[wps-auth] 自动注册 SSO 用户: ${displayName} (${email}), wps_id=${wpsUser.id}`);
+  log.info('自动注册 SSO 用户', { name: displayName, email, wpsId: wpsUser.id });
   return { id, role: roleJson, isNew: true };
 }
 
@@ -251,9 +284,9 @@ router.get('/wps/callback', async (req, res) => {
 
     // 直接 302 到前端目标路径，不再通过 sso-callback 中转传 JWT
     res.redirect(302, `${FRONTEND_URL}/#${entry.redirect}`);
-  } catch (e: any) {
-    console.error('[wps-auth/callback]', e?.message || e);
-    redirectToFrontendError(res, e?.message || 'WPS 登录失败');
+  } catch (e: unknown) {
+    log.error('callback failed', { message: errorMessage(e) });
+    redirectToFrontendError(res, errorMessage(e) || 'WPS 登录失败');
   }
 });
 

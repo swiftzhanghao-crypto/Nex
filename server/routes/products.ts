@@ -6,13 +6,74 @@ import { buildRowPermissionWhere, checkRowPermissionForSingle } from '../rowPerm
 import { safeJsonParse, getUserName, safePagination } from '../utils.ts';
 import { validateBody, productCreateSchema, productUpdateSchema } from '../validate.ts';
 
+type SqlParam = string | number | null;
+
+interface ProductRow {
+  id: string;
+  name: string;
+  category: string;
+  sub_category: string | null;
+  description: string | null;
+  status: string;
+  tags: string;
+  skus: string;
+  composition: string;
+  install_pkgs: string;
+  license_tpl: string | null;
+  product_type: string | null;
+  online_delivery: string | null;
+  product_class: string | null;
+  product_classification: string | null;
+  product_series: string | null;
+  product_line: string | null;
+  product_category: string | null;
+  product_class_finance: string | null;
+  product_line_finance: string | null;
+  product_series_finance: string | null;
+  business_delivery_name: string | null;
+  sales_org_name: string | null;
+  sales_scope: string;
+  linked_services: string;
+}
+
+interface ChannelRow {
+  id: string;
+  name: string;
+  type: string;
+  level: string;
+  contact_name: string;
+  contact_phone: string;
+  email: string;
+  region: string;
+  status: string;
+  agreement_date: string;
+}
+
+interface OpportunityRow {
+  id: string;
+  crm_id: string | null;
+  name: string;
+  customer_id: string;
+  customer_name: string;
+  product_type: string | null;
+  stage: string;
+  probability: number;
+  amount: number | null;
+  expected_revenue: number;
+  final_user_rev: number | null;
+  close_date: string;
+  owner_id: string;
+  owner_name: string;
+  created_at: string;
+}
+
 const router = Router();
 router.use(authMiddleware);
 
-function toProduct(row: any) {
+function toProduct(row: ProductRow) {
   return {
     id: row.id, name: row.name, category: row.category,
-    subCategory: row.sub_category, description: row.description,
+    subCategory: row.sub_category ?? undefined, description: row.description ?? undefined,
     status: row.status, tags: safeJsonParse(row.tags, []),
     skus: safeJsonParse(row.skus, []),
     composition: safeJsonParse(row.composition, []),
@@ -39,7 +100,7 @@ router.get('/', checkPermission('product', 'list'), (req: AuthRequest, res) => {
   const { category, status, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   const conds: string[] = ['1=1'];
-  const params: any[] = [];
+  const params: SqlParam[] = [];
 
   if (category) { conds.push('category = ?'); params.push(category); }
   if (status) { conds.push('status = ?'); params.push(status); }
@@ -58,13 +119,13 @@ router.get('/', checkPermission('product', 'list'), (req: AuthRequest, res) => {
 
   const { limit, offset, pageNum } = safePagination(page, size);
   const rows = db.prepare(`SELECT * FROM products${whereSql} ORDER BY name LIMIT ? OFFSET ?`)
-    .all(...whereParams, limit, offset);
+    .all(...whereParams, limit, offset) as ProductRow[];
 
   res.json({ data: rows.map(toProduct), total, page: pageNum, size: limit });
 });
 
 router.get('/meta/channels', (_req, res) => {
-  const rows = getDb().prepare('SELECT * FROM channels ORDER BY name').all() as any[];
+  const rows = getDb().prepare('SELECT * FROM channels ORDER BY name').all() as ChannelRow[];
   res.json(rows.map(r => ({
     id: r.id, name: r.name, type: r.type, level: r.level,
     contactName: r.contact_name, contactPhone: r.contact_phone,
@@ -74,7 +135,7 @@ router.get('/meta/channels', (_req, res) => {
 });
 
 router.get('/meta/opportunities', (_req, res) => {
-  const rows = getDb().prepare('SELECT * FROM opportunities ORDER BY close_date DESC').all() as any[];
+  const rows = getDb().prepare('SELECT * FROM opportunities ORDER BY close_date DESC').all() as OpportunityRow[];
   res.json(rows.map(r => ({
     id: r.id, crmId: r.crm_id, name: r.name, customerId: r.customer_id,
     customerName: r.customer_name, productType: r.product_type,
@@ -87,7 +148,7 @@ router.get('/meta/opportunities', (_req, res) => {
 
 router.get('/:id', checkPermission('product', 'read'), (req: AuthRequest, res) => {
   const db = getDb();
-  const row = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
+  const row = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id) as ProductRow | undefined;
   if (!row) { res.status(404).json({ error: '产品不存在' }); return; }
   const product = toProduct(row);
   if (!checkRowPermissionForSingle(db, req.user!, 'Product', product)) {
@@ -122,7 +183,7 @@ router.post('/', checkPermission('product', 'create'), validateBody(productCreat
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, userName, 'CREATE', 'Product', id, `创建产品 ${p.name}`);
 
-  const row = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
+  const row = db.prepare('SELECT * FROM products WHERE id = ?').get(id) as ProductRow;
   res.status(201).json(toProduct(row));
 });
 
@@ -151,7 +212,7 @@ router.put('/:id', checkPermission('product', 'update'), validateBody(productUpd
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, userName, 'UPDATE', 'Product', req.params.id, `更新产品 ${p.name}`);
 
-  const row = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
+  const row = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id) as ProductRow;
   res.json(toProduct(row));
 });
 

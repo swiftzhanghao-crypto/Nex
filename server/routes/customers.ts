@@ -1,121 +1,66 @@
 import { Router } from 'express';
-import { getDb } from '../db.ts';
 import { authMiddleware, type AuthRequest } from '../auth.ts';
 import { checkPermission } from '../rbac.ts';
-import { buildRowPermissionWhere, checkRowPermissionForSingle } from '../rowPermissionFilter.ts';
 import { validateBody, customerCreateSchema, customerUpdateSchema } from '../validate.ts';
-import { safeJsonParse, safePagination, getUserName } from '../utils.ts';
+import { CustomerService } from '../services/CustomerService.ts';
 
 const router = Router();
 router.use(authMiddleware);
 
-function toCustomer(row: any) {
-  return {
-    id: row.id, companyName: row.company_name, industry: row.industry,
-    customerType: row.customer_type, level: row.level, region: row.region,
-    address: row.address, shippingAddress: row.shipping_address,
-    status: row.status, logo: row.logo,
-    contacts: safeJsonParse(row.contacts, []),
-    billingInfo: row.billing_info ? safeJsonParse(row.billing_info) : undefined,
-    ownerId: row.owner_id, ownerName: row.owner_name,
-    enterprises: safeJsonParse(row.enterprises, []),
-    nextFollowUpDate: row.next_follow_up,
-  };
-}
+const customerService = new CustomerService();
 
-router.get('/', checkPermission('customer', 'list'), (req: AuthRequest, res) => {
-  const { type, level, status, search, industry, region, page = '1', size = '50' } = req.query as Record<string, string>;
-  const db = getDb();
-  const conds: string[] = ['1=1'];
-  const params: any[] = [];
-
-  if (type) { conds.push('customer_type = ?'); params.push(type); }
-  if (level) { conds.push('level = ?'); params.push(level); }
-  if (status) { conds.push('status = ?'); params.push(status); }
-  if (industry) { conds.push('industry = ?'); params.push(industry); }
-  if (region) { conds.push('region = ?'); params.push(region); }
-  if (search && search.trim()) {
-    conds.push('(company_name LIKE ? OR id LIKE ?)');
-    const k = `%${search.trim()}%`;
-    params.push(k, k);
+router.get('/', checkPermission('customer', 'list'), async (req: AuthRequest, res) => {
+  try {
+    const result = await customerService.getCustomers(
+      req.query as Record<string, string>,
+      req.user!
+    );
+    res.json(result);
+  } catch (err: any) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || '获取客户列表失败' });
   }
-
-  const rowPerm = buildRowPermissionWhere(db, req.user!, 'Customer');
-  const whereSql = ' WHERE ' + conds.join(' AND ') + rowPerm.sql;
-  const whereParams = [...params, ...rowPerm.params];
-
-  const totalRow = db.prepare(`SELECT COUNT(*) AS c FROM customers${whereSql}`).get(...whereParams) as { c: number };
-  const total = totalRow?.c ?? 0;
-
-  const { limit, offset, pageNum } = safePagination(page, size);
-  const rows = db.prepare(`SELECT * FROM customers${whereSql} ORDER BY company_name LIMIT ? OFFSET ?`)
-    .all(...whereParams, limit, offset);
-
-  res.json({ data: rows.map(toCustomer), total, page: pageNum, size: limit });
 });
 
-router.get('/:id', checkPermission('customer', 'read'), (req: AuthRequest, res) => {
-  const db = getDb();
-  const row = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.params.id);
-  if (!row) { res.status(404).json({ error: '客户不存在' }); return; }
-  const customer = toCustomer(row);
-  if (!checkRowPermissionForSingle(db, req.user!, 'Customer', customer)) {
-    res.status(403).json({ error: '无权查看此客户' });
-    return;
+router.get('/:id', checkPermission('customer', 'read'), async (req: AuthRequest, res) => {
+  try {
+    const customer = await customerService.getCustomerById(req.params.id as string, req.user!);
+    res.json(customer);
+  } catch (err: any) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || '获取客户失败' });
   }
-  res.json(customer);
 });
 
-router.post('/', checkPermission('customer', 'create'), validateBody(customerCreateSchema), (req: AuthRequest, res) => {
-  const db = getDb();
-  const c = req.body;
-  const id = c.id || `C${Date.now().toString().slice(-8)}`;
-
-  db.prepare(`
-    INSERT INTO customers (id, company_name, industry, customer_type, level, region, address, shipping_address, status, logo, contacts, billing_info, owner_id, owner_name, enterprises, next_follow_up)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, c.companyName, c.industry, c.customerType, c.level, c.region,
-    c.address || '', c.shippingAddress || '', c.status || 'Active', c.logo ?? null,
-    JSON.stringify(c.contacts || []), c.billingInfo ? JSON.stringify(c.billingInfo) : null,
-    c.ownerId ?? null, c.ownerName ?? null, JSON.stringify(c.enterprises || []),
-    c.nextFollowUpDate ?? null);
-
-  const userName = getUserName(db, req.user!.userId);
-  db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, userName, 'CREATE', 'Customer', id, `创建客户 ${c.companyName}`);
-
-  const row = db.prepare('SELECT * FROM customers WHERE id = ?').get(id);
-  res.status(201).json(toCustomer(row));
+router.post('/', checkPermission('customer', 'create'), validateBody(customerCreateSchema), async (req: AuthRequest, res) => {
+  try {
+    const id = req.body.id || `C${Date.now().toString().slice(-8)}`;
+    const customer = await customerService.createCustomer(id, req.body, req.user!);
+    res.status(201).json(customer);
+  } catch (err: any) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || '创建客户失败' });
+  }
 });
 
-router.put('/:id', checkPermission('customer', 'update'), validateBody(customerUpdateSchema), (req: AuthRequest, res) => {
-  const db = getDb();
-  const c = req.body;
-
-  const existing = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.params.id);
-  if (!existing) { res.status(404).json({ error: '客户不存在' }); return; }
-
-  db.prepare(`
-    UPDATE customers SET company_name=?, industry=?, customer_type=?, level=?, region=?, address=?, shipping_address=?, status=?, logo=?, contacts=?, billing_info=?, owner_id=?, owner_name=?, enterprises=?, next_follow_up=?, updated_at=datetime('now')
-    WHERE id=?
-  `).run(c.companyName, c.industry, c.customerType, c.level, c.region,
-    c.address || '', c.shippingAddress || '', c.status, c.logo ?? null,
-    JSON.stringify(c.contacts || []), c.billingInfo ? JSON.stringify(c.billingInfo) : null,
-    c.ownerId ?? null, c.ownerName ?? null, JSON.stringify(c.enterprises || []),
-    c.nextFollowUpDate ?? null, req.params.id);
-
-  const row = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.params.id);
-  res.json(toCustomer(row));
+router.put('/:id', checkPermission('customer', 'update'), validateBody(customerUpdateSchema), async (req: AuthRequest, res) => {
+  try {
+    const customer = await customerService.updateCustomer(req.params.id as string, req.body, req.user!);
+    res.json(customer);
+  } catch (err: any) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || '更新客户失败' });
+  }
 });
 
-router.delete('/:id', checkPermission('customer', 'delete'), (req: AuthRequest, res) => {
-  const db = getDb();
-  const { changes } = db.prepare('DELETE FROM customers WHERE id = ?').run(req.params.id);
-  if (!changes) { res.status(404).json({ error: '客户不存在' }); return; }
-  const userName = getUserName(db, req.user!.userId);
-  db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user!.userId, userName, 'DELETE', 'Customer', req.params.id, `删除客户 ${req.params.id}`);
-  res.json({ ok: true });
+router.delete('/:id', checkPermission('customer', 'delete'), async (req: AuthRequest, res) => {
+  try {
+    await customerService.deleteCustomer(req.params.id as string, req.user!);
+    res.json({ ok: true });
+  } catch (err: any) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || '删除客户失败' });
+  }
 });
 
 export default router;

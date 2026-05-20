@@ -26,6 +26,44 @@ export function validateBody<T extends ZodTypeAny>(schema: T) {
 const idStr = z.string().min(1).max(64);
 const optStr = (max = 256) => z.string().max(max).optional().nullable();
 
+const jsonRecord = z.record(z.string(), z.unknown());
+const contactSchema = z.object({
+  name: z.string().max(100).optional(),
+  phone: z.string().max(30).optional(),
+  email: z.string().max(100).optional(),
+  role: z.string().max(40).optional(),
+}).passthrough();
+const enterpriseSchema = z.object({
+  id: z.string().max(64).optional(),
+  name: z.string().max(200).optional(),
+}).passthrough();
+const skuSchema = z.object({
+  id: z.string().max(64).optional(),
+  name: z.string().max(200).optional(),
+  price: z.number().optional(),
+}).passthrough();
+const compositionSchema = z.object({
+  componentId: z.string().max(64).optional(),
+  quantity: z.number().optional(),
+}).passthrough();
+const installPkgSchema = z.object({
+  id: z.string().max(64).optional(),
+  name: z.string().max(200).optional(),
+}).passthrough();
+const rightSchema = z.object({
+  id: z.string().max(64).optional(),
+  name: z.string().max(200).optional(),
+}).passthrough();
+const permNodeSchema = z.object({
+  id: z.string().max(64).optional(),
+  label: z.string().max(200).optional(),
+}).passthrough();
+const rowPermSchema = z.object({
+  field: z.string().max(100).optional(),
+  operator: z.string().max(40).optional(),
+  value: z.unknown().optional(),
+}).passthrough();
+
 const subUnitSchema = z.object({
   id: z.string().max(64),
   unitName: z.string().min(1, '下级单位名称不能为空').max(200),
@@ -69,15 +107,15 @@ export const orderCreateSchema = z.object({
   deliveryMethod: optStr(),
   paymentMethod: optStr(),
   paymentTerms: optStr(),
-  approval: z.record(z.string(), z.any()).optional(),
-  approvalRecords: z.array(z.any()).optional(),
+  approval: jsonRecord.optional(),
+  approvalRecords: z.array(jsonRecord).optional(),
   salesRepId: optStr(64),
   salesRepName: optStr(),
   businessManagerId: optStr(64),
   businessManagerName: optStr(),
-  invoiceInfo: z.record(z.string(), z.any()).optional(),
-  acceptanceInfo: z.record(z.string(), z.any()).optional(),
-  acceptanceConfig: z.record(z.string(), z.any()).optional(),
+  invoiceInfo: jsonRecord.optional(),
+  acceptanceInfo: jsonRecord.optional(),
+  acceptanceConfig: jsonRecord.optional(),
   opportunityId: optStr(64),
   opportunityName: optStr(),
   originalOrderId: optStr(64),
@@ -95,11 +133,11 @@ export const customerCreateSchema = z.object({
   shippingAddress: z.string().max(500).optional(),
   status: z.string().max(40).optional(),
   logo: optStr(500),
-  contacts: z.array(z.any()).max(200).optional(),
-  billingInfo: z.record(z.string(), z.any()).optional(),
+  contacts: z.array(contactSchema).max(200).optional(),
+  billingInfo: jsonRecord.optional(),
   ownerId: optStr(64),
   ownerName: optStr(),
-  enterprises: z.array(z.any()).max(200).optional(),
+  enterprises: z.array(enterpriseSchema).max(200).optional(),
   nextFollowUpDate: optStr(40),
 }).passthrough();
 
@@ -124,11 +162,11 @@ export const productCreateSchema = z.object({
   description: optStr(2000),
   status: z.enum(['OnShelf', 'OffShelf']).optional(),
   tags: z.array(z.string().max(40)).max(50).optional(),
-  skus: z.array(z.any()).max(200).optional(),
-  composition: z.array(z.any()).max(200).optional(),
-  installPkgs: z.array(z.any()).max(50).optional(),
-  rights: z.array(z.any()).max(200).optional(),
-  licenseTpl: z.any().optional(),
+  skus: z.array(skuSchema).max(200).optional(),
+  composition: z.array(compositionSchema).max(200).optional(),
+  installPkgs: z.array(installPkgSchema).max(50).optional(),
+  rights: z.array(rightSchema).max(200).optional(),
+  licenseTpl: z.unknown().optional(),
   productType: optStr(80),
   onlineDelivery: optStr(80),
   productClass: optStr(80),
@@ -141,8 +179,8 @@ export const productCreateSchema = z.object({
   productSeriesFinance: optStr(80),
   businessDeliveryName: optStr(200),
   salesOrgName: optStr(200),
-  salesScope: z.array(z.any()).max(200).optional(),
-  linkedServices: z.array(z.any()).max(100).optional(),
+  salesScope: z.array(z.unknown()).max(200).optional(),
+  linkedServices: z.array(z.unknown()).max(100).optional(),
 }).passthrough();
 
 export const productUpdateSchema = productCreateSchema.partial().extend({
@@ -270,16 +308,16 @@ export const invoiceCreateSchema = z.object({
  * - 必填字段不能为空
  * 返回 null 表示通过，否则返回错误信息。
  */
-export function validateSubUnits(items: any[] | undefined): string | null {
+export function validateSubUnits(items: z.infer<typeof orderItemSchema>[] | undefined): string | null {
   if (!items) return null;
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const mode = item.subUnitAuthMode;
     if (!mode || mode === 'none') continue;
-    const subs: any[] = item.subUnits;
+    const subs = item.subUnits;
     if (!subs || subs.length === 0) continue;
 
-    const qty = typeof item.quantity === 'number' ? item.quantity : parseInt(item.quantity);
+    const qty = typeof item.quantity === 'number' ? item.quantity : parseInt(String(item.quantity ?? ''), 10);
     if (!qty || qty <= 0) continue;
 
     let authTotal = 0;
@@ -303,3 +341,102 @@ export function validateSubUnits(items: any[] | undefined): string | null {
   }
   return null;
 }
+
+// ============================================================
+// Spaces
+// ============================================================
+export const spaceCreateSchema = z.object({
+  name: z.string().min(1, '应用名称不能为空').max(200),
+  description: z.string().max(500).optional(),
+  icon: z.string().max(40).optional(),
+  permTree: z.array(permNodeSchema).optional(),
+  resourceConfig: z.array(z.unknown()).optional(),
+  columnConfig: z.array(z.unknown()).optional(),
+  adminUserId: z.string().max(64).optional(),
+});
+
+export const spaceUpdateSchema = spaceCreateSchema.partial();
+
+export const spaceRoleSchema = z.object({
+  name: z.string().min(1, '角色名称不能为空').max(100),
+  description: z.string().max(500).optional(),
+  permissions: z.array(z.string().max(100)).max(500).optional(),
+  rowPermissions: z.array(rowPermSchema).max(200).optional(),
+  rowLogic: jsonRecord.optional(),
+  columnPermissions: z.array(permNodeSchema).max(200).optional(),
+});
+
+export const spaceMemberSchema = z.object({
+  userId: z.string().min(1).max(64),
+  roleId: z.string().min(1).max(64),
+  isAdmin: z.boolean().optional(),
+});
+
+// ============================================================
+// Users
+// ============================================================
+export const userUpdateSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  email: z.string().email().max(100).optional(),
+  phone: z.string().max(30).optional().nullable(),
+  roles: z.array(z.string().max(40)).max(20).optional(),
+  role: z.union([z.string().max(40), z.array(z.string().max(40))]).optional(),
+  userType: z.enum(['Internal', 'External']).optional(),
+  status: z.enum(['Active', 'Inactive']).optional(),
+  departmentId: z.string().max(64).optional().nullable(),
+  channelId: z.string().max(64).optional().nullable(),
+});
+
+export const roleSchema = z.object({
+  name: z.string().min(1, '角色名称不能为空').max(100),
+  description: z.string().max(500).optional(),
+  permissions: z.array(z.string().max(100)).max(1000).optional(),
+  rowPermissions: z.array(rowPermSchema).max(200).optional(),
+  rowLogic: jsonRecord.optional(),
+  columnPermissions: z.array(permNodeSchema).max(200).optional(),
+  appPermissions: jsonRecord.optional(),
+});
+
+// ============================================================
+// AI
+// ============================================================
+export const aiGenerateSchema = z.object({
+  prompt: z.string().min(1, '提示词不能为空').max(10000),
+  context: z.string().max(50000).optional(),
+  maxTokens: z.number().int().min(1).max(8192).optional(),
+}).passthrough(); // 保留 generate-json 所需的 schema、model 等扩展字段
+
+export const aiCategorySuggestSchema = z.object({
+  productName: z.string().min(1).max(500),
+  description: z.string().max(5000).optional(),
+});
+
+// ============================================================
+// Auth
+// ============================================================
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1).max(128),
+});
+
+export const refreshTokenBodySchema = z.object({
+  refreshToken: z.string().min(1),
+});
+
+// ============================================================
+// CRM 销售易
+// ============================================================
+export const crmXsySyncSchema = z.object({
+  limit: z.number().int().positive().max(500).optional(),
+});
+
+// ============================================================
+// Bulk Import
+// ============================================================
+export const customerImportBatchSchema = z.object({
+  items: z.array(customerCreateSchema).min(1).max(500),
+});
+
+export const productImportBatchSchema = z.object({
+  items: z.array(productCreateSchema).min(1).max(500),
+});

@@ -3,6 +3,7 @@ import { Search, ChevronDown, ChevronRight, Eye, Layers, Package, Tag, X, FileTe
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../../types';
 import { useAppContext } from '../../contexts/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 import InstallPackageManager from './InstallPackageManager';
 
 interface CategoryGroup {
@@ -11,7 +12,8 @@ interface CategoryGroup {
 }
 
 const ProductCenter: React.FC = () => {
-  const { filteredProducts: products, currentUser, roles } = useAppContext();
+  const { filteredProducts: products, roles } = useAppContext();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
   const currentUserRole = roles.find(r => currentUser.roles?.includes(r.id));
   const permissions = currentUserRole?.permissions || [];

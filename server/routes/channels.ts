@@ -6,10 +6,39 @@ import { safePagination, getUserName } from '../utils.ts';
 import { validateBody, channelCreateSchema, channelUpdateSchema } from '../validate.ts';
 import { parseRoles } from './users.ts';
 
+type SqlParam = string | number | null;
+
+interface ChannelRow {
+  id: string;
+  name: string;
+  type: string;
+  level: string;
+  contact_name: string;
+  contact_phone: string;
+  email: string;
+  region: string;
+  status: string;
+  agreement_date: string;
+}
+
+interface UserRow {
+  id: string;
+  account_id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  role: string;
+  user_type: string;
+  status: string;
+  avatar: string | null;
+  department_id: string | null;
+  channel_id: string | null;
+}
+
 const router = Router();
 router.use(authMiddleware);
 
-function toChannel(row: any) {
+function toChannel(row: ChannelRow) {
   return {
     id: row.id, name: row.name, type: row.type, level: row.level,
     contactName: row.contact_name, contactPhone: row.contact_phone,
@@ -22,7 +51,7 @@ router.get('/', checkPermission('channel', 'list'), (req, res) => {
   const { type, level, status, region, search, page = '1', size = '50' } = req.query as Record<string, string>;
   const db = getDb();
   let sql = 'SELECT * FROM channels WHERE 1=1';
-  const params: any[] = [];
+  const params: SqlParam[] = [];
 
   if (type) { sql += ' AND type = ?'; params.push(type); }
   if (level) { sql += ' AND level = ?'; params.push(level); }
@@ -37,11 +66,12 @@ router.get('/', checkPermission('channel', 'list'), (req, res) => {
   sql += ' ORDER BY name LIMIT ? OFFSET ?';
   params.push(limit, offset);
 
-  res.json({ data: db.prepare(sql).all(...params).map(toChannel), total, page: pageNum, size: limit });
+  const rows = db.prepare(sql).all(...params) as ChannelRow[];
+  res.json({ data: rows.map(toChannel), total, page: pageNum, size: limit });
 });
 
 router.get('/:id', checkPermission('channel', 'read'), (req, res) => {
-  const row = getDb().prepare('SELECT * FROM channels WHERE id = ?').get(req.params.id);
+  const row = getDb().prepare('SELECT * FROM channels WHERE id = ?').get(req.params.id) as ChannelRow | undefined;
   if (!row) { res.status(404).json({ error: '渠道不存在' }); return; }
   res.json(toChannel(row));
 });
@@ -60,7 +90,7 @@ router.post('/', checkPermission('channel', 'create'), validateBody(channelCreat
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, userName, 'CREATE', 'Channel', id, `创建渠道 ${c.name}`);
 
-  const row = db.prepare('SELECT * FROM channels WHERE id = ?').get(id);
+  const row = db.prepare('SELECT * FROM channels WHERE id = ?').get(id) as ChannelRow;
   res.status(201).json(toChannel(row));
 });
 
@@ -81,13 +111,13 @@ router.put('/:id', checkPermission('channel', 'update'), validateBody(channelUpd
   db.prepare(`INSERT INTO audit_logs (user_id, user_name, action, resource, resource_id, detail) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(req.user!.userId, userName, 'UPDATE', 'Channel', id, `更新渠道 ${c.name}`);
 
-  const row = db.prepare('SELECT * FROM channels WHERE id = ?').get(id);
+  const row = db.prepare('SELECT * FROM channels WHERE id = ?').get(id) as ChannelRow;
   res.json(toChannel(row));
 });
 
 router.get('/:id/users', checkPermission('channel', 'read'), (req, res) => {
   const db = getDb();
-  const rows = db.prepare("SELECT * FROM users WHERE channel_id = ? ORDER BY sort_order ASC, rowid ASC").all(req.params.id) as any[];
+  const rows = db.prepare("SELECT * FROM users WHERE channel_id = ? ORDER BY sort_order ASC, rowid ASC").all(req.params.id) as UserRow[];
   res.json(rows.map(r => ({
     id: r.id, accountId: r.account_id, name: r.name,
     email: r.email, phone: r.phone, roles: parseRoles(r.role),

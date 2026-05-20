@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAppContext } from '../../contexts/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -20,7 +21,8 @@ const WPS_LOGO = (
 );
 
 const LoginModal: React.FC = () => {
-    const { needsLogin, apiMode, login } = useAppContext();
+    const { needsLogin, login } = useAuth();
+    const { apiMode } = useAppContext();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [submitting, setSubmitting] = useState(false);
@@ -65,8 +67,8 @@ const LoginModal: React.FC = () => {
         setErrMsg(null);
         try {
             await login(email.trim(), password);
-        } catch (err: any) {
-            setErrMsg(err?.message || '登录失败');
+        } catch (err: unknown) {
+            setErrMsg(err instanceof Error ? err.message : '登录失败');
         } finally {
             setSubmitting(false);
         }

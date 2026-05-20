@@ -51,8 +51,15 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => window.removeEventListener('api:error', handler);
   }, [toastError]);
 
+  const value = React.useMemo(() => ({
+    toasts,
+    toast,
+    toastError,
+    toastSuccess,
+  }), [toasts, toast, toastError, toastSuccess]);
+
   return (
-    <ToastContext.Provider value={{ toasts, toast, toastError, toastSuccess }}>
+    <ToastContext.Provider value={value}>
       {children}
       <ToastContainer toasts={toasts} onDismiss={(id) => setToasts(prev => prev.filter(t => t.id !== id))} />
     </ToastContext.Provider>

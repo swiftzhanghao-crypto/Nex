@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { GoogleGenAI, Type } from '@google/genai';
 import { authMiddleware } from '../auth.ts';
+import { createLogger } from '../logger.ts';
+import { validateBody, aiGenerateSchema, aiCategorySuggestSchema } from '../validate.ts';
 
+const log = createLogger('ai');
 const router = Router();
 
 let _ai: GoogleGenAI | null = null;
@@ -13,7 +16,7 @@ function getAI(): GoogleGenAI | null {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     _missing = true;
-    console.warn('[ai] GEMINI_API_KEY 未配置，AI 接口将返回 503');
+    log.warn('GEMINI_API_KEY 未配置，AI 接口将返回 503');
     return null;
   }
   _ai = new GoogleGenAI({ apiKey: key });
@@ -28,41 +31,29 @@ router.get('/status', (_req, res) => {
 // 其他 AI 接口需要登录态
 router.use(authMiddleware);
 
-router.post('/generate', async (req, res) => {
+router.post('/generate', validateBody(aiGenerateSchema), async (req, res) => {
   const ai = getAI();
   if (!ai) {
     res.status(503).json({ error: 'AI 服务未配置 (GEMINI_API_KEY)' });
     return;
   }
   const { prompt, model = 'gemini-2.5-flash' } = req.body || {};
-  if (typeof prompt !== 'string' || prompt.length === 0) {
-    res.status(400).json({ error: 'prompt 必填' });
-    return;
-  }
-  if (prompt.length > 20000) {
-    res.status(413).json({ error: 'prompt 过长' });
-    return;
-  }
   try {
     const response = await ai.models.generateContent({ model, contents: prompt });
     res.json({ text: response.text || '' });
   } catch (err: any) {
-    console.error('[ai] generate error:', err?.message);
+    log.error('generate error', { message: err?.message });
     res.status(502).json({ error: 'AI 调用失败' });
   }
 });
 
-router.post('/generate-json', async (req, res) => {
+router.post('/generate-json', validateBody(aiGenerateSchema), async (req, res) => {
   const ai = getAI();
   if (!ai) {
     res.status(503).json({ error: 'AI 服务未配置' });
     return;
   }
   const { prompt, schema, model = 'gemini-2.5-flash' } = req.body || {};
-  if (typeof prompt !== 'string' || !prompt) {
-    res.status(400).json({ error: 'prompt 必填' });
-    return;
-  }
   if (!schema || typeof schema !== 'object') {
     res.status(400).json({ error: 'schema 必填' });
     return;
@@ -81,22 +72,18 @@ router.post('/generate-json', async (req, res) => {
     try { json = JSON.parse(text); } catch { /* ignore */ }
     res.json({ text, json });
   } catch (err: any) {
-    console.error('[ai] generate-json error:', err?.message);
+    log.error('generate-json error', { message: err?.message });
     res.status(502).json({ error: 'AI 调用失败' });
   }
 });
 
-router.post('/category-suggest', async (req, res) => {
+router.post('/category-suggest', validateBody(aiCategorySuggestSchema), async (req, res) => {
   const ai = getAI();
   if (!ai) {
     res.status(503).json({ error: 'AI 服务未配置' });
     return;
   }
   const { productName } = req.body || {};
-  if (typeof productName !== 'string' || !productName.trim()) {
-    res.status(400).json({ error: 'productName 必填' });
-    return;
-  }
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
@@ -117,7 +104,7 @@ router.post('/category-suggest', async (req, res) => {
     } catch { /* fallback to default */ }
     res.json({ category });
   } catch (err: any) {
-    console.error('[ai] category-suggest error:', err?.message);
+    log.error('category-suggest error', { message: err?.message });
     res.status(502).json({ error: 'AI 调用失败' });
   }
 });

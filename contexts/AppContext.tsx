@@ -1,5 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useAuth } from './AuthContext';
+import { registerAuthSessionBridge } from './authSessionBridge';
+import { useUI } from './UIContext';
 import type {
     Product, SalesMerchandise, AtomicCapability,
     AuthTypeData, Customer, Opportunity, Order,
@@ -15,62 +18,92 @@ import {
 } from '../utils/rowPermissionFilter';
 
 import {
-    initialProducts, initialMerchandises, initialAtomicCapabilities,
-    initialAuthTypes,
-    initialDepartments, initialRoles, initialUsers, initialChannels,
-    initialStandaloneEnterprises, initialSalesOrgs, productSalesOrgMap,
-} from '../data/staticData';
-
-import {
-    generateCustomers, generateOpportunities, generateOrders,
-    generateContracts, generateRemittances, generateInvoices,
-    generatePerformances, generateAuthorizations, generateDeliveryInfos,
-    generateSubscriptionChainOrders, buildSubscriptionsFromOrders,
-} from '../data/generators';
-
-import {
     authApi, userApi, orderApi, customerApi, productApi, opportunityApi, financeApi, spaceApi,
     systemApi,
-    setToken, getToken,
 } from '../services/api';
+import { buildSubscriptionsFromOrders } from '../data/subscriptionUtils';
 
 
 // --- Mode detection: set VITE_API_MODE=true in .env to use backend ---
 const USE_API = import.meta.env.VITE_API_MODE === 'true';
 
-// --- Mock data fallback (bump version when schema changes to force refresh) ---
+// --- Mock data: only loaded in non-API mode ---
+let initialProducts: Product[] = [];
+let initialMerchandises: SalesMerchandise[] = [];
+let initialAtomicCapabilities: AtomicCapability[] = [];
+let initialAuthTypes: AuthTypeData[] = [];
+let initialDepartments: Department[] = [];
+let initialRoles: RoleDefinition[] = [];
+let initialUsers: User[] = [];
+let initialChannels: Channel[] = [];
+let initialStandaloneEnterprises: Enterprise[] = [];
+let initialSalesOrgs: SalesOrg[] = [];
+let productSalesOrgMap: Record<string, { salesOrg: string; businessShipProductName: string; materialType: string; authMaterialName: string; mediaMaterialName: string; supplyOrg: string }[]> = {};
+let mockCustomers: Customer[] = [];
+let mockOpportunities: Opportunity[] = [];
+let mockContracts: Contract[] = [];
+let mockOrders: Order[] = [];
+let mockRemittances: Remittance[] = [];
+let mockInvoices: Invoice[] = [];
+let mockPerformances: Performance[] = [];
+let mockAuthorizations: Authorization[] = [];
+let mockDeliveryInfos: DeliveryInfo[] = [];
+let _mockDataReady: Promise<void> | null = null;
+
 const MOCK_DATA_VERSION = 23;
 
-function safeGenerateMockData() {
-    try {
-        const customers = generateCustomers(initialUsers);
-        const opportunities = generateOpportunities(customers);
-        const contracts = generateContracts(customers);
-        const chainOrders = generateSubscriptionChainOrders({
-            customers,
-            products: initialProducts,
-            users: initialUsers,
-        });
-        const baseOrders = generateOrders({
-            customers,
-            products: initialProducts,
-            users: initialUsers,
-            merchandises: initialMerchandises,
-            opportunities,
-            channels: initialChannels,
-            contracts,
-        });
-        const orders = [...chainOrders, ...baseOrders].sort(
-            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-        );
-        return { customers, opportunities, contracts, orders };
-    } catch (e) {
-        console.error('[MockData] Failed to generate mock data, using empty fallback:', e);
-        return { customers: [] as Customer[], opportunities: [] as Opportunity[], contracts: [] as Contract[], orders: [] as Order[] };
-    }
-}
+if (!USE_API) {
+    _mockDataReady = (async () => {
+        const [staticMod, genMod] = await Promise.all([
+            import('../data/staticData'),
+            import('../data/generators'),
+        ]);
+        initialProducts = staticMod.initialProducts;
+        initialMerchandises = staticMod.initialMerchandises;
+        initialAtomicCapabilities = staticMod.initialAtomicCapabilities;
+        initialAuthTypes = staticMod.initialAuthTypes;
+        initialDepartments = staticMod.initialDepartments;
+        initialRoles = staticMod.initialRoles;
+        initialUsers = staticMod.initialUsers;
+        initialChannels = staticMod.initialChannels;
+        initialStandaloneEnterprises = staticMod.initialStandaloneEnterprises;
+        initialSalesOrgs = staticMod.initialSalesOrgs;
+        productSalesOrgMap = staticMod.productSalesOrgMap;
 
-const { customers: mockCustomers, opportunities: mockOpportunities, contracts: mockContracts, orders: mockOrders } = safeGenerateMockData();
+        try {
+            const customers = genMod.generateCustomers(initialUsers);
+            const opportunities = genMod.generateOpportunities(customers);
+            const contracts = genMod.generateContracts(customers);
+            const chainOrders = genMod.generateSubscriptionChainOrders({
+                customers,
+                products: initialProducts,
+                users: initialUsers,
+            });
+            const baseOrders = genMod.generateOrders({
+                customers,
+                products: initialProducts,
+                users: initialUsers,
+                merchandises: initialMerchandises,
+                opportunities,
+                channels: initialChannels,
+                contracts,
+            });
+            mockOrders = [...chainOrders, ...baseOrders].sort(
+                (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+            );
+            mockCustomers = customers;
+            mockOpportunities = opportunities;
+            mockContracts = contracts;
+            mockRemittances = genMod.generateRemittances();
+            mockInvoices = genMod.generateInvoices();
+            mockPerformances = genMod.generatePerformances();
+            mockAuthorizations = genMod.generateAuthorizations();
+            mockDeliveryInfos = genMod.generateDeliveryInfos();
+        } catch (e) {
+            console.error('[MockData] Failed to generate mock data:', e);
+        }
+    })();
+}
 
 // ---------- Context shape ----------
 interface AppContextType {
@@ -102,8 +135,6 @@ interface AppContextType {
     setDepartments: React.Dispatch<React.SetStateAction<Department[]>>;
     roles: RoleDefinition[];
     setRoles: React.Dispatch<React.SetStateAction<RoleDefinition[]>>;
-    currentUser: User;
-    setCurrentUser: (user: User) => void;
 
     channels: Channel[];
     setChannels: React.Dispatch<React.SetStateAction<Channel[]>>;
@@ -149,12 +180,7 @@ interface AppContextType {
 
     loading: boolean;
     error: string | null;
-
-    needsLogin: boolean;
-    login: (email: string, password: string) => Promise<void>;
-    /** SSO 回调兼容：写入 JWT 后拉取引导数据（旧 token-in-URL 模式 fallback） */
-    completeSsoLogin: (token: string) => Promise<void>;
-    logout: () => void;
+    setError: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -163,6 +189,11 @@ export function useAppContext(): AppContextType {
     const ctx = useContext(AppContext);
     if (!ctx) throw new Error('useAppContext must be used within <AppProvider>');
     return ctx;
+}
+
+/** 向后兼容：合并业务、认证、UI 上下文（优先使用 useAuth / useUI / useAppContext 以减少重渲染） */
+export function useApp() {
+    return { ...useAppContext(), ...useAuth(), ...useUI() };
 }
 
 export type LazyDataKey =
@@ -179,7 +210,7 @@ export type LazyDataKey =
  */
 export function useEnsureData(keys: LazyDataKey[]) {
     const ctx = useAppContext();
-    const { needsLogin } = ctx;
+    const { needsLogin } = useAuth();
     useEffect(() => {
         if (needsLogin) return;
         keys.forEach((k) => {
@@ -200,67 +231,44 @@ export function useEnsureData(keys: LazyDataKey[]) {
 }
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [loading, setLoading] = useState(USE_API);
+    const {
+        currentUser,
+        setCurrentUser,
+        needsLogin,
+        setNeedsLogin,
+    } = useAuth();
+
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    // 不再依赖 localStorage token 判断：SSO cookie 登录时 localStorage 无 token，
-    // 初始设为 false，由 loadBootstrap 探测后决定。
-    const [needsLogin, setNeedsLogin] = useState<boolean>(false);
 
     // --- Product domain ---
-    const [products, setProducts] = useState(() => {
-        return initialProducts.map(p => {
-            const csvEntries = productSalesOrgMap[p.id];
-            if (csvEntries && csvEntries.length > 0) {
-                const salesScope = csvEntries.map(e => ({
-                    salesOrg: e.salesOrg,
-                    businessShipProductName: e.businessShipProductName || p.name,
-                    materialType: e.materialType,
-                    authMaterialName: e.authMaterialName,
-                    mediaMaterialName: e.mediaMaterialName,
-                    supplyOrg: e.supplyOrg,
-                    status: 'listed' as const,
-                    billingStatus: 'unmaintained' as const,
-                }));
-                return { ...p, salesScope, salesOrgName: csvEntries[0].salesOrg };
-            }
-            return p;
-        });
-    });
-    const [merchandises, setMerchandises] = useState(initialMerchandises);
-    const [atomicCapabilities, setAtomicCapabilities] = useState(initialAtomicCapabilities);
-    const [authTypes, setAuthTypes] = useState(initialAuthTypes);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [merchandises, setMerchandises] = useState<SalesMerchandise[]>([]);
+    const [atomicCapabilities, setAtomicCapabilities] = useState<AtomicCapability[]>([]);
+    const [authTypes, setAuthTypes] = useState<AuthTypeData[]>([]);
 
     // --- CRM domain ---
-    const [customers, setCustomers] = useState(USE_API ? [] as Customer[] : mockCustomers);
-    const [opportunities, setOpportunities] = useState(USE_API ? [] as Opportunity[] : mockOpportunities);
+    const [customers, setCustomers] = useState<Customer[]>([]);
+    const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
 
     // --- Order domain ---
-    const [orders, setOrders] = useState(USE_API ? [] as Order[] : mockOrders);
+    const [orders, setOrders] = useState<Order[]>([]);
     const [orderDrafts, setOrderDrafts] = useState<OrderDraft[]>([]);
 
     // --- User & Org domain ---
-    const [users, setUsers] = useState(initialUsers);
-    const [departments, setDepartments] = useState(initialDepartments);
-    const [roles, setRoles] = useState(initialRoles);
-    const [currentUser, setCurrentUser] = useState(initialUsers[0]);
+    const [users, setUsers] = useState<User[]>([]);
+    const [departments, setDepartments] = useState<Department[]>([]);
+    const [roles, setRoles] = useState<RoleDefinition[]>([]);
 
     // --- Channel domain ---
-    const [channels, setChannels] = useState(initialChannels);
-    const [standaloneEnterprises] = useState(initialStandaloneEnterprises);
+    const [channels, setChannels] = useState<Channel[]>([]);
+    const [standaloneEnterprises, setStandaloneEnterprises] = useState<Enterprise[]>([]);
 
     // --- Sales organizations ---
-    const [salesOrganizations, setSalesOrganizations] = useState<SalesOrg[]>(initialSalesOrgs);
+    const [salesOrganizations, setSalesOrganizations] = useState<SalesOrg[]>([]);
 
     // --- Space domain ---
-    // Mock 模式下优先从 localStorage 恢复（含用户新建/修改过的应用），无则用 seed
-    const [spaces, setSpacesRaw] = useState<Space[]>(() => {
-        if (USE_API) return [];
-        try {
-            const cached = localStorage.getItem('spaceMock:list');
-            if (cached) return JSON.parse(cached) as Space[];
-        } catch { /* noop */ }
-        return initialSpaces;
-    });
+    const [spaces, setSpacesRaw] = useState<Space[]>([]);
     // 包装 setter：Mock 模式下任何变更都同步写回 localStorage
     const setSpaces: React.Dispatch<React.SetStateAction<Space[]>> = useCallback((value) => {
         setSpacesRaw(prev => {
@@ -273,15 +281,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, []);
 
     // --- Read-only generated domains ---
-    const [contracts, setContracts] = useState<Contract[]>(() => USE_API ? [] : mockContracts);
-    const [remittances, setRemittances] = useState<Remittance[]>(() => USE_API ? [] : generateRemittances());
-    const [invoices, setInvoices] = useState<Invoice[]>(() => USE_API ? [] : generateInvoices());
-    const [performances, setPerformances] = useState<Performance[]>(() =>
-        USE_API ? [] : generatePerformances());
-    const [authorizations, setAuthorizations] = useState<Authorization[]>(() =>
-        USE_API ? [] : generateAuthorizations());
-    const [deliveryInfos, setDeliveryInfos] = useState<DeliveryInfo[]>(() =>
-        USE_API ? [] : generateDeliveryInfos());
+    const [contracts, setContracts] = useState<Contract[]>([]);
+    const [remittances, setRemittances] = useState<Remittance[]>([]);
+    const [invoices, setInvoices] = useState<Invoice[]>([]);
+    const [performances, setPerformances] = useState<Performance[]>([]);
+    const [authorizations, setAuthorizations] = useState<Authorization[]>([]);
+    const [deliveryInfos, setDeliveryInfos] = useState<DeliveryInfo[]>([]);
 
     // --- WorkReports domain ---
     const [workReports, setWorkReports] = useState<WorkReport[]>([]);
@@ -306,11 +311,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setCustomers(mockCustomers);
             setOpportunities(mockOpportunities);
             setContracts(mockContracts);
-            setRemittances(generateRemittances());
-            setInvoices(generateInvoices());
-            setPerformances(generatePerformances());
-            setAuthorizations(generateAuthorizations());
-            setDeliveryInfos(generateDeliveryInfos());
+            setRemittances(mockRemittances);
+            setInvoices(mockInvoices);
+            setPerformances(mockPerformances);
+            setAuthorizations(mockAuthorizations);
+            setDeliveryInfos(mockDeliveryInfos);
         }
     }, []);
 
@@ -470,17 +475,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, []);
 
     const loadBootstrap = useCallback(async () => {
-        if (!USE_API) return;
+        if (!USE_API) {
+            if (_mockDataReady) await _mockDataReady;
+            setProducts(initialProducts.map(p => {
+                const csvEntries = productSalesOrgMap[p.id];
+                if (csvEntries && csvEntries.length > 0) {
+                    const salesScope = csvEntries.map(e => ({
+                        salesOrg: e.salesOrg,
+                        businessShipProductName: e.businessShipProductName || p.name,
+                        materialType: e.materialType,
+                        authMaterialName: e.authMaterialName,
+                        mediaMaterialName: e.mediaMaterialName,
+                        supplyOrg: e.supplyOrg,
+                        status: 'listed' as const,
+                        billingStatus: 'unmaintained' as const,
+                    }));
+                    return { ...p, salesScope, salesOrgName: csvEntries[0].salesOrg };
+                }
+                return p;
+            }));
+            setMerchandises(initialMerchandises);
+            setAtomicCapabilities(initialAtomicCapabilities);
+            setAuthTypes(initialAuthTypes);
+            setUsers(initialUsers);
+            setDepartments(initialDepartments);
+            setRoles(initialRoles);
+            setCurrentUser(initialUsers[0]);
+            setChannels(initialChannels);
+            setStandaloneEnterprises(initialStandaloneEnterprises);
+            setSalesOrganizations(initialSalesOrgs);
+            setCustomers(mockCustomers);
+            setOpportunities(mockOpportunities);
+            setOrders(mockOrders);
+            setContracts(mockContracts);
+            setRemittances(mockRemittances);
+            setInvoices(mockInvoices);
+            setPerformances(mockPerformances);
+            setAuthorizations(mockAuthorizations);
+            setDeliveryInfos(mockDeliveryInfos);
+            setSpaces(initialSpaces);
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
-        // 先探测登录态（支持 Bearer JWT 和 SSO session cookie 双模式）
-        // 如果有 localStorage token 就直接走 /me；否则靠 cookie 走 /me
-        let me: any;
+        let me: User;
         try {
             me = await authApi.me();
         } catch {
-            // 探测失败 → 需要登录
             clearApiData();
             setNeedsLogin(true);
             setLoading(false);
@@ -496,32 +540,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 productApi.list({ size: 2000 }),
                 productApi.channels(),
                 productApi.opportunities(),
-                spaceApi.list().catch(() => [] as any[]),
-                systemApi.listAuthTypes().catch(() => [] as any[]),
-                systemApi.listSalesOrgs().catch(() => [] as any[]),
+                spaceApi.list({ silent: true }).catch(() => [] as Space[]),
+                systemApi.listAuthTypes({ silent: true }).catch(() => [] as AuthTypeData[]),
+                systemApi.listSalesOrgs({ silent: true }).catch(() => [] as SalesOrg[]),
             ]);
             setUsers(userListRes.data);
             setDepartments(deptList);
             setRoles(roleList);
             setProducts(prodListRes.data);
-            setChannels(channelList);
-            setOpportunities(oppList);
+            setChannels(channelList as unknown as Channel[]);
+            setOpportunities(oppList as unknown as Opportunity[]);
             setSpaces(spaceList as Space[]);
             if (authTypeList.length) setAuthTypes(authTypeList);
             if (salesOrgList.length) setSalesOrganizations(salesOrgList);
 
             setNeedsLogin(false);
-            console.log('[API] Bootstrap loaded (auth: %s)', getToken() ? 'JWT' : 'cookie');
-        } catch (e: any) {
-            console.error('[API] Initialization failed:', e);
-            setError(e.message || '数据加载失败');
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : '数据加载失败';
+            setError(msg);
         } finally {
             setLoading(false);
         }
-    }, [clearApiData]);
+    }, [clearApiData, setCurrentUser, setNeedsLogin]);
 
     useEffect(() => {
-        if (!USE_API) return;
         loadBootstrap();
     }, [loadBootstrap]);
 
@@ -534,35 +576,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
         window.addEventListener('auth:expired', handler);
         return () => window.removeEventListener('auth:expired', handler);
-    }, [clearApiData]);
+    }, [clearApiData, setNeedsLogin]);
 
-    const login = useCallback(async (email: string, password: string) => {
-        const { token, user } = await authApi.login(email, password);
-        setToken(token);
-        setCurrentUser(user);
-        // 重置 lazy-load 标记，让之前因 401 失败的加载在 needsLogin 变为 false 后重试
+    const resetLazyLoadMarkers = useCallback(() => {
         loadedOnceRef.current = {};
         inFlightRef.current = {};
-        setNeedsLogin(false);
-        await loadBootstrap();
-    }, [loadBootstrap]);
+    }, []);
 
-    const completeSsoLogin = useCallback(async (token: string) => {
-        setToken(token);
-        loadedOnceRef.current = {};
-        inFlightRef.current = {};
-        setNeedsLogin(false);
-        setError(null);
-        await loadBootstrap();
-    }, [loadBootstrap]);
-
-    const logout = useCallback(async () => {
-        try { await authApi.logout(); } catch { /* noop — 即使服务端清理失败也要清前端态 */ }
-        setToken(null);
-        clearApiData();
-        setNeedsLogin(true);
-        setError(null);
-    }, [clearApiData]);
+    useEffect(() => {
+        registerAuthSessionBridge({
+            onBeforeLoginReset: resetLazyLoadMarkers,
+            onAfterLogin: async () => {
+                setError(null);
+                await loadBootstrap();
+            },
+            onAfterLogout: () => {
+                clearApiData();
+                setError(null);
+            },
+        });
+        return () => registerAuthSessionBridge(null);
+    }, [loadBootstrap, clearApiData, resetLazyLoadMarkers]);
 
     // 多角色：取用户所有平台角色定义，行权限按角色取并集（任一角色可见即可见），与功能权限合并口径一致
     const currentUserRoles = useMemo(() =>
@@ -585,7 +619,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         [products, currentUserRoles, currentUser, users, departments]
     );
 
-    const value: AppContextType = {
+    const value = useMemo<AppContextType>(() => ({
         apiMode: USE_API,
 
         products, setProducts,
@@ -602,7 +636,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         users, setUsers,
         departments, setDepartments,
         roles, setRoles,
-        currentUser, setCurrentUser,
 
         channels, setChannels,
         standaloneEnterprises,
@@ -643,12 +676,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         loading,
         error,
+        setError,
+    }), [
+        products, merchandises, atomicCapabilities, authTypes,
+        customers, opportunities, orders, orderDrafts,
+        users, departments, roles, channels, standaloneEnterprises,
+        salesOrganizations, contracts, remittances, invoices,
+        performances, authorizations, deliveryInfos, subscriptions,
+        workReports, addWorkReport,
+        filteredOrders, filteredCustomers, filteredProducts,
+        spaces, setSpaces, refreshSpaces,
+        refreshOrders, refreshCustomers, refreshChannels,
+        loadAllOrders, loadAllCustomers, loadAllOpportunities,
+        loadAllContracts, loadAllRemittances, loadAllInvoices,
+        loadAllPerformances, loadAllAuthorizations, loadAllDeliveryInfos,
+        loading, error,
+    ]);
 
-        needsLogin,
-        login,
-        completeSsoLogin,
-        logout,
-    };
+    if (loading && !needsLogin) {
+        return (
+            <div className="h-screen w-screen flex items-center justify-center bg-[#f5f5f7] dark:bg-[#1d1d1f]">
+                <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

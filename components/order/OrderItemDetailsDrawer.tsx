@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { OrderItem, Product, SubUnit } from '../../types';
+import { OrderItem, Product, SubUnit, Order, Customer } from '../../types';
 import { X, Box, CreditCard, Truck, Package, Disc, AlertCircle, ShieldCheck, RefreshCcw, Building2, Download } from 'lucide-react';
 
 interface Props {
@@ -8,9 +8,9 @@ interface Props {
   isClosing: boolean;
   onClose: () => void;
   products: Product[];
-  selectedOrder: any;
+  selectedOrder: Order;
   editable?: boolean;
-  customers?: any[];
+  customers?: Customer[];
   onUpdateItem?: (itemIndex: number, updatedItem: OrderItem) => void;
   initialTab?: 'INFO' | 'SUBUNIT';
 }

@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Search, Shield, Trash2, Settings, Save, X, Copy, GripVertical } from 'lucide-react';
-import type { Space, SpaceMember, SpaceRole } from '../../types';
+import type { Space, SpaceMember, SpaceRole, SpacePermGroup, SpaceResourceConfig, SpaceColumnConfig } from '../../types';
 import { useAppContext } from '../../contexts/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { spaceApi } from '../../services/api';
 import SpaceRoleDetail from './space/SpaceRoleDetail';
 import ModalPortal from '../common/ModalPortal';
@@ -37,7 +38,8 @@ const genId = (prefix: string) =>
   `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
 const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
-  const { spaces, setSpaces, users, apiMode, currentUser } = useAppContext();
+  const { spaces, setSpaces, users, apiMode } = useAppContext();
+  const { currentUser } = useAuth();
   const [spaceRoles, setSpaceRoles] = useState<SpaceRole[]>([]);
   const [spaceMembers, setSpaceMembers] = useState<SpaceMember[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -86,7 +88,7 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
       ]);
       setSpaceRoles(roles as SpaceRole[]);
       setSpaceMembers(members as SpaceMember[]);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('加载应用数据失败', e);
     } finally {
       setLoadingDetail(false);
@@ -147,8 +149,8 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
         setIsEditingRole(false);
       }
       fetchData();
-    } catch (e: any) {
-      alert(e?.message || '删除失败');
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : '删除失败');
     }
   };
 
@@ -188,8 +190,8 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
       setSelectedRoleId((created as SpaceRole).id);
       setIsEditingRole(true);
       await fetchData();
-    } catch (e: any) {
-      alert(e?.message || '复制失败');
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : '复制失败');
     }
   };
 
@@ -253,7 +255,7 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
       ]);
       setSpaceRoles(roles as SpaceRole[]);
       setSpaceMembers(members as SpaceMember[]);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('加载应用数据失败', e);
     } finally {
       setLoadingDetail(false);
@@ -291,7 +293,7 @@ const SpaceRoleManager: React.FC<Props> = ({ spaceId }) => {
         await Promise.all(
           withOrder.map(r => spaceApi.updateRole(spaceId, r.id, { sortOrder: r.sortOrder })),
         );
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error('排序持久化失败', e);
       }
     }
@@ -491,11 +493,13 @@ const SettingsPanel: React.FC<{
   }, [space]);
 
   const handleSave = async () => {
-    let permTree: any, resourceConfig: any, columnConfig: any;
+    let permTree: SpacePermGroup[];
+    let resourceConfig: SpaceResourceConfig[];
+    let columnConfig: SpaceColumnConfig[];
     try {
-      permTree = JSON.parse(permTreeText);
-      resourceConfig = JSON.parse(resourceText);
-      columnConfig = JSON.parse(columnText);
+      permTree = JSON.parse(permTreeText) as SpacePermGroup[];
+      resourceConfig = JSON.parse(resourceText) as SpaceResourceConfig[];
+      columnConfig = JSON.parse(columnText) as SpaceColumnConfig[];
     } catch {
       alert('权限树/资源/列配置 JSON 格式错误');
       return;
@@ -509,8 +513,8 @@ const SettingsPanel: React.FC<{
         onUpdated({ ...space, name, description, permTree, resourceConfig, columnConfig });
       }
       alert('保存成功');
-    } catch (e: any) {
-      alert(e?.message || '保存失败');
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : '保存失败');
     } finally {
       setSaving(false);
     }

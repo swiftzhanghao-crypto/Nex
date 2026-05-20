@@ -1,19 +1,16 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ClipboardCheck, Radar, Search, List, ArrowLeft, Smartphone, RefreshCcw, Sparkles, Bot, LogOut } from 'lucide-react';
-import manualContent from '../../docs/产品说明文档.md?raw';
-import designSpecContent from '../../docs/设计规范.md?raw';
-import operationManualContent from '../../docs/WPS365业务平台操作手册.md?raw';
-import aiManualContent from '../../docs/AI业务助手操作手册.md?raw';
-import openApiContent from '../../docs/开放API-订单下单.md?raw';
-import aiTechDocContent from '../../docs/AI业务助手技术文档.md?raw';
-import DocCenterDrawer from './DocCenterDrawer';
+import { LayoutDashboard, ShoppingCart, Package, Users, Menu, X, ChevronDown, Shield, Building2, Network, Target, Settings, Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Layers, BarChart3, PieChart, Contact2, Zap, FileText, ArrowUpCircle, Database, Link as LinkIcon, Settings2, Monitor, LayoutList, BookOpen, FileBadge, Banknote, Receipt, TrendingUp, KeyRound, PackageCheck, ListTree, HardDriveDownload, FileKey, SlidersHorizontal, Tag, MessageSquarePlus, Send, Star, CheckCircle2, ClipboardCheck, Radar, Search, List, ArrowLeft, Smartphone, RefreshCcw, Sparkles, Bot, LogOut, ClipboardList } from 'lucide-react';
 import { useAppContext } from '../../contexts/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 import WPSLogo from '../common/WPSLogo';
 import MobilePreview from '../mobile/MobilePreview';
-import AIAssistantDrawer from '../ai/AIAssistantDrawer';
 import GlobalSearchModal from './GlobalSearchModal';
+import NotificationBell from './NotificationBell';
+
+const DocCenterDrawer = React.lazy(() => import('./DocCenterDrawer'));
+const AIAssistantDrawer = React.lazy(() => import('../ai/AIAssistantDrawer'));
 import { mergeAllPlatformPermissionIds } from '../../utils/mergeRolePermissions';
 
 interface LayoutProps {
@@ -22,7 +19,8 @@ interface LayoutProps {
 
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { currentUser, users, setCurrentUser, roles, apiMode, logout, filteredCustomers: customers, filteredProducts: products } = useAppContext();
+  const { currentUser, setCurrentUser, logout } = useAuth();
+  const { users, roles, apiMode, filteredCustomers: customers, filteredProducts: products } = useAppContext();
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -80,12 +78,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const hideSidebar = false;
-
-  useEffect(() => {
-    const root = window.document.documentElement;
-    root.classList.remove('dark');
-    localStorage.removeItem('theme');
-  }, []);
 
   useEffect(() => {
     if (location.pathname === '/' || location.pathname.startsWith('/dashboard')) {
@@ -277,6 +269,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             >
               <Smartphone className="w-4 h-4" />
             </button>
+
+            <NotificationBell />
             
             <div className="relative pl-2 border-l border-gray-200 dark:border-white/10 ml-1">
                 <button 
@@ -563,6 +557,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             <NavItem to="/organization" icon={Building2} label="组织架构" />
                             <NavItem to="/users" icon={Users} label="用户管理" />
                             <NavItem to="/roles" icon={Shield} label="角色管理" />
+                            <NavItem to="/system/audit" icon={ClipboardList} label="审计日志" />
                           </>
                         )}
                         {renderSectionGroup('system_biz_rules', '业务规则配置',
@@ -591,18 +586,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Manual Panel Overlay */}
       {/* ── Document Center Drawer ── */}
-      {isManualOpen && (() => {
-        const DOC_LIST = [
-          { id: 'manual', title: '产品说明文档', icon: '📘', content: manualContent },
-          { id: 'design', title: '设计规范', icon: '🎨', content: designSpecContent },
-          { id: 'ops', title: '操作手册', icon: '📋', content: operationManualContent },
-          { id: 'prd', title: '产品 PRD', icon: '📄', link: 'https://365.kdocs.cn/l/cg9iaTHwv9VX' },
-          { id: 'ai-manual', title: 'AI 助手手册', icon: '🤖', content: aiManualContent },
-          { id: 'ai-tech', title: 'AI 技术文档', icon: '⚙️', content: aiTechDocContent },
-          { id: 'open-api', title: '开放 API', icon: '🔗', content: openApiContent },
-        ];
-        return <DocCenterDrawer docs={DOC_LIST} onClose={() => setIsManualOpen(false)} />;
-      })()}
+      {isManualOpen && (
+        <Suspense fallback={null}>
+          <DocCenterDrawer onClose={() => setIsManualOpen(false)} />
+        </Suspense>
+      )}
 
       {/* 全局搜索弹窗 */}
       <GlobalSearchModal
@@ -616,7 +604,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       />
 
       {/* AI 业务助手抽屉 */}
-      <AIAssistantDrawer open={isAIDrawerOpen} onClose={() => setIsAIDrawerOpen(false)} initialQuery={aiInitialQuery} />
+      <Suspense fallback={null}>
+        <AIAssistantDrawer open={isAIDrawerOpen} onClose={() => setIsAIDrawerOpen(false)} initialQuery={aiInitialQuery} />
+      </Suspense>
 
       {/* AI 助手悬浮球 */}
       {!isAIDrawerOpen && (

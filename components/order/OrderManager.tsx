@@ -1,10 +1,8 @@
-
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import ReactDOM from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Order, OrderStatus, OrderItem, User, ApprovalRecord, OrderSource, OrderDraft, Subscription, SubscriptionLineProductSnapshot, BuyerType } from '../../types';
+import { Order, OrderStatus, OrderDraft, User, OrderSource, Subscription, SubscriptionLineProductSnapshot } from '../../types';
 import { subscriptionMostUrgentProductSnapshot } from '../../utils/subscriptionLineProduct';
-import { Search, Plus, Trash2, Disc, CheckCircle, FileText, CreditCard, Truck, X, Layers, Clock, AlertCircle, Network, Globe, Radio, RefreshCcw, FileCheck, CheckSquare, Package, Settings, Filter, ChevronDown, Calendar, Shield, RotateCcw, Save, ChevronRight, Copy, Check, Eye, Pencil, SlidersHorizontal, GripVertical, Columns3 } from 'lucide-react';
+import { Search, Plus, Trash2, Save, ChevronRight, ChevronDown, X, RotateCcw, SlidersHorizontal, Filter, Columns3, CheckSquare, Truck, FileCheck, CheckCircle, FileText, Disc, CreditCard, RefreshCcw, AlertCircle } from 'lucide-react';
 import ModalPortal from '../common/ModalPortal';
 import OrderCreateWizard from './OrderCreateWizard';
 import StatusFilterCard from './StatusFilterCard';
@@ -12,160 +10,25 @@ import DeleteConfirmModal from './DeleteConfirmModal';
 import UserDetailPanel from '../common/UserDetailPanel';
 import EmployeeCardModal from '../common/EmployeeCardModal';
 import { useAppContext, useEnsureData } from '../../contexts/AppContext';
-import Pagination from '../common/Pagination';
-
-type FilterMode = '单选' | '多选' | '时间段' | '时间点' | '金额范围';
-
-interface OrderViewFilters {
-  filterStatus: string;
-  advancedFilters: FilterCondition[];
-}
-
-interface OrderView {
-  id: string;
-  name: string;
-  columns: string[];
-  isDefault?: boolean;
-  filters?: OrderViewFilters;
-}
-
-const VIEWS_STORAGE_KEY = 'order_list_views';
-const ACTIVE_VIEW_STORAGE_KEY = 'order_list_active_view';
-
-function loadViews(defaultColumns: string[]): OrderView[] {
-  try {
-    const raw = localStorage.getItem(VIEWS_STORAGE_KEY);
-    if (raw) {
-      const views = JSON.parse(raw) as OrderView[];
-      if (Array.isArray(views) && views.length > 0) {
-        return views.map(v => v.isDefault && v.name === '默认视图' ? { ...v, name: '全部订单' } : v);
-      }
-    }
-  } catch {}
-  return [{ id: 'default', name: '全部订单', columns: defaultColumns, isDefault: true }];
-}
-function saveViews(views: OrderView[]) {
-  localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify(views));
-}
-function loadActiveViewId(): string {
-  return localStorage.getItem(ACTIVE_VIEW_STORAGE_KEY) || 'default';
-}
-
-const DEFAULT_COLS = ['id', 'customer', 'buyer', 'products', 'sales', 'businessManager', 'department', 'source', 'buyerType', 'date', 'status', 'paymentStatus', 'stockStatus', 'total', 'action'];
-
-function orderToDraft(order: Order): OrderDraft {
-  return {
-    id: order.id,
-    savedAt: order.date || new Date().toISOString(),
-    currentStep: 0,
-    buyerType: (order.buyerType as BuyerType) || '',
-    orderSource: order.source || 'Sales',
-    creatorId: order.creatorId || '',
-    originalOrderId: order.originalOrderId,
-    hasOpportunity: order.opportunityId ? 'yes' : '',
-    linkedOpportunityId: order.opportunityId || '',
-    newOrderCustomer: order.customerId || '',
-    orderEnterpriseId: '',
-    selectedChannelId: order.buyerType === 'Channel' ? (order.buyerId || '') : '',
-    directChannel: order.directChannel || '',
-    terminalChannel: order.terminalChannel || '',
-    salesRepId: order.salesRepId || '',
-    businessManagerId: order.businessManagerId || '',
-    newOrderItems: order.items || [],
-    tempCategory: '',
-    enableConversion: false,
-    selectedConversionIds: [],
-    sellerProductCategory: '',
-    sellerName: order.sellerName || '',
-    sellerContact: order.sellerContact || '',
-    invoiceForm: order.invoiceInfo || { type: 'VAT_Special', title: '', taxId: '', content: '' },
-    paymentMethod: order.paymentMethod,
-    paymentTerms: order.paymentTerms,
-    deliveryMethod: order.deliveryMethod || 'Online',
-    receivingParty: order.receivingParty || '',
-    receivingCompany: order.receivingCompany || '',
-    receivingMethod: order.receivingMethod || '',
-    shippingAddress: order.shippingAddress || '',
-    shippingPhone: order.shippingPhone || '',
-    shippingEmail: order.shippingEmail || '',
-    acceptanceForm: order.acceptanceInfo || { contactName: '', contactPhone: '', method: 'Remote' },
-    acceptanceType: order.acceptanceConfig?.type || 'OneTime',
-    phaseDrafts: [],
-    orderRemark: order.orderRemark || '',
-    linkedContractIds: order.linkedContractIds || [],
-    purchasingContactId: order.purchasingContactId || '',
-    itContactId: order.itContactId || '',
-    isAgentOrder: order.isAgentOrder,
-    agentCode: order.agentCode,
-    buyerNameId: order.buyerId,
-    settlementMethod: (order.settlementMethod as 'cash' | 'credit' | '') || '',
-    expectedPaymentDate: order.expectedPaymentDate || '',
-  };
-}
-
-interface FilterCondition {
-    id: string;
-    fieldId: string;
-    mode: FilterMode;
-    value: string | number | boolean | { start: string; end: string } | { min: string; max: string } | string[];
-}
-
-const availableFilterFields = [
-    { id: 'orderSource', label: '订单来源', defaultMode: '多选' as FilterMode },
-    { id: 'orderType', label: '订单类型', defaultMode: '多选' as FilterMode },
-    { id: 'businessManager', label: '商务', defaultMode: '单选' as FilterMode },
-    { id: 'orderStatus', label: '订单状态', defaultMode: '多选' as FilterMode },
-    { id: 'paymentStatus', label: '付款状态', defaultMode: '多选' as FilterMode },
-    { id: 'stockStatus', label: '备货状态', defaultMode: '多选' as FilterMode },
-    { id: 'subUnitAuth', label: '下级单位授权', defaultMode: '多选' as FilterMode },
-    { id: 'orderDate', label: '提单时间', defaultMode: '时间段' as FilterMode },
-    { id: 'shippedDate', label: '发货时间', defaultMode: '时间段' as FilterMode },
-    { id: 'orderAmount', label: '订单应付金额', defaultMode: '金额范围' as FilterMode },
-];
-
-const orderSourceLabelMap: Record<string, string> = {
-    Sales: '后台下单',
-    ChannelPortal: '渠道来源',
-    OnlineStore: '官网',
-    APISync: '三方平台',
-};
-
-
-const statusMap: Record<string, string> = {
-    [OrderStatus.DRAFT]: '草稿',
-    [OrderStatus.PENDING_APPROVAL]: '订单审批',
-    [OrderStatus.PENDING_CONFIRM]: '订单确认',
-    [OrderStatus.PROCESSING_PROD]: '备货中',
-    [OrderStatus.PENDING_PAYMENT]: '订单支付',
-    [OrderStatus.SHIPPED]: '已发货',
-    [OrderStatus.DELIVERED]: '已完成',
-    [OrderStatus.CANCELLED]: '已取消',
-    [OrderStatus.REFUND_PENDING]: '退款中',
-    [OrderStatus.REFUNDED]: '已退款',
-};
-
-const buyerTypeMap: Record<string, string> = {
-    'Customer': '直签订单',
-    'Channel': '渠道订单',
-    'SelfDeal': '自成交订单',
-    'RedeemCode': '兑换码订单',
-};
-
-const deliveryMethodMap: Record<string, string> = {
-    'Online': '线上发货',
-    'Offline': '线下发货',
-    'Hybrid': '混合发货'
-};
-
-const paymentMethodMap: Record<string, string> = {
-    'WechatPay': '微信支付',
-    'Alipay': '支付宝支付',
-    'Transfer': '银行转账',
-};
+import { useAuth } from '../../contexts/AuthContext';
+import { usePagedQuery } from '../../hooks/usePagedQuery';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { buildOrderListFilters, orderListNeedsClientDataset, type OrderListFilters } from '../../hooks/buildOrderListParams';
+import { orderApi } from '../../services/api';
+import {
+  loadViews, saveViews, loadActiveViewId, orderToDraft,
+  DEFAULT_COLS, DEFAULT_VISIBLE, ACTIVE_VIEW_STORAGE_KEY,
+  FilterCondition, OrderView, allColumns, colWidthMap,
+  availableFilterFields, statusMap, buyerTypeMap,
+  initValueForField, searchFieldOptions, getCheckboxOptions,
+} from './manager/orderManagerUtils';
+import { OrderFilterDrawerTab, OrderFilterDropdownPortal, ActiveDropdown } from './manager/OrderFilters';
+import { OrderViewDropdown, OrderColumnDrawerTab } from './manager/OrderViewConfig';
+import { OrderTable } from './manager/OrderTable';
 
 const OrderManager: React.FC = () => {
-  const { orders, setOrders, products, customers, filteredOrders: ctxFilteredOrders, currentUser, users, setUsers, departments, opportunities, channels, roles, standaloneEnterprises, orderDrafts, setOrderDrafts, apiMode, refreshOrders } = useAppContext();
-  useEnsureData(['orders', 'customers', 'opportunities']);
+  const { orders, setOrders, products, customers, filteredOrders: ctxFilteredOrders, users, setUsers, departments, opportunities, channels, roles, standaloneEnterprises, orderDrafts, setOrderDrafts, apiMode, refreshOrders } = useAppContext();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -222,12 +85,7 @@ const OrderManager: React.FC = () => {
   const [advancedFilters, setAdvancedFilters] = useState<FilterCondition[]>(() => _initActiveView.filters?.advancedFilters || []);
   const [appliedFilters, setAppliedFilters] = useState<FilterCondition[]>(() => _initActiveView.filters?.advancedFilters || []);
 
-  const multiCheckboxFields = ['orderSource', 'orderType', 'orderStatus', 'paymentStatus', 'stockStatus', 'subUnitAuth'];
-  const personPickerFields = ['businessManager'];
-  const dateFilterFields = ['orderDate', 'shippedDate'];
-  const amountFilterFields = ['orderAmount'];
-
-  const [activeDropdown, setActiveDropdown] = useState<{ filterId: string; type: 'field' | 'mode' | 'value'; top: number; left: number; width: number } | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<ActiveDropdown | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -260,35 +118,10 @@ const OrderManager: React.FC = () => {
       setActiveDropdown({ filterId, type, top, left, width });
   };
 
-  const getCheckboxOptions = (fieldId: string): { value: string; label: string }[] => {
-      const sourceKeys = [...new Set([...Object.keys(orderSourceLabelMap), ...orders.map(o => o.source as string).filter(Boolean)])];
-      if (fieldId === 'orderSource') return sourceKeys.map(s => ({ value: s, label: orderSourceLabelMap[s as string] || s }));
-      if (fieldId === 'orderType') {
-          // 订单类型：使用订单列表展示的 buyerType（直签/渠道/自成交/兑换码），不是“新购/增购/续费”等订购性质
-          return Object.entries(buyerTypeMap).map(([value, label]) => ({ value, label }));
-      }
-      if (fieldId === 'orderStatus') return Object.entries(statusMap).map(([k, v]) => ({ value: k, label: v }));
-      if (fieldId === 'paymentStatus') return [{ value: 'paid', label: '已支付' }, { value: 'unpaid', label: '待支付' }];
-      if (fieldId === 'stockStatus') return [
-          { value: 'pending', label: '待处理' }, { value: 'processing', label: '备货中' },
-          { value: 'pendingShip', label: '待发货' }, { value: 'shipped', label: '已发货' }, { value: 'completed', label: '已完成' }
-      ];
-      if (fieldId === 'subUnitAuth') return [
-          { value: 'no_subunit', label: '无下级单位授权' },
-          { value: 'separate_auth_separate_eid', label: '授权分别呈现，企业ID分别管理' },
-          { value: 'separate_auth_unified_eid', label: '授权分别呈现，企业ID统一管理' },
-          { value: 'unified_auth_with_list', label: '授权和企业ID统一管理并提供下级清单' },
-      ];
-      return [];
-  };
-
-  const initValueForField = (fieldId: string, mode: string) => {
-      if (multiCheckboxFields.includes(fieldId)) return [] as string[];
-      if (amountFilterFields.includes(fieldId)) return { min: '', max: '' };
-      if (mode === '时间段') return { start: '', end: '' };
-      if (mode === '时间点') return '';
-      return '全部';
-  };
+  const getFilterCheckboxOptions = useCallback(
+    (fieldId: string) => getCheckboxOptions(fieldId, orders),
+    [orders],
+  );
 
   const addFilterCondition = () => {
       const unusedField = availableFilterFields.find(f => !advancedFilters.some(af => af.fieldId === f.id));
@@ -392,29 +225,6 @@ const OrderManager: React.FC = () => {
   }, []);
 
 
-  const allColumns = [
-      { id: 'id', label: '订单编号' },
-      { id: 'customer', label: '客户名称' },
-      { id: 'buyer', label: '买方名称' },
-      { id: 'products', label: '产品信息' },
-      { id: 'sales', label: '销售' },
-      { id: 'businessManager', label: '商务' },
-      { id: 'department', label: '所属部门' },
-      { id: 'source', label: '订单来源' },
-      { id: 'buyerType', label: '订单类型' },
-      { id: 'date', label: '提单时间' },
-      { id: 'status', label: '订单状态' },
-      { id: 'paymentStatus', label: '付款状态' },
-      { id: 'stockStatus', label: '备货状态' },
-      { id: 'total', label: '订单应付金额' },
-      { id: 'payment', label: '支付方式' },
-      { id: 'delivery', label: '发货方式' },
-      { id: 'address', label: '收货地址' },
-      { id: 'invoice', label: '发票抬头' },
-      { id: 'licensee', label: '被授权方' },
-      { id: 'opportunity', label: '关联商机' },
-      { id: 'action', label: '操作' },
-  ];
 
   // Batch Selection State
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
@@ -422,6 +232,71 @@ const OrderManager: React.FC = () => {
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+
+  const orderNeedsClientDataset = useMemo(
+    () =>
+      !apiMode ||
+      orderListNeedsClientDataset({
+        filterStatus,
+        appliedAdvancedCount: appliedFilters.length,
+        hasDateOrAmountFilter:
+          !!filterDateStart ||
+          !!filterDateEnd ||
+          filterAmountMin !== '' ||
+          filterAmountMax !== '',
+      }),
+    [
+      apiMode,
+      filterStatus,
+      appliedFilters.length,
+      filterDateStart,
+      filterDateEnd,
+      filterAmountMin,
+      filterAmountMax,
+    ],
+  );
+
+  useEnsureData(orderNeedsClientDataset ? ['orders', 'customers', 'opportunities'] : ['customers', 'opportunities']);
+
+  const debouncedSearch = useDebouncedValue(searchTerm, 350);
+  const apiOrderFilters = useMemo(
+    () => buildOrderListFilters(filterStatus, filterSource, debouncedSearch, searchField),
+    [filterStatus, filterSource, debouncedSearch, searchField],
+  );
+
+  const orderQuery = usePagedQuery<Order, OrderListFilters>({
+    fetcher: (p) =>
+      orderApi.list({
+        page: p.page,
+        size: p.size,
+        status: p.status || undefined,
+        source: p.source || undefined,
+        keyword: p.keyword || undefined,
+      }),
+    initialFilters: apiOrderFilters,
+    initialSize: itemsPerPage,
+    autoFetch: apiMode && !orderNeedsClientDataset,
+  });
+
+  useEffect(() => {
+    if (!apiMode || orderNeedsClientDataset) return;
+    orderQuery.setFilters(apiOrderFilters, { resetPage: true });
+  }, [apiMode, orderNeedsClientDataset, apiOrderFilters]);
+
+  useEffect(() => {
+    if (!apiMode || orderNeedsClientDataset) return;
+    orderQuery.setSize(itemsPerPage);
+  }, [apiMode, orderNeedsClientDataset, itemsPerPage]);
+
+  const refreshOrderList = useCallback(async () => {
+    if (apiMode && !orderNeedsClientDataset) {
+      await orderQuery.refresh();
+    } else {
+      await refreshOrders();
+    }
+  }, [apiMode, orderNeedsClientDataset, orderQuery, refreshOrders]);
+
+  const useServerOrderPaging = apiMode && !orderNeedsClientDataset;
 
   // User Details Drawer State
   const [detailsUser, setDetailsUser] = useState<User | null>(null);
@@ -613,7 +488,7 @@ const OrderManager: React.FC = () => {
       }
   }, []);
 
-  const filteredOrders = useMemo(() => ctxFilteredOrders.filter(order => {
+  const clientFilteredOrders = useMemo(() => ctxFilteredOrders.filter(order => {
     let matchesStatus = filterStatus === 'All' || order.status === filterStatus;
     
     // Handle sub-status filtering for PROCESSING_PROD
@@ -746,12 +621,36 @@ const OrderManager: React.FC = () => {
     return matchesStatus && matchesSearch && matchesSource && matchesDate && matchesAmount && matchesAdvanced;
   }), [ctxFilteredOrders, filterStatus, searchTerm, searchField, filterSource, filterDateStart, filterDateEnd, filterAmountMin, filterAmountMax, appliedFilters]);
 
-  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage) || 1;
-  const safePage = Math.min(currentPage, totalPages);
+  const serverPageOrders = useMemo(() => {
+    if (!useServerOrderPaging) return [];
+    const list = orderQuery.data;
+    if (!searchTerm.trim()) return list;
+    if (searchField === 'id' || searchField === 'customerName') return list;
+    const searchLower = searchTerm.toLowerCase();
+    const safeItems = (items: Order['items']) => items || [];
+    return list.filter((order) => {
+      if (searchField === 'productName') {
+        return safeItems(order.items).some((item) => (item.productName || '').toLowerCase().includes(searchLower));
+      }
+      if (searchField === 'licensee') {
+        return safeItems(order.items).some((item) => (item.licensee || '').toLowerCase().includes(searchLower));
+      }
+      return (order.buyerName || order.customerName || '').toLowerCase().includes(searchLower);
+    });
+  }, [useServerOrderPaging, orderQuery.data, searchTerm, searchField]);
+
+  const filteredOrders = useServerOrderPaging ? serverPageOrders : clientFilteredOrders;
+  const listTotal = useServerOrderPaging ? orderQuery.total : clientFilteredOrders.length;
+  const activePage = useServerOrderPaging ? orderQuery.page : currentPage;
+  const activePageSize = useServerOrderPaging ? orderQuery.size : itemsPerPage;
+
+  const totalPages = Math.ceil(listTotal / activePageSize) || 1;
+  const safePage = Math.min(activePage, totalPages);
   const currentOrders = useMemo(() => {
-    const indexOfLastItem = safePage * itemsPerPage;
-    return filteredOrders.slice(indexOfLastItem - itemsPerPage, indexOfLastItem);
-  }, [filteredOrders, safePage, itemsPerPage]);
+    if (useServerOrderPaging) return serverPageOrders;
+    const indexOfLastItem = safePage * activePageSize;
+    return clientFilteredOrders.slice(indexOfLastItem - activePageSize, indexOfLastItem);
+  }, [useServerOrderPaging, serverPageOrders, clientFilteredOrders, safePage, activePageSize]);
 
   const toggleSelectOrder = useCallback((id: string) => {
       setSelectedOrderIds(prev => {
@@ -789,8 +688,8 @@ const OrderManager: React.FC = () => {
           try {
               const { orderApi } = await import('../../services/api');
               await Promise.all(eligible.map(o => orderApi.update(o.id, { ...o, status: OrderStatus.PROCESSING_PROD })));
-              await refreshOrders();
-          } catch (e) { alert((e as any).message || '批量确认失败'); return; }
+              await refreshOrderList();
+          } catch (e) { alert(e instanceof Error ? e.message : '批量确认失败'); return; }
       } else {
           const updatedOrders = orders.map(o => {
               if (selectedOrderIds.has(o.id) && o.status === OrderStatus.PENDING_CONFIRM) {
@@ -822,8 +721,8 @@ const OrderManager: React.FC = () => {
           try {
               const { orderApi } = await import('../../services/api');
               await Promise.all(eligible.map(o => orderApi.update(o.id, { ...o, status: OrderStatus.SHIPPED, shippedDate: now })));
-              await refreshOrders();
-          } catch (e) { alert((e as any).message || '批量发货失败'); return; }
+              await refreshOrderList();
+          } catch (e) { alert(e instanceof Error ? e.message : '批量发货失败'); return; }
       } else {
           const updatedOrders = orders.map(o => {
               if (selectedOrderIds.has(o.id) && o.status === OrderStatus.PROCESSING_PROD) {
@@ -854,7 +753,7 @@ const OrderManager: React.FC = () => {
           if (!prev) return prev;
           setOrderDrafts(drafts => drafts.filter(d => d.id !== prev));
           if (apiMode) {
-              import('../../services/api').then(({ orderApi }) => orderApi.delete(prev)).then(() => refreshOrders()).catch(() => { /* error shown via global toast */ });
+              import('../../services/api').then(({ orderApi }) => orderApi.delete(prev)).then(() => refreshOrderList()).catch(() => { /* error shown via global toast */ });
           }
           setOrders(ords => ords.filter(o => o.id !== prev));
           return null;
@@ -996,693 +895,264 @@ const OrderManager: React.FC = () => {
     <div className="page-container animate-page-enter pb-2 h-full flex flex-col gap-2.5 min-w-0 overflow-hidden">
       <div className="flex items-center gap-3 flex-wrap shrink-0">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight shrink-0">订单管理</h1>
-        {/* View Dropdown */}
-        <div className="relative" ref={viewMenuRef}>
-          <button
-            onClick={() => setViewMenuOpenId(viewMenuOpenId ? null : '__dropdown__')}
-            className="h-8 px-3 pr-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-sm font-medium text-gray-700 dark:text-gray-300 hover:border-blue-300 dark:hover:border-blue-500/40 transition shadow-apple flex items-center gap-1.5"
-          >
-            <Eye className="w-3.5 h-3.5 text-[#0071E3] dark:text-[#0A84FF]" />
-            {activeView.name}
-            <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${viewMenuOpenId === '__dropdown__' ? 'rotate-180' : ''}`} />
-          </button>
-          {viewMenuOpenId === '__dropdown__' && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => { setViewMenuOpenId(null); setEditingViewId(null); }} />
-              <div className="absolute left-0 top-full mt-1.5 w-56 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl z-50 py-1 animate-fade-in">
-                {views.map(view => (
-                  <div key={view.id} className="group flex items-center">
-                    {editingViewId === view.id ? (
-                      <input
-                        autoFocus
-                        value={editingViewName}
-                        onChange={e => setEditingViewName(e.target.value)}
-                        onBlur={() => renameView(view.id, editingViewName)}
-                        onKeyDown={e => { if (e.key === 'Enter') renameView(view.id, editingViewName); if (e.key === 'Escape') setEditingViewId(null); }}
-                        onClick={e => e.stopPropagation()}
-                        className="flex-1 h-9 mx-1 px-3 text-sm border border-blue-400 rounded-lg bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white outline-none"
-                      />
-                    ) : (
-                      <button
-                        onClick={() => { switchView(view.id); setViewMenuOpenId(null); }}
-                        className={`flex-1 text-left px-3 py-2 text-sm font-medium flex items-center gap-2 transition ${
-                          activeViewId === view.id
-                            ? 'text-[#0071E3] dark:text-[#0A84FF] bg-blue-50 dark:bg-blue-900/20'
-                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
-                        }`}
-                      >
-                        <Eye className="w-3.5 h-3.5 shrink-0" />
-                        <span className="flex-1 truncate">{view.name}</span>
-                        {activeViewId === view.id && <Check className="w-3.5 h-3.5 shrink-0" />}
-                      </button>
-                    )}
-                    {!editingViewId && !view.isDefault && (
-                      <div className="flex items-center gap-0.5 pr-1.5 opacity-0 group-hover:opacity-100 transition shrink-0">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setEditingViewId(view.id); setEditingViewName(view.name); }}
-                          className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 transition"
-                          title="重命名"
-                        >
-                          <Pencil className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); deleteView(view.id); }}
-                          className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
-                          title="删除"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+        <OrderViewDropdown
+          views={views}
+          activeViewId={activeViewId}
+          activeView={activeView}
+          viewMenuOpenId={viewMenuOpenId}
+          editingViewId={editingViewId}
+          editingViewName={editingViewName}
+          viewMenuRef={viewMenuRef}
+          onToggleMenu={() => setViewMenuOpenId(viewMenuOpenId ? null : '__dropdown__')}
+          onCloseMenu={() => { setViewMenuOpenId(null); setEditingViewId(null); }}
+          onSwitchView={(viewId) => { switchView(viewId); setViewMenuOpenId(null); }}
+          onStartRename={(viewId, name) => { setEditingViewId(viewId); setEditingViewName(name); }}
+          onRenameView={renameView}
+          onCancelRename={() => setEditingViewId(null)}
+          onEditingViewNameChange={setEditingViewName}
+          onDeleteView={deleteView}
+        />
+        <div className="flex-1" />
+        {/* Search bar - kept inline */}
+        <div className="flex items-stretch h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] w-[280px] lg:w-[320px] shrink-0 focus-within:border-blue-400 dark:focus-within:border-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)] transition shadow-apple">
+            {/* Field selector */}
+            <div className="relative flex-shrink-0">
+                <button
+                    onClick={() => setIsSearchFieldOpen(v => !v)}
+                    className="h-full flex items-center gap-1.5 pl-3 pr-2.5 text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-white/5 rounded-l-lg border-r border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none whitespace-nowrap"
+                >
+                    {currentSearchOption.label}
+                    <ChevronDown className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform duration-150 ${isSearchFieldOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {isSearchFieldOpen && (
+                    <>
+                        <div className="fixed inset-0 z-40" onClick={() => setIsSearchFieldOpen(false)} />
+                        <div className="absolute left-0 top-full mt-1.5 w-28 bg-white dark:bg-[#2C2C2E] border border-gray-100 dark:border-white/10 rounded-xl shadow-xl z-50 py-1 animate-fade-in">
+                            {searchFieldOptions.map(opt => (
+                                <button
+                                    key={opt.value}
+                                    onClick={() => { setSearchField(opt.value); setSearchTerm(''); setIsSearchFieldOpen(false); }}
+                                    className={`w-full text-left px-3 py-2 text-sm font-medium transition-colors ${searchField === opt.value ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                )}
+            </div>
+            {/* Input */}
+            <div className="relative flex-1 flex items-center min-w-0">
+                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 pointer-events-none shrink-0" />
+                <input
+                    type="text"
+                    placeholder={currentSearchOption.placeholder}
+                    className="w-full h-full pl-8 pr-8 bg-transparent text-sm outline-none text-gray-900 dark:text-white placeholder:text-gray-400"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                {searchTerm && (
+                    <button onClick={() => setSearchTerm('')} className="absolute right-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-0.5 rounded">
+                        <X className="w-3.5 h-3.5" />
+                    </button>
+                )}
+            </div>
         </div>
 
-            <div className="flex-1" />
+        {/* 筛选 & 列配置（合并入口） */}
+        <button 
+            onClick={() => {
+                if (!isAdvancedFilterOpen && advancedFilters.length === 0) {
+                    const defaults = availableFilterFields.map((field, idx) => ({
+                        id: String(idx + 1),
+                        fieldId: field.id,
+                        mode: field.defaultMode,
+                        value: initValueForField(field.id, field.defaultMode),
+                    }));
+                    setAdvancedFilters(defaults);
+                }
+                setDrawerTab('filter');
+                setIsAdvancedFilterOpen(!isAdvancedFilterOpen);
+            }}
+            className={`relative p-2 rounded-lg border transition shadow-apple ${isAdvancedFilterOpen ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
+            title="筛选与列配置"
+        >
+            <SlidersHorizontal className="w-4 h-4" />
+            {appliedFilters.length > 0 && !isAdvancedFilterOpen && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#0071E3] dark:bg-[#0A84FF]" />
+            )}
+        </button>
 
-            {/* Search bar */}
-            <div className="flex items-stretch h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] w-[280px] lg:w-[320px] shrink-0 focus-within:border-blue-400 dark:focus-within:border-blue-500/60 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.1)] transition shadow-apple">
-                {/* Field selector */}
-                <div className="relative flex-shrink-0">
-                    <button
-                        onClick={() => setIsSearchFieldOpen(v => !v)}
-                        className="h-full flex items-center gap-1.5 pl-3 pr-2.5 text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-white/5 rounded-l-lg border-r border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none whitespace-nowrap"
-                    >
-                        {currentSearchOption.label}
-                        <ChevronDown className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform duration-150 ${isSearchFieldOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                    {isSearchFieldOpen && (
-                        <>
-                            <div className="fixed inset-0 z-40" onClick={() => setIsSearchFieldOpen(false)} />
-                            <div className="absolute left-0 top-full mt-1.5 w-28 bg-white dark:bg-[#2C2C2E] border border-gray-100 dark:border-white/10 rounded-xl shadow-xl z-50 py-1 animate-fade-in">
-                                {searchFieldOptions.map(opt => (
-                                    <button
-                                        key={opt.value}
-                                        onClick={() => { setSearchField(opt.value); setSearchTerm(''); setIsSearchFieldOpen(false); }}
-                                        className={`w-full text-left px-3 py-2 text-sm font-medium transition-colors ${searchField === opt.value ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'}`}
-                                    >
-                                        {opt.label}
-                                    </button>
+        {/* 重置按钮 */}
+        <button
+            onClick={() => {
+                setSearchTerm('');
+                setFilterStatus('All');
+                setFilterDateStart('');
+                setFilterDateEnd('');
+                setFilterAmountMin('');
+                setFilterAmountMax('');
+                setFilterSource('All');
+                setAdvancedFilters([]);
+                setAppliedFilters([]);
+            }}
+            className="p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-500 dark:text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:border-red-800 dark:hover:text-red-400 transition shadow-apple"
+            title="重置所有筛选"
+        >
+            <RotateCcw className="w-4 h-4" />
+        </button>
+
+        {hasPermission('order_create') && (
+            <div className="flex items-center gap-2">
+                {orderDrafts.length > 0 && (
+                    <div className="relative group">
+                        <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-100 dark:hover:bg-amber-900/40 transition">
+                            <Save className="w-3.5 h-3.5"/>
+                            草稿箱
+                            <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">{orderDrafts.length}</span>
+                        </button>
+                        {/* Draft dropdown */}
+                        <div className="absolute right-0 top-full mt-1 w-80 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden hidden group-focus-within:block group-hover:block">
+                            <div className="p-3 border-b border-gray-100 dark:border-white/10 flex justify-between items-center">
+                                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">暂存草稿</span>
+                                <span className="text-xs text-gray-400">{orderDrafts.length} 条</span>
+                            </div>
+                            <div className="max-h-64 overflow-y-auto">
+                                {orderDrafts.map(draft => (
+                                    <div key={draft.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-white/5 transition group/item border-b border-gray-50 dark:border-white/5 last:border-0">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-xs text-gray-500 dark:text-gray-400" style={{fontVariantNumeric:'tabular-nums'}}>{draft.id}</div>
+                                            <div className="text-xs text-gray-400 mt-0.5">
+                                                第 {draft.currentStep} 步 · {draft.buyerType || '未选类型'}
+                                                {draft.newOrderItems.length > 0 && ` · ${draft.newOrderItems.length} 个产品`}
+                                            </div>
+                                            <div className="text-[10px] text-gray-300 dark:text-gray-600 mt-0.5">{new Date(draft.savedAt).toLocaleString('zh-CN')}</div>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <button
+                                                onClick={() => { setResumeDraft(draft); setIsCreateOpen(true); }}
+                                                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-[#0071E3] dark:text-[#FF2D55] bg-blue-50 dark:bg-white/5 rounded-lg hover:bg-blue-100 dark:hover:bg-white/10 transition"
+                                            >
+                                                继续 <ChevronRight className="w-3 h-3"/>
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    setOrderDrafts(prev => prev.filter(d => d.id !== draft.id));
+                                                    if (apiMode) {
+                                                        try { const { orderApi } = await import('../../services/api'); await orderApi.delete(draft.id); } catch {}
+                                                    }
+                                                    setOrders(prev => prev.filter(o => o.id !== draft.id));
+                                                }}
+                                                className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+                                            >
+                                                <X className="w-3.5 h-3.5"/>
+                                            </button>
+                                        </div>
+                                    </div>
                                 ))}
                             </div>
-                        </>
-                    )}
-                </div>
-                {/* Input */}
-                <div className="relative flex-1 flex items-center min-w-0">
-                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 pointer-events-none shrink-0" />
-                    <input
-                        type="text"
-                        placeholder={currentSearchOption.placeholder}
-                        className="w-full h-full pl-8 pr-8 bg-transparent text-sm outline-none text-gray-900 dark:text-white placeholder:text-gray-400"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    {searchTerm && (
-                        <button onClick={() => setSearchTerm('')} className="absolute right-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-0.5 rounded">
-                            <X className="w-3.5 h-3.5" />
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {/* 筛选 & 列配置（合并入口） */}
-            <button 
-                onClick={() => {
-                    if (!isAdvancedFilterOpen && advancedFilters.length === 0) {
-                        const defaults = availableFilterFields.map((field, idx) => ({
-                            id: String(idx + 1),
-                            fieldId: field.id,
-                            mode: field.defaultMode,
-                            value: initValueForField(field.id, field.defaultMode),
-                        }));
-                        setAdvancedFilters(defaults);
-                    }
-                    setDrawerTab('filter');
-                    setIsAdvancedFilterOpen(!isAdvancedFilterOpen);
-                }}
-                className={`relative p-2 rounded-lg border transition shadow-apple ${isAdvancedFilterOpen ? 'bg-blue-50 border-blue-200 text-[#0071E3] dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400' : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400'}`}
-                title="筛选与列配置"
-            >
-                <SlidersHorizontal className="w-4 h-4" />
-                {appliedFilters.length > 0 && !isAdvancedFilterOpen && (
-                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#0071E3] dark:bg-[#0A84FF]" />
-                )}
-            </button>
-
-            {/* 重置按钮 */}
-            <button
-                onClick={() => {
-                    setSearchTerm('');
-                    setFilterStatus('All');
-                    setFilterDateStart('');
-                    setFilterDateEnd('');
-                    setFilterAmountMin('');
-                    setFilterAmountMax('');
-                    setFilterSource('All');
-                    setAdvancedFilters([]);
-                    setAppliedFilters([]);
-                }}
-                className="p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-gray-500 dark:text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:border-red-800 dark:hover:text-red-400 transition shadow-apple"
-                title="重置所有筛选"
-            >
-                <RotateCcw className="w-4 h-4" />
-            </button>
-
-            {hasPermission('order_create') && (
-                <div className="flex items-center gap-2">
-                    {orderDrafts.length > 0 && (
-                        <div className="relative group">
-                            <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-100 dark:hover:bg-amber-900/40 transition">
-                                <Save className="w-3.5 h-3.5"/>
-                                草稿箱
-                                <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">{orderDrafts.length}</span>
-                            </button>
-                            {/* Draft dropdown */}
-                            <div className="absolute right-0 top-full mt-1 w-80 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden hidden group-focus-within:block group-hover:block">
-                                <div className="p-3 border-b border-gray-100 dark:border-white/10 flex justify-between items-center">
-                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">暂存草稿</span>
-                                    <span className="text-xs text-gray-400">{orderDrafts.length} 条</span>
-                                </div>
-                                <div className="max-h-64 overflow-y-auto">
-                                    {orderDrafts.map(draft => (
-                                        <div key={draft.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-white/5 transition group/item border-b border-gray-50 dark:border-white/5 last:border-0">
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-xs text-gray-500 dark:text-gray-400" style={{fontVariantNumeric:'tabular-nums'}}>{draft.id}</div>
-                                                <div className="text-xs text-gray-400 mt-0.5">
-                                                    第 {draft.currentStep} 步 · {draft.buyerType || '未选类型'}
-                                                    {draft.newOrderItems.length > 0 && ` · ${draft.newOrderItems.length} 个产品`}
-                                                </div>
-                                                <div className="text-[10px] text-gray-300 dark:text-gray-600 mt-0.5">{new Date(draft.savedAt).toLocaleString('zh-CN')}</div>
-                                            </div>
-                                            <div className="flex items-center gap-1 shrink-0">
-                                                <button
-                                                    onClick={() => { setResumeDraft(draft); setIsCreateOpen(true); }}
-                                                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-[#0071E3] dark:text-[#FF2D55] bg-blue-50 dark:bg-white/5 rounded-lg hover:bg-blue-100 dark:hover:bg-white/10 transition"
-                                                >
-                                                    继续 <ChevronRight className="w-3 h-3"/>
-                                                </button>
-                                                <button
-                                                    onClick={async () => {
-                                                        setOrderDrafts(prev => prev.filter(d => d.id !== draft.id));
-                                                        if (apiMode) {
-                                                            try { const { orderApi } = await import('../../services/api'); await orderApi.delete(draft.id); } catch {}
-                                                        }
-                                                        setOrders(prev => prev.filter(o => o.id !== draft.id));
-                                                    }}
-                                                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"
-                                                >
-                                                    <X className="w-3.5 h-3.5"/>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
                         </div>
-                    )}
-                    <button onClick={() => { setResumeDraft(undefined); setIsCreateOpen(true); }} className="unified-button-primary">
-                        <Plus className="w-4 h-4" /> 新建订单
-                    </button>
-                </div>
-            )}
+                    </div>
+                )}
+                <button onClick={() => { setResumeDraft(undefined); setIsCreateOpen(true); }} className="unified-button-primary">
+                    <Plus className="w-4 h-4" /> 新建订单
+                </button>
+            </div>
+        )}
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col gap-2.5">
-        {/* Status Filter Tabs */}
-        {(() => {
-          const shippingIds = new Set(['STOCK_AUTH', 'STOCK_PKG', 'STOCK_SHIP', 'STOCK_CD']);
-          const successIds = new Set<string>([OrderStatus.SHIPPED, OrderStatus.DELIVERED]);
-          const warningIds = new Set<string>([OrderStatus.PENDING_PAYMENT]);
-          const getVariant = (id: string): 'primary' | 'shipping' | 'warning' | 'success' | 'danger' | 'muted' => {
-            if (shippingIds.has(id)) return 'shipping';
-            if (successIds.has(id)) return 'success';
-            if (warningIds.has(id)) return 'warning';
-            return 'primary';
-          };
-          const approvalGroup = pipelineStatuses.filter(s => !shippingIds.has(s.id) && !successIds.has(s.id) && !warningIds.has(s.id)).filter(s => hasPermission(s.permission));
-          const shippingGroup = pipelineStatuses.filter(s => shippingIds.has(s.id)).filter(s => hasPermission(s.permission));
-          const paymentGroup = pipelineStatuses.filter(s => warningIds.has(s.id)).filter(s => hasPermission(s.permission));
-          const sep = <div className="w-px h-6 bg-gray-200 dark:bg-white/10 mx-0.5 self-center shrink-0" />;
-          return (
-            <div className="flex flex-wrap items-center gap-1.5">
-              {approvalGroup.map(step => (
-                <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} variant={getVariant(step.id)} onClick={() => setFilterStatus(step.id)} />
-              ))}
-              {shippingGroup.length > 0 && sep}
-              {shippingGroup.map(step => (
-                <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} variant="shipping" onClick={() => setFilterStatus(step.id)} />
-              ))}
-              {paymentGroup.length > 0 && sep}
-              {paymentGroup.map(step => (
-                <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} variant="warning" onClick={() => setFilterStatus(step.id)} />
-              ))}
-            </div>
-          );
-        })()}
-
-        <div className="unified-card overflow-hidden flex-1 min-h-0 min-w-0 flex flex-col">
-            {/* ── 固定表头（不在滚动容器内，滚动条不延伸至此） ── */}
-            <div
-                ref={headerScrollRef}
-                className="overflow-x-auto no-scrollbar"
-                onScroll={(e) => { if (bodyScrollRef.current) bodyScrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
-            >
-              <table className="text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed', width: tableWidth }}>
-                {tableColGroup}
-                <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E]">
-                  <tr>
-                    <th className="pl-6 pr-2 py-2.5 sticky left-0 z-10 bg-gray-50 dark:bg-[#1C1C1E] border-b border-gray-200/50 dark:border-white/10 w-[52px] min-w-[52px] align-middle">
-                        <input 
-                            type="checkbox" 
-                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 align-middle"
-                            onChange={toggleSelectAll}
-                            checked={currentOrders.length > 0 && currentOrders.every(o => selectedOrderIds.has(o.id))}
-                        />
-                    </th>
-                    {orderedVisibleColumns.map(col => (
-                        <th key={col.id} className={`px-3 py-2.5 whitespace-nowrap border-b border-gray-200/50 dark:border-white/10 bg-gray-50 dark:bg-[#1C1C1E] ${
-                            col.id === 'id'
-                                ? 'sticky left-[52px] z-10 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.08)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.3)]'
-                                : col.id === 'action'
-                                ? 'sticky right-[52px] z-10 shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.08)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.3)] text-right'
-                                : ''
-                        }`}>{col.label}</th>
-                    ))}
-                    <th className="px-3 py-2.5 sticky right-0 z-10 bg-gray-50 dark:bg-[#1C1C1E] border-b border-gray-200/50 dark:border-white/10 w-[52px] min-w-[52px]"></th>
-                  </tr>
-                </thead>
-              </table>
-            </div>
-            {/* ── 可滚动表体（滚动条只在此区域） ── */}
-            <div
-                ref={bodyScrollRef}
-                className="overflow-x-auto overflow-y-auto flex-1 min-h-0 custom-scrollbar"
-                onScroll={(e) => { if (headerScrollRef.current) headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}
-            >
-          <table className="text-left border-separate border-spacing-0" style={{ tableLayout: 'fixed', width: tableWidth }}>
-            {tableColGroup}
-            <tbody className="divide-y divide-gray-100 dark:divide-white/5 text-sm">
-              {currentOrders.map(order => {
-                const isSelected = selectedOrderIds.has(order.id);
-                const stickyBg = isSelected
-                    ? 'bg-blue-50/80 dark:bg-blue-900/10'
-                    : 'bg-white dark:bg-[#1C1C1E] group-hover:bg-gray-50 dark:group-hover:bg-white/[0.03]';
-                return (
-                <tr key={order.id} className={`group hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors border-b border-gray-100/50 dark:border-white/5 last:border-0 ${isSelected ? '!bg-blue-50/50 dark:!bg-blue-900/10' : ''}`}>
-                  <td className={`pl-6 pr-2 py-2.5 sticky left-0 z-20 ${stickyBg} transition-colors align-middle`}>
-                      <input 
-                          type="checkbox" 
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 align-middle"
-                          checked={isSelected}
-                          onChange={() => toggleSelectOrder(order.id)}
-                      />
-                  </td>
-                  {orderedVisibleColumns.map(col => {
-                    const colId = col.id;
-                    switch (colId) {
-                      case 'id':
-                        return (
-                          <td key={colId} className={`px-3 py-2 sticky left-[52px] z-20 ${stickyBg} shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_6px_-2px_rgba(0,0,0,0.25)] transition-colors align-middle`}>
-                              <div className="relative">
-                                  <span
-                                      className={`text-sm font-semibold cursor-pointer hover:underline ${order.status === OrderStatus.DRAFT ? 'text-amber-500 dark:text-amber-400' : 'text-[#0071E3] dark:text-[#FF2D55]'}`}
-                                      style={{fontVariantNumeric:'tabular-nums'}}
-                                      onClick={() => navigate(`/orders/${order.id}`)}
-                                  >
-                                      {order.id}
-                                  </span>
-                                  <button
-                                      onClick={(e) => handleCopyOrderId(e, order.id)}
-                                      className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-white/10 text-gray-300 hover:text-gray-500 dark:hover:text-gray-300 transition-all"
-                                      title="复制订单编号"
-                                  >
-                                      {copiedOrderId === order.id
-                                          ? <Check className="w-3 h-3 text-green-500" />
-                                          : <Copy className="w-3 h-3" />}
-                                  </button>
-                              </div>
-                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                  <span className="group/tip relative">
-                                    {order.buyerType === 'Channel'    && <span className="unified-tag-indigo">{buyerTypeMap['Channel']}</span>}
-                                    {order.buyerType === 'SelfDeal'   && <span className="unified-tag-orange">{buyerTypeMap['SelfDeal']}</span>}
-                                    {order.buyerType === 'RedeemCode' && <span className="unified-tag-purple">{buyerTypeMap['RedeemCode']}</span>}
-                                    {(order.buyerType === 'Customer' || !order.buyerType) && <span className="unified-tag-blue">{buyerTypeMap[order.buyerType || 'Customer']}</span>}
-                                    <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-7 px-1.5 py-0.5 rounded bg-gray-800 dark:bg-gray-700 text-[10px] text-white whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity z-30">订单类型</span>
-                                  </span>
-                                  <span className="group/tip relative">
-                                    {getStatusBadge(order.status)}
-                                    <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-7 px-1.5 py-0.5 rounded bg-gray-800 dark:bg-gray-700 text-[10px] text-white whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity z-30">订单状态</span>
-                                  </span>
-                                  <span className="group/tip relative text-xs font-semibold text-red-600 dark:text-red-400 whitespace-nowrap ml-auto" style={{fontVariantNumeric:'tabular-nums'}}>
-                                    ¥{(order.total ?? 0).toLocaleString()}
-                                    <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-7 px-1.5 py-0.5 rounded bg-gray-800 dark:bg-gray-700 text-[10px] text-white font-normal whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity z-30">订单应付金额</span>
-                                  </span>
-                              </div>
-                          </td>
-                        );
-                      case 'customer':
-                        return (
-                          <td key={colId} className="px-3 py-2.5 max-w-[180px]">
-                            <div 
-                                className="font-bold text-[#0071E3] dark:text-[#0A84FF] hover:underline transition-colors break-words cursor-pointer"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigate(`/customers/${order.customerId}`);
-                                }}
-                            >
-                                {order.customerName}
-                            </div>
-                          </td>
-                        );
-                      case 'buyer':
-                        return (
-                          <td key={colId} className="px-3 py-2.5 max-w-[180px]">
-                            {order.buyerType === 'Channel' ? (
-                                <div 
-                                    className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer break-words"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        const channelId = order.buyerId || channels.find(c => c.name === order.buyerName)?.id;
-                                        if (channelId) navigate(`/channels/${channelId}`);
-                                    }}
-                                >
-                                    {order.buyerName}
-                                </div>
-                            ) : (
-                                <div className="text-gray-500 dark:text-gray-400 break-words">
-                                    {order.customerName}
-                                </div>
-                            )}
-                          </td>
-                        );
-                      case 'products':
-                        return (
-                          <td key={colId} className="px-3 py-2.5">
-                              <div className="flex flex-col gap-1 max-w-[220px]">
-                                  {(order.items || []).slice(0, 1).map((item, idx) => (
-                                      <div key={idx} className="flex flex-col">
-                                          <div className="flex items-center justify-between gap-2">
-                                              <div className="relative group/pname min-w-0 flex-1">
-                                                  <div className="truncate font-medium text-gray-700 dark:text-gray-300">{item.productName}</div>
-                                                  <div className="absolute left-0 top-full mt-1.5 z-[9999] hidden group-hover/pname:block pointer-events-none">
-                                                      <div className="px-3 py-2 bg-gray-900/95 dark:bg-gray-100/95 text-white dark:text-gray-900 text-xs leading-relaxed rounded-lg shadow-lg max-w-xs whitespace-normal break-words animate-[tooltipIn_0.15s_ease-out]">{item.productName}</div>
-                                                  </div>
-                                              </div>
-                                              <span className="text-gray-400 shrink-0">×{item.quantity}</span>
-                                          </div>
-                                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                              {item.skuName && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">{item.skuName}</span>}
-                                              {item.licenseType && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg">{item.licenseType}</span>}
-                                              {item.subUnits && item.subUnits.length > 0 && <span className="inline-flex w-fit px-2 py-0.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg">下级×{item.subUnits.length}</span>}
-                                          </div>
-                                      </div>
-                                  ))}
-                                  {(order.items || []).length > 1 && (
-                                      <div className="mt-1 self-end" ref={productPopoverId === order.id ? productPopoverRef : undefined}>
-                                          <button
-                                              onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  if (productPopoverId === order.id) {
-                                                      setProductPopoverId(null);
-                                                      setPopoverPos(null);
-                                                  } else {
-                                                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                                      const popoverWidth = 288;
-                                                      const left = Math.max(4, rect.left - popoverWidth - 6);
-                                                      const top = rect.top - 8;
-                                                      setPopoverPos({ top, left });
-                                                      setProductPopoverId(order.id);
-                                                  }
-                                              }}
-                                              className="text-[10px] font-semibold text-[#0071E3] dark:text-[#0A84FF] bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-100 dark:border-blue-800 px-1.5 py-px rounded-full transition"
-                                          >
-                                              +{(order.items || []).length - 1} 更多
-                                          </button>
-                                      </div>
-                                  )}
-                              </div>
-                          </td>
-                        );
-                      case 'sales':
-                        return (
-                          <td key={colId} className="px-3 py-2.5 whitespace-nowrap">
-                              {(() => {
-                                  const user = users.find(u => u.id === order.salesRepId);
-                                  const rawName = order.salesRepName || '未分配';
-                                  const displayName = rawName.replace(/\s*\(.*\)\s*$/, '');
-                                  const initials = displayName.slice(0, 1);
-                                  return (
-                                      <div className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 rounded-lg transition-all group/user" onClick={(e) => { e.stopPropagation(); if (user) { setDetailsUser(user); setIsDrawerOpen(true); } }}>
-                                          <div className="relative shrink-0">
-                                              <img src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${rawName}`} className="w-7 h-7 rounded-full object-cover bg-gray-100 border border-gray-200 dark:border-white/10 transition-transform group-hover/user:scale-110" alt={displayName}
-                                                  onError={(e) => { const t = e.currentTarget; t.style.display='none'; const f = t.nextElementSibling as HTMLElement; if(f) f.style.display='flex'; }} />
-                                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 items-center justify-center text-white text-[10px] font-bold" style={{display:'none'}}>{initials}</div>
-                                              {user?.status === 'Active' && <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 border-2 border-white dark:border-[#1C1C1E] rounded-full"></div>}
-                                          </div>
-                                          <span className="font-semibold text-gray-900 dark:text-white group-hover/user:text-blue-600 transition-colors whitespace-nowrap">{displayName}</span>
-                                      </div>
-                                  );
-                              })()}
-                          </td>
-                        );
-                      case 'businessManager':
-                        return (
-                          <td key={colId} className="px-3 py-2.5 whitespace-nowrap">
-                              {(() => {
-                                  const user = users.find(u => u.id === order.businessManagerId);
-                                  const rawName = order.businessManagerName || '未分配';
-                                  const displayName = rawName.replace(/\s*\(.*\)\s*$/, '');
-                                  const initials = displayName.slice(0, 1);
-                                  return (
-                                      <div className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 p-1 rounded-lg transition-all group/user" onClick={(e) => { e.stopPropagation(); if (user) { setDetailsUser(user); setIsDrawerOpen(true); } }}>
-                                          <div className="relative shrink-0">
-                                              <img src={user?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${rawName}`} className="w-7 h-7 rounded-full object-cover bg-gray-100 border border-gray-200 dark:border-white/10 transition-transform group-hover/user:scale-110" alt={displayName}
-                                                  onError={(e) => { const t = e.currentTarget; t.style.display='none'; const f = t.nextElementSibling as HTMLElement; if(f) f.style.display='flex'; }} />
-                                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 items-center justify-center text-white text-[10px] font-bold" style={{display:'none'}}>{initials}</div>
-                                              {user?.status === 'Active' && <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 border-2 border-white dark:border-[#1C1C1E] rounded-full"></div>}
-                                          </div>
-                                          <span className="font-semibold text-gray-900 dark:text-white group-hover/user:text-blue-600 transition-colors whitespace-nowrap">{displayName}</span>
-                                      </div>
-                                  );
-                              })()}
-                          </td>
-                        );
-                      case 'department':
-                        return (
-                          <td key={colId} className="px-3 py-2.5">
-                              {(() => {
-                                  const user = users.find(u => u.id === order.salesRepId);
-                                  const fullPath = getDepartmentPath(user?.departmentId);
-                                  if (fullPath === '-') return <span className="text-gray-400">-</span>;
-                                  const parts = fullPath.split(' / ');
-                                  return (
-                                      <div className="flex items-start gap-1 flex-wrap leading-snug">
-                                          {parts.map((part, idx) => (
-                                              <span key={idx} className="flex items-center gap-1">
-                                                  {idx > 0 && <span className="text-gray-300 dark:text-gray-600 text-[10px]">/</span>}
-                                                  <span className={`text-xs font-medium ${idx === parts.length - 1 ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>{part}</span>
-                                              </span>
-                                          ))}
-                                      </div>
-                                  );
-                              })()}
-                          </td>
-                        );
-                      case 'source':
-                        return <td key={colId} className="px-3 py-2.5 whitespace-nowrap">{getSourceBadge(order.source)}</td>;
-                      case 'buyerType':
-                        return (
-                          <td key={colId} className="px-3 py-2.5 whitespace-nowrap">
-                              {order.buyerType === 'Channel'    && <span className="unified-tag-indigo">{buyerTypeMap['Channel']}</span>}
-                              {order.buyerType === 'SelfDeal'   && <span className="unified-tag-orange">{buyerTypeMap['SelfDeal']}</span>}
-                              {order.buyerType === 'RedeemCode' && <span className="unified-tag-purple">{buyerTypeMap['RedeemCode']}</span>}
-                              {order.buyerType === 'Customer'   && <span className="unified-tag-blue">{buyerTypeMap['Customer']}</span>}
-                              {!order.buyerType                 && <span className="unified-tag-gray">{buyerTypeMap['Customer']}</span>}
-                          </td>
-                        );
-                      case 'date':
-                        return <td key={colId} className="px-3 py-2.5 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap" style={{fontVariantNumeric:'tabular-nums'}}>{new Date(order.date).toLocaleString('zh-CN', { hour12: false })}</td>;
-                      case 'status':
-                        return <td key={colId} className="px-3 py-2.5 whitespace-nowrap">{getStatusBadge(order.status)}</td>;
-                      case 'paymentStatus':
-                        return <td key={colId} className="px-3 py-2.5 whitespace-nowrap">{getPaymentStatusBadge(order.isPaid)}</td>;
-                      case 'stockStatus':
-                        return <td key={colId} className="px-3 py-2.5 whitespace-nowrap">{getStockStatusBadge(order)}</td>;
-                      case 'total':
-                        return <td key={colId} className="px-3 py-2.5 text-right font-bold text-red-600 dark:text-red-400 whitespace-nowrap" style={{fontVariantNumeric:'tabular-nums'}}>¥{(order.total ?? 0).toLocaleString()}</td>;
-                      case 'payment':
-                        return (
-                          <td key={colId} className="px-3 py-2.5 text-gray-600 dark:text-gray-300">
-                              {order.paymentMethod ? paymentMethodMap[order.paymentMethod] : '-'}
-                          </td>
-                        );
-                      case 'delivery':
-                        return (
-                          <td key={colId} className="px-3 py-2.5">
-                              {order.deliveryMethod ? (
-                                  <span className={`unified-tag ${
-                                      order.deliveryMethod === 'Online'  ? 'unified-tag-blue' :
-                                      order.deliveryMethod === 'Offline' ? 'unified-tag-orange' : 'unified-tag-indigo'
-                                  }`}>{deliveryMethodMap[order.deliveryMethod]}</span>
-                              ) : <span className="text-gray-400">-</span>}
-                          </td>
-                        );
-                      case 'address':
-                        return (
-                          <td key={colId} className="px-3 py-2.5 text-gray-500 dark:text-gray-400 max-w-[180px] truncate" title={order.shippingAddress}>
-                              {order.shippingAddress || '-'}
-                          </td>
-                        );
-                      case 'invoice':
-                        return (
-                          <td key={colId} className="px-3 py-2.5 text-gray-500 dark:text-gray-400 max-w-[150px] truncate" title={order.invoiceInfo?.title}>
-                              {order.invoiceInfo?.title || '-'}
-                          </td>
-                        );
-                      case 'licensee':
-                        return (
-                          <td key={colId} className="px-3 py-2.5 max-w-[200px]">
-                              {(() => {
-                                  const licensees = [...new Set((order.items || []).map(i => i.licensee).filter(Boolean))];
-                                  if (licensees.length === 0) return <span className="text-gray-400">-</span>;
-                                  return (
-                                    <div className="flex flex-col gap-1">
-                                      <div className="relative group/lic">
-                                        <div className="truncate text-sm font-medium text-gray-700 dark:text-gray-300">{licensees[0]}</div>
-                                        <div className="absolute left-0 top-full mt-1.5 z-[9999] hidden group-hover/lic:block pointer-events-none">
-                                          <div className="px-3 py-2 bg-gray-900/95 dark:bg-gray-100/95 text-white dark:text-gray-900 text-xs leading-relaxed rounded-lg shadow-lg max-w-xs whitespace-normal break-words animate-[tooltipIn_0.15s_ease-out]">{licensees[0]}</div>
-                                        </div>
-                                      </div>
-                                      {licensees.length > 1 && (
-                                        <div className="relative group/licmore self-start">
-                                          <span className="text-[10px] font-semibold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800 px-1.5 py-px rounded-full cursor-default">
-                                            +{licensees.length - 1} 被授权方
-                                          </span>
-                                          <div className="absolute left-0 top-full mt-1.5 z-[9999] hidden group-hover/licmore:block">
-                                            <div className="px-3 py-2.5 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl min-w-[180px] max-w-xs">
-                                              <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5">全部被授权方（{licensees.length}）</div>
-                                              <div className="space-y-1">
-                                                {licensees.map((lic, li) => (
-                                                  <div key={li} className="text-xs text-gray-700 dark:text-gray-300 leading-snug break-words">{lic}</div>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                              })()}
-                          </td>
-                        );
-                      case 'opportunity':
-                        return (
-                          <td key={colId} className="px-3 py-2.5 text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer max-w-[150px] truncate" title={order.opportunityName} onClick={(e) => { e.stopPropagation(); if (order.opportunityId) navigate(`/opportunities/${order.opportunityId}`); }}>
-                              {order.opportunityName || '-'}
-                          </td>
-                        );
-                      case 'action': {
-                        const actionContent = getAction(order);
-                        const hasAction = actionContent !== null;
-                        return (
-                          <td key={colId} className={`px-3 py-2.5 text-right whitespace-nowrap sticky right-[52px] z-20 transition-colors overflow-visible ${hasAction ? `${stickyBg} shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.06)] dark:shadow-[-2px_0_6px_-2px_rgba(0,0,0,0.25)]` : ''}`}>
-                              {actionContent}
-                          </td>
-                        );
-                      }
-                      default:
-                        return <td key={colId} className="px-3 py-2.5 text-gray-400">-</td>;
-                    }
-                  })}
-                  <td className={`px-3 py-2.5 sticky right-0 z-10 w-[52px] min-w-[52px] ${stickyBg} transition-colors`} />
-                </tr>
-                );
-              })}
-              {currentOrders.length === 0 && <tr><td colSpan={visibleColumns.length + 2} className="p-12 text-center text-gray-400">暂无订单数据</td></tr>}
-            </tbody>
-          </table>
-        </div>
-        
-        <div className="flex items-center px-5 py-3.5 border-t border-gray-100/50 dark:border-white/10 bg-gray-50/30 dark:bg-white/5 shrink-0">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              共 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF]">{filteredOrders.length}</span> 条
-            </span>
-            <button
-                onClick={handleCopyTable}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition ml-4 ${
-                    tableCopied
-                        ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
-                        : 'bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/10'
-                }`}
-                title="复制当前页表格数据（可粘贴到 Excel）"
-            >
-                {tableCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                {tableCopied ? '已复制' : '复制表格'}
-            </button>
-            <Pagination
-                page={safePage}
-                size={itemsPerPage}
-                total={filteredOrders.length}
-                onPageChange={setCurrentPage}
-                onSizeChange={(s) => { setItemsPerPage(s); setCurrentPage(1); }}
-                sizeOptions={[20, 50, 100]}
-                className="flex items-center gap-3 ml-auto"
-                hideTotal
-            />
-        </div>
-      </div>
-    </div>
-
-      {/* Product Popover — fixed to viewport, avoids table clipping */}
-      {productPopoverId && popoverPos && (() => {
-          const order = orders.find(o => o.id === productPopoverId);
-          if (!order) return null;
-          return (
-              <div
-                  ref={productPopoverRef}
-                  style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left, zIndex: 9999, width: 288 }}
-                  className="bg-white dark:bg-[#2C2C2E] rounded-2xl shadow-2xl border border-gray-100 dark:border-white/10 overflow-hidden animate-fade-in"
-                  onClick={e => e.stopPropagation()}
-              >
-                  <div className="px-4 py-2.5 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
-                      <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">全部产品（{(order.items || []).length}）</span>
-                      <button onClick={() => { setProductPopoverId(null); setPopoverPos(null); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition">
-                          <X className="w-3.5 h-3.5" />
-                      </button>
-                  </div>
-                  <div className="p-3 space-y-2.5 max-h-96 overflow-y-auto custom-scrollbar">
-                      {(order.items || []).map((item, idx) => (
-                          <div key={idx} className="flex flex-col gap-1 pb-2.5 border-b border-gray-50 dark:border-white/5 last:border-0 last:pb-0">
-                              <div className="flex items-center justify-between gap-2">
-                                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200 leading-snug">{item.productName}</span>
-                                  <span className="text-xs text-gray-400 shrink-0">×{item.quantity}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                  {item.skuName && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-[#0071E3] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">{item.skuName}</span>}
-                                  {item.licenseType && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg">{item.licenseType}</span>}
-                                  {item.subUnits && item.subUnits.length > 0 && <span className="inline-flex px-2 py-0.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg">下级×{item.subUnits.length}</span>}
-                              </div>
-                          </div>
-                      ))}
-                  </div>
-              </div>
-          );
+      {/* Status Filter Tabs */}
+      {(() => {
+        const shippingIds = new Set(['STOCK_AUTH', 'STOCK_PKG', 'STOCK_SHIP', 'STOCK_CD']);
+        const successIds = new Set<string>([OrderStatus.SHIPPED, OrderStatus.DELIVERED]);
+        const warningIds = new Set<string>([OrderStatus.PENDING_PAYMENT]);
+        const getVariant = (id: string): 'primary' | 'shipping' | 'warning' | 'success' | 'danger' | 'muted' => {
+          if (shippingIds.has(id)) return 'shipping';
+          if (successIds.has(id)) return 'success';
+          if (warningIds.has(id)) return 'warning';
+          return 'primary';
+        };
+        const approvalGroup = pipelineStatuses.filter(s => !shippingIds.has(s.id) && !successIds.has(s.id) && !warningIds.has(s.id)).filter(s => hasPermission(s.permission));
+        const shippingGroup = pipelineStatuses.filter(s => shippingIds.has(s.id)).filter(s => hasPermission(s.permission));
+        const paymentGroup = pipelineStatuses.filter(s => warningIds.has(s.id)).filter(s => hasPermission(s.permission));
+        const sep = <div className="w-px h-6 bg-gray-200 dark:bg-white/10 mx-0.5 self-center shrink-0" />;
+        return (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {approvalGroup.map(step => (
+              <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} variant={getVariant(step.id)} onClick={() => setFilterStatus(step.id)} />
+            ))}
+            {shippingGroup.length > 0 && sep}
+            {shippingGroup.map(step => (
+              <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} variant="shipping" onClick={() => setFilterStatus(step.id)} />
+            ))}
+            {paymentGroup.length > 0 && sep}
+            {paymentGroup.map(step => (
+              <StatusFilterCard key={step.id} id={step.id} label={step.label} icon={step.icon} count={statusCounts[step.id] || 0} isActive={filterStatus === step.id} variant="warning" onClick={() => setFilterStatus(step.id)} />
+            ))}
+          </div>
+        );
       })()}
+        <OrderTable
+          currentOrders={currentOrders}
+          filteredOrdersCount={listTotal}
+          visibleColumns={visibleColumns}
+          orderedVisibleColumns={orderedVisibleColumns}
+          tableColGroup={tableColGroup}
+          tableWidth={tableWidth}
+          selectedOrderIds={selectedOrderIds}
+          headerScrollRef={headerScrollRef}
+          bodyScrollRef={bodyScrollRef}
+          productPopoverId={productPopoverId}
+          popoverPos={popoverPos}
+          productPopoverRef={productPopoverRef}
+          copiedOrderId={copiedOrderId}
+          tableCopied={tableCopied}
+          safePage={safePage}
+          itemsPerPage={activePageSize}
+          orders={orders}
+          users={users}
+          departments={departments}
+          channels={channels}
+          onToggleSelectAll={toggleSelectAll}
+          onToggleSelectOrder={toggleSelectOrder}
+          onCopyOrderId={handleCopyOrderId}
+          onCopyTable={handleCopyTable}
+          onPageChange={(p) => {
+            if (useServerOrderPaging) orderQuery.setPage(p);
+            else setCurrentPage(p);
+          }}
+          onSizeChange={(s) => {
+            setItemsPerPage(s);
+            if (useServerOrderPaging) orderQuery.setSize(s);
+            else setCurrentPage(1);
+          }}
+          onProductPopoverToggle={(orderId, rect) => {
+            const popoverWidth = 288;
+            const left = Math.max(4, rect.left - popoverWidth - 6);
+            const top = rect.top - 8;
+            setPopoverPos({ top, left });
+            setProductPopoverId(orderId);
+          }}
+          onProductPopoverClose={() => { setProductPopoverId(null); setPopoverPos(null); }}
+          onUserClick={(user) => { setDetailsUser(user); setIsDrawerOpen(true); }}
+          getDepartmentPath={getDepartmentPath}
+          getStatusBadge={getStatusBadge}
+          getPaymentStatusBadge={getPaymentStatusBadge}
+          getStockStatusBadge={getStockStatusBadge}
+          getSourceBadge={getSourceBadge}
+          getAction={getAction}
+        />
+      </div>
 
-      {/* Unified Filter & Column Config Drawer */}
       {isAdvancedFilterOpen && (
         <ModalPortal>
         <div className="fixed inset-0 z-[500]">
           <div
             className={`absolute inset-0 pointer-events-auto ${isFilterClosing ? 'animate-backdrop-exit' : 'animate-backdrop-enter'} bg-black/40 backdrop-blur-sm`}
             onClick={closeFilterDrawer}
-          />
+          ></div>
           <div className={`absolute right-0 inset-y-0 w-full max-w-[560px] pointer-events-auto bg-white dark:bg-[#1C1C1E] shadow-2xl flex flex-col border-l border-gray-200/50 dark:border-white/10 ${isFilterClosing ? 'animate-drawer-exit' : 'animate-drawer-enter'}`}>
-            {/* Header with Tabs */}
             <div className="border-b border-gray-100 dark:border-white/10 shrink-0">
                 <div className="px-5 pt-4 pb-0 flex items-center justify-between">
                     <div className="flex items-center gap-1 bg-gray-100 dark:bg-white/5 rounded-lg p-0.5">
@@ -1708,448 +1178,66 @@ const OrderManager: React.FC = () => {
                 </div>
                 <div className="h-3" />
             </div>
-
-            {/* Tab: Filter */}
             {drawerTab === 'filter' && (
-              <>
-                <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
-                    <div className="space-y-4 mb-8">
-                        {advancedFilters.length === 0 && (
-                            <div className="text-center py-12 border-2 border-dashed border-gray-100 dark:border-white/5 rounded-2xl">
-                                <p className="text-sm text-gray-400">暂无筛选条件，点击下方按钮添加</p>
-                            </div>
-                        )}
-                        {advancedFilters.map((filter) => {
-                            const isMultiCheckbox = multiCheckboxFields.includes(filter.fieldId);
-                            const isPersonPicker = personPickerFields.includes(filter.fieldId);
-                            const isDateFilter = dateFilterFields.includes(filter.fieldId);
-                            const isAmountFilter = amountFilterFields.includes(filter.fieldId);
-                            const selectedArr = Array.isArray(filter.value) ? filter.value as string[] : [];
-                            const amountVal = (filter.value && typeof filter.value === 'object' && 'min' in filter.value) ? filter.value as { min: string; max: string } : { min: '', max: '' };
-                            const checkboxOpts = getCheckboxOptions(filter.fieldId);
-                            const fieldLabel = availableFilterFields.find(f => f.id === filter.fieldId)?.label || '选择字段';
-                            const isFieldOpen = activeDropdown?.filterId === filter.id && activeDropdown.type === 'field';
-                            const isModeOpen = activeDropdown?.filterId === filter.id && activeDropdown.type === 'mode';
-                            const isValueOpen = activeDropdown?.filterId === filter.id && activeDropdown.type === 'value';
-                            const bmIds = isPersonPicker ? [...new Set(orders.filter(o => o.businessManagerId).map(o => o.businessManagerId as string))] : [];
-                            const bmUsers = isPersonPicker ? bmIds.map(id => users.find(u => u.id === id)).filter(Boolean) as typeof users : [];
-                            const selectedUser = isPersonPicker ? bmUsers.find(u => u.id === filter.value) : undefined;
-                            return (
-                            <div key={filter.id} className="flex items-start gap-2">
-                                <div className="w-[120px] shrink-0">
-                                    <button
-                                        onMouseDown={(e) => { e.stopPropagation(); toggleDropdown(e, filter.id, 'field'); }}
-                                        className={`w-full flex items-center justify-between px-3 py-2.5 text-xs bg-gray-50 dark:bg-black/30 border rounded-xl transition hover:border-[#0071E3]/50 ${isFieldOpen ? 'border-[#0071E3] ring-2 ring-[#0071E3]/20' : 'border-gray-200 dark:border-white/10'}`}
-                                    >
-                                        <span className="text-gray-900 dark:text-white truncate">{fieldLabel}</span>
-                                        <ChevronDown className={`w-3.5 h-3.5 text-gray-400 shrink-0 ml-1 transition-transform ${isFieldOpen ? 'rotate-180' : ''}`} />
-                                    </button>
-                                </div>
-                                <div className="w-[64px] shrink-0">
-                                    {(isMultiCheckbox || isPersonPicker || isAmountFilter) ? (
-                                        <div className="px-2 py-2.5 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-400 text-center select-none">
-                                            {isMultiCheckbox ? '多选' : isPersonPicker ? '单选' : '范围'}
-                                        </div>
-                                    ) : (
-                                        <button
-                                            onMouseDown={(e) => { e.stopPropagation(); toggleDropdown(e, filter.id, 'mode'); }}
-                                            className={`w-full flex items-center justify-between px-2 py-2.5 text-xs bg-gray-50 dark:bg-black/30 border rounded-xl transition hover:border-[#0071E3]/50 ${isModeOpen ? 'border-[#0071E3] ring-2 ring-[#0071E3]/20' : 'border-gray-200 dark:border-white/10'}`}
-                                        >
-                                            <span className="text-gray-900 dark:text-white truncate">{filter.mode}</span>
-                                            <ChevronDown className={`w-3 h-3 text-gray-400 shrink-0 ml-0.5 transition-transform ${isModeOpen ? 'rotate-180' : ''}`} />
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    {isAmountFilter ? (
-                                        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-xl">
-                                            <span className="text-xs text-gray-400 shrink-0">¥</span>
-                                            <input type="number" placeholder="最小" className="bg-transparent text-sm dark:text-white outline-none w-full min-w-0" value={amountVal.min} onChange={(e) => updateFilterCondition(filter.id, { value: { ...amountVal, min: e.target.value } })} />
-                                            <span className="text-gray-300 shrink-0">—</span>
-                                            <input type="number" placeholder="最大" className="bg-transparent text-sm dark:text-white outline-none w-full min-w-0" value={amountVal.max} onChange={(e) => updateFilterCondition(filter.id, { value: { ...amountVal, max: e.target.value } })} />
-                                        </div>
-                                    ) : isDateFilter && filter.mode === '时间段' ? (
-                                        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-xl">
-                                            <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                            <input type="date" className="bg-transparent text-xs dark:text-white outline-none flex-1 min-w-0" value={(filter.value as any)?.start || ''} onChange={(e) => updateFilterCondition(filter.id, { value: { ...(filter.value as any), start: e.target.value } })} />
-                                            <span className="text-gray-300 shrink-0">—</span>
-                                            <input type="date" className="bg-transparent text-xs dark:text-white outline-none flex-1 min-w-0" value={(filter.value as any)?.end || ''} onChange={(e) => updateFilterCondition(filter.id, { value: { ...(filter.value as any), end: e.target.value } })} />
-                                        </div>
-                                    ) : isDateFilter && filter.mode === '时间点' ? (
-                                        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-xl">
-                                            <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                            <input type="date" className="bg-transparent text-sm dark:text-white outline-none w-full" value={typeof filter.value === 'string' ? filter.value : ''} onChange={(e) => updateFilterCondition(filter.id, { value: e.target.value })} />
-                                        </div>
-                                    ) : (isMultiCheckbox || isPersonPicker) ? (
-                                        <button
-                                            onMouseDown={(e) => { e.stopPropagation(); toggleDropdown(e, filter.id, 'value'); }}
-                                            className={`w-full flex items-center justify-between px-3 py-2.5 text-sm bg-gray-50 dark:bg-black/30 border rounded-xl transition hover:border-[#0071E3]/50 ${isValueOpen ? 'border-[#0071E3] ring-2 ring-[#0071E3]/20' : 'border-gray-200 dark:border-white/10'}`}
-                                        >
-                                            {isPersonPicker ? (
-                                                selectedUser ? (
-                                                    <span className="flex items-center gap-2 truncate">
-                                                        <img src={selectedUser.avatar} className="w-5 h-5 rounded-full shrink-0" alt="" onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedUser.name)}&background=0071E3&color=fff&size=40`; }} />
-                                                        <span className="text-gray-700 dark:text-gray-200 truncate">{selectedUser.name}</span>
-                                                    </span>
-                                                ) : <span className="text-gray-400">点击选择…</span>
-                                            ) : (
-                                                <span className={`text-left truncate ${selectedArr.length === 0 ? 'text-gray-400' : 'text-gray-700 dark:text-gray-200'}`}>
-                                                    {selectedArr.length === 0 ? '点击选择…' : selectedArr.map(v => checkboxOpts.find(o => o.value === v)?.label || v).join('、')}
-                                                </span>
-                                            )}
-                                            <span className="flex items-center gap-1 shrink-0 ml-2">
-                                                {isMultiCheckbox && selectedArr.length > 0 && (
-                                                    <span className="unified-button-primary text-[10px] bg-[#0071E3] w-5 h-5">{selectedArr.length}</span>
-                                                )}
-                                                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isValueOpen ? 'rotate-180' : ''}`} />
-                                            </span>
-                                        </button>
-                                    ) : (
-                                        <button
-                                            onMouseDown={(e) => { e.stopPropagation(); toggleDropdown(e, filter.id, 'value'); }}
-                                            className={`w-full flex items-center justify-between px-3 py-2.5 text-sm bg-gray-50 dark:bg-black/30 border rounded-xl transition hover:border-[#0071E3]/50 ${isValueOpen ? 'border-[#0071E3] ring-2 ring-[#0071E3]/20' : 'border-gray-200 dark:border-white/10'}`}
-                                        >
-                                            <span className="text-gray-900 dark:text-white truncate">{filter.value as string || '全部'}</span>
-                                            <ChevronDown className={`w-3.5 h-3.5 text-gray-400 shrink-0 ml-2 transition-transform ${isValueOpen ? 'rotate-180' : ''}`} />
-                                        </button>
-                                    )}
-                                </div>
-                                <button onClick={() => removeFilterCondition(filter.id)} className="p-2.5 text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition shrink-0">
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </div>
-                            );
-                        })}
-                    </div>
-
-                    <button 
-                        onClick={addFilterCondition}
-                        className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-xl"
-                    >
-                        <Plus className="w-4 h-4" />
-                        添加筛选条件
-                    </button>
-                </div>
-
-                <div className="p-5 bg-gray-50/50 dark:bg-white/5 border-t border-gray-100 dark:border-white/10 shrink-0">
-                    {showSaveView && drawerTab === 'filter' ? (
-                      <div className="flex items-center gap-2 mb-3">
-                        <Eye className="w-4 h-4 text-emerald-500 shrink-0" />
-                        <input
-                          autoFocus
-                          value={saveViewName}
-                          onChange={e => setSaveViewName(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter' && saveViewName.trim()) saveCurrentAsView(saveViewName.trim()); if (e.key === 'Escape') setShowSaveView(false); }}
-                          placeholder="输入视图名称…"
-                          className="flex-1 h-8 px-3 text-sm border border-gray-200 dark:border-white/10 rounded-lg bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white outline-none focus:border-emerald-400 dark:focus:border-emerald-600 placeholder:text-gray-400 transition"
-                        />
-                        <button
-                          onClick={() => { if (saveViewName.trim()) saveCurrentAsView(saveViewName.trim()); }}
-                          disabled={!saveViewName.trim()}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                        >保存</button>
-                        <button onClick={() => setShowSaveView(false)} className="px-2 py-1.5 rounded-lg text-xs text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition">取消</button>
-                      </div>
-                    ) : null}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <button onClick={clearAdvancedFilters} className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-white dark:hover:bg-white/10 transition-all">重置</button>
-                        {!showSaveView && (
-                          <button
-                            onClick={() => { setShowSaveView(true); setSaveViewName(''); }}
-                            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            存为视图
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                          <button onClick={closeFilterDrawer} className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">取消</button>
-                          <button onClick={applyFilters} className="unified-button-primary bg-[#0071E3] shadow-blue-500/25">查询</button>
-                      </div>
-                    </div>
-                </div>
-              </>
+              <OrderFilterDrawerTab
+                advancedFilters={advancedFilters}
+                appliedFilters={appliedFilters}
+                activeDropdown={activeDropdown}
+                showSaveView={showSaveView}
+                saveViewName={saveViewName}
+                orders={orders}
+                users={users}
+                onAddFilter={addFilterCondition}
+                onRemoveFilter={removeFilterCondition}
+                onUpdateFilter={updateFilterCondition}
+                onToggleDropdown={toggleDropdown}
+                onToggleMultiValue={toggleMultiValue}
+                onClearFilters={clearAdvancedFilters}
+                onApplyFilters={applyFilters}
+                onCloseDrawer={closeFilterDrawer}
+                onShowSaveView={() => { setShowSaveView(true); setSaveViewName(''); }}
+                onHideSaveView={() => setShowSaveView(false)}
+                onSaveViewNameChange={setSaveViewName}
+                onSaveCurrentAsView={saveCurrentAsView}
+                getCheckboxOptions={getFilterCheckboxOptions}
+              />
             )}
-
-            {/* Tab: Column Config */}
-            {drawerTab === 'columns' && (() => {
-              const colFilteredAll = allColumns.filter(c => c.id !== 'action' && (!colSearch || c.label.includes(colSearch)));
-              const selectedSet = new Set(tempVisibleCols);
-              const orderedSelected = tempVisibleCols.filter(id => id !== 'action').map(id => allColumns.find(c => c.id === id)!).filter(Boolean);
-              const unselected = colFilteredAll.filter(c => !selectedSet.has(c.id));
-              return (
-                <>
-                  <div className="flex-1 overflow-y-auto custom-scrollbar">
-                    <div className="px-5 pt-4 pb-3">
-                      <input
-                        type="text"
-                        value={colSearch}
-                        onChange={e => setColSearch(e.target.value)}
-                        placeholder="搜索列字段…"
-                        className="w-full text-sm px-3.5 py-2 border border-gray-200 dark:border-white/10 rounded-xl bg-gray-50 dark:bg-black/30 outline-none text-gray-700 dark:text-gray-200 placeholder:text-gray-400 focus:border-blue-300 dark:focus:border-blue-600 transition"
-                      />
-                    </div>
-
-                    {/* Selected columns with drag reorder */}
-                    {orderedSelected.length > 0 && (
-                      <div className="px-5 pb-2">
-                        <div className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">已选字段 · {orderedSelected.length}</div>
-                        <div className="space-y-0.5">
-                          {orderedSelected.filter(c => !colSearch || c.label.includes(colSearch)).map((col) => {
-                            const isFixed = FIXED_COLUMNS.has(col.id);
-                            const tIdx = tempVisibleCols.indexOf(col.id);
-                            return (
-                              <div
-                                key={col.id}
-                                draggable={!isFixed}
-                                onDragStart={() => setColDragIdx(tIdx)}
-                                onDragOver={e => {
-                                  e.preventDefault();
-                                  if (colDragIdx === null || colDragIdx === tIdx) return;
-                                  const arr = [...tempVisibleCols];
-                                  const [item] = arr.splice(colDragIdx, 1);
-                                  arr.splice(tIdx, 0, item);
-                                  setTempVisibleCols(arr);
-                                  setColDragIdx(tIdx);
-                                }}
-                                onDragEnd={() => setColDragIdx(null)}
-                                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition group ${colDragIdx === tIdx ? 'bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-200 dark:ring-blue-800' : 'hover:bg-gray-50 dark:hover:bg-white/5'}`}
-                              >
-                                <GripVertical className={`w-3.5 h-3.5 shrink-0 ${isFixed ? 'text-transparent' : 'text-gray-300 dark:text-gray-600 cursor-grab'}`} />
-                                <input
-                                  type="checkbox"
-                                  checked
-                                  disabled={isFixed}
-                                  onChange={() => {
-                                    if (!isFixed) setTempVisibleCols(prev => prev.filter(id => id !== col.id));
-                                  }}
-                                  className="w-3.5 h-3.5 rounded border-gray-300 text-[#0071E3] shrink-0 disabled:opacity-40"
-                                />
-                                <span className="text-sm text-gray-800 dark:text-gray-200 flex-1">{col.label}</span>
-                                {isFixed && <span className="text-[10px] text-orange-500 font-medium shrink-0">固定</span>}
-                                {!isFixed && (
-                                  <button
-                                    onClick={() => setTempVisibleCols(prev => prev.filter(id => id !== col.id))}
-                                    className="text-gray-300 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition shrink-0"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Unselected columns */}
-                    {unselected.length > 0 && (
-                      <div className="px-5 pb-4">
-                        <div className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2 mt-3">可选字段 · {unselected.length}</div>
-                        <div className="space-y-0.5">
-                          {unselected.map(col => (
-                            <label key={col.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer transition">
-                              <span className="w-3.5" />
-                              <input
-                                type="checkbox"
-                                checked={false}
-                                onChange={() => {
-                                  setTempVisibleCols(prev => {
-                                    const actionIdx = prev.indexOf('action');
-                                    if (actionIdx >= 0) {
-                                      const next = [...prev];
-                                      next.splice(actionIdx, 0, col.id);
-                                      return next;
-                                    }
-                                    return [...prev, col.id];
-                                  });
-                                }}
-                                className="w-3.5 h-3.5 rounded border-gray-300 text-[#0071E3] shrink-0"
-                              />
-                              <span className="text-sm text-gray-500 dark:text-gray-400">{col.label}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-5 bg-gray-50/50 dark:bg-white/5 border-t border-gray-100 dark:border-white/10 shrink-0">
-                    {showSaveView && drawerTab === 'columns' ? (
-                      <div className="flex items-center gap-2 mb-3">
-                        <Eye className="w-4 h-4 text-emerald-500 shrink-0" />
-                        <input
-                          autoFocus
-                          value={saveViewName}
-                          onChange={e => setSaveViewName(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter' && saveViewName.trim()) saveCurrentAsView(saveViewName.trim()); if (e.key === 'Escape') setShowSaveView(false); }}
-                          placeholder="输入视图名称…"
-                          className="flex-1 h-8 px-3 text-sm border border-gray-200 dark:border-white/10 rounded-lg bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white outline-none focus:border-emerald-400 dark:focus:border-emerald-600 placeholder:text-gray-400 transition"
-                        />
-                        <button
-                          onClick={() => { if (saveViewName.trim()) saveCurrentAsView(saveViewName.trim()); }}
-                          disabled={!saveViewName.trim()}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                        >保存</button>
-                        <button onClick={() => setShowSaveView(false)} className="px-2 py-1.5 rounded-lg text-xs text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10 transition">取消</button>
-                      </div>
-                    ) : null}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => { setTempVisibleCols([...DEFAULT_VISIBLE]); }}
-                          className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-white dark:hover:bg-white/10 transition-all"
-                        >
-                          恢复默认
-                        </button>
-                        {!showSaveView && (
-                          <button
-                            onClick={() => { setShowSaveView(true); setSaveViewName(''); }}
-                            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            存为视图
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button onClick={closeFilterDrawer} className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">取消</button>
-                        <button
-                          onClick={() => { handleColumnConfigConfirm(tempVisibleCols); closeFilterDrawer(); }}
-                          className="unified-button-primary bg-[#0071E3] shadow-blue-500/25"
-                        >
-                          确 定
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              );
-            })()}
+            {drawerTab === 'columns' && (
+              <OrderColumnDrawerTab
+                tempVisibleCols={tempVisibleCols}
+                colSearch={colSearch}
+                colDragIdx={colDragIdx}
+                fixedColumns={FIXED_COLUMNS}
+                showSaveView={showSaveView}
+                saveViewName={saveViewName}
+                onColSearchChange={setColSearch}
+                onTempVisibleColsChange={setTempVisibleCols}
+                onColDragIdxChange={setColDragIdx}
+                onShowSaveView={() => { setShowSaveView(true); setSaveViewName(''); }}
+                onHideSaveView={() => setShowSaveView(false)}
+                onSaveViewNameChange={setSaveViewName}
+                onSaveCurrentAsView={saveCurrentAsView}
+                onRestoreDefault={() => setTempVisibleCols([...DEFAULT_VISIBLE])}
+                onCloseDrawer={closeFilterDrawer}
+                onConfirm={(cols) => { handleColumnConfigConfirm(cols); closeFilterDrawer(); }}
+              />
+            )}
           </div>
         </div>
         </ModalPortal>
       )}
 
-      {/* Unified filter dropdown — rendered via portal to escape any ancestor transform/overflow */}
-      {activeDropdown && (() => {
-          const f = advancedFilters.find(x => x.id === activeDropdown.filterId);
-          if (!f) return null;
-          const isMultiCheckbox = multiCheckboxFields.includes(f.fieldId);
-          const isPersonPicker = personPickerFields.includes(f.fieldId);
-          const baseStyle: React.CSSProperties = { position: 'fixed', zIndex: 9999, top: activeDropdown.top, left: activeDropdown.left, width: activeDropdown.width };
-          const baseClass = "bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden";
-
-          let content: React.ReactNode = null;
-
-          if (activeDropdown.type === 'field') {
-              content = (
-                  <div ref={dropdownRef} style={baseStyle} className={baseClass} onMouseDown={e => e.stopPropagation()}>
-                      <div className="py-1 max-h-64 overflow-y-auto custom-scrollbar">
-                          {availableFilterFields.map(field => {
-                              const isSelected = f.fieldId === field.id;
-                              const isUsed = advancedFilters.some(af => af.id !== f.id && af.fieldId === field.id);
-                              return (
-                                  <button key={field.id} disabled={isUsed} onMouseDown={(e) => { e.stopPropagation(); if (!isUsed) { updateFilterCondition(f.id, { fieldId: field.id, mode: field.defaultMode, value: initValueForField(field.id, field.defaultMode) }); setActiveDropdown(null); } }} className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition ${isUsed ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed' : isSelected ? 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] font-medium' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'}`}>
-                                      <span className="truncate">{field.label}</span>
-                                      {isSelected && <CheckCircle className="w-4 h-4 text-[#0071E3] shrink-0" />}
-                                  </button>
-                              );
-                          })}
-                      </div>
-                  </div>
-              );
-          } else if (activeDropdown.type === 'mode') {
-              const modeOpts = dateFilterFields.includes(f.fieldId)
-                  ? [{ value: '时间段', label: '时间段' }, { value: '时间点', label: '时间点' }]
-                  : [{ value: '单选', label: '单选' }, { value: '多选', label: '多选' }];
-              content = (
-                  <div ref={dropdownRef} style={baseStyle} className={baseClass} onMouseDown={e => e.stopPropagation()}>
-                      <div className="py-1 max-h-64 overflow-y-auto custom-scrollbar">
-                          {modeOpts.map(opt => {
-                              const isSelected = f.mode === opt.value;
-                              return (
-                                  <button key={opt.value} onMouseDown={(e) => { e.stopPropagation(); const newMode = opt.value as FilterMode; updateFilterCondition(f.id, { mode: newMode, value: newMode === '时间段' ? { start: '', end: '' } : newMode === '时间点' ? '' : initValueForField(f.fieldId, newMode) }); setActiveDropdown(null); }} className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] font-medium' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'}`}>
-                                      <span>{opt.label}</span>
-                                      {isSelected && <CheckCircle className="w-4 h-4 text-[#0071E3] shrink-0" />}
-                                  </button>
-                              );
-                          })}
-                      </div>
-                  </div>
-              );
-          } else if (activeDropdown.type === 'value') {
-              if (isMultiCheckbox) {
-                  const opts = getCheckboxOptions(f.fieldId);
-                  const selectedArr = Array.isArray(f.value) ? f.value as string[] : [];
-                  content = (
-                      <div ref={dropdownRef} style={baseStyle} className={baseClass} onMouseDown={e => e.stopPropagation()}>
-                          <div className="px-3 py-2 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
-                              <span className="text-xs font-semibold text-gray-500">选择筛选值</span>
-                              {selectedArr.length > 0 && <button onMouseDown={(e) => { e.stopPropagation(); updateFilterCondition(f.id, { value: [] }); }} className="text-xs text-gray-400 hover:text-red-500 transition">清除</button>}
-                          </div>
-                          <div className="py-1 max-h-64 overflow-y-auto custom-scrollbar">
-                              {opts.map(opt => {
-                                  const checked = selectedArr.includes(opt.value);
-                                  return (
-                                      <button key={opt.value} onMouseDown={(e) => { e.stopPropagation(); toggleMultiValue(f.id, opt.value); }} className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition ${checked ? 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3]' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'}`}>
-                                          <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition ${checked ? 'bg-[#0071E3] border-[#0071E3]' : 'border-gray-300 dark:border-gray-500'}`}>
-                                              {checked && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                                          </span>
-                                          <span className="text-left">{opt.label}</span>
-                                      </button>
-                                  );
-                              })}
-                          </div>
-                      </div>
-                  );
-              } else if (isPersonPicker) {
-                  const bmIds = [...new Set(orders.filter(o => o.businessManagerId).map(o => o.businessManagerId as string))];
-                  const bmUsers = bmIds.map(id => users.find(u => u.id === id)).filter(Boolean) as typeof users;
-                  content = (
-                      <div ref={dropdownRef} style={baseStyle} className={baseClass} onMouseDown={e => e.stopPropagation()}>
-                          <div className="px-3 py-2 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
-                              <span className="text-xs font-semibold text-gray-500">选择商务</span>
-                              {f.value && f.value !== '全部' && <button onMouseDown={(e) => { e.stopPropagation(); updateFilterCondition(f.id, { value: '全部' }); }} className="text-xs text-gray-400 hover:text-red-500 transition">清除</button>}
-                          </div>
-                          <div className="py-1 max-h-64 overflow-y-auto custom-scrollbar">
-                              {bmUsers.map(user => {
-                                  const checked = f.value === user.id;
-                                  return (
-                                      <button key={user.id} onMouseDown={(e) => { e.stopPropagation(); updateFilterCondition(f.id, { value: checked ? '全部' : user.id }); setActiveDropdown(null); }} className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition ${checked ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-white/5'}`}>
-                                          <img src={user.avatar} className="w-6 h-6 rounded-full shrink-0" alt="" onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=0071E3&color=fff&size=40`; }} />
-                                          <span className={`flex-1 text-left truncate ${checked ? 'text-[#0071E3] font-medium' : 'text-gray-700 dark:text-gray-200'}`}>{user.name}</span>
-                                          {checked && <div className="w-1.5 h-1.5 rounded-full bg-[#0071E3] shrink-0" />}
-                                      </button>
-                                  );
-                              })}
-                          </div>
-                      </div>
-                  );
-              } else {
-                  content = (
-                      <div ref={dropdownRef} style={baseStyle} className={baseClass} onMouseDown={e => e.stopPropagation()}>
-                          <div className="py-1 max-h-64 overflow-y-auto custom-scrollbar">
-                              {[{ value: '全部', label: '全部' }, { value: '不限', label: '不限' }].map(opt => {
-                                  const isSelected = f.value === opt.value;
-                                  return (
-                                      <button key={opt.value} onMouseDown={(e) => { e.stopPropagation(); updateFilterCondition(f.id, { value: opt.value }); setActiveDropdown(null); }} className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 text-[#0071E3] font-medium' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'}`}>
-                                          <span>{opt.label}</span>
-                                          {isSelected && <CheckCircle className="w-4 h-4 text-[#0071E3] shrink-0" />}
-                                      </button>
-                                  );
-                              })}
-                          </div>
-                      </div>
-                  );
-              }
-          }
-
-          return content ? ReactDOM.createPortal(content, document.body) : null;
-      })()}
-
+      <OrderFilterDropdownPortal
+        activeDropdown={activeDropdown}
+        advancedFilters={advancedFilters}
+        orders={orders}
+        users={users}
+        dropdownRef={dropdownRef}
+        onUpdateFilter={updateFilterCondition}
+        onToggleMultiValue={toggleMultiValue}
+        onCloseDropdown={() => setActiveDropdown(null)}
+        getCheckboxOptions={getFilterCheckboxOptions}
+      />
       {/* Batch Action Floating Bar */}
       {selectedOrderIds.size > 0 && (
           <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 animate-fade-in w-full px-4 md:w-auto md:px-0">

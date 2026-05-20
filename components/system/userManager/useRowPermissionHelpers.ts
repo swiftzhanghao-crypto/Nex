@@ -11,6 +11,8 @@ import {
   getRequiredPermIdsForResource,
 } from '../permissionConfig';
 
+type DeptTreeNode = { dept: Department; children: DeptTreeNode[] };
+
 /**
  * 行权限展示侧的辅助函数（维度选项列表、可读值、公式展示等）。
  */
@@ -245,7 +247,7 @@ export function useRowPermissionHelpers(
   );
 
   const buildDeptTree = useCallback(
-    (parentId?: string): Array<{ dept: Department; children: any[] }> => {
+    (parentId?: string): DeptTreeNode[] => {
       return departments
         .filter(d => (d.parentId || undefined) === parentId)
         .map(d => ({ dept: d, children: buildDeptTree(d.id) }));

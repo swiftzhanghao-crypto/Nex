@@ -12,11 +12,10 @@ import type Database from 'better-sqlite3';
  * 安全 JSON 解析：失败/空值返回 fallback，避免单条脏数据让接口 5xx。
  *
  * 重载：
- *   - 不带 fallback：返回 any，兼容旧用法（如 `safeJsonParse(row.extra)` 视为对象）；
+ *   - 不带 fallback：返回 unknown；
  *   - 带 fallback：返回 typeof fallback。
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function safeJsonParse(str: string | null | undefined): any;
+export function safeJsonParse(str: string | null | undefined): unknown;
 export function safeJsonParse<T>(str: string | null | undefined, fallback: T): T;
 export function safeJsonParse(str: string | null | undefined, fallback: unknown = {}): unknown {
     if (!str) return fallback;
@@ -56,17 +55,17 @@ export function parseRoles(raw: string | null): string[] {
  * - 业务规则：当一个订单存在多条产品明细时，不应包含任何下级单位授权信息。
  * - 这里做“服务端兜底”，避免历史脏数据/手工写库导致 UI 异常。
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function sanitizeOrderItemsSubUnits(items: any, buyerType?: string): any[] {
+export function sanitizeOrderItemsSubUnits(items: unknown, buyerType?: string): unknown[] {
     if (!Array.isArray(items)) return [];
     const shouldStrip = buyerType === 'SelfDeal' || items.length > 1;
     if (!shouldStrip) return items;
     let changed = false;
-    const next = items.map((it: any) => {
+    const next = items.map((it: unknown) => {
         if (!it || typeof it !== 'object') return it;
-        if (it.subUnitAuthMode !== undefined || it.subUnits !== undefined) {
+        const rec = it as Record<string, unknown>;
+        if (rec.subUnitAuthMode !== undefined || rec.subUnits !== undefined) {
             changed = true;
-            const { subUnitAuthMode: _m, subUnits: _s, ...rest } = it;
+            const { subUnitAuthMode: _m, subUnits: _s, ...rest } = rec;
             return rest;
         }
         return it;

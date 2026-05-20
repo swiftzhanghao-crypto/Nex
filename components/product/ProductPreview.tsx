@@ -7,6 +7,7 @@ import {
   ArrowLeft, Users, Landmark, Handshake, Info, Package, Eye, FileKey, Building2, LayoutGrid, Layers
 } from 'lucide-react';
 import { useAppContext } from '../../contexts/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const sectionNavItems = [
   { label: '组件信息', id: 'components-section' },
@@ -17,7 +18,8 @@ const sectionNavItems = [
 ];
 
 const ProductPreview: React.FC = () => {
-  const { products, currentUser, roles } = useAppContext();
+  const { products, roles } = useAppContext();
+  const { currentUser } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
 

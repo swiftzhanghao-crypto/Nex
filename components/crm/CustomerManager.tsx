@@ -1,12 +1,18 @@
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useNavigate } from 'react-router-dom';
 import { Customer } from '../../types';
-import { Search, Plus, X, Filter, RotateCcw, ChevronDown, Trash2, CheckCircle, Cloud, Loader2 } from 'lucide-react';
+import { Search, Plus, X, Filter, RotateCcw, ChevronDown, Trash2, CheckCircle, Cloud, Loader2, Upload } from 'lucide-react';
+import DataImportModal from '../common/DataImportModal';
 import ModalPortal from '../common/ModalPortal';
 import { useAppContext, useEnsureData } from '../../contexts/AppContext';
 import Pagination from '../common/Pagination';
-import { crmXsyApi, buildCrmXsyOAuthLoginUrl, getToken } from '../../services/api';
+import { Badge } from '../ui';
+import { crmXsyApi, buildCrmXsyOAuthLoginUrl, getToken, customerApi } from '../../services/api';
+import { usePagedQuery } from '../../hooks/usePagedQuery';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { buildCustomerListFilters, type CustomerListFilters } from '../../hooks/buildCustomerListParams';
 
 // ── 筛选字段定义 ─────────────────────────────────────────────────
 const customerFilterFields: { id: string; label: string; mode: '单选' | '多选' }[] = [
@@ -26,12 +32,57 @@ interface CFilterCondition {
 
 const CustomerManager: React.FC = () => {
   const { customers, filteredCustomers: rowFilteredCustomers, users, apiMode, refreshCustomers } = useAppContext();
-  useEnsureData(['customers']);
   const navigate = useNavigate();
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchField, setSearchField] = useState<'crmId' | 'companyName' | 'enterpriseId'>('crmId');
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [appliedFilters, setAppliedFilters] = useState<CFilterCondition[]>([]);
+
+  const customerNeedsClientDataset = useMemo(() => {
+    if (!apiMode) return true;
+    if (searchField === 'enterpriseId' && searchTerm.trim()) return true;
+    return appliedFilters.some((f) => f.mode === '多选' && f.value.length > 0);
+  }, [apiMode, searchField, searchTerm, appliedFilters]);
+
+  useEnsureData(customerNeedsClientDataset ? ['customers'] : []);
+
+  const debouncedSearch = useDebouncedValue(searchTerm, 350);
+  const apiListFilters = useMemo(
+    () => buildCustomerListFilters(appliedFilters, debouncedSearch, searchField),
+    [appliedFilters, debouncedSearch, searchField],
+  );
+
+  const customerQuery = usePagedQuery<Customer, CustomerListFilters>({
+    fetcher: (p) =>
+      customerApi.list({
+        page: p.page,
+        size: p.size,
+        search: p.search || undefined,
+        type: p.type || undefined,
+        level: p.level || undefined,
+        region: p.region || undefined,
+        industry: p.industry || undefined,
+      }),
+    initialFilters: apiListFilters,
+    initialSize: itemsPerPage,
+    autoFetch: apiMode && !customerNeedsClientDataset,
+  });
+
+  useEffect(() => {
+    if (!apiMode || customerNeedsClientDataset) return;
+    customerQuery.setFilters(apiListFilters, { resetPage: true });
+  }, [apiMode, customerNeedsClientDataset, apiListFilters]);
+
+  useEffect(() => {
+    if (!apiMode || customerNeedsClientDataset) return;
+    customerQuery.setSize(itemsPerPage);
+  }, [apiMode, customerNeedsClientDataset, itemsPerPage]);
 
   const [crmStatus, setCrmStatus] = useState<{ enabled: boolean; bound: boolean } | null>(null);
   const [crmSyncing, setCrmSyncing] = useState(false);
   const [crmBanner, setCrmBanner] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const loadCrmStatus = useCallback(() => {
     if (!apiMode) {
@@ -68,25 +119,25 @@ const CustomerManager: React.FC = () => {
     setCrmBanner(null);
     try {
       const r = await crmXsyApi.syncCustomers();
-      await refreshCustomers();
+      if (apiMode && !customerNeedsClientDataset) {
+        await customerQuery.refresh();
+      } else {
+        await refreshCustomers();
+      }
       setCrmBanner(`已从销售易同步 ${r.synced} 条客户（共拉取 ${r.total} 条）`);
-    } catch (e: any) {
-      setCrmBanner(e?.message || '同步失败');
+    } catch (e: unknown) {
+      setCrmBanner(e instanceof Error ? e.message : '同步失败');
     } finally {
       setCrmSyncing(false);
     }
   };
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchField, setSearchField] = useState<'crmId' | 'companyName' | 'enterpriseId'>('crmId');
   const [isSearchFieldOpen, setIsSearchFieldOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   // ── 筛选状态 ──────────────────────────────────────────────────
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isFilterClosing, setIsFilterClosing] = useState(false);
   const [draftFilters, setDraftFilters] = useState<CFilterCondition[]>([]);
-  const [appliedFilters, setAppliedFilters] = useState<CFilterCondition[]>([]);
   const [activeValueDropdown, setActiveValueDropdown] = useState<{ filterId: string; top: number; left: number; width: number } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -168,6 +219,9 @@ const CustomerManager: React.FC = () => {
       setAppliedFilters(draftFilters.filter(f => f.value.length > 0));
       closeFilterDrawer();
       setCurrentPage(1);
+      if (apiMode && !customerNeedsClientDataset) {
+        customerQuery.setPage(1);
+      }
   };
 
   const resetFilters = () => {
@@ -201,7 +255,7 @@ const CustomerManager: React.FC = () => {
   };
 
 
-  const filteredCustomers = rowFilteredCustomers.filter(c => {
+  const clientFilteredCustomers = rowFilteredCustomers.filter(c => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || (
         searchField === 'crmId'        ? c.id.toLowerCase().includes(searchLower) :
@@ -224,23 +278,55 @@ const CustomerManager: React.FC = () => {
     return matchesSearch && matchesFilters;
   }).reverse();
 
-  const getLevelBadge = (level: string) => {
+  const useServerPaging = apiMode && !customerNeedsClientDataset;
+  const filteredCustomers = useServerPaging ? customerQuery.data : clientFilteredCustomers;
+  const listTotal = useServerPaging ? customerQuery.total : clientFilteredCustomers.length;
+  const activePage = useServerPaging ? customerQuery.page : currentPage;
+  const activePageSize = useServerPaging ? customerQuery.size : itemsPerPage;
+
+  const getLevelBadgeColor = (level: string): 'indigo' | 'blue' | 'green' | 'gray' => {
       switch(level) {
-          case '一级/中央级': return 'unified-tag-indigo';
-          case '二级/省级': return 'unified-tag-blue';
-          case '三级/市级': return 'unified-tag-green';
-          case '四级/县级': return 'unified-tag-gray';
-          default: return 'unified-tag-gray';
+          case '一级/中央级': return 'indigo';
+          case '二级/省级': return 'blue';
+          case '三级/市级': return 'green';
+          case '四级/县级': return 'gray';
+          default: return 'gray';
       }
   };
 
   // Pagination Logic
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentCustomers = filteredCustomers.slice(indexOfFirstItem, indexOfLastItem);
+  const indexOfLastItem = activePage * activePageSize;
+  const indexOfFirstItem = indexOfLastItem - activePageSize;
+  const currentCustomers = useServerPaging
+    ? filteredCustomers
+    : clientFilteredCustomers.slice(indexOfFirstItem, indexOfLastItem);
+  const useVirtualScroll = !useServerPaging && clientFilteredCustomers.length > 50;
+  const tableCustomers = useVirtualScroll ? clientFilteredCustomers : currentCustomers;
+
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: tableCustomers.length,
+    getScrollElement: () => tableScrollRef.current,
+    estimateSize: () => 68,
+    overscan: 8,
+    enabled: useVirtualScroll,
+  });
 
   const handlePageChange = (pageNumber: number) => {
-    setCurrentPage(pageNumber);
+    if (useServerPaging) {
+      customerQuery.setPage(pageNumber);
+    } else {
+      setCurrentPage(pageNumber);
+    }
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setItemsPerPage(size);
+    if (useServerPaging) {
+      customerQuery.setSize(size);
+    } else {
+      setCurrentPage(1);
+    }
   };
 
   const [enterprisePopover, setEnterprisePopover] = useState<{ customerId: string; top: number; left: number } | null>(null);
@@ -259,8 +345,8 @@ const CustomerManager: React.FC = () => {
 
 
   React.useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
+    if (!useServerPaging) setCurrentPage(1);
+  }, [searchTerm, useServerPaging]);
 
   return (
     <div className="page-container animate-page-enter h-full flex flex-col gap-4 min-w-0">
@@ -365,8 +451,28 @@ const CustomerManager: React.FC = () => {
             >
                 <RotateCcw className="w-4 h-4" />
             </button>
+            {apiMode && (
+              <button
+                type="button"
+                onClick={() => setImportOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] text-sm font-semibold text-gray-700 dark:text-gray-200 hover:border-[#0071E3]/40 hover:text-[#0071E3] transition shadow-apple"
+              >
+                <Upload className="w-4 h-4" />
+                导入
+              </button>
+            )}
         </div>
       </div>
+
+      <DataImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        target="customers"
+        onSuccess={async (n) => {
+          await refreshCustomers();
+          setCrmBanner(`成功导入 ${n} 条客户`);
+        }}
+      />
 
       {crmBanner && (
         <div
@@ -381,7 +487,7 @@ const CustomerManager: React.FC = () => {
       )}
 
       <div className="unified-card overflow-hidden flex-1 flex flex-col min-h-0">
-        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 custom-scrollbar">
+        <div ref={tableScrollRef} className="overflow-x-auto overflow-y-auto flex-1 min-h-0 custom-scrollbar">
           <table className="w-full text-left border-separate border-spacing-0">
             <thead className="unified-table-header bg-gray-50 dark:bg-[#1C1C1E] sticky top-0 z-10">
               <tr>
@@ -395,7 +501,8 @@ const CustomerManager: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-white/5 text-sm">
-              {currentCustomers.map(customer => {
+              {(() => {
+                const renderRow = (customer: Customer) => {
                 const enterprises = customer.enterprises || [];
                 const visibleEnterprises = enterprises.slice(0, 2);
                 const hiddenCount = enterprises.length - 2;
@@ -445,15 +552,15 @@ const CustomerManager: React.FC = () => {
                       )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="unified-tag-gray !rounded-lg">{customer.customerType || '—'}</span>
+                      <Badge color="gray" className="!rounded-lg">{customer.customerType || '—'}</Badge>
                     </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">
                       {customer.industryLine || customer.industry || <span className="text-gray-300 dark:text-gray-600">—</span>}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {customer.customerGrade
-                        ? <span className="unified-tag-blue !rounded-lg">{customer.customerGrade}</span>
-                        : <span className={`${getLevelBadge(customer.level)} !rounded-lg`}>{customer.level}</span>
+                        ? <Badge color="blue" className="!rounded-lg">{customer.customerGrade}</Badge>
+                        : <Badge color={getLevelBadgeColor(customer.level)} className="!rounded-lg">{customer.level}</Badge>
                       }
                     </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">
@@ -461,29 +568,64 @@ const CustomerManager: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {customer.customerAttribute
-                        ? <span className="unified-tag-gray !rounded-lg">{customer.customerAttribute}</span>
+                        ? <Badge color="gray" className="!rounded-lg">{customer.customerAttribute}</Badge>
                         : <span className="text-gray-300 dark:text-gray-600">—</span>
                       }
                     </td>
                   </tr>
                 );
-              })}
-              {currentCustomers.length === 0 && (
-                  <tr>
+                };
+
+                if (tableCustomers.length === 0) {
+                  return (
+                    <tr>
                       <td colSpan={7} className="p-12 text-center text-gray-400">暂无客户数据</td>
-                  </tr>
-              )}
+                    </tr>
+                  );
+                }
+
+                if (useVirtualScroll) {
+                  const virtualRows = rowVirtualizer.getVirtualItems();
+                  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+                  const paddingBottom = virtualRows.length > 0
+                    ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
+                    : 0;
+                  return (
+                    <>
+                      {paddingTop > 0 && (
+                        <tr aria-hidden="true">
+                          <td colSpan={7} style={{ height: paddingTop, padding: 0, border: 'none' }} />
+                        </tr>
+                      )}
+                      {virtualRows.map((vRow) => renderRow(tableCustomers[vRow.index]))}
+                      {paddingBottom > 0 && (
+                        <tr aria-hidden="true">
+                          <td colSpan={7} style={{ height: paddingBottom, padding: 0, border: 'none' }} />
+                        </tr>
+                      )}
+                    </>
+                  );
+                }
+
+                return tableCustomers.map((customer) => renderRow(customer));
+              })()}
             </tbody>
           </table>
         </div>
 
-        <Pagination
-            page={currentPage}
-            size={itemsPerPage}
-            total={filteredCustomers.length}
-            onPageChange={handlePageChange}
-            onSizeChange={(s) => { setItemsPerPage(s); setCurrentPage(1); }}
-        />
+        {useVirtualScroll ? (
+          <div className="px-5 py-3.5 border-t border-gray-100/50 dark:border-white/10 text-xs text-gray-500 dark:text-gray-400">
+            共 <span className="font-semibold text-[#0071E3] dark:text-[#0A84FF]">{listTotal}</span> 条
+          </div>
+        ) : (
+          <Pagination
+              page={activePage}
+              size={activePageSize}
+              total={listTotal}
+              onPageChange={handlePageChange}
+              onSizeChange={handlePageSizeChange}
+          />
+        )}
       </div>
 
       {/* ── 企业 ID 弹出层 ─────────────────────────────── */}

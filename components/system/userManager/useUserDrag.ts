@@ -49,9 +49,9 @@ export function useUserDrag(
       setDragUserId(null);
       setDragOverUserId(null);
       if (apiMode) {
-        userApi.reorderUsers(current.map(u => u.id)).catch((err: any) => {
+        userApi.reorderUsers(current.map(u => u.id)).catch((err: unknown) => {
           setUsers(prev);
-          alert(err?.message || '用户排序保存失败，已恢复原顺序。');
+          alert(err instanceof Error ? err.message : '用户排序保存失败，已恢复原顺序。');
         });
       }
     },

@@ -7,7 +7,7 @@ import type {
 } from '../../../types';
 import { resourceConfig as defaultResourceConfig } from '../permissionConfig';
 
-type RoleLike = Pick<RoleDefinition, 'rowPermissions' | 'rowLogic'> & Record<string, any>;
+type RoleLike = Pick<RoleDefinition, 'rowPermissions' | 'rowLogic'>;
 type ResourceCfgLike = { id: string; dimensions: { id: string; label: string }[] };
 
 /**
@@ -23,7 +23,7 @@ export function useRowPermissionRules<T extends RoleLike = RoleDefinition>(
   setRoleForm: React.Dispatch<React.SetStateAction<Partial<T>>>,
   overrideResourceConfig?: ResourceCfgLike[],
 ) {
-  const resCfgList: ResourceCfgLike[] = overrideResourceConfig ?? (defaultResourceConfig as any);
+  const resCfgList: ResourceCfgLike[] = overrideResourceConfig ?? defaultResourceConfig;
 
   const addCondition = useCallback(
     (dim?: PermissionDimension | string) => {

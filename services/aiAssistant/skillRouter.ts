@@ -5,7 +5,7 @@
  */
 import type { SkillId, SkillRouteResult } from './types';
 
-const API_BASE: string = (import.meta as any).env?.VITE_API_URL || '/api';
+const API_BASE: string = import.meta.env.VITE_API_URL || '/api';
 
 let _aiAvailable: boolean | null = null;
 
@@ -16,7 +16,7 @@ function getAuthHeaders(): Record<string, string> {
   return headers;
 }
 
-async function aiCall<T>(path: string, body: any): Promise<T | null> {
+async function aiCall<T>(path: string, body: Record<string, unknown>): Promise<T | null> {
   if (_aiAvailable === false) return null;
   try {
     const res = await fetch(`${API_BASE}${path}`, {
@@ -161,7 +161,7 @@ const ROUTER_PROMPT = `你是一个业务意图分类器，用于 WPS 365 业务
  * 优先 Gemini，无 API Key 时自动降级到本地关键词匹配
  */
 export async function routeSkill(userMessage: string): Promise<SkillRouteResult> {
-  const result = await aiCall<{ json: any | null }>('/ai/generate-json', {
+  const result = await aiCall<{ json: Record<string, unknown> | null }>('/ai/generate-json', {
     prompt: `${ROUTER_PROMPT}\n\n用户问题：「${userMessage}」`,
     schema: {
       type: 'OBJECT',

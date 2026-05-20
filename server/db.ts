@@ -3,7 +3,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, '..', 'data', 'app.db');
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'app.db');
+
+export function getDbPath(): string {
+  return DB_PATH;
+}
 
 let _db: Database.Database | null = null;
 
@@ -300,6 +304,18 @@ export function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_orders_date     ON orders(date);
     CREATE INDEX IF NOT EXISTS idx_customers_type  ON customers(customer_type);
     CREATE INDEX IF NOT EXISTS idx_audit_resource  ON audit_logs(resource, resource_id);
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id          TEXT PRIMARY KEY,
+      user_id     TEXT NOT NULL,
+      title       TEXT NOT NULL,
+      body        TEXT,
+      link        TEXT,
+      read        INTEGER DEFAULT 0,
+      created_at  TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read);
     CREATE INDEX IF NOT EXISTS idx_contracts_order  ON contracts(order_id);
     CREATE INDEX IF NOT EXISTS idx_contracts_status ON contracts(verify_status);
     CREATE INDEX IF NOT EXISTS idx_opportunities_customer ON opportunities(customer_id);

@@ -2,6 +2,9 @@
 import React, { Suspense } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useAppContext } from './contexts/AppContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { UIProvider } from './contexts/UIContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import { ToastProvider } from './contexts/ToastContext';
 import Layout from './components/layout/Layout';
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -19,7 +22,7 @@ const ProductPreview = React.lazy(() => import('./components/product/ProductPrev
 const MerchandiseDetails = React.lazy(() => import('./components/product/MerchandiseDetails'));
 const ProductPolicyManager = React.lazy(() => import('./components/product/ProductPolicyManager'));
 const ProductComponentPoolManager = React.lazy(() => import('./components/product/ProductComponentPoolManager'));
-const ProductPackageManager = React.lazy(() => import('./components/product/ProductPackageManager'));
+const InstallPackageManager = React.lazy(() => import('./components/product/InstallPackageManager'));
 const ProductLicenseTemplateManager = React.lazy(() => import('./components/product/ProductLicenseTemplateManager'));
 const ProductServiceConfigManager = React.lazy(() => import('./components/product/ProductServiceConfigManager'));
 const ProductAttrConfigManager = React.lazy(() => import('./components/product/ProductAttrConfigManager'));
@@ -48,6 +51,7 @@ const OrganizationManager = React.lazy(() => import('./components/system/Organiz
 const LicenseTypeManager = React.lazy(() => import('./components/product/LicenseTypeManager'));
 const DeliveryMethodConfig = React.lazy(() => import('./components/system/DeliveryMethodConfig'));
 const SalesOrgConfig = React.lazy(() => import('./components/system/SalesOrgConfig'));
+const AuditLogManager = React.lazy(() => import('./components/system/AuditLogManager'));
 
 const ChannelManager = React.lazy(() => import('./components/channel/ChannelManager'));
 const ChannelDetails = React.lazy(() => import('./components/channel/ChannelDetails'));
@@ -78,7 +82,8 @@ const OpsPlaceholder: React.FC = () => (
 );
 
 const RequireAnyPermission: React.FC<{ permissions: string[]; children: React.ReactElement }> = ({ permissions, children }) => {
-  const { currentUser, roles } = useAppContext();
+  const { currentUser } = useAuth();
+  const { roles } = useAppContext();
   const currentUserRole = roles.find((r) => currentUser.roles?.includes(r.id));
   const rolePermissions = currentUserRole?.permissions || [];
   const canAccess = rolePermissions.includes('all') || permissions.some((p) => rolePermissions.includes(p));
@@ -115,6 +120,7 @@ function AppRoutes() {
           <Route path="/system/license-types" element={<LicenseTypeManager />} />
           <Route path="/system/delivery-methods" element={<DeliveryMethodConfig />} />
           <Route path="/system/sales-org" element={<SalesOrgConfig />} />
+          <Route path="/system/audit" element={<AuditLogManager />} />
 
           <Route path="/channels" element={<ChannelManager />} />
           <Route path="/channels/:id" element={<ChannelDetails />} />
@@ -136,7 +142,7 @@ function AppRoutes() {
           <Route path="/leads" element={<LeadsManager />} />
 
           <Route path="/product-manage/component-pool" element={<ProductComponentPoolManager />} />
-          <Route path="/product-manage/packages" element={<ProductPackageManager />} />
+          <Route path="/product-manage/packages" element={<InstallPackageManager />} />
           <Route path="/product-manage/license-templates" element={<ProductLicenseTemplateManager />} />
           <Route path="/product-manage/service-config" element={<ProductServiceConfigManager />} />
           <Route path="/product-manage/attr-config" element={<ProductAttrConfigManager />} />
@@ -174,16 +180,22 @@ function AppRoutes() {
 
 function App() {
   return (
-    <AppProvider>
-      <ToastProvider>
-        <Router>
-          <ErrorBoundary fallbackTitle="页面加载异常">
-            <AppRoutes />
-          </ErrorBoundary>
-          <LoginModal />
-        </Router>
-      </ToastProvider>
-    </AppProvider>
+    <UIProvider>
+      <AuthProvider>
+        <AppProvider>
+          <NotificationProvider>
+          <ToastProvider>
+            <Router>
+              <ErrorBoundary fallbackTitle="页面加载异常">
+                <AppRoutes />
+              </ErrorBoundary>
+              <LoginModal />
+            </Router>
+          </ToastProvider>
+          </NotificationProvider>
+        </AppProvider>
+      </AuthProvider>
+    </UIProvider>
   );
 }
 

@@ -2,9 +2,9 @@
  * 前端不再直接持有 Gemini API Key——所有调用通过后端 /api/ai/* 代理。
  * 若后端未配置 GEMINI_API_KEY，则相关函数会捕获错误并返回降级文案。
  */
-const API_BASE = (import.meta as any).env?.VITE_API_URL || '/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
-async function aiPost<T>(path: string, body: any): Promise<T> {
+async function aiPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
   const token = localStorage.getItem('auth_token');
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
